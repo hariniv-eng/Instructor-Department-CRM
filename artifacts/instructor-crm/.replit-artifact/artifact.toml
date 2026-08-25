@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Instructor Department CRM"
+description = "An internal headcount and attrition tracker for an EdTech instructor department, with source reconciliation, status review, uploads, and a live dashboard."
+version = "1.0.0"
+id = "artifacts/instructor-crm"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 21663
+
+[services.development]
+run = "pnpm --filter @workspace/instructor-crm run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/instructor-crm", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/instructor-crm/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "21663"
+BASE_PATH = "/"

@@ -1,0 +1,1 @@
+- [OpenAPI Zod integer compatibility](openapi-zod-integer-compatibility.md) — numeric API fields need `number`, not `integer`, until the Zod runtime is upgraded.

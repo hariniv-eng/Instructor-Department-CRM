@@ -10,6 +10,12 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: instructors
+    description: Instructor records and review
+  - name: dashboard
+    description: Dashboard summaries
+  - name: uploads
+    description: Source upload history
 paths:
   /healthz:
     get:
@@ -24,6 +30,127 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /instructors:
+    get:
+      operationId: listInstructors
+      tags: [instructors]
+      summary: List instructors
+      parameters:
+        - in: query
+          name: search
+          schema: { type: string }
+        - in: query
+          name: status
+          schema: { type: string }
+        - in: query
+          name: sub_department
+          schema: { type: string }
+        - in: query
+          name: designation
+          schema: { type: string }
+        - in: query
+          name: source
+          schema: { type: string }
+      responses:
+        "200":
+          description: Instructor records
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Instructor" }
+    post:
+      operationId: createInstructor
+      tags: [instructors]
+      summary: Create an instructor record
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/InstructorInput" }
+      responses:
+        "201":
+          description: Created instructor
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Instructor" }
+  /instructors/{id}:
+    get:
+      operationId: getInstructor
+      tags: [instructors]
+      summary: Get an instructor
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: number }
+      responses:
+        "200":
+          description: Instructor record
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Instructor" }
+        "404": { description: Not found }
+    patch:
+      operationId: updateInstructor
+      tags: [instructors]
+      summary: Update manual instructor status
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: number }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/InstructorUpdate" }
+      responses:
+        "200":
+          description: Updated instructor
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Instructor" }
+        "404": { description: Not found }
+  /dashboard:
+    get:
+      operationId: getDashboard
+      tags: [dashboard]
+      summary: Get headcount and attrition dashboard
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Dashboard" }
+  /uploads:
+    get:
+      operationId: listUploads
+      tags: [uploads]
+      summary: List recent uploads
+      responses:
+        "200":
+          description: Upload history
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Upload" }
+    post:
+      operationId: uploadSource
+      tags: [uploads]
+      summary: Record a source upload
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UploadInput" }
+      responses:
+        "201":
+          description: Upload recorded
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Upload" }
 components:
   schemas:
     HealthStatus:
@@ -33,4 +160,108 @@ components:
           type: string
       required:
         - status
+    Instructor:
+      type: object
+      required: [id, full_name, institutes, in_darwin, in_teachos, computed_status]
+      properties:
+        id: { type: number }
+        employee_id: { type: ["string", "null"] }
+        teachos_user_id: { type: ["string", "null"] }
+        full_name: { type: string }
+        org_email: { type: ["string", "null"] }
+        mobile: { type: ["string", "null"] }
+        date_of_joining: { type: ["string", "null"], format: date }
+        department: { type: ["string", "null"] }
+        sub_department: { type: ["string", "null"] }
+        designation: { type: ["string", "null"] }
+        direct_manager: { type: ["string", "null"] }
+        work_location: { type: ["string", "null"] }
+        workspace: { type: ["string", "null"] }
+        gender: { type: ["string", "null"] }
+        current_state: { type: ["string", "null"] }
+        current_city: { type: ["string", "null"] }
+        darwin_employee_status: { type: ["string", "null"] }
+        in_darwin: { type: boolean }
+        in_teachos: { type: boolean }
+        teachos_role: { type: ["string", "null"] }
+        teachos_category: { type: ["string", "null"] }
+        teachos_manager: { type: ["string", "null"] }
+        institutes:
+          type: array
+          items: { type: string }
+        computed_status: { type: string }
+        manual_status: { type: ["string", "null"] }
+        exit_date: { type: ["string", "null"], format: date }
+        converted_university_name: { type: ["string", "null"] }
+        notes: { type: ["string", "null"] }
+    InstructorInput:
+      type: object
+      required: [full_name]
+      properties:
+        full_name: { type: string }
+        employee_id: { type: ["string", "null"] }
+        org_email: { type: ["string", "null"] }
+        sub_department: { type: ["string", "null"] }
+        designation: { type: ["string", "null"] }
+    InstructorUpdate:
+      type: object
+      properties:
+        manual_status: { type: ["string", "null"] }
+        exit_date: { type: ["string", "null"], format: date }
+        converted_university_name: { type: ["string", "null"] }
+        notes: { type: ["string", "null"] }
+    Dashboard:
+      type: object
+      required: [kpis, monthly_trend, sub_departments, designations]
+      properties:
+        kpis:
+          type: object
+          additionalProperties: { type: number }
+        monthly_trend:
+          type: array
+          items:
+            type: object
+            required: [month, joiners, exits]
+            properties:
+              month: { type: string }
+              joiners: { type: number }
+              exits: { type: number }
+        sub_departments:
+          type: array
+          items:
+            type: object
+            required: [name, count]
+            properties:
+              name: { type: string }
+              count: { type: number }
+        designations:
+          type: array
+          items:
+            type: object
+            required: [name, count]
+            properties:
+              name: { type: string }
+              count: { type: number }
+    Upload:
+      type: object
+      required: [id, source, filename, row_count, uploaded_at]
+      properties:
+        id: { type: number }
+        source: { type: string }
+        filename: { type: string }
+        row_count: { type: number }
+        uploaded_at: { type: string, format: date-time }
+    UploadInput:
+      type: object
+      required: [source, filename, row_count]
+      properties:
+        source: { type: string }
+        filename: { type: string }
+        row_count: { type: number }
+        rows:
+          type: array
+          description: Parsed tabular source rows, retained only long enough to reconcile the current snapshot.
+          items:
+            type: object
+            additionalProperties: true
 

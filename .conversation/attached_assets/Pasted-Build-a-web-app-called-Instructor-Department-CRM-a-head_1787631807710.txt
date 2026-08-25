@@ -1,0 +1,113 @@
+Build a web app called "Instructor Department CRM" — a headcount and attrition
+tracker for an EdTech company's Instructors department. It reconciles data from
+two source systems that don't share a common ID, and gives a dashboard view of
+who's currently active, who's newly recruited but not yet deployed, and who
+needs manual review.
+
+## Data model
+
+One core entity: **Instructor**. Fields:
+- employee_id (string, unique, nullable) — from Darwin/HRMS, e.g. "NW0007260"
+- teachos_user_id (string, unique, nullable) — from TeachOS, a UUID
+- full_name (string, required)
+- org_email, mobile (strings, nullable)
+- date_of_joining (date, nullable)
+- department, sub_department, designation (strings, nullable)
+- direct_manager (string, nullable)
+- work_location, workspace (strings, nullable)
+- gender, current_state, current_city (strings, nullable)
+- darwin_employee_status (string, nullable) — e.g. "Active"
+- in_darwin, in_teachos (booleans) — whether this person appears in each
+  source's latest upload
+- teachos_role, teachos_category, teachos_manager (strings, nullable)
+- institutes (list of strings) — which institutes/universities they teach at
+  (many-to-many: one instructor can teach at multiple institutes)
+- computed_status (string) — auto-derived, see status logic below
+- manual_status (string, nullable) — human override: "active" | "exited" |
+  "converted_university" | "needs_review"; when set, this always wins over
+  computed_status
+- exit_date (date, nullable)
+- converted_university_name (string, nullable)
+- notes (text, nullable)
+
+## The two data sources
+
+1. **Darwin (HRMS export)** — columns: Employee Id, Full Name, Org Email Id,
+   Primary Mobile Number, Date Of Joining, Department, Sub Department,
+   Designation, Direct Manager, Work Location, Workspace, Gender, Employee
+   Status, Current State, Current City. This is the system of record for who's
+   employed — someone gets a Darwin record the moment they're recruited.
+
+2. **TeachOS (teaching platform access export)** — columns:
+   instructor_user_id, instructor_name, institute_name, instructor_role
+   (INSTRUCTOR / CENTRAL_INSTRUCTOR), instructor_category, instructor_manager.
+   One row per (instructor, institute) assignment — someone shows up here once
+   they're actually deployed and teaching. An instructor who converts to a
+   university's own payroll drops out of Darwin's active export but keeps
+   their TeachOS access — that's the key signal this app surfaces.
+
+Both are uploaded as CSV/XLSX files (support drag-and-drop file upload).
+Matching between the two sources is by name, since there's no shared ID:
+1. First try an exact match on normalized full name (lowercase, strip
+   punctuation, collapse whitespace).
+2. If that fails, try again with all spaces removed too (catches spacing
+   differences like "Jyotirmayee Sahoo" vs "JyotirmayeeSahoo" — safe because
+   it only fires when the letter sequence is identical).
+3. Anything still unmatched after both passes should be listed separately as
+   "possible matches" using a fuzzy string-similarity check (e.g. Python's
+   difflib or a Levenshtein-based library), shown with a confidence score for
+   manual human review — never auto-merge these, since two different people
+   can share a first name or initials.
+
+Each new upload of a source **fully replaces** that source's contribution
+(reset all in_darwin or in_teachos flags before applying the new file) —
+don't accumulate duplicates across uploads.
+
+## Status logic (computed_status)
+
+- `active` — in_darwin is true and darwin_employee_status is "Active"
+- `pending_deployment` — in_darwin true, in_teachos false (recruited, not yet
+  deployed)
+- `needs_review` — in_teachos true, in_darwin false (has teaching access but
+  no active Darwin record — likely converted to university payroll, exited
+  without an update, or a name-matching miss)
+- A manual_status set by a user always overrides computed_status everywhere
+  in the UI.
+
+## Pages / features
+
+**Dashboard** (home page):
+- KPI cards: total active instructors, joiners this month vs last month,
+  exits this month vs last month, net change, attrition rate (%)
+- Secondary KPI row: count of "pending deployment", "needs review",
+  "converted to university payroll", total exited
+- A line chart: joiners vs exits by month, last ~15 months, two series
+- Two breakdown panels: headcount by sub-department, top designations by
+  count
+
+**Instructors** (list page):
+- Searchable/filterable table (search by name/employee ID/email; filter by
+  status, sub-department, designation, source)
+- Click a row to open a detail view showing all fields from both sources side
+  by side, plus a form to set manual_status / exit_date /
+  converted_university_name / notes
+
+**Upload Data**:
+- Three upload zones: Darwin export, TeachOS export, and a simple "Exit List"
+  (Employee Id, Full Name, Exit Date, Reason columns) that sets manual_status
+  = "exited" for matching instructors
+- A log of recent uploads (source, filename, row count, timestamp)
+
+## Tech preferences
+
+Full-stack app — React frontend, a simple backend (Node/Express or Python/
+FastAPI, whichever Replit handles best) with a real database (Postgres is
+fine, SQLite also fine for now). Clean, minimal UI — no heavy component
+library needed, just a clear dashboard-style layout with cards, a data table,
+and one chart. This is an internal single-user tool for now, no auth needed
+yet.
+
+Seed the database with a small set of realistic fictional sample instructors
+(~20-30 people, a mix of all the statuses above) so the dashboard and list
+aren't empty on first run — I'll replace this with my real exported data
+afterward.
