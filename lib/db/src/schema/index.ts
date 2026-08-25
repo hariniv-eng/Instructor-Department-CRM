@@ -18,7 +18,7 @@
 //   export type Post = typeof postsTable.$inferSelect;
 
 import { createInsertSchema } from "drizzle-zod";
-import { boolean, date, integer, pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, date, integer, jsonb, pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
 import { z } from "zod/v4";
 
 export const instructorsTable = pgTable("instructors", {
@@ -60,9 +60,50 @@ export const uploadsTable = pgTable("uploads", {
   uploadedAt: timestamp("uploaded_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// Raw per-source snapshots from the live syncs (Darwinbox Master API,
+// Darwinbox Reports Builder exits API, TeachOS/BigQuery). Each live sync
+// fully replaces its own table's rows with whatever it just fetched — a
+// "latest known state per source" snapshot, kept deliberately separate and
+// unmatched. rawData holds the entire fetched row as-is (every column the
+// source returned, not just the couple pulled out below for convenience).
+// No merging into `instructorsTable` happens from these — that reconciliation
+// step is intentionally separate and comes later.
+export const darwinboxActiveTable = pgTable("darwinbox_active", {
+  id: serial("id").primaryKey(),
+  employeeId: text("employee_id"),
+  fullName: text("full_name"),
+  rawData: jsonb("raw_data").notNull().$type<Record<string, unknown>>(),
+  syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const darwinboxExitsTable = pgTable("darwinbox_exits", {
+  id: serial("id").primaryKey(),
+  employeeId: text("employee_id"),
+  fullName: text("full_name"),
+  rawData: jsonb("raw_data").notNull().$type<Record<string, unknown>>(),
+  syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const teachosDeploymentTable = pgTable("teachos_deployment", {
+  id: serial("id").primaryKey(),
+  instructorUserId: text("instructor_user_id"),
+  instructorName: text("instructor_name"),
+  rawData: jsonb("raw_data").notNull().$type<Record<string, unknown>>(),
+  syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const insertInstructorSchema = createInsertSchema(instructorsTable);
 export const insertUploadSchema = createInsertSchema(uploadsTable);
+export const insertDarwinboxActiveSchema = createInsertSchema(darwinboxActiveTable);
+export const insertDarwinboxExitsSchema = createInsertSchema(darwinboxExitsTable);
+export const insertTeachosDeploymentSchema = createInsertSchema(teachosDeploymentTable);
 export type Instructor = typeof instructorsTable.$inferSelect;
 export type InsertInstructor = z.infer<typeof insertInstructorSchema>;
 export type Upload = typeof uploadsTable.$inferSelect;
 export type InsertUpload = z.infer<typeof insertUploadSchema>;
+export type DarwinboxActive = typeof darwinboxActiveTable.$inferSelect;
+export type InsertDarwinboxActive = z.infer<typeof insertDarwinboxActiveSchema>;
+export type DarwinboxExit = typeof darwinboxExitsTable.$inferSelect;
+export type InsertDarwinboxExit = z.infer<typeof insertDarwinboxExitsSchema>;
+export type TeachosDeployment = typeof teachosDeploymentTable.$inferSelect;
+export type InsertTeachosDeployment = z.infer<typeof insertTeachosDeploymentSchema>;

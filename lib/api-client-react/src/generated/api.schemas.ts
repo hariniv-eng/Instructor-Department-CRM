@@ -128,6 +128,42 @@ export interface UploadInput {
   rows?: UploadInputRowsItem[];
 }
 
+export type SyncResultSource = typeof SyncResultSource[keyof typeof SyncResultSource];
+
+
+export const SyncResultSource = {
+  darwinbox_live: 'darwinbox_live',
+  darwinbox_exits_live: 'darwinbox_exits_live',
+  teachos_live: 'teachos_live',
+} as const;
+
+/**
+ * Result of one live sync attempt. Each sync replaces that source's own raw snapshot table only — sources are kept fully separate, nothing is matched/merged across them. `ok:false` means the attempt failed (network/credential/schema issue) — check `error`; `stored` is only meaningful when `ok:true`.
+ */
+export interface SyncResult {
+  ok: boolean;
+  source: SyncResultSource;
+  /**
+     * Row count now stored for this source after the replace.
+     * @nullable
+     */
+  stored?: number | null;
+  /** @nullable */
+  error?: string | null;
+  synced_at: string;
+}
+
+export interface SyncSourceStatus {
+  auto_sync_interval_hours: number;
+  last_sync: SyncResult | null;
+}
+
+export interface SyncStatus {
+  darwinbox: SyncSourceStatus;
+  darwinbox_exits: SyncSourceStatus;
+  teachos: SyncSourceStatus;
+}
+
 export type ListInstructorsParams = {
 search?: string;
 status?: string;
