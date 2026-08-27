@@ -13,11 +13,24 @@ export class DarwinboxExitsError extends Error {}
 
 const REQUIRED = ["DBX_CHECK_ENDPOINT", "DBX_CHECK_USERNAME", "DBX_CHECK_PASSWORD", "DBX_CHECK_API_KEY", "DBX_CHECK_REPORT_ID"] as const;
 
+// Confirmed live on 2026-08-26: this report's real fields are "Employee Id",
+// "Employee Name", "Date Of Resignation", "Separation Requested On",
+// "Separation Type" (often blank), and "Status" (e.g. "Revoked", seen in a
+// live sample — meaning that resignation was cancelled, NOT a completed
+// exit). The real field names are listed first in each list below so they
+// match directly; the original snake_case guesses are kept as fallbacks in
+// case the report's shape ever changes. "Status" is newly added — it isn't
+// consumed by anything downstream yet, but it's important enough (it's the
+// only signal distinguishing an actual completed exit from a revoked/
+// pending resignation request) that it needs to survive into rawData rather
+// than being silently dropped, since storeDarwinboxExits() in storeRaw.ts
+// persists exactly this mapped row object, not the original raw record.
 const ALIASES: Record<string, string[]> = {
-  "Employee Id": ["employee_id", "emp_id", "employeeId", "employee_code", "id"],
-  "Full Name": ["full_name", "employee_name", "name", "fullName"],
-  "Exit Date": ["exit_date", "date_of_exit", "last_working_day", "lwd", "relieving_date", "separation_date", "exitDate"],
-  "Reason": ["reason", "exit_reason", "separation_reason", "reason_for_leaving"],
+  "Employee Id": ["Employee Id", "employee_id", "emp_id", "employeeId", "employee_code", "id"],
+  "Full Name": ["Employee Name", "full_name", "employee_name", "name", "fullName"],
+  "Exit Date": ["Date Of Resignation", "Separation Requested On", "exit_date", "date_of_exit", "last_working_day", "lwd", "relieving_date", "separation_date", "exitDate"],
+  "Reason": ["Separation Type", "reason", "exit_reason", "separation_reason", "reason_for_leaving"],
+  "Status": ["Status", "status"],
 };
 
 function firstPresent(record: Record<string, unknown>, aliases: string[]): unknown {
@@ -73,17 +86,33 @@ async function fetchRaw(timeoutMs = 30000): Promise<unknown> {
   }
 }
 
-export async function fetchExitRecords(): Promise<Record<string, unknown>[]> {
-  const raw = await fetchRaw();
-  if (Array.isArray(raw)) return raw as Record<string, unknown>[];
-  if (raw && typeof raw === "object") {
-    for (const key of ["data", "report_data", "reportData", "records", "result", "rows"]) {
-      const val = (raw as Record<string, unknown>)[key];
-      if (Array.isArray(val)) return val as Record<string, unknown>[];
+// Keys tried, in order, at each nesting level while hunting for the actual
+// records array. Confirmed live on 2026-08-26: the real envelope is
+// { response, code, status } — the array lives under "response" (possibly
+// nested one level deeper still, hence the recursive search below rather
+// than a flat one-level check).
+const NESTED_ARRAY_KEYS = ["response", "data", "report_data", "reportData", "records", "result", "rows", "list", "items", "report", "details"];
+
+function findRecordsArray(value: unknown, depth = 0): Record<string, unknown>[] | null {
+  if (Array.isArray(value)) return value as Record<string, unknown>[];
+  if (depth < 3 && value && typeof value === "object") {
+    for (const key of NESTED_ARRAY_KEYS) {
+      const val = (value as Record<string, unknown>)[key];
+      if (val !== undefined && val !== null) {
+        const found = findRecordsArray(val, depth + 1);
+        if (found) return found;
+      }
     }
   }
+  return null;
+}
+
+export async function fetchExitRecords(): Promise<Record<string, unknown>[]> {
+  const raw = await fetchRaw();
+  const found = findRecordsArray(raw);
+  if (found) return found;
   throw new DarwinboxExitsError(
-    `Unrecognized response shape — top-level keys: ${raw && typeof raw === "object" ? Object.keys(raw).join(", ") : typeof raw}. Adjust fetchExitRecords() in darwinboxExits.ts.`
+    `Unrecognized response shape — could not find a records array searching keys [${NESTED_ARRAY_KEYS.join(", ")}] up to 3 levels deep. Raw response (truncated to 3000 chars): ${JSON.stringify(raw).slice(0, 3000)}`
   );
 }
 

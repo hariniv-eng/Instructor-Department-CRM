@@ -10,7 +10,12 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "inspect:darwinbox": "tsx src/lib/connectors/inspect.ts darwinbox",
     "inspect:darwinbox-exits": "tsx src/lib/connectors/inspect.ts darwinbox-exits",
-    "inspect:bigquery": "tsx src/lib/connectors/inspect.ts bigquery"
+    "inspect:bigquery": "tsx src/lib/connectors/inspect.ts bigquery",
+    "export:darwinbox": "tsx src/lib/connectors/export.ts darwinbox",
+    "export:darwinbox-exits": "tsx src/lib/connectors/export.ts darwinbox-exits",
+    "export:teachos": "tsx src/lib/connectors/export.ts teachos",
+    "check:active-with-exit-date": "tsx src/lib/connectors/checkActiveWithExitDate.ts",
+    "check:teachos-column": "tsx src/lib/connectors/checkColumnValues.ts"
   },
   "dependencies": {
     "@google-cloud/bigquery": "^7.9.4",

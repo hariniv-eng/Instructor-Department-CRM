@@ -57,3 +57,7 @@ Thumbs.db
 *-service-account.json
 darwinbox_sample_response.json
 darwinbox_exits_sample_response.json
+
+# CSV exports from `pnpm run export:*` — real names/emails/phone numbers,
+# never commit these.
+artifacts/api-server/exports/

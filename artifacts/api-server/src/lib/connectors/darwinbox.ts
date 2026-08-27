@@ -2,11 +2,14 @@
 // employee roster ("Darwin" data). Auth: HTTP Basic Auth + api_key/
 // datasetKey in the JSON body (Darwinbox's documented request shape).
 //
-// Field names in the real response haven't been confirmed from in here (no
-// outbound network access in the sandbox this was built in) — run this
-// module's `inspectDarwinbox()` once you have real network access (see
-// LIVE_SYNC.md) and adjust ALIASES below if names differ.
-
+// Confirmed live on 2026-08-25 against the real Master API (3,327 employee
+// records). Real field names are snake_case and listed first in each alias
+// list below. There is no "Sub Department" field in the real response at
+// all (only "department") — deliberately left unmapped rather than guessed,
+// same treatment as the missing TeachOS/BigQuery columns: reconcileDarwin()
+// already handles an unmapped canonical column by leaving it null via
+// cell()'s normal not-found behavior, so nothing else needs to change for
+// that.
 import { config, missing } from "./config";
 import { runWithHardTimeout, HardTimeout } from "./timeout";
 import type { SheetRow } from "../reconcile";
@@ -15,24 +18,23 @@ export class DarwinboxError extends Error {}
 
 const REQUIRED = ["DARWINBOX_ENDPOINT", "DARWINBOX_USERNAME", "DARWINBOX_PASSWORD", "DARWINBOX_API_KEY", "DARWINBOX_DATASET_KEY"] as const;
 
-// Canonical column -> plausible raw-field aliases. Once you've seen a real
-// response, move the confirmed field name to the front of its list.
+// Canonical column -> plausible raw-field aliases, real name first.
 const ALIASES: Record<string, string[]> = {
   "Employee Id": ["employee_id", "emp_id", "employeeId", "employee_code", "id"],
   "Full Name": ["full_name", "employee_name", "name", "fullName"],
-  "Org Email Id": ["official_email", "email", "org_email", "work_email", "emailId"],
-  "Primary Mobile Number": ["mobile_number", "contact_number", "mobile", "phone", "phone_number"],
+  "Org Email Id": ["org_email_id", "official_email", "email", "org_email", "work_email", "emailId"],
+  "Primary Mobile Number": ["primary_mobile_number", "mobile_number", "contact_number", "mobile", "phone", "phone_number"],
   "Date Of Joining": ["date_of_joining", "doj", "joining_date", "dateOfJoining"],
   "Department": ["department", "dept"],
-  "Sub Department": ["sub_department", "subDepartment", "sub_dept"],
   "Designation": ["designation", "designation_name"],
-  "Direct Manager": ["reporting_manager", "manager_name", "direct_manager", "reportingManager"],
+  "Direct Manager": ["direct_manager", "reporting_manager", "manager_name", "reportingManager"],
   "Work Location": ["work_location", "location", "workLocation"],
   "Workspace": ["workspace", "office", "seating_location"],
   "Gender": ["gender"],
   "Employee Status": ["employee_status", "status", "employment_status"],
-  "Current State": ["state", "current_state"],
-  "Current City": ["city", "current_city"],
+  "Date Of Exit": ["date_of_exit", "exit_date", "last_working_day"],
+  "Current State": ["current_state", "state"],
+  "Current City": ["current_city", "city"],
 };
 
 function firstPresent(record: Record<string, unknown>, aliases: string[]): unknown {
@@ -49,7 +51,12 @@ function basicAuthHeader(username: string, password: string): string {
   return `Basic ${Buffer.from(`${username}:${password}`).toString("base64")}`;
 }
 
-async function fetchRaw(timeoutMs = 30000): Promise<unknown> {
+// 90s: the Master API returns Darwinbox's entire company roster (~3,300+
+// records with many fields) in one response before this file filters it
+// down — confirmed on 2026-08-25 that a real fetch can take longer than the
+// previous 30s limit some of the time (worked once, then timed out twice in
+// a row right after).
+async function fetchRaw(timeoutMs = 90000): Promise<unknown> {
   const missingKeys = missing(REQUIRED);
   if (missingKeys.length) {
     throw new DarwinboxError(`Darwinbox credentials are not fully configured — missing: ${missingKeys.join(", ")} (check .env).`);
@@ -83,18 +90,36 @@ async function fetchRaw(timeoutMs = 30000): Promise<unknown> {
   }
 }
 
+// The Master API returns Darwinbox's whole company roster (confirmed
+// 3,327 records live) — this CRM only tracks the Instructors department,
+// so every record is narrowed down to ones whose "department" field starts
+// with "Instructors" (matches every instructor sub-department/subject-area
+// code, e.g. "Instructors – English & Communication Studies (NWD_ID_E&CS)").
+function isInstructorRecord(rec: Record<string, unknown>): boolean {
+  const dept = rec["department"];
+  return typeof dept === "string" && dept.trim().toLowerCase().startsWith("instructors");
+}
+
 export async function fetchEmployeeRecords(): Promise<Record<string, unknown>[]> {
   const raw = await fetchRaw();
-  if (Array.isArray(raw)) return raw as Record<string, unknown>[];
-  if (raw && typeof raw === "object") {
+  let records: Record<string, unknown>[] | null = null;
+  if (Array.isArray(raw)) {
+    records = raw as Record<string, unknown>[];
+  } else if (raw && typeof raw === "object") {
     for (const key of ["employee_data", "data", "employees", "records"]) {
       const val = (raw as Record<string, unknown>)[key];
-      if (Array.isArray(val)) return val as Record<string, unknown>[];
+      if (Array.isArray(val)) {
+        records = val as Record<string, unknown>[];
+        break;
+      }
     }
   }
-  throw new DarwinboxError(
-    `Unrecognized Darwinbox response shape — top-level keys: ${raw && typeof raw === "object" ? Object.keys(raw).join(", ") : typeof raw}. Adjust fetchEmployeeRecords() in darwinbox.ts.`
-  );
+  if (!records) {
+    throw new DarwinboxError(
+      `Unrecognized Darwinbox response shape — top-level keys: ${raw && typeof raw === "object" ? Object.keys(raw).join(", ") : typeof raw}. Adjust fetchEmployeeRecords() in darwinbox.ts.`
+    );
+  }
+  return records.filter(isInstructorRecord);
 }
 
 /** Fetches + maps to the same "Full Name" / "Employee Id" / ... row shape reconcileDarwin() already expects from CSV uploads. */
@@ -123,7 +148,7 @@ export async function inspectDarwinbox() {
   const raw = await fetchRaw();
   console.log("Raw top-level shape:", Array.isArray(raw) ? `array (${raw.length} items)` : Object.keys(raw as object));
   const records = await fetchEmployeeRecords();
-  console.log(`Found ${records.length} employee records.`);
+  console.log(`Found ${records.length} Instructors-department employee records (filtered from Darwinbox's full company roster).`);
   if (records[0]) {
     console.log("First record's keys:", Object.keys(records[0]));
     console.log(JSON.stringify(records[0], null, 2).slice(0, 2000));

@@ -3,12 +3,16 @@
 // esbuild bundle in build.mjs already — @google-cloud/* — so it resolves
 // from node_modules at runtime as-is).
 //
-// The table name (niat_instructor_unit_wise_completion_and_best_attempt_
-// details) reads like unit/lesson completion tracking rather than a
-// dedicated roster table. Confirmed live on 2026-08-25: it carries
-// instructor_user_id / instructor_name / institute_name per row, but has
-// no instructor_role / instructor_category / instructor_manager columns.
-// See the note above EXPECTED_COLUMNS for how that's handled.
+// BIGQUERY_TABLE (.env) points at niat_instructor_managers_and_instructors_
+// details as of 2026-08-25 — a dedicated instructor/manager roster table,
+// switched from niat_instructor_unit_wise_completion_and_best_attempt_details
+// (a lesson/unit completion-tracking table that had no role/category/manager
+// columns at all). This roster table has 9 columns confirmed live: identity
+// (instructor_user_id, instructor_name, institute_name, instructor_status),
+// role/manager (instructor_role, instructor_manager, instructor_manager_
+// category, instructor_manager_mail), and instructormanager_id. It has no
+// instructor_mail, institute_id, or institute_type — those existed on the
+// old completion table but not here.
 
 import { BigQuery } from "@google-cloud/bigquery";
 import { config, missing } from "./config";
@@ -24,18 +28,26 @@ const API_TIMEOUT_MS = 30000;
 // column name. Adjust the right-hand side once inspectBigQuery() shows you
 // the table's real columns.
 //
-// Confirmed against the real table (2026-08-25): this is a lesson/unit
-// completion-tracking table, not a dedicated instructor roster. It carries
-// instructor_user_id / instructor_name / institute_name per row, but has no
-// instructor_role / instructor_category / instructor_manager columns at all.
-// Those three are intentionally left out of the query below — reconcileTeachos()
-// already resets teachosRole/teachosCategory/teachosManager to null before
-// every sync, so synced records simply keep those fields empty until a real
-// source for them is wired in (a proper roster table, another API, etc.).
+// instructor_category below is intentionally aliased from the source
+// column "instructor_manager_category" — reconcileTeachos() (reconcile.ts)
+// looks up rows by the literal key "instructor_category" when populating
+// teachosCategory, so the alias makes that wiring work without touching
+// reconcile.ts. instructor_status and instructormanager_id are pulled
+// through but not yet consumed by reconcileTeachos() — add handling there
+// if/when this CRM needs to track instructor active/inactive status.
 export const EXPECTED_COLUMNS: Record<string, string> = {
   instructor_user_id: "instructor_user_id",
   instructor_name: "instructor_name",
   institute_name: "institute_name",
+  instructor_role: "instructor_role",
+  instructor_status: "instructor_status",
+  instructor_manager: "instructor_manager",
+  // Source column is "instructor_manager_category" — aliased to
+  // "instructor_category" because reconcileTeachos() (reconcile.ts) already
+  // looks up rows by that exact key when populating teachosCategory.
+  instructor_category: "instructor_manager_category",
+  instructor_manager_mail: "instructor_manager_mail",
+  instructormanager_id: "instructormanager_id",
 };
 
 function assertConfigured() {
@@ -95,6 +107,27 @@ export async function fetchTeachosRows(): Promise<SheetRow[]> {
     // already bounds the whole call externally regardless.
     const [rows] = await runWithHardTimeout(() => bq.query({ query }), API_TIMEOUT_MS * 3 + 10000);
     return rows as SheetRow[];
+  } catch (e) {
+    if (e instanceof HardTimeout) throw new BigQueryTeachosError(`Query against ${ref} failed: ${e.message}`);
+    throw new BigQueryTeachosError(`Query against ${ref} failed: ${(e as Error).message}`);
+  }
+}
+
+/** Prints distinct values of a column + how many rows carry each — used to check what e.g. availability_status actually holds. */
+export async function checkDistinctValues(column: string): Promise<void> {
+  const bq = client();
+  const ref = tableRef();
+  const schemaFields = new Set((await getSchema()).map(([name]) => name));
+  if (!schemaFields.has(column)) {
+    throw new BigQueryTeachosError(`Table ${ref} has no column "${column}". Actual columns: ${[...schemaFields].sort().join(", ")}.`);
+  }
+  const query = `SELECT ${column}, COUNT(*) AS row_count FROM \`${ref}\` GROUP BY ${column} ORDER BY row_count DESC`;
+  try {
+    const [rows] = await runWithHardTimeout(() => bq.query({ query }), API_TIMEOUT_MS * 3 + 10000);
+    console.log(`Distinct values of "${column}" in ${ref}:`);
+    for (const row of rows as Record<string, unknown>[]) {
+      console.log(`  ${JSON.stringify(row[column])} — ${row["row_count"]} rows`);
+    }
   } catch (e) {
     if (e instanceof HardTimeout) throw new BigQueryTeachosError(`Query against ${ref} failed: ${e.message}`);
     throw new BigQueryTeachosError(`Query against ${ref} failed: ${(e as Error).message}`);
