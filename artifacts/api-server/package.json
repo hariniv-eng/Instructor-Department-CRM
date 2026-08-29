@@ -15,7 +15,9 @@
     "export:darwinbox-exits": "tsx src/lib/connectors/export.ts darwinbox-exits",
     "export:teachos": "tsx src/lib/connectors/export.ts teachos",
     "check:active-with-exit-date": "tsx src/lib/connectors/checkActiveWithExitDate.ts",
-    "check:teachos-column": "tsx src/lib/connectors/checkColumnValues.ts"
+    "check:teachos-column": "tsx src/lib/connectors/checkColumnValues.ts",
+    "check:darwinbox-ids": "tsx src/lib/connectors/checkDarwinboxIds.ts",
+    "reconcile:from-csv": "tsx src/scripts/reconcileFromCsv.ts"
   },
   "dependencies": {
     "@google-cloud/bigquery": "^7.9.4",

@@ -100,26 +100,90 @@ function isInstructorRecord(rec: Record<string, unknown>): boolean {
   return typeof dept === "string" && dept.trim().toLowerCase().startsWith("instructors");
 }
 
-export async function fetchEmployeeRecords(): Promise<Record<string, unknown>[]> {
-  const raw = await fetchRaw();
-  let records: Record<string, unknown>[] | null = null;
-  if (Array.isArray(raw)) {
-    records = raw as Record<string, unknown>[];
-  } else if (raw && typeof raw === "object") {
+function extractRecordsArray(raw: unknown): Record<string, unknown>[] {
+  if (Array.isArray(raw)) return raw as Record<string, unknown>[];
+  if (raw && typeof raw === "object") {
     for (const key of ["employee_data", "data", "employees", "records"]) {
       const val = (raw as Record<string, unknown>)[key];
-      if (Array.isArray(val)) {
-        records = val as Record<string, unknown>[];
-        break;
-      }
+      if (Array.isArray(val)) return val as Record<string, unknown>[];
     }
   }
-  if (!records) {
+  throw new DarwinboxError(
+    `Unrecognized Darwinbox response shape — top-level keys: ${raw && typeof raw === "object" ? Object.keys(raw).join(", ") : typeof raw}. Adjust extractRecordsArray() in darwinbox.ts.`
+  );
+}
+
+export async function fetchEmployeeRecords(): Promise<Record<string, unknown>[]> {
+  const raw = await fetchRaw();
+  const records = extractRecordsArray(raw);
+  return records.filter(isInstructorRecord);
+}
+
+function mapRecordToRow(rec: Record<string, unknown>): SheetRow {
+  const row: SheetRow = {};
+  for (const [canonical, aliases] of Object.entries(ALIASES)) row[canonical] = firstPresent(rec, aliases);
+  return row;
+}
+
+function assertMappedSomething(rows: SheetRow[], records: Record<string, unknown>[]) {
+  if (!rows.length) return;
+  const missingCanonical = Object.keys(ALIASES).filter((c) => rows.every((r) => r[c] == null));
+  if (missingCanonical.length) {
+    const seen = new Set<string>();
+    records.forEach((r) => Object.keys(r).forEach((k) => seen.add(k)));
     throw new DarwinboxError(
-      `Unrecognized Darwinbox response shape — top-level keys: ${raw && typeof raw === "object" ? Object.keys(raw).join(", ") : typeof raw}. Adjust fetchEmployeeRecords() in darwinbox.ts.`
+      `Could not map any values for: ${missingCanonical.join(", ")}. Raw fields available: ${[...seen].sort().join(", ")}. Update ALIASES in darwinbox.ts.`
     );
   }
-  return records.filter(isInstructorRecord);
+}
+
+// Fetches Darwinbox's Master API exactly ONCE and returns both:
+//  - instructorRows: the existing Instructors-department-filtered subset
+//    (same rows fetchDarwinRows() below returns) — feeds darwinbox_active +
+//    the primary reconcileDarwin() match.
+//  - fullRosterRows: every record Darwinbox returned, unfiltered, mapped
+//    through the same canonical-column ALIASES — feeds darwinbox_full_roster
+//    + reconcileDarwinFullRosterFallback()'s fallback match for TeachOS
+//    instructors whose Darwin record isn't filed under "Instructors" at all
+//    (e.g. Mentors, or some other department).
+// Doing this in one function (rather than calling fetchDarwinRows() and a
+// separate full-roster fetch back to back) avoids hitting the ~90s Master
+// API twice per Darwinbox sync.
+export async function fetchDarwinRowsBoth(): Promise<{ instructorRows: SheetRow[]; fullRosterRows: SheetRow[] }> {
+  const raw = await fetchRaw();
+  const records = extractRecordsArray(raw);
+  const fullRosterRows = records.map(mapRecordToRow);
+  assertMappedSomething(fullRosterRows, records);
+  const instructorRows = records.filter(isInstructorRecord).map(mapRecordToRow);
+  return { instructorRows, fullRosterRows };
+}
+
+/** Diagnostic: checks whether specific employee ids exist ANYWHERE in the Master
+ * API's raw company-wide response, regardless of department — used on
+ * 2026-08-27 to check whether 6 employee ids missing from every
+ * Instructors-department export (this connector's filtered output, and two
+ * separately-uploaded static snapshots) exist in this API's dataset at all,
+ * or whether DARWINBOX_DATASET_KEY's configured scope excludes them upstream. */
+export async function checkEmployeeIds(ids: string[]): Promise<void> {
+  const raw = await fetchRaw();
+  const records = extractRecordsArray(raw);
+  console.log(`Master API returned ${records.length} raw records (before any department filtering).`);
+  const byId = new Map<string, Record<string, unknown>>();
+  for (const rec of records) {
+    const id = firstPresent(rec, ALIASES["Employee Id"]);
+    if (typeof id === "string") byId.set(id.trim(), rec);
+  }
+  for (const id of ids) {
+    const rec = byId.get(id);
+    if (rec) {
+      const dept = firstPresent(rec, ALIASES["Department"]);
+      const status = firstPresent(rec, ALIASES["Employee Status"]);
+      const name = firstPresent(rec, ALIASES["Full Name"]);
+      console.log(`FOUND in raw Master API response: ${id} -> ${name} | dept=${dept} | status=${status} | isInstructorRecord=${isInstructorRecord(rec)}`);
+    } else {
+      console.log(`NOT FOUND anywhere in raw Master API response: ${id}`);
+    }
+  }
 }
 
 /** Fetches + maps to the same "Full Name" / "Employee Id" / ... row shape reconcileDarwin() already expects from CSV uploads. */

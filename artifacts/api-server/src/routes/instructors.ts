@@ -32,10 +32,24 @@ const toApiInstructor = (row: typeof instructorsTable.$inferSelect) => ({
   exit_date: row.exitDate,
   converted_university_name: row.convertedUniversityName,
   notes: row.notes,
+  // TeachOS instructor-count classification — see
+  // artifacts/api-server/src/data/classificationOverrides.ts and
+  // TEACHOS_INSTRUCTOR_COUNT_RULES.md.
+  classification: row.classification,
+  classification_reason: row.classificationReason,
+  exit_flag: row.exitFlag,
+  exit_flag_status: row.exitFlagStatus,
+  exit_flag_date: row.exitFlagDate,
+  // Department taxonomy + deployment status — see
+  // artifacts/api-server/src/lib/departmentTaxonomy.ts.
+  dept_bucket: row.deptBucket,
+  dept_area: row.deptArea,
+  deployment_status: row.deploymentStatus,
+  in_darwin_full_roster: row.inDarwinFullRoster,
 });
 
 router.get("/instructors", async (req, res) => {
-  const { search, status, sub_department: subDepartment, designation, source } = req.query as Record<string, string | undefined>;
+  const { search, status, sub_department: subDepartment, designation, source, classification, exit_flag: exitFlag } = req.query as Record<string, string | undefined>;
   const conditions = [];
   if (search) conditions.push(or(ilike(instructorsTable.fullName, `%${search}%`), ilike(instructorsTable.employeeId, `%${search}%`), ilike(instructorsTable.orgEmail, `%${search}%`)));
   if (status) conditions.push(or(eq(instructorsTable.manualStatus, status), eq(instructorsTable.computedStatus, status)));
@@ -43,6 +57,9 @@ router.get("/instructors", async (req, res) => {
   if (designation) conditions.push(eq(instructorsTable.designation, designation));
   if (source === "darwin") conditions.push(eq(instructorsTable.inDarwin, true));
   if (source === "teachos") conditions.push(eq(instructorsTable.inTeachos, true));
+  if (classification) conditions.push(eq(instructorsTable.classification, classification));
+  if (exitFlag === "true") conditions.push(eq(instructorsTable.exitFlag, true));
+  if (exitFlag === "false") conditions.push(eq(instructorsTable.exitFlag, false));
   const rows = await db.select().from(instructorsTable).where(conditions.length ? and(...conditions) : undefined).orderBy(asc(instructorsTable.fullName));
   res.json(rows.map(toApiInstructor));
 });

@@ -1,5 +1,5 @@
 import { ArrowDownRight, ArrowUpRight, CalendarDays, CircleAlert, RefreshCw, UsersRound } from 'lucide-react';
-import { useGetDashboard, getGetDashboardQueryKey } from '@workspace/api-client-react';
+import { useGetDashboard, getGetDashboardQueryKey, useGetReportsInstructors } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link } from 'wouter';
 import { PageIntro, QueryError, SkeletonBlock } from '@/components/ui-pieces';
@@ -11,6 +11,8 @@ function formatKpi(value: number | undefined) {
 export default function DashboardPage() {
   const queryClient = useQueryClient();
   const dashboardQuery = useGetDashboard();
+  const reportQuery = useGetReportsInstructors();
+  const report = reportQuery.data;
   const dashboard = dashboardQuery.data;
   const kpis = dashboard?.kpis ?? {};
   const total = kpis.total_instructors ?? kpis.total ?? kpis.headcount;
@@ -23,6 +25,24 @@ export default function DashboardPage() {
   return <div className="mx-auto max-w-[1500px]">
     <PageIntro eyebrow="Command center / 09:42 IST" title="Good morning, Aarav." description="A clear read on the instructor workforce, source integrity, and the exceptions worth your attention." action={<button type="button" data-testid="button-refresh-dashboard" onClick={() => queryClient.invalidateQueries({ queryKey: getGetDashboardQueryKey() })} className="inline-flex items-center gap-2 self-start rounded-lg border border-border bg-card px-3.5 py-2.5 text-[12px] font-bold text-foreground transition-colors hover:bg-secondary lg:self-auto"><RefreshCw size={14} /> Refresh data</button>} />
 
+    <section className="mb-5 rounded-xl border border-primary bg-primary p-6 text-primary-foreground shadow-xs sm:p-7">
+      <p className="font-mono-ui text-[10px] uppercase tracking-[0.17em] text-primary-foreground/65">Standing rule / TeachOS instructor count</p>
+      {reportQuery.isLoading && <div className="mt-3 h-12 w-40 animate-pulse rounded bg-primary-foreground/15" />}
+      {reportQuery.isError && <p className="mt-3 text-[13px] text-primary-foreground/80">Total instructor count is unavailable right now.</p>}
+      {report && <div className="mt-2 flex flex-wrap items-end justify-between gap-6">
+        <div>
+          <p className="text-[44px] font-extrabold leading-none tracking-[-0.05em]">{formatKpi(report.kpis.total_instructor_count)}</p>
+          <p className="mt-2 text-[13px] font-semibold text-primary-foreground/75">Total instructor count — TeachOS instructors mapped &amp; classified against Darwin</p>
+        </div>
+        <div className="flex flex-wrap gap-x-8 gap-y-3 text-[12px]">
+          <div><p className="font-mono-ui uppercase tracking-[0.1em] text-primary-foreground/55">Matched — instructor dept</p><p className="mt-1 text-[17px] font-bold">{formatKpi(report.darwin_match?.matched_primary)}</p></div>
+          <div><p className="font-mono-ui uppercase tracking-[0.1em] text-primary-foreground/55">Matched — full roster</p><p className="mt-1 text-[17px] font-bold">{formatKpi(report.darwin_match?.matched_full_roster_fallback)}</p></div>
+          <div><p className="font-mono-ui uppercase tracking-[0.1em] text-primary-foreground/55">Payroll converted</p><p className="mt-1 text-[17px] font-bold">{formatKpi(report.kpis.payroll_count)}</p></div>
+          <div><p className="font-mono-ui uppercase tracking-[0.1em] text-primary-foreground/55">Mentors (separate)</p><p className="mt-1 text-[17px] font-bold">{formatKpi(report.kpis.mentors_count)}</p></div>
+        </div>
+      </div>}
+    </section>
+
     {dashboardQuery.isLoading && <div className="space-y-5"><div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{[1, 2, 3, 4].map((item) => <SkeletonBlock key={item} className="h-[126px]" />)}</div><div className="grid gap-5 lg:grid-cols-[1.35fr_.65fr]"><SkeletonBlock className="h-[340px]" /><SkeletonBlock className="h-[340px]" /></div></div>}
     {dashboardQuery.isError && <QueryError message="Dashboard data is unavailable right now." />}
     {dashboard && <div className="space-y-5 animate-rise">
@@ -31,6 +51,17 @@ export default function DashboardPage() {
         <KpiCard label="Active in TeachOS" value={formatKpi(active)} meta="Access confirmed" icon={<CircleAlert size={17} />} tone="teal" />
         <KpiCard label="Exceptions" value={formatKpi(exceptions)} meta="Needs review" icon={<CircleAlert size={17} />} tone="saffron" alert />
         <KpiCard label="Exits this month" value={formatKpi(exits)} meta="Exit list signal" icon={<CalendarDays size={17} />} tone="coral" />
+      </section>
+
+      <section className="rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6">
+        <div className="mb-5 flex items-start justify-between"><div><p className="font-mono-ui text-[10px] uppercase tracking-[0.17em] text-muted-foreground">Standing rule / TeachOS instructor count</p><h2 className="mt-1 text-[16px] font-extrabold tracking-[-0.03em]">Classification breakdown</h2></div></div>
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
+          <ClassificationStat label="Counted as instructors" value={formatKpi(kpis.counted_as_instructors)} />
+          <ClassificationStat label="Active, no exit record" value={formatKpi(kpis.active_no_exit_record)} />
+          <ClassificationStat label="Exit-flagged" value={formatKpi(kpis.exit_flagged)} tone="amber" />
+          <ClassificationStat label="Payroll converted" value={formatKpi(kpis.payroll_converted)} tone="indigo" />
+          <ClassificationStat label="Excluded (other dept)" value={formatKpi(kpis.excluded)} tone="muted" />
+        </div>
       </section>
 
       <section className="grid gap-5 lg:grid-cols-[1.35fr_.65fr]">
@@ -69,6 +100,11 @@ export default function DashboardPage() {
       </section>
     </div>}
   </div>;
+}
+
+function ClassificationStat({ label, value, tone = 'default' }: { label: string; value: string; tone?: 'default' | 'amber' | 'indigo' | 'muted' }) {
+  const toneClass = tone === 'amber' ? 'text-[#8b6207]' : tone === 'indigo' ? 'text-[#4a4fb0]' : tone === 'muted' ? 'text-muted-foreground' : 'text-foreground';
+  return <div className="rounded-lg border border-border/70 bg-[#f8fafb] p-3"><p className="font-mono-ui text-[10px] uppercase tracking-[0.1em] text-muted-foreground">{label}</p><p className={`mt-2 text-[20px] font-extrabold tracking-[-0.04em] ${toneClass}`}>{value}</p></div>;
 }
 
 function KpiCard({ label, value, meta, icon, tone, alert = false }: { label: string; value: string; meta: string; icon: React.ReactNode; tone: 'navy' | 'teal' | 'saffron' | 'coral'; alert?: boolean }) {

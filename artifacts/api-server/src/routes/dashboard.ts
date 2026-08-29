@@ -19,6 +19,43 @@ router.get("/dashboard", async (_req, res) => {
     return { month: label, joiners: rows.filter((r) => r.dateOfJoining && new Date(r.dateOfJoining).getMonth() === date.getMonth() && new Date(r.dateOfJoining).getFullYear() === date.getFullYear()).length, exits: rows.filter((r) => r.exitDate && new Date(r.exitDate).getMonth() === date.getMonth() && new Date(r.exitDate).getFullYear() === date.getFullYear()).length };
   });
   const needsReview = rows.filter((r) => effective(r) === "needs_review").length;
-  res.json({ kpis: { total_instructors: rows.length, active: active.length, exceptions: needsReview, exits: exits.length, joiners_this_month: joiners.length, exits_this_month: exits.length, net_change: joiners.length - exits.length, attrition_rate: rows.length ? Math.round((exits.length / rows.length) * 1000) / 10 : 0, pending_deployment: rows.filter((r) => effective(r) === "pending_deployment").length, needs_review: needsReview, converted_university: rows.filter((r) => effective(r) === "converted_university").length, total_exited: rows.filter((r) => effective(r) === "exited").length }, monthly_trend: trend, sub_departments: grouped("subDepartment"), designations: grouped("designation") });
+
+  // TeachOS instructor-count classification — see
+  // artifacts/api-server/src/data/classificationOverrides.ts and
+  // TEACHOS_INSTRUCTOR_COUNT_RULES.md. "Excluded" people (Other Department /
+  // Non-Department Team) are left out of every count below; exit-flagged
+  // people are NOT subtracted, only reported as a separate subtotal.
+  const excludedRows = rows.filter((r) => r.classification === "excluded_other_department" || r.classification === "excluded_non_department_team");
+  const countedRows = rows.filter((r) => r.classification !== "excluded_other_department" && r.classification !== "excluded_non_department_team");
+  const exitFlaggedRows = countedRows.filter((r) => r.exitFlag);
+  const payrollConvertedRows = countedRows.filter((r) => r.classification === "payroll_converted");
+  const blankIdentityRows = countedRows.filter((r) => r.inTeachos && !r.employeeId);
+
+  res.json({
+    kpis: {
+      total_instructors: rows.length,
+      active: active.length,
+      exceptions: needsReview,
+      exits: exits.length,
+      joiners_this_month: joiners.length,
+      exits_this_month: exits.length,
+      net_change: joiners.length - exits.length,
+      attrition_rate: rows.length ? Math.round((exits.length / rows.length) * 1000) / 10 : 0,
+      pending_deployment: rows.filter((r) => effective(r) === "pending_deployment").length,
+      needs_review: needsReview,
+      converted_university: rows.filter((r) => effective(r) === "converted_university").length,
+      total_exited: rows.filter((r) => effective(r) === "exited").length,
+      // TeachOS instructor-count classification subtotals (see comment above)
+      excluded: excludedRows.length,
+      counted_as_instructors: countedRows.length,
+      exit_flagged: exitFlaggedRows.length,
+      active_no_exit_record: countedRows.length - exitFlaggedRows.length,
+      payroll_converted: payrollConvertedRows.length,
+      blank_identity: blankIdentityRows.length,
+    },
+    monthly_trend: trend,
+    sub_departments: grouped("subDepartment"),
+    designations: grouped("designation"),
+  });
 });
 export default router;

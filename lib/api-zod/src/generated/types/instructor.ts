@@ -57,4 +57,37 @@ export interface Instructor {
   converted_university_name?: string | null;
   /** @nullable */
   notes?: string | null;
+  /**
+     * TeachOS instructor-count classification override match — one of excluded_other_department, excluded_non_department_team, payroll_converted, or null. See classificationOverrides.ts / TEACHOS_INSTRUCTOR_COUNT_RULES.md.
+     * @nullable
+     */
+  classification?: string | null;
+  /** @nullable */
+  classification_reason?: string | null;
+  /** True when a live Darwinbox exit/resignation record was found for this person. Flagged only — NOT subtracted from the standing instructor count. */
+  exit_flag?: boolean;
+  /**
+     * Darwinbox resignation status as of the most recent exit sync, e.g. Approved, Pending With Approver, Rejected, Revoked.
+     * @nullable
+     */
+  exit_flag_status?: string | null;
+  /** @nullable */
+  exit_flag_date?: Date | null;
+  /**
+     * tech | non_tech | null. See departmentTaxonomy.ts. Null for excluded/mentor rows (see classification).
+     * @nullable
+     */
+  dept_bucket?: string | null;
+  /**
+     * Sub-area within dept_bucket, e.g. Frontend, Backend, DSA, GenAI, English, Aptitude, Math.
+     * @nullable
+     */
+  dept_area?: string | null;
+  /**
+     * deployed | in_training | null, derived from TeachOS institutes (institute_name "Training Institute" = in_training).
+     * @nullable
+     */
+  deployment_status?: string | null;
+  /** True when this person's Darwin match came from the full/unfiltered company roster fallback rather than the primary Instructors-department sync — see reconcileDarwinFullRosterFallback(). */
+  in_darwin_full_roster?: boolean;
 }

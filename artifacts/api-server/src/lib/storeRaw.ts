@@ -14,6 +14,7 @@ import {
   db,
   darwinboxActiveTable,
   darwinboxExitsTable,
+  darwinboxFullRosterTable,
   teachosDeploymentTable,
 } from "@workspace/db";
 import { cell, type SheetRow } from "./reconcile";
@@ -30,6 +31,21 @@ export async function storeDarwinboxActive(rows: SheetRow[]): Promise<number> {
         rawData: row,
       }));
       if (batch.length) await tx.insert(darwinboxActiveTable).values(batch);
+    }
+  });
+  return rows.length;
+}
+
+export async function storeDarwinboxFullRoster(rows: SheetRow[]): Promise<number> {
+  await db.transaction(async (tx) => {
+    await tx.delete(darwinboxFullRosterTable);
+    for (let i = 0; i < rows.length; i += CHUNK) {
+      const batch = rows.slice(i, i + CHUNK).map((row) => ({
+        employeeId: cell(row, "Employee Id", "employee_id"),
+        fullName: cell(row, "Full Name", "full_name"),
+        rawData: row,
+      }));
+      if (batch.length) await tx.insert(darwinboxFullRosterTable).values(batch);
     }
   });
   return rows.length;

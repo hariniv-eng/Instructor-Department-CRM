@@ -18,6 +18,8 @@ tags:
     description: Source upload history
   - name: sync
     description: Live sync from Darwinbox and BigQuery/TeachOS
+  - name: reports
+    description: Instructor headcount and classification reporting
 paths:
   /healthz:
     get:
@@ -52,6 +54,12 @@ paths:
           schema: { type: string }
         - in: query
           name: source
+          schema: { type: string }
+        - in: query
+          name: classification
+          schema: { type: string }
+        - in: query
+          name: exit_flag
           schema: { type: string }
       responses:
         "200":
@@ -197,6 +205,24 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/SyncStatus" }
+  /reports/instructors:
+    get:
+      operationId: getReportsInstructors
+      tags: [reports]
+      summary: Total instructor count and full breakdown (department, payroll, campus, manager, deployment)
+      description: >
+        The single reporting surface for the TeachOS instructor-count
+        standing rule. Anchored on TeachOS's own instructor roster
+        (in_teachos=true) reconciled against Darwin (primary
+        Instructors-department match, then the full-roster fallback match —
+        see darwin_match in the response) and the maintained classification
+        overrides. kpis.total_instructor_count is the headline figure.
+      responses:
+        "200":
+          description: Instructor report
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InstructorsReport" }
 components:
   schemas:
     HealthStatus:
@@ -240,6 +266,15 @@ components:
         exit_date: { type: ["string", "null"], format: date }
         converted_university_name: { type: ["string", "null"] }
         notes: { type: ["string", "null"] }
+        classification: { type: ["string", "null"], description: "TeachOS instructor-count classification override match — one of excluded_other_department, excluded_non_department_team, payroll_converted, or null. See classificationOverrides.ts / TEACHOS_INSTRUCTOR_COUNT_RULES.md." }
+        classification_reason: { type: ["string", "null"] }
+        exit_flag: { type: boolean, description: "True when a live Darwinbox exit/resignation record was found for this person. Flagged only — NOT subtracted from the standing instructor count." }
+        exit_flag_status: { type: ["string", "null"], description: "Darwinbox resignation status as of the most recent exit sync, e.g. Approved, Pending With Approver, Rejected, Revoked." }
+        exit_flag_date: { type: ["string", "null"], format: date }
+        dept_bucket: { type: ["string", "null"], description: "tech | non_tech | null. See departmentTaxonomy.ts. Null for excluded/mentor rows (see classification)." }
+        dept_area: { type: ["string", "null"], description: "Sub-area within dept_bucket, e.g. Frontend, Backend, DSA, GenAI, English, Aptitude, Math." }
+        deployment_status: { type: ["string", "null"], description: "deployed | in_training | null, derived from TeachOS institutes (institute_name \"Training Institute\" = in_training)." }
+        in_darwin_full_roster: { type: boolean, description: "True when this person's Darwin match came from the full/unfiltered company roster fallback rather than the primary Instructors-department sync — see reconcileDarwinFullRosterFallback()." }
     InstructorInput:
       type: object
       required: [full_name]
@@ -338,3 +373,71 @@ components:
         darwinbox: { $ref: "#/components/schemas/SyncSourceStatus" }
         darwinbox_exits: { $ref: "#/components/schemas/SyncSourceStatus" }
         teachos: { $ref: "#/components/schemas/SyncSourceStatus" }
+    InstructorsReport:
+      type: object
+      required: [kpis, darwin_match, department, payroll, campuses, managers, deployment, mentors]
+      properties:
+        kpis:
+          type: object
+          additionalProperties: { type: number }
+          description: total_instructor_count is the headline "TeachOS instructor count" figure.
+        darwin_match:
+          type: object
+          required: [matched_primary, matched_full_roster_fallback, not_in_darwin]
+          properties:
+            matched_primary: { type: number }
+            matched_full_roster_fallback: { type: number }
+            not_in_darwin: { type: number }
+        department:
+          type: object
+          properties:
+            tech: { $ref: "#/components/schemas/DeptBucketReport" }
+            non_tech: { $ref: "#/components/schemas/DeptBucketReport" }
+            unclassified: { type: number }
+        payroll:
+          type: object
+          properties:
+            payroll_converted: { type: number }
+            non_payroll: { type: number }
+        campuses:
+          type: array
+          items: { $ref: "#/components/schemas/GroupedInstructors" }
+        managers:
+          type: array
+          items: { $ref: "#/components/schemas/GroupedInstructors" }
+        deployment:
+          type: object
+          properties:
+            deployed: { type: number }
+            in_training: { type: number }
+            unknown: { type: number }
+        mentors:
+          type: array
+          items: { $ref: "#/components/schemas/ReportPerson" }
+    DeptBucketReport:
+      type: object
+      properties:
+        count: { type: number }
+        areas:
+          type: array
+          items:
+            type: object
+            properties:
+              area: { type: string }
+              count: { type: number }
+    GroupedInstructors:
+      type: object
+      properties:
+        campus: { type: string, description: "Present on campus-grouped entries." }
+        manager: { type: string, description: "Present on manager-grouped entries." }
+        count: { type: number }
+        instructors:
+          type: array
+          items: { $ref: "#/components/schemas/ReportPerson" }
+    ReportPerson:
+      type: object
+      properties:
+        id: { type: number }
+        full_name: { type: string }
+        employee_id: { type: ["string", "null"] }
+        designation: { type: ["string", "null"] }
