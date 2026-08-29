@@ -26,6 +26,8 @@ import type {
   InstructorInput,
   InstructorUpdate,
   ListInstructorsParams,
+  SyncResult,
+  SyncStatus,
   Upload,
   UploadInput
 } from './api.schemas';
@@ -663,4 +665,294 @@ export const useUploadSource = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getUploadSourceMutationOptions(options));
     }
+
+export const getSyncDarwinboxUrl = () => {
+
+
+
+
+  return `/api/sync/darwinbox`
+}
+
+/**
+ * @summary Pull active employees from Darwinbox's Master API and reconcile
+ */
+export const syncDarwinbox = async ( options?: Parameters<typeof customFetch>[1]): Promise<SyncResult> => {
+
+  return customFetch<SyncResult>(getSyncDarwinboxUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getSyncDarwinboxMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof syncDarwinbox>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof syncDarwinbox>>, TError,void, TContext> => {
+
+const mutationKey = ['syncDarwinbox'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof syncDarwinbox>>, void> = () => {
+
+
+          return  syncDarwinbox(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SyncDarwinboxMutationResult = NonNullable<Awaited<ReturnType<typeof syncDarwinbox>>>
+
+    export type SyncDarwinboxMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Pull active employees from Darwinbox's Master API and reconcile
+ */
+export const useSyncDarwinbox = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof syncDarwinbox>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof syncDarwinbox>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getSyncDarwinboxMutationOptions(options));
+    }
+
+export const getSyncDarwinboxExitsUrl = () => {
+
+
+
+
+  return `/api/sync/darwinbox-exits`
+}
+
+/**
+ * @summary Pull the exit-employee report from Darwinbox's Reports Builder API and reconcile
+ */
+export const syncDarwinboxExits = async ( options?: Parameters<typeof customFetch>[1]): Promise<SyncResult> => {
+
+  return customFetch<SyncResult>(getSyncDarwinboxExitsUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getSyncDarwinboxExitsMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof syncDarwinboxExits>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof syncDarwinboxExits>>, TError,void, TContext> => {
+
+const mutationKey = ['syncDarwinboxExits'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof syncDarwinboxExits>>, void> = () => {
+
+
+          return  syncDarwinboxExits(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SyncDarwinboxExitsMutationResult = NonNullable<Awaited<ReturnType<typeof syncDarwinboxExits>>>
+
+    export type SyncDarwinboxExitsMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Pull the exit-employee report from Darwinbox's Reports Builder API and reconcile
+ */
+export const useSyncDarwinboxExits = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof syncDarwinboxExits>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof syncDarwinboxExits>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getSyncDarwinboxExitsMutationOptions(options));
+    }
+
+export const getSyncTeachosUrl = () => {
+
+
+
+
+  return `/api/sync/teachos`
+}
+
+/**
+ * @summary Pull instructor deployment data from BigQuery and reconcile
+ */
+export const syncTeachos = async ( options?: Parameters<typeof customFetch>[1]): Promise<SyncResult> => {
+
+  return customFetch<SyncResult>(getSyncTeachosUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getSyncTeachosMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof syncTeachos>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof syncTeachos>>, TError,void, TContext> => {
+
+const mutationKey = ['syncTeachos'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof syncTeachos>>, void> = () => {
+
+
+          return  syncTeachos(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SyncTeachosMutationResult = NonNullable<Awaited<ReturnType<typeof syncTeachos>>>
+
+    export type SyncTeachosMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Pull instructor deployment data from BigQuery and reconcile
+ */
+export const useSyncTeachos = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof syncTeachos>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof syncTeachos>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getSyncTeachosMutationOptions(options));
+    }
+
+export const getGetSyncStatusUrl = () => {
+
+
+
+
+  return `/api/sync/status`
+}
+
+/**
+ * @summary Get auto-sync interval and most recent sync result per source
+ */
+export const getSyncStatus = async ( options?: Parameters<typeof customFetch>[1]): Promise<SyncStatus> => {
+
+  return customFetch<SyncStatus>(getGetSyncStatusUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetSyncStatusQueryKey = () => {
+    return [
+    `/api/sync/status`
+    ] as const;
+    }
+
+
+export const getGetSyncStatusQueryOptions = <TData = Awaited<ReturnType<typeof getSyncStatus>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSyncStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSyncStatusQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSyncStatus>>> = ({ signal }) => getSyncStatus({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSyncStatus>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetSyncStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getSyncStatus>>>
+export type GetSyncStatusQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get auto-sync interval and most recent sync result per source
+ */
+
+export function useGetSyncStatus<TData = Awaited<ReturnType<typeof getSyncStatus>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSyncStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetSyncStatusQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 

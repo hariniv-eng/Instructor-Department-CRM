@@ -242,3 +242,76 @@ export const UploadSourceResponse = zod.object({
 })
 
 
+/**
+ * @summary Pull active employees from Darwinbox's Master API and reconcile
+ */
+export const SyncDarwinboxResponse = zod.object({
+  "ok": zod.boolean(),
+  "source": zod.enum(['darwinbox_live', 'darwinbox_exits_live', 'teachos_live']),
+  "stored": zod.number().nullish().describe('Row count now stored for this source after the replace.'),
+  "error": zod.string().nullish(),
+  "synced_at": zod.coerce.date()
+}).describe('Result of one live sync attempt. Each sync replaces that source\'s own raw snapshot table only — sources are kept fully separate, nothing is matched\/merged across them. `ok:false` means the attempt failed (network\/credential\/schema issue) — check `error`; `stored` is only meaningful when `ok:true`.')
+
+
+/**
+ * @summary Pull the exit-employee report from Darwinbox's Reports Builder API and reconcile
+ */
+export const SyncDarwinboxExitsResponse = zod.object({
+  "ok": zod.boolean(),
+  "source": zod.enum(['darwinbox_live', 'darwinbox_exits_live', 'teachos_live']),
+  "stored": zod.number().nullish().describe('Row count now stored for this source after the replace.'),
+  "error": zod.string().nullish(),
+  "synced_at": zod.coerce.date()
+}).describe('Result of one live sync attempt. Each sync replaces that source\'s own raw snapshot table only — sources are kept fully separate, nothing is matched\/merged across them. `ok:false` means the attempt failed (network\/credential\/schema issue) — check `error`; `stored` is only meaningful when `ok:true`.')
+
+
+/**
+ * @summary Pull instructor deployment data from BigQuery and reconcile
+ */
+export const SyncTeachosResponse = zod.object({
+  "ok": zod.boolean(),
+  "source": zod.enum(['darwinbox_live', 'darwinbox_exits_live', 'teachos_live']),
+  "stored": zod.number().nullish().describe('Row count now stored for this source after the replace.'),
+  "error": zod.string().nullish(),
+  "synced_at": zod.coerce.date()
+}).describe('Result of one live sync attempt. Each sync replaces that source\'s own raw snapshot table only — sources are kept fully separate, nothing is matched\/merged across them. `ok:false` means the attempt failed (network\/credential\/schema issue) — check `error`; `stored` is only meaningful when `ok:true`.')
+
+
+/**
+ * @summary Get auto-sync interval and most recent sync result per source
+ */
+export const GetSyncStatusResponse = zod.object({
+  "darwinbox": zod.object({
+  "auto_sync_interval_hours": zod.number(),
+  "last_sync": zod.union([zod.object({
+  "ok": zod.boolean(),
+  "source": zod.enum(['darwinbox_live', 'darwinbox_exits_live', 'teachos_live']),
+  "stored": zod.number().nullish().describe('Row count now stored for this source after the replace.'),
+  "error": zod.string().nullish(),
+  "synced_at": zod.coerce.date()
+}).describe('Result of one live sync attempt. Each sync replaces that source\'s own raw snapshot table only — sources are kept fully separate, nothing is matched\/merged across them. `ok:false` means the attempt failed (network\/credential\/schema issue) — check `error`; `stored` is only meaningful when `ok:true`.'),zod.null()])
+}),
+  "darwinbox_exits": zod.object({
+  "auto_sync_interval_hours": zod.number(),
+  "last_sync": zod.union([zod.object({
+  "ok": zod.boolean(),
+  "source": zod.enum(['darwinbox_live', 'darwinbox_exits_live', 'teachos_live']),
+  "stored": zod.number().nullish().describe('Row count now stored for this source after the replace.'),
+  "error": zod.string().nullish(),
+  "synced_at": zod.coerce.date()
+}).describe('Result of one live sync attempt. Each sync replaces that source\'s own raw snapshot table only — sources are kept fully separate, nothing is matched\/merged across them. `ok:false` means the attempt failed (network\/credential\/schema issue) — check `error`; `stored` is only meaningful when `ok:true`.'),zod.null()])
+}),
+  "teachos": zod.object({
+  "auto_sync_interval_hours": zod.number(),
+  "last_sync": zod.union([zod.object({
+  "ok": zod.boolean(),
+  "source": zod.enum(['darwinbox_live', 'darwinbox_exits_live', 'teachos_live']),
+  "stored": zod.number().nullish().describe('Row count now stored for this source after the replace.'),
+  "error": zod.string().nullish(),
+  "synced_at": zod.coerce.date()
+}).describe('Result of one live sync attempt. Each sync replaces that source\'s own raw snapshot table only — sources are kept fully separate, nothing is matched\/merged across them. `ok:false` means the attempt failed (network\/credential\/schema issue) — check `error`; `stored` is only meaningful when `ok:true`.'),zod.null()])
+})
+})
+
+

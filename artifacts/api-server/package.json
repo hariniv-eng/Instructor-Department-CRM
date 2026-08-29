@@ -4,18 +4,28 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "export NODE_ENV=development && pnpm run build && pnpm run start",
+    "dev": "pnpm run build && pnpm run start",
     "build": "node ./build.mjs",
-    "start": "node --enable-source-maps ./dist/index.mjs",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "start": "node --enable-source-maps --env-file-if-exists=.env ./dist/index.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "inspect:darwinbox": "tsx src/lib/connectors/inspect.ts darwinbox",
+    "inspect:darwinbox-exits": "tsx src/lib/connectors/inspect.ts darwinbox-exits",
+    "inspect:bigquery": "tsx src/lib/connectors/inspect.ts bigquery",
+    "export:darwinbox": "tsx src/lib/connectors/export.ts darwinbox",
+    "export:darwinbox-exits": "tsx src/lib/connectors/export.ts darwinbox-exits",
+    "export:teachos": "tsx src/lib/connectors/export.ts teachos",
+    "check:active-with-exit-date": "tsx src/lib/connectors/checkActiveWithExitDate.ts",
+    "check:teachos-column": "tsx src/lib/connectors/checkColumnValues.ts"
   },
   "dependencies": {
+    "@google-cloud/bigquery": "^7.9.4",
     "@workspace/api-zod": "workspace:*",
     "@workspace/db": "workspace:*",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "drizzle-orm": "catalog:",
     "express": "^5.2.1",
+    "node-cron": "^3.0.3",
     "pino": "^9.14.0",
     "pino-http": "^10.5.0"
   },
@@ -24,9 +34,11 @@
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "catalog:",
+    "@types/node-cron": "^3.0.11",
     "esbuild": "0.27.3",
     "esbuild-plugin-pino": "^2.3.3",
     "pino-pretty": "^13.1.3",
-    "thread-stream": "3.1.0"
+    "thread-stream": "3.1.0",
+    "tsx": "^4.19.2"
   }
 }

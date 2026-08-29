@@ -16,6 +16,8 @@ tags:
     description: Dashboard summaries
   - name: uploads
     description: Source upload history
+  - name: sync
+    description: Live sync from Darwinbox and BigQuery/TeachOS
 paths:
   /healthz:
     get:
@@ -151,6 +153,50 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Upload" }
+  /sync/darwinbox:
+    post:
+      operationId: syncDarwinbox
+      tags: [sync]
+      summary: Pull active employees from Darwinbox's Master API and reconcile
+      responses:
+        "200":
+          description: Sync result
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SyncResult" }
+  /sync/darwinbox-exits:
+    post:
+      operationId: syncDarwinboxExits
+      tags: [sync]
+      summary: Pull the exit-employee report from Darwinbox's Reports Builder API and reconcile
+      responses:
+        "200":
+          description: Sync result
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SyncResult" }
+  /sync/teachos:
+    post:
+      operationId: syncTeachos
+      tags: [sync]
+      summary: Pull instructor deployment data from BigQuery and reconcile
+      responses:
+        "200":
+          description: Sync result
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SyncResult" }
+  /sync/status:
+    get:
+      operationId: getSyncStatus
+      tags: [sync]
+      summary: Get auto-sync interval and most recent sync result per source
+      responses:
+        "200":
+          description: Sync status
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SyncStatus" }
 components:
   schemas:
     HealthStatus:
@@ -264,4 +310,31 @@ components:
           items:
             type: object
             additionalProperties: true
-
+    SyncResult:
+      type: object
+      description: Result of one live sync attempt. Each sync replaces that source's own raw snapshot table only — sources are kept fully separate, nothing is matched/merged across them. `ok:false` means the attempt failed (network/credential/schema issue) — check `error`; `stored` is only meaningful when `ok:true`.
+      required: [ok, source, synced_at]
+      properties:
+        ok: { type: boolean }
+        source:
+          type: string
+          enum: [darwinbox_live, darwinbox_exits_live, teachos_live]
+        stored: { type: ["number", "null"], description: "Row count now stored for this source after the replace." }
+        error: { type: ["string", "null"] }
+        synced_at: { type: string, format: date-time }
+    SyncSourceStatus:
+      type: object
+      required: [auto_sync_interval_hours, last_sync]
+      properties:
+        auto_sync_interval_hours: { type: number }
+        last_sync:
+          oneOf:
+            - $ref: "#/components/schemas/SyncResult"
+            - type: "null"
+    SyncStatus:
+      type: object
+      required: [darwinbox, darwinbox_exits, teachos]
+      properties:
+        darwinbox: { $ref: "#/components/schemas/SyncSourceStatus" }
+        darwinbox_exits: { $ref: "#/components/schemas/SyncSourceStatus" }
+        teachos: { $ref: "#/components/schemas/SyncSourceStatus" }
