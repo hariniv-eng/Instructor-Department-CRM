@@ -25,6 +25,7 @@ import type {
   Instructor,
   InstructorInput,
   InstructorUpdate,
+  InstructorsReport,
   ListInstructorsParams,
   SyncResult,
   SyncStatus,
@@ -944,6 +945,84 @@ export function useGetSyncStatus<TData = Awaited<ReturnType<typeof getSyncStatus
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetSyncStatusQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetReportsInstructorsUrl = () => {
+
+
+
+
+  return `/api/reports/instructors`
+}
+
+/**
+ * The single reporting surface for the TeachOS instructor-count standing rule. Anchored on TeachOS's own instructor roster (in_teachos=true) reconciled against Darwin (primary Instructors-department match, then the full-roster fallback match — see darwin_match in the response) and the maintained classification overrides. kpis.total_instructor_count is the headline figure.
+ * @summary Total instructor count and full breakdown (department, payroll, campus, manager, deployment)
+ */
+export const getReportsInstructors = async ( options?: Parameters<typeof customFetch>[1]): Promise<InstructorsReport> => {
+
+  return customFetch<InstructorsReport>(getGetReportsInstructorsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetReportsInstructorsQueryKey = () => {
+    return [
+    `/api/reports/instructors`
+    ] as const;
+    }
+
+
+export const getGetReportsInstructorsQueryOptions = <TData = Awaited<ReturnType<typeof getReportsInstructors>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getReportsInstructors>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetReportsInstructorsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getReportsInstructors>>> = ({ signal }) => getReportsInstructors({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getReportsInstructors>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetReportsInstructorsQueryResult = NonNullable<Awaited<ReturnType<typeof getReportsInstructors>>>
+export type GetReportsInstructorsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Total instructor count and full breakdown (department, payroll, campus, manager, deployment)
+ */
+
+export function useGetReportsInstructors<TData = Awaited<ReturnType<typeof getReportsInstructors>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getReportsInstructors>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetReportsInstructorsQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

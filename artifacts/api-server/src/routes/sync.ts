@@ -4,27 +4,55 @@ import {
   uploadsTable,
   darwinboxActiveTable,
   darwinboxExitsTable,
+  darwinboxFullRosterTable,
   teachosDeploymentTable,
 } from "@workspace/db";
 import { desc } from "drizzle-orm";
 import { config } from "../lib/connectors/config";
-import { fetchDarwinRows, DarwinboxError } from "../lib/connectors/darwinbox";
+import { fetchDarwinRowsBoth, DarwinboxError } from "../lib/connectors/darwinbox";
 import { fetchExitRows, DarwinboxExitsError } from "../lib/connectors/darwinboxExits";
 import { fetchTeachosRows, BigQueryTeachosError } from "../lib/connectors/bigquery";
-import { storeDarwinboxActive, storeDarwinboxExits, storeTeachosDeployment } from "../lib/storeRaw";
+import { storeDarwinboxActive, storeDarwinboxExits, storeDarwinboxFullRoster, storeTeachosDeployment } from "../lib/storeRaw";
+import { reconcileDarwin, reconcileDarwinFullRosterFallback, reconcileTeachos, recomputeStatuses } from "../lib/reconcile";
 import { LAST_SYNC, type SyncResult } from "../lib/syncState";
 
 const router: IRouter = Router();
 
-// Each sync below only pulls from the source and replaces that source's own
-// raw table (see lib/storeRaw.ts) — the 3 sources are kept fully separate,
-// nothing is matched or merged into the instructors table here.
+// Each sync below pulls from the source, replaces that source's own raw
+// table (see lib/storeRaw.ts), and then reconciles those same rows into the
+// instructors table using the exact same matching logic manual CSV/XLSX
+// uploads already use (lib/reconcile.ts) — so "Sync Now" and the background
+// scheduler keep the instructor register (and the classification fields it
+// carries — see recomputeStatuses()) current on their own, the same as a
+// manual upload does, without anyone having to re-export and re-upload a
+// file after every sync.
+//
+// The Darwinbox exits sync is the one exception: it does NOT call
+// reconcileExits() (which hard-sets manualStatus="exited", removing someone
+// from the active headcount entirely — the deliberate behavior manual
+// "Exit List" uploads still use). A live exit-report sync should only ever
+// *flag* a person for review, never auto-subtract them from the standing
+// instructor count per the TeachOS instructor-count rule (see
+// TEACHOS_INSTRUCTOR_COUNT_RULES.md and classificationOverrides.ts) — so it
+// just refreshes darwinboxExitsTable and calls recomputeStatuses(), which
+// already reads that table fresh on every run to set exitFlag/
+// exitFlagStatus/exitFlagDate. Marking someone as actually, fully exited
+// stays a deliberate manual action via the Exit List upload.
 
 async function runDarwinboxSync(): Promise<SyncResult> {
   try {
-    const rows = await fetchDarwinRows();
-    const stored = await storeDarwinboxActive(rows);
-    await db.insert(uploadsTable).values({ source: "Darwin", filename: "Darwinbox API sync (raw)", rowCount: stored });
+    // One Master API round trip yields both the Instructors-department-
+    // filtered rows (primary match, same as before) and Darwin's full
+    // company roster (fallback match target for TeachOS instructors whose
+    // Darwin record isn't filed under "Instructors" at all — see
+    // reconcileDarwinFullRosterFallback() in lib/reconcile.ts).
+    const { instructorRows, fullRosterRows } = await fetchDarwinRowsBoth();
+    const stored = await storeDarwinboxActive(instructorRows);
+    await storeDarwinboxFullRoster(fullRosterRows);
+    await reconcileDarwin(instructorRows);
+    await reconcileDarwinFullRosterFallback(fullRosterRows);
+    await recomputeStatuses();
+    await db.insert(uploadsTable).values({ source: "Darwin", filename: "Darwinbox API sync (raw + full roster + reconciled)", rowCount: stored });
     return { ok: true, source: "darwinbox_live", stored, synced_at: new Date().toISOString() };
   } catch (e) {
     const message = e instanceof DarwinboxError ? e.message : `Unexpected error: ${(e as Error).message}`;
@@ -36,7 +64,8 @@ async function runDarwinboxExitsSync(): Promise<SyncResult> {
   try {
     const rows = await fetchExitRows();
     const stored = await storeDarwinboxExits(rows);
-    await db.insert(uploadsTable).values({ source: "Exit List", filename: "Darwinbox reports-API sync (raw)", rowCount: stored });
+    await recomputeStatuses(); // re-derives exit flags for existing instructors from the freshly replaced raw exits table — see comment above
+    await db.insert(uploadsTable).values({ source: "Exit List", filename: "Darwinbox reports-API sync (raw, flagged only)", rowCount: stored });
     return { ok: true, source: "darwinbox_exits_live", stored, synced_at: new Date().toISOString() };
   } catch (e) {
     const message = e instanceof DarwinboxExitsError ? e.message : `Unexpected error: ${(e as Error).message}`;
@@ -48,7 +77,9 @@ async function runTeachosSync(): Promise<SyncResult> {
   try {
     const rows = await fetchTeachosRows();
     const stored = await storeTeachosDeployment(rows);
-    await db.insert(uploadsTable).values({ source: "TeachOS", filename: "BigQuery sync (raw)", rowCount: stored });
+    await reconcileTeachos(rows);
+    await recomputeStatuses();
+    await db.insert(uploadsTable).values({ source: "TeachOS", filename: "BigQuery sync (raw + reconciled)", rowCount: stored });
     return { ok: true, source: "teachos_live", stored, synced_at: new Date().toISOString() };
   } catch (e) {
     const message = e instanceof BigQueryTeachosError ? e.message : `Unexpected error: ${(e as Error).message}`;
@@ -85,8 +116,7 @@ router.get("/sync/status", (_req, res) => {
 // Plain read-only views of each source's current raw snapshot — not part of
 // the OpenAPI spec yet (no typed frontend hooks), just for verifying via
 // curl/Invoke-WebRequest that a sync actually stored what you expect. These
-// can get wired into the OpenAPI spec + frontend once the mapping/reconcile
-// step is designed.
+// can get wired into the OpenAPI spec + frontend once needed.
 router.get("/sync/darwinbox/data", async (_req, res) => {
   const rows = await db.select().from(darwinboxActiveTable).orderBy(desc(darwinboxActiveTable.id));
   res.json({ count: rows.length, rows });
@@ -99,6 +129,11 @@ router.get("/sync/darwinbox-exits/data", async (_req, res) => {
 
 router.get("/sync/teachos/data", async (_req, res) => {
   const rows = await db.select().from(teachosDeploymentTable).orderBy(desc(teachosDeploymentTable.id));
+  res.json({ count: rows.length, rows });
+});
+
+router.get("/sync/darwinbox-full-roster/data", async (_req, res) => {
+  const rows = await db.select().from(darwinboxFullRosterTable).orderBy(desc(darwinboxFullRosterTable.id));
   res.json({ count: rows.length, rows });
 });
 

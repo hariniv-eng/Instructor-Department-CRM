@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ArrowLeft, Building2, CalendarDays, CheckCircle2, FileText, Mail, MapPin, Phone, ShieldCheck, UserRound } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Building2, CalendarDays, CheckCircle2, FileText, Mail, MapPin, Phone, ShieldCheck, ShieldOff, UserRound } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { getGetInstructorQueryKey, getListInstructorsQueryKey, useGetInstructor, useUpdateInstructor } from '@workspace/api-client-react';
 import type { InstructorUpdate } from '@workspace/api-client-react';
@@ -40,6 +40,8 @@ export default function InstructorDetailPage() {
   return <div className="mx-auto max-w-[1200px]">
     <Link href="/instructors" data-testid="link-back-instructors" className="mb-6 inline-flex items-center gap-2 text-[12px] font-bold text-muted-foreground transition-colors hover:text-foreground"><ArrowLeft size={14} /> Instructor register</Link>
     <PageIntro eyebrow={`Record / ${instructor.employee_id || `ID-${instructor.id}`}`} title={instructor.full_name} description={`${instructor.designation || 'Instructor'}${instructor.sub_department ? ` · ${instructor.sub_department}` : ''}`} action={<span data-testid="status-detail-record" className={`inline-flex w-fit rounded-full px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.08em] ${statusTone(status)}`}>{status}</span>} />
+    {instructor.classification && <div data-testid="banner-classification" className="mb-5 flex items-start gap-2.5 rounded-lg border border-[#d8dce4] bg-[#f4f5fa] px-4 py-3 text-[12px] leading-5 text-[#4a4fb0]"><ShieldOff size={16} className="mt-0.5 shrink-0" /><span><strong className="font-extrabold">{classificationLabel(instructor.classification)}.</strong> {instructor.classification_reason ? ` ${instructor.classification_reason}` : ''} This is a maintained classification decision — update classificationOverrides.ts to change it.</span></div>}
+    {instructor.exit_flag && <div data-testid="banner-exit-flag" className="mb-5 flex items-start gap-2.5 rounded-lg border border-[#f0dca0] bg-[#fff7db] px-4 py-3 text-[12px] leading-5 text-[#79601a]"><AlertTriangle size={16} className="mt-0.5 shrink-0" /><span><strong className="font-extrabold">Darwinbox exit record on file{instructor.exit_flag_status ? ` — ${instructor.exit_flag_status}` : ''}.</strong> Flagged for review, not automatically removed from the instructor count. Mark the record's manual status Exited below if this should be excluded.</span></div>}
     <div className="grid gap-5 lg:grid-cols-[.78fr_1.22fr]">
       <div className="space-y-5">
         <section className="rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6">
@@ -66,6 +68,7 @@ export default function InstructorDetailPage() {
       </form>
     </div>
     <section className="mt-5 rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6"><p className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Additional context</p><div className="mt-4 grid gap-4 text-[12px] sm:grid-cols-3"><InfoRow compact label="Workspace" value={instructor.workspace} testId="text-detail-workspace" /><InfoRow compact label="Institutes" value={instructor.institutes?.join(', ')} testId="text-detail-institutes" /><InfoRow compact label="Darwin status" value={instructor.darwin_employee_status} testId="text-detail-darwin-status" /></div></section>
+    <section className="mt-5 rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6"><p className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-muted-foreground">TeachOS instructor-count classification</p><div className="mt-4 grid gap-4 text-[12px] sm:grid-cols-2"><InfoRow compact label="Classification" value={instructor.classification ? classificationLabel(instructor.classification) : null} testId="text-detail-classification" /><InfoRow compact label="Reason" value={instructor.classification_reason} testId="text-detail-classification-reason" /><InfoRow compact label="Exit record" value={instructor.exit_flag ? (instructor.exit_flag_status || 'On file') : 'None on file'} testId="text-detail-exit-flag-status" /><InfoRow compact label="Exit record date" value={formatDate(instructor.exit_flag_date)} testId="text-detail-exit-flag-date" /></div></section>
   </div>;
 }
 
@@ -81,6 +84,13 @@ function formatDate(value?: string | null) {
   if (!value) return 'Not recorded';
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function classificationLabel(value: string) {
+  if (value === 'excluded_other_department') return 'Excluded — other department';
+  if (value === 'excluded_non_department_team') return 'Excluded — non-department team';
+  if (value === 'payroll_converted') return 'Payroll converted instructor';
+  return value;
 }
 
 function statusTone(status: string) {

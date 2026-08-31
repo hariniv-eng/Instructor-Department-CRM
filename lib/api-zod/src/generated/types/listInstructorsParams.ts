@@ -12,4 +12,6 @@ status?: string;
 sub_department?: string;
 designation?: string;
 source?: string;
+classification?: string;
+exit_flag?: string;
 };

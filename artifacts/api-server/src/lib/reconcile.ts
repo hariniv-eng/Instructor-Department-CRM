@@ -4,8 +4,10 @@
 // uploads and live API syncs now both go through these same functions, so
 // behavior stays identical regardless of where the rows came from.
 
-import { eq } from "drizzle-orm";
-import { db, instructorsTable } from "@workspace/db";
+import { and, eq } from "drizzle-orm";
+import { db, instructorsTable, darwinboxExitsTable } from "@workspace/db";
+import { EXCLUDED_EMPLOYEES, PAYROLL_CONVERTED_EMPLOYEES, type ExcludedOverride, type PayrollConvertedOverride } from "../data/classificationOverrides";
+import { classifyDepartment, classifyDeployment } from "./departmentTaxonomy";
 
 export type SheetRow = Record<string, unknown>;
 
@@ -39,11 +41,144 @@ export const possibleMatchNote = (rows: Array<typeof instructorsTable.$inferSele
   return candidate && candidate.score >= 0.62 && candidate.score < 1 ? `Possible match: ${candidate.name} (${Math.round(candidate.score * 100)}% confidence). Review before merging.` : null;
 };
 
+// --- TeachOS instructor-count classification -------------------------------
+// Applies the maintained override lists (../data/classificationOverrides.ts)
+// plus live Darwinbox exit-record matching on top of whatever
+// reconcileDarwin/reconcileTeachos/reconcileExits already wrote. See
+// TEACHOS_INSTRUCTOR_COUNT_RULES.md for the narrative rule this encodes.
+
+type InstructorRow = typeof instructorsTable.$inferSelect;
+
+// teachosUserId first (exact match against TeachOS's stable instructor_user_id);
+// falls back to normalized full name when either side has no teachosUserId
+// recorded. Mirrors findMatch()'s employeeId-then-name fallback above.
+function findOverride<T extends { teachosUserId?: string; fullName: string }>(row: InstructorRow, list: T[]): T | undefined {
+  if (row.teachosUserId) {
+    const byId = list.find((entry) => entry.teachosUserId && entry.teachosUserId === row.teachosUserId);
+    if (byId) return byId;
+  }
+  const normalizedRowName = normalize(row.fullName);
+  return list.find((entry) => normalize(entry.fullName) === normalizedRowName);
+}
+
+interface ExitInfo {
+  status: string | null;
+  exitDate: string | null;
+}
+
+// Darwinbox exit records don't carry a stable numeric ordering we can trust
+// across sources, and "Exit Date" strings come from Darwinbox as-is (same
+// caveat as instructorsTable.exitDate elsewhere in this file — no format
+// normalization is done, consistent with the rest of this codebase). This
+// parses just well enough to pick a "most recent" record per person when
+// more than one comes back (e.g. a resignation that was Approved and later
+// Rejected, or Revoked and later re-Approved) — falls back to whichever
+// record was inserted last (highest id) when dates can't be compared.
+function parseLooseDate(value: string | null): number {
+  if (!value) return -Infinity;
+  const iso = Date.parse(value);
+  if (!Number.isNaN(iso)) return iso;
+  const dmy = /^(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})$/.exec(value.trim());
+  if (dmy) {
+    const [, d, m, y] = dmy;
+    const year = y.length === 2 ? 2000 + Number(y) : Number(y);
+    const parsed = new Date(year, Number(m) - 1, Number(d)).getTime();
+    if (!Number.isNaN(parsed)) return parsed;
+  }
+  return -Infinity;
+}
+
+// Builds a lookup of the single most-recent exit record per person (by
+// employeeId, falling back to normalized name), from whatever's currently
+// in darwinboxExitsTable (fully replaced on every live exits sync — see
+// storeRaw.ts). Any hit here means "flag, don't subtract" per the standing
+// rule — this person still counts as an instructor, they're just annotated.
+async function loadLatestExitsByPerson(): Promise<{ byEmployeeId: Map<string, ExitInfo>; byName: Map<string, ExitInfo> }> {
+  const exits = await db.select().from(darwinboxExitsTable);
+  const byEmployeeId = new Map<string, { info: ExitInfo; rank: number; id: number }>();
+  const byName = new Map<string, { info: ExitInfo; rank: number; id: number }>();
+  for (const exit of exits) {
+    const status = cell(exit.rawData, "Status", "status");
+    const exitDate = cell(exit.rawData, "Exit Date", "exit_date");
+    const info: ExitInfo = { status, exitDate };
+    const rank = parseLooseDate(exitDate);
+    const candidate = { info, rank, id: exit.id };
+    const isNewer = (existing?: { rank: number; id: number }) => !existing || rank > existing.rank || (rank === existing.rank && exit.id > existing.id);
+    if (exit.employeeId) {
+      if (isNewer(byEmployeeId.get(exit.employeeId))) byEmployeeId.set(exit.employeeId, candidate);
+    }
+    if (exit.fullName) {
+      const key = normalize(exit.fullName);
+      if (isNewer(byName.get(key))) byName.set(key, candidate);
+    }
+  }
+  return {
+    byEmployeeId: new Map([...byEmployeeId].map(([key, value]) => [key, value.info])),
+    byName: new Map([...byName].map(([key, value]) => [key, value.info])),
+  };
+}
+
+function findExit(row: InstructorRow, exits: { byEmployeeId: Map<string, ExitInfo>; byName: Map<string, ExitInfo> }): ExitInfo | undefined {
+  if (row.employeeId && exits.byEmployeeId.has(row.employeeId)) return exits.byEmployeeId.get(row.employeeId);
+  return exits.byName.get(normalize(row.fullName));
+}
+
 export const recomputeStatuses = async () => {
   const rows = await db.select().from(instructorsTable);
-  await Promise.all(rows.map((row) => db.update(instructorsTable).set({
-    computedStatus: row.inDarwin && row.darwinEmployeeStatus === "Active" ? "active" : row.inDarwin && !row.inTeachos ? "pending_deployment" : "needs_review",
-  }).where(eq(instructorsTable.id, row.id))));
+  const exits = await loadLatestExitsByPerson();
+  await Promise.all(rows.map((row) => {
+    // Priority: an individual, human-reviewed override (classificationOverrides.ts)
+    // always wins first; then the two department-level exclusion rules
+    // (Delivery Support -> ops/managers, Mentors -> mentor); then the
+    // payroll-converted override; only then the ordinary Darwin/TeachOS
+    // presence rules. See departmentTaxonomy.ts for the department matching.
+    const excludedOverride = findOverride<ExcludedOverride>(row, EXCLUDED_EMPLOYEES);
+    const deptInfo = classifyDepartment(row.department, row.teachosCategory);
+    const isDeptExclusion = deptInfo.bucket === "excluded_ops_managers" || deptInfo.bucket === "mentor";
+    const payrollConverted = !excludedOverride && !isDeptExclusion ? findOverride<PayrollConvertedOverride>(row, PAYROLL_CONVERTED_EMPLOYEES) : undefined;
+    const exit = findExit(row, exits);
+    const deploymentStatus = classifyDeployment(row.institutes);
+
+    let classification: string | null = null;
+    let classificationReason: string | null = null;
+    let computedStatus: string;
+
+    if (excludedOverride) {
+      classification = excludedOverride.classification;
+      classificationReason = excludedOverride.reason;
+      computedStatus = "excluded";
+    } else if (deptInfo.bucket === "excluded_ops_managers") {
+      classification = "excluded_ops_managers";
+      classificationReason = "Delivery Support (Ops and Central Managers) department — not an instructor role";
+      computedStatus = "excluded";
+    } else if (deptInfo.bucket === "mentor") {
+      classification = "mentor";
+      classificationReason = "Mentors department — tracked as its own section, not counted as an instructor";
+      computedStatus = "mentor";
+    } else if (payrollConverted) {
+      classification = "payroll_converted";
+      classificationReason = payrollConverted.reason;
+      computedStatus = "payroll_converted";
+    } else {
+      computedStatus = row.inDarwin && row.darwinEmployeeStatus === "Active"
+        ? "active"
+        : row.inDarwin && !row.inTeachos
+          ? "pending_deployment"
+          : "needs_review";
+    }
+
+    return db.update(instructorsTable).set({
+      computedStatus,
+      classification,
+      classificationReason,
+      exitFlag: !!exit,
+      exitFlagStatus: exit?.status ?? null,
+      exitFlagDate: exit?.exitDate ?? null,
+      deptBucket: isDeptExclusion ? null : deptInfo.bucket,
+      deptArea: isDeptExclusion ? null : deptInfo.area,
+      deploymentStatus,
+    }).where(eq(instructorsTable.id, row.id));
+  }));
 };
 
 export async function reconcileDarwin(rows: SheetRow[]) {
@@ -117,6 +252,81 @@ export async function reconcileTeachos(rows: SheetRow[]) {
     }
   }
   return { new: newCount, matched: matchedCount, total_rows: rows.length };
+}
+
+// --- Darwin full-roster fallback match --------------------------------------
+// After the primary reconcileDarwin() pass (Instructors-department-filtered
+// Darwin data), some TeachOS instructors may still show inDarwin=false —
+// their Darwinbox record exists, it's just filed under a department other
+// than "Instructors" (Mentors is the confirmed real case; there may be
+// others). This pass takes Darwin's FULL/unfiltered company roster
+// (darwinbox_full_roster — see fetchDarwinRowsBoth() in
+// lib/connectors/darwinbox.ts and storeDarwinboxFullRoster() in
+// lib/storeRaw.ts) and re-checks exactly those remaining people against it.
+// A match here sets inDarwin=true (this person genuinely is in Darwinbox,
+// the primary sync just couldn't see them) plus inDarwinFullRoster=true as
+// an audit flag, and backfills department/status/manager fields so
+// recomputeStatuses()'s classifyDepartment() call picks the right bucket
+// (e.g. Mentors, or Delivery Support/Ops) exactly as it would have if the
+// primary sync had found them directly.
+//
+// Must run AFTER reconcileDarwin() (which needs a clean, freshly-matched
+// inDarwin state to know who's still unmatched) and does not depend on
+// reconcileTeachos() having *just* run — it reads whatever inTeachos state
+// is currently in instructorsTable, which reflects the most recent TeachOS
+// sync regardless of when that was.
+export async function reconcileDarwinFullRosterFallback(fullRosterRows: SheetRow[]) {
+  // Reset first so a person who dropped out of the full roster (or is now
+  // matched by the primary sync instead) doesn't keep a stale flag.
+  await db.update(instructorsTable).set({ inDarwinFullRoster: false });
+
+  const byEmployeeId = new Map<string, SheetRow>();
+  const byName = new Map<string, SheetRow>();
+  for (const row of fullRosterRows) {
+    const employeeId = cell(row, "Employee Id", "employee_id");
+    const fullName = cell(row, "Full Name", "full_name");
+    if (employeeId && !byEmployeeId.has(employeeId)) byEmployeeId.set(employeeId, row);
+    if (fullName) {
+      const key = normalize(fullName);
+      if (!byName.has(key)) byName.set(key, row);
+    }
+  }
+
+  const candidates = await db
+    .select()
+    .from(instructorsTable)
+    .where(and(eq(instructorsTable.inTeachos, true), eq(instructorsTable.inDarwin, false)));
+
+  let matchedCount = 0;
+  for (const person of candidates) {
+    const match = (person.employeeId && byEmployeeId.get(person.employeeId)) || byName.get(normalize(person.fullName));
+    if (!match) continue;
+
+    const employeeId = cell(match, "Employee Id", "employee_id");
+    const department = cell(match, "Department", "department");
+    const darwinEmployeeStatus = cell(match, "Employee Status", "darwin_employee_status") ?? "Active";
+
+    await db.update(instructorsTable).set({
+      inDarwin: true,
+      inDarwinFullRoster: true,
+      employeeId: employeeId ?? person.employeeId,
+      orgEmail: cell(match, "Org Email Id", "org_email") ?? person.orgEmail,
+      mobile: cell(match, "Primary Mobile Number", "mobile") ?? person.mobile,
+      dateOfJoining: cell(match, "Date Of Joining", "date_of_joining") ?? person.dateOfJoining,
+      department: department ?? person.department,
+      designation: cell(match, "Designation", "designation") ?? person.designation,
+      directManager: cell(match, "Direct Manager", "direct_manager") ?? person.directManager,
+      workLocation: cell(match, "Work Location", "work_location") ?? person.workLocation,
+      workspace: cell(match, "Workspace", "workspace") ?? person.workspace,
+      gender: cell(match, "Gender", "gender") ?? person.gender,
+      currentState: cell(match, "Current State", "current_state") ?? person.currentState,
+      currentCity: cell(match, "Current City", "current_city") ?? person.currentCity,
+      darwinEmployeeStatus,
+    }).where(eq(instructorsTable.id, person.id));
+    matchedCount += 1;
+  }
+
+  return { candidates: candidates.length, matched: matchedCount };
 }
 
 export async function reconcileExits(rows: SheetRow[]) {

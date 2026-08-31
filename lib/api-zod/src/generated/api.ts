@@ -25,7 +25,9 @@ export const ListInstructorsQueryParams = zod.object({
   "status": zod.coerce.string().optional(),
   "sub_department": zod.coerce.string().optional(),
   "designation": zod.coerce.string().optional(),
-  "source": zod.coerce.string().optional()
+  "source": zod.coerce.string().optional(),
+  "classification": zod.coerce.string().optional(),
+  "exit_flag": zod.coerce.string().optional()
 })
 
 export const ListInstructorsResponseItem = zod.object({
@@ -56,7 +58,16 @@ export const ListInstructorsResponseItem = zod.object({
   "manual_status": zod.string().nullish(),
   "exit_date": zod.coerce.date().nullish(),
   "converted_university_name": zod.string().nullish(),
-  "notes": zod.string().nullish()
+  "notes": zod.string().nullish(),
+  "classification": zod.string().nullish().describe('TeachOS instructor-count classification override match — one of excluded_other_department, excluded_non_department_team, payroll_converted, or null. See classificationOverrides.ts \/ TEACHOS_INSTRUCTOR_COUNT_RULES.md.'),
+  "classification_reason": zod.string().nullish(),
+  "exit_flag": zod.boolean().optional().describe('True when a live Darwinbox exit\/resignation record was found for this person. Flagged only — NOT subtracted from the standing instructor count.'),
+  "exit_flag_status": zod.string().nullish().describe('Darwinbox resignation status as of the most recent exit sync, e.g. Approved, Pending With Approver, Rejected, Revoked.'),
+  "exit_flag_date": zod.coerce.date().nullish(),
+  "dept_bucket": zod.string().nullish().describe('tech | non_tech | null. See departmentTaxonomy.ts. Null for excluded\/mentor rows (see classification).'),
+  "dept_area": zod.string().nullish().describe('Sub-area within dept_bucket, e.g. Frontend, Backend, DSA, GenAI, English, Aptitude, Math.'),
+  "deployment_status": zod.string().nullish().describe('deployed | in_training | null, derived from TeachOS institutes (institute_name \"Training Institute\" = in_training).'),
+  "in_darwin_full_roster": zod.boolean().optional().describe('True when this person\'s Darwin match came from the full\/unfiltered company roster fallback rather than the primary Instructors-department sync — see reconcileDarwinFullRosterFallback().')
 })
 export const ListInstructorsResponse = zod.array(ListInstructorsResponseItem)
 
@@ -100,7 +111,16 @@ export const CreateInstructorResponse = zod.object({
   "manual_status": zod.string().nullish(),
   "exit_date": zod.coerce.date().nullish(),
   "converted_university_name": zod.string().nullish(),
-  "notes": zod.string().nullish()
+  "notes": zod.string().nullish(),
+  "classification": zod.string().nullish().describe('TeachOS instructor-count classification override match — one of excluded_other_department, excluded_non_department_team, payroll_converted, or null. See classificationOverrides.ts \/ TEACHOS_INSTRUCTOR_COUNT_RULES.md.'),
+  "classification_reason": zod.string().nullish(),
+  "exit_flag": zod.boolean().optional().describe('True when a live Darwinbox exit\/resignation record was found for this person. Flagged only — NOT subtracted from the standing instructor count.'),
+  "exit_flag_status": zod.string().nullish().describe('Darwinbox resignation status as of the most recent exit sync, e.g. Approved, Pending With Approver, Rejected, Revoked.'),
+  "exit_flag_date": zod.coerce.date().nullish(),
+  "dept_bucket": zod.string().nullish().describe('tech | non_tech | null. See departmentTaxonomy.ts. Null for excluded\/mentor rows (see classification).'),
+  "dept_area": zod.string().nullish().describe('Sub-area within dept_bucket, e.g. Frontend, Backend, DSA, GenAI, English, Aptitude, Math.'),
+  "deployment_status": zod.string().nullish().describe('deployed | in_training | null, derived from TeachOS institutes (institute_name \"Training Institute\" = in_training).'),
+  "in_darwin_full_roster": zod.boolean().optional().describe('True when this person\'s Darwin match came from the full\/unfiltered company roster fallback rather than the primary Instructors-department sync — see reconcileDarwinFullRosterFallback().')
 })
 
 
@@ -139,7 +159,16 @@ export const GetInstructorResponse = zod.object({
   "manual_status": zod.string().nullish(),
   "exit_date": zod.coerce.date().nullish(),
   "converted_university_name": zod.string().nullish(),
-  "notes": zod.string().nullish()
+  "notes": zod.string().nullish(),
+  "classification": zod.string().nullish().describe('TeachOS instructor-count classification override match — one of excluded_other_department, excluded_non_department_team, payroll_converted, or null. See classificationOverrides.ts \/ TEACHOS_INSTRUCTOR_COUNT_RULES.md.'),
+  "classification_reason": zod.string().nullish(),
+  "exit_flag": zod.boolean().optional().describe('True when a live Darwinbox exit\/resignation record was found for this person. Flagged only — NOT subtracted from the standing instructor count.'),
+  "exit_flag_status": zod.string().nullish().describe('Darwinbox resignation status as of the most recent exit sync, e.g. Approved, Pending With Approver, Rejected, Revoked.'),
+  "exit_flag_date": zod.coerce.date().nullish(),
+  "dept_bucket": zod.string().nullish().describe('tech | non_tech | null. See departmentTaxonomy.ts. Null for excluded\/mentor rows (see classification).'),
+  "dept_area": zod.string().nullish().describe('Sub-area within dept_bucket, e.g. Frontend, Backend, DSA, GenAI, English, Aptitude, Math.'),
+  "deployment_status": zod.string().nullish().describe('deployed | in_training | null, derived from TeachOS institutes (institute_name \"Training Institute\" = in_training).'),
+  "in_darwin_full_roster": zod.boolean().optional().describe('True when this person\'s Darwin match came from the full\/unfiltered company roster fallback rather than the primary Instructors-department sync — see reconcileDarwinFullRosterFallback().')
 })
 
 
@@ -185,7 +214,16 @@ export const UpdateInstructorResponse = zod.object({
   "manual_status": zod.string().nullish(),
   "exit_date": zod.coerce.date().nullish(),
   "converted_university_name": zod.string().nullish(),
-  "notes": zod.string().nullish()
+  "notes": zod.string().nullish(),
+  "classification": zod.string().nullish().describe('TeachOS instructor-count classification override match — one of excluded_other_department, excluded_non_department_team, payroll_converted, or null. See classificationOverrides.ts \/ TEACHOS_INSTRUCTOR_COUNT_RULES.md.'),
+  "classification_reason": zod.string().nullish(),
+  "exit_flag": zod.boolean().optional().describe('True when a live Darwinbox exit\/resignation record was found for this person. Flagged only — NOT subtracted from the standing instructor count.'),
+  "exit_flag_status": zod.string().nullish().describe('Darwinbox resignation status as of the most recent exit sync, e.g. Approved, Pending With Approver, Rejected, Revoked.'),
+  "exit_flag_date": zod.coerce.date().nullish(),
+  "dept_bucket": zod.string().nullish().describe('tech | non_tech | null. See departmentTaxonomy.ts. Null for excluded\/mentor rows (see classification).'),
+  "dept_area": zod.string().nullish().describe('Sub-area within dept_bucket, e.g. Frontend, Backend, DSA, GenAI, English, Aptitude, Math.'),
+  "deployment_status": zod.string().nullish().describe('deployed | in_training | null, derived from TeachOS institutes (institute_name \"Training Institute\" = in_training).'),
+  "in_darwin_full_roster": zod.boolean().optional().describe('True when this person\'s Darwin match came from the full\/unfiltered company roster fallback rather than the primary Instructors-department sync — see reconcileDarwinFullRosterFallback().')
 })
 
 
@@ -312,6 +350,74 @@ export const GetSyncStatusResponse = zod.object({
   "synced_at": zod.coerce.date()
 }).describe('Result of one live sync attempt. Each sync replaces that source\'s own raw snapshot table only — sources are kept fully separate, nothing is matched\/merged across them. `ok:false` means the attempt failed (network\/credential\/schema issue) — check `error`; `stored` is only meaningful when `ok:true`.'),zod.null()])
 })
+})
+
+
+/**
+ * The single reporting surface for the TeachOS instructor-count standing rule. Anchored on TeachOS's own instructor roster (in_teachos=true) reconciled against Darwin (primary Instructors-department match, then the full-roster fallback match — see darwin_match in the response) and the maintained classification overrides. kpis.total_instructor_count is the headline figure.
+ * @summary Total instructor count and full breakdown (department, payroll, campus, manager, deployment)
+ */
+export const GetReportsInstructorsResponse = zod.object({
+  "kpis": zod.record(zod.string(), zod.number()).describe('total_instructor_count is the headline \"TeachOS instructor count\" figure.'),
+  "darwin_match": zod.object({
+  "matched_primary": zod.number(),
+  "matched_full_roster_fallback": zod.number(),
+  "not_in_darwin": zod.number()
+}),
+  "department": zod.object({
+  "tech": zod.object({
+  "count": zod.number().optional(),
+  "areas": zod.array(zod.object({
+  "area": zod.string().optional(),
+  "count": zod.number().optional()
+})).optional()
+}).optional(),
+  "non_tech": zod.object({
+  "count": zod.number().optional(),
+  "areas": zod.array(zod.object({
+  "area": zod.string().optional(),
+  "count": zod.number().optional()
+})).optional()
+}).optional(),
+  "unclassified": zod.number().optional()
+}),
+  "payroll": zod.object({
+  "payroll_converted": zod.number().optional(),
+  "non_payroll": zod.number().optional()
+}),
+  "campuses": zod.array(zod.object({
+  "campus": zod.string().optional().describe('Present on campus-grouped entries.'),
+  "manager": zod.string().optional().describe('Present on manager-grouped entries.'),
+  "count": zod.number().optional(),
+  "instructors": zod.array(zod.object({
+  "id": zod.number().optional(),
+  "full_name": zod.string().optional(),
+  "employee_id": zod.string().nullish(),
+  "designation": zod.string().nullish()
+})).optional()
+})),
+  "managers": zod.array(zod.object({
+  "campus": zod.string().optional().describe('Present on campus-grouped entries.'),
+  "manager": zod.string().optional().describe('Present on manager-grouped entries.'),
+  "count": zod.number().optional(),
+  "instructors": zod.array(zod.object({
+  "id": zod.number().optional(),
+  "full_name": zod.string().optional(),
+  "employee_id": zod.string().nullish(),
+  "designation": zod.string().nullish()
+})).optional()
+})),
+  "deployment": zod.object({
+  "deployed": zod.number().optional(),
+  "in_training": zod.number().optional(),
+  "unknown": zod.number().optional()
+}),
+  "mentors": zod.array(zod.object({
+  "id": zod.number().optional(),
+  "full_name": zod.string().optional(),
+  "employee_id": zod.string().nullish(),
+  "designation": zod.string().nullish()
+}))
 })
 
 

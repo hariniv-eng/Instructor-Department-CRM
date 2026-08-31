@@ -60,6 +60,39 @@ export interface Instructor {
   converted_university_name?: string | null;
   /** @nullable */
   notes?: string | null;
+  /**
+     * TeachOS instructor-count classification override match — one of excluded_other_department, excluded_non_department_team, payroll_converted, or null. See classificationOverrides.ts / TEACHOS_INSTRUCTOR_COUNT_RULES.md.
+     * @nullable
+     */
+  classification?: string | null;
+  /** @nullable */
+  classification_reason?: string | null;
+  /** True when a live Darwinbox exit/resignation record was found for this person. Flagged only — NOT subtracted from the standing instructor count. */
+  exit_flag?: boolean;
+  /**
+     * Darwinbox resignation status as of the most recent exit sync, e.g. Approved, Pending With Approver, Rejected, Revoked.
+     * @nullable
+     */
+  exit_flag_status?: string | null;
+  /** @nullable */
+  exit_flag_date?: string | null;
+  /**
+     * tech | non_tech | null. See departmentTaxonomy.ts. Null for excluded/mentor rows (see classification).
+     * @nullable
+     */
+  dept_bucket?: string | null;
+  /**
+     * Sub-area within dept_bucket, e.g. Frontend, Backend, DSA, GenAI, English, Aptitude, Math.
+     * @nullable
+     */
+  dept_area?: string | null;
+  /**
+     * deployed | in_training | null, derived from TeachOS institutes (institute_name "Training Institute" = in_training).
+     * @nullable
+     */
+  deployment_status?: string | null;
+  /** True when this person's Darwin match came from the full/unfiltered company roster fallback rather than the primary Instructors-department sync — see reconcileDarwinFullRosterFallback(). */
+  in_darwin_full_roster?: boolean;
 }
 
 export interface InstructorInput {
@@ -164,11 +197,81 @@ export interface SyncStatus {
   teachos: SyncSourceStatus;
 }
 
+/**
+ * total_instructor_count is the headline "TeachOS instructor count" figure.
+ */
+export type InstructorsReportKpis = {[key: string]: number};
+
+export type InstructorsReportDarwinMatch = {
+  matched_primary: number;
+  matched_full_roster_fallback: number;
+  not_in_darwin: number;
+};
+
+export type DeptBucketReportAreasItem = {
+  area?: string;
+  count?: number;
+};
+
+export interface DeptBucketReport {
+  count?: number;
+  areas?: DeptBucketReportAreasItem[];
+}
+
+export type InstructorsReportDepartment = {
+  tech?: DeptBucketReport;
+  non_tech?: DeptBucketReport;
+  unclassified?: number;
+};
+
+export type InstructorsReportPayroll = {
+  payroll_converted?: number;
+  non_payroll?: number;
+};
+
+export type InstructorsReportDeployment = {
+  deployed?: number;
+  in_training?: number;
+  unknown?: number;
+};
+
+export interface ReportPerson {
+  id?: number;
+  full_name?: string;
+  /** @nullable */
+  employee_id?: string | null;
+  /** @nullable */
+  designation?: string | null;
+}
+
+export interface GroupedInstructors {
+  /** Present on campus-grouped entries. */
+  campus?: string;
+  /** Present on manager-grouped entries. */
+  manager?: string;
+  count?: number;
+  instructors?: ReportPerson[];
+}
+
+export interface InstructorsReport {
+  /** total_instructor_count is the headline "TeachOS instructor count" figure. */
+  kpis: InstructorsReportKpis;
+  darwin_match: InstructorsReportDarwinMatch;
+  department: InstructorsReportDepartment;
+  payroll: InstructorsReportPayroll;
+  campuses: GroupedInstructors[];
+  managers: GroupedInstructors[];
+  deployment: InstructorsReportDeployment;
+  mentors: ReportPerson[];
+}
+
 export type ListInstructorsParams = {
 search?: string;
 status?: string;
 sub_department?: string;
 designation?: string;
 source?: string;
+classification?: string;
+exit_flag?: string;
 };
 
