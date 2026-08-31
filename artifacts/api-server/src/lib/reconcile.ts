@@ -88,6 +88,28 @@ function parseLooseDate(value: string | null): number {
   return -Infinity;
 }
 
+// Converts a "DD-MM-YYYY" (or "DD/MM/YYYY") string from Darwinbox into the
+// ISO "YYYY-MM-DD" format Postgres date columns require. Darwinbox's exit
+// report emits dates day-first (e.g. "31-08-2025"), which Postgres's
+// default month-first date parser rejects once the day exceeds 12 — exactly
+// the failure the live exits sync hit. Returns null for anything that isn't
+// a recognizable calendar date, so a bad value is dropped, not crashed on.
+function toISODate(value: string | null): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) return trimmed.slice(0, 10);
+  const dmy = /^(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})$/.exec(trimmed);
+  if (!dmy) return null;
+  const [, d, m, y] = dmy;
+  const day = Number(d);
+  const month = Number(m);
+  const year = y.length === 2 ? 2000 + Number(y) : Number(y);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed.toISOString().slice(0, 10);
+}
+
 // Builds a lookup of the single most-recent exit record per person (by
 // employeeId, falling back to normalized name), from whatever's currently
 // in darwinboxExitsTable (fully replaced on every live exits sync — see
@@ -180,7 +202,7 @@ export const recomputeStatuses = async () => {
       classificationReason,
       exitFlag: !!exit,
       exitFlagStatus: exit?.status ?? null,
-      exitFlagDate: exit?.exitDate ?? null,
+      exitFlagDate: toISODate(exit?.exitDate ?? null),
       deptBucket: isDeptExclusion ? null : deptInfo.bucket,
       deptArea: isDeptExclusion ? null : deptInfo.area,
       deploymentStatus,
