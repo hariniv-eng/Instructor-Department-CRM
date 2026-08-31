@@ -37,9 +37,16 @@ export const config = {
   BIGQUERY_DATASET: env("BIGQUERY_DATASET"),
   BIGQUERY_TABLE: env("BIGQUERY_TABLE"),
   BIGQUERY_SYNC_INTERVAL_HOURS: num("BIGQUERY_SYNC_INTERVAL_HOURS"),
-  // google-cloud/bigquery reads GOOGLE_APPLICATION_CREDENTIALS from
-  // process.env itself — no need to re-read it here, just make sure it's
-  // set in .env (it already is, pointing at ./bigquery-service-account.json).
+  // Local/VS Code dev: google-cloud/bigquery reads GOOGLE_APPLICATION_CREDENTIALS
+  // (a file path) from process.env itself — no need to re-read it here, just
+  // make sure it's set in .env (it already is, pointing at
+  // ./bigquery-service-account.json).
+  //
+  // Replit (dev workspace or deployment) has no file to point at — Secrets
+  // are plain strings — so set GOOGLE_APPLICATION_CREDENTIALS_JSON there
+  // instead, to the *entire contents* of bigquery-service-account.json.
+  // bigquery.ts's client() prefers this when present.
+  BIGQUERY_CREDENTIALS_JSON: env("GOOGLE_APPLICATION_CREDENTIALS_JSON"),
 };
 
 export function missing(keys: readonly (keyof typeof config)[]): string[] {
