@@ -60,8 +60,26 @@ function assertConfigured() {
 function client(): BigQuery {
   assertConfigured();
   try {
+    // Locally this resolves via GOOGLE_APPLICATION_CREDENTIALS pointing at a
+    // service-account JSON *file* (see .env / config.ts comment) — that
+    // works for local/VS Code dev, but Replit Secrets are plain strings, not
+    // files, so there's no way to hand the deployment a file path that
+    // actually resolves. GOOGLE_APPLICATION_CREDENTIALS_JSON is the Replit
+    // path: paste the *entire contents* of bigquery-service-account.json as
+    // one Secret value, and this parses it directly instead of relying on
+    // Application Default Credentials to find a file on disk.
+    if (config.BIGQUERY_CREDENTIALS_JSON) {
+      let credentials: Record<string, unknown>;
+      try {
+        credentials = JSON.parse(config.BIGQUERY_CREDENTIALS_JSON);
+      } catch (e) {
+        throw new BigQueryTeachosError(`GOOGLE_APPLICATION_CREDENTIALS_JSON is not valid JSON: ${(e as Error).message}`);
+      }
+      return new BigQuery({ projectId: config.BIGQUERY_PROJECT_ID, credentials });
+    }
     return new BigQuery({ projectId: config.BIGQUERY_PROJECT_ID });
   } catch (e) {
+    if (e instanceof BigQueryTeachosError) throw e;
     throw new BigQueryTeachosError(`Could not create BigQuery client: ${(e as Error).message}`);
   }
 }

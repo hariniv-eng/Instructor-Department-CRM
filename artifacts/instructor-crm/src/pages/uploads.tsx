@@ -7,6 +7,8 @@ import { PageIntro, EmptyState, QueryError, SkeletonBlock } from '@/components/u
 const sources = [
   { key: 'Darwin', label: 'Darwin HRMS', detail: 'Employment master', color: 'bg-[#dce8f2] text-primary' },
   { key: 'TeachOS', label: 'TeachOS', detail: 'Deployment access', color: 'bg-[#dff0eb] text-[#287469]' },
+  { key: 'TeachOS ID Reference', label: 'TeachOS ID Reference', detail: 'Employee ID mapping', color: 'bg-[#eae4f6] text-[#5b3d99]' },
+  { key: 'Payroll Candidates', label: 'Payroll Candidates', detail: 'Payroll-converted list', color: 'bg-[#fbe9d0] text-[#93601a]' },
   { key: 'Exit List', label: 'Exit List', detail: 'Separation tracker', color: 'bg-[#f6e4de] text-[#9b4434]' },
 ];
 

@@ -66,23 +66,38 @@ router.get("/reports/instructors", async (_req, res) => {
   const matchedFullRosterFallback = rows.filter((r) => r.inDarwin && r.inDarwinFullRoster).length;
   const notInDarwin = rows.filter((r) => !r.inDarwin).length;
 
-  // Requirement #1: the headline "total instructor count" (kpis.total_instructor_count,
-  // and the flat `instructors` list below) is every distinct person in the
-  // TeachOS data, full stop — no exclusion by classification, exit status, or
-  // Darwin match. Darwin is enrichment only (department/payroll/manager shown
-  // per person); it never decides who's counted. See `rows` above and its
-  // direct use in kpis.total_instructor_count / `instructors` below.
-  //
-  // activeInstructorRows/exitedInstructorRows below are narrower subsets used
-  // ONLY for the department/campus/manager/payroll/deployment breakdown
-  // sections, where lumping in mentors, excluded roles, or exited people
-  // wouldn't make sense — they do not feed the headline total.
+  // Requirement #1: the headline "total instructor count" — per the full
+  // pipeline (see TEACHOS_INSTRUCTOR_COUNT_RULES.md): start from TeachOS's
+  // own distinct roster, then only two paths count as an actual instructor:
+  //   (a) got an employee_id (via the TeachOS ID reference upload or
+  //       Darwin) AND matched Darwin's Instructors-department data directly
+  //       (inDarwin && !inDarwinFullRoster) — "normal" instructors, or
+  //   (b) got an employee_id but did NOT match Darwin, and IS confirmed in
+  //       the uploaded Payroll Candidates reference (classification ===
+  //       "payroll_converted", which recomputeStatuses() sets from either
+  //       the hand-maintained override list or payrollCandidateMatched).
+  // Anyone who never got an employee_id at all is set aside (not counted,
+  // not "excluded" either — just pending a future reference file). Anyone
+  // with an employee_id who matched neither Darwin nor the payroll
+  // reference falls into "other departments" below — also not counted.
+  // Mentors/ops-managers/individually-excluded people are out regardless
+  // (already dropped via instructorRows above). Exited people are excluded
+  // from this specific net figure (the dashboard's separate "flag, don't
+  // subtract" KPI still shows exits without subtracting them).
+  const hasEmployeeId = (r: InstructorRow) => !!r.employeeId;
+  const matchedDarwinPrimary = (r: InstructorRow) => r.inDarwin && !r.inDarwinFullRoster;
+  const isPayrollConverted = (r: InstructorRow) => r.classification === "payroll_converted";
+
   const activeInstructorRows = instructorRows.filter((r) => !r.exitFlag && r.manualStatus !== "exited");
   const exitedInstructorRows = instructorRows.filter((r) => r.exitFlag || r.manualStatus === "exited");
 
+  const noEmployeeIdRows = activeInstructorRows.filter((r) => !hasEmployeeId(r));
+  const countedInstructorRows = activeInstructorRows.filter((r) => hasEmployeeId(r) && (matchedDarwinPrimary(r) || isPayrollConverted(r)));
+  const otherDepartmentRows = activeInstructorRows.filter((r) => hasEmployeeId(r) && !matchedDarwinPrimary(r) && !isPayrollConverted(r));
+
   // Requirement #2: Tech vs Non-tech, with sub-areas within each.
   const byDeptBucket = (bucket: "tech" | "non_tech") => {
-    const inBucket = activeInstructorRows.filter((r) => r.deptBucket === bucket);
+    const inBucket = countedInstructorRows.filter((r) => r.deptBucket === bucket);
     const areas = new Map<string, InstructorRow[]>();
     for (const r of inBucket) {
       const key = r.deptArea ?? "Unclassified";
@@ -94,18 +109,18 @@ router.get("/reports/instructors", async (_req, res) => {
       areas: [...areas.entries()].map(([area, people]) => ({ area, count: people.length })).sort((a, b) => b.count - a.count),
     };
   };
-  const unclassifiedDept = activeInstructorRows.filter((r) => !r.deptBucket).length;
+  const unclassifiedDept = countedInstructorRows.filter((r) => !r.deptBucket).length;
 
   // Requirement #3: payroll vs non-payroll.
-  const payrollRows = activeInstructorRows.filter((r) => r.classification === "payroll_converted");
-  const nonPayrollRows = activeInstructorRows.filter((r) => r.classification !== "payroll_converted");
+  const payrollRows = countedInstructorRows.filter((r) => r.classification === "payroll_converted");
+  const nonPayrollRows = countedInstructorRows.filter((r) => r.classification !== "payroll_converted");
 
   // Requirement #4: campus level — grouped by each entry in `institutes`
   // (excluding the "Training Institute" placeholder, which requirement #6
   // covers separately). A person can appear under more than one campus if
   // they're recorded against multiple institutes.
   const byCampus = new Map<string, InstructorRow[]>();
-  for (const r of activeInstructorRows) {
+  for (const r of countedInstructorRows) {
     for (const institute of r.institutes) {
       const name = institute.trim();
       if (!name || name.toLowerCase() === "training institute") continue;
@@ -121,7 +136,7 @@ router.get("/reports/instructors", async (_req, res) => {
   // deployment reporting line) is preferred; falls back to Darwin's direct
   // manager when TeachOS has none recorded.
   const byManager = new Map<string, InstructorRow[]>();
-  for (const r of activeInstructorRows) {
+  for (const r of countedInstructorRows) {
     const manager = (r.teachosManager || r.directManager || "Unassigned").trim() || "Unassigned";
     if (!byManager.has(manager)) byManager.set(manager, []);
     byManager.get(manager)!.push(r);
@@ -131,17 +146,22 @@ router.get("/reports/instructors", async (_req, res) => {
     .sort((a, b) => b.count - a.count);
 
   // Requirement #6: deployed (real campus) vs in-training.
-  const deployedRows = activeInstructorRows.filter((r) => r.deploymentStatus === "deployed");
-  const inTrainingRows = activeInstructorRows.filter((r) => r.deploymentStatus === "in_training");
-  const unknownDeploymentRows = activeInstructorRows.filter((r) => !r.deploymentStatus);
+  const deployedRows = countedInstructorRows.filter((r) => r.deploymentStatus === "deployed");
+  const inTrainingRows = countedInstructorRows.filter((r) => r.deploymentStatus === "in_training");
+  const unknownDeploymentRows = countedInstructorRows.filter((r) => !r.deploymentStatus);
 
   res.json({
     kpis: {
-      total_instructor_count: rows.length,
+      total_instructor_count: countedInstructorRows.length,
       total_including_exited: instructorRows.length,
       exited_excluded_from_count: exitedInstructorRows.length,
       mentors_count: mentors.length,
       excluded_count: excludedRows.length,
+      // New employee-ID-mapping pipeline breakdown (see comment above
+      // countedInstructorRows): who's actually feeding the headline total,
+      // and who's sitting in each of the two "not counted yet" buckets.
+      no_employee_id_count: noEmployeeIdRows.length,
+      other_department_count: otherDepartmentRows.length,
       payroll_count: payrollRows.length,
       non_payroll_count: nonPayrollRows.length,
       deployed_count: deployedRows.length,
@@ -170,12 +190,18 @@ router.get("/reports/instructors", async (_req, res) => {
       unknown: unknownDeploymentRows.length,
     },
     mentors: mentors.map(toApiPerson),
+    // Set-aside buckets from the employee-ID-mapping pipeline — not counted
+    // in kpis.total_instructor_count, but surfaced so they're reviewable
+    // instead of silently dropped.
+    no_employee_id: noEmployeeIdRows.map(toApiPerson),
+    other_department: otherDepartmentRows.map(toApiInstructorSummary),
     // Flat list backing the click-to-expand details view under the total
-    // instructor count card — every person counted in kpis.total_instructor_count
-    // (every distinct TeachOS instructor, full stop — see note above), sorted by
-    // name. Darwin-derived fields (department, payroll, manager) are still shown
-    // per-person here, they just no longer decide who's included.
-    instructors: [...rows]
+    // instructor count card — every person counted in
+    // kpis.total_instructor_count (has an employee_id AND either matched
+    // Darwin's Instructors-department data directly, or is a confirmed
+    // payroll-converted instructor — see comment above countedInstructorRows),
+    // sorted by name.
+    instructors: [...countedInstructorRows]
       .sort((a, b) => a.fullName.localeCompare(b.fullName))
       .map(toApiInstructorSummary),
   });
