@@ -66,9 +66,17 @@ router.get("/reports/instructors", async (_req, res) => {
   const matchedFullRosterFallback = rows.filter((r) => r.inDarwin && r.inDarwinFullRoster).length;
   const notInDarwin = rows.filter((r) => !r.inDarwin).length;
 
-  // Requirement #1: total instructor count excluding managers, non-
-  // instructor teams, AND exits (unlike the dashboard's "flag, don't
-  // subtract" default — this specific count is the fully-net figure).
+  // Requirement #1: the headline "total instructor count" (kpis.total_instructor_count,
+  // and the flat `instructors` list below) is every distinct person in the
+  // TeachOS data, full stop — no exclusion by classification, exit status, or
+  // Darwin match. Darwin is enrichment only (department/payroll/manager shown
+  // per person); it never decides who's counted. See `rows` above and its
+  // direct use in kpis.total_instructor_count / `instructors` below.
+  //
+  // activeInstructorRows/exitedInstructorRows below are narrower subsets used
+  // ONLY for the department/campus/manager/payroll/deployment breakdown
+  // sections, where lumping in mentors, excluded roles, or exited people
+  // wouldn't make sense — they do not feed the headline total.
   const activeInstructorRows = instructorRows.filter((r) => !r.exitFlag && r.manualStatus !== "exited");
   const exitedInstructorRows = instructorRows.filter((r) => r.exitFlag || r.manualStatus === "exited");
 
@@ -129,7 +137,7 @@ router.get("/reports/instructors", async (_req, res) => {
 
   res.json({
     kpis: {
-      total_instructor_count: activeInstructorRows.length,
+      total_instructor_count: rows.length,
       total_including_exited: instructorRows.length,
       exited_excluded_from_count: exitedInstructorRows.length,
       mentors_count: mentors.length,
@@ -163,9 +171,11 @@ router.get("/reports/instructors", async (_req, res) => {
     },
     mentors: mentors.map(toApiPerson),
     // Flat list backing the click-to-expand details view under the total
-    // instructor count card — every person counted in kpis.total_instructor_count,
-    // sorted by name.
-    instructors: [...activeInstructorRows]
+    // instructor count card — every person counted in kpis.total_instructor_count
+    // (every distinct TeachOS instructor, full stop — see note above), sorted by
+    // name. Darwin-derived fields (department, payroll, manager) are still shown
+    // per-person here, they just no longer decide who's included.
+    instructors: [...rows]
       .sort((a, b) => a.fullName.localeCompare(b.fullName))
       .map(toApiInstructorSummary),
   });
