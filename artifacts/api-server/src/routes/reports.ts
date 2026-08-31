@@ -12,6 +12,24 @@ const toApiPerson = (row: InstructorRow) => ({
   designation: row.designation,
 });
 
+// Fuller per-person shape for the flat "instructors" list below — this is
+// what powers a click-to-expand details view on top of the headline total
+// instructor count card (department/campus/payroll status per person, not
+// just name+id like toApiPerson above).
+const toApiInstructorSummary = (row: InstructorRow) => ({
+  id: row.id,
+  full_name: row.fullName,
+  employee_id: row.employeeId,
+  designation: row.designation,
+  department: row.department,
+  dept_bucket: row.deptBucket,
+  dept_area: row.deptArea,
+  is_payroll: row.classification === "payroll_converted",
+  deployment_status: row.deploymentStatus,
+  institutes: row.institutes,
+  manager: row.teachosManager || row.directManager || null,
+});
+
 // This is the single reporting surface for the breakdowns requested on top
 // of the TeachOS instructor-count standing rule (see reconcile.ts /
 // TEACHOS_INSTRUCTOR_COUNT_RULES.md): total instructor count, department
@@ -144,6 +162,12 @@ router.get("/reports/instructors", async (_req, res) => {
       unknown: unknownDeploymentRows.length,
     },
     mentors: mentors.map(toApiPerson),
+    // Flat list backing the click-to-expand details view under the total
+    // instructor count card — every person counted in kpis.total_instructor_count,
+    // sorted by name.
+    instructors: [...activeInstructorRows]
+      .sort((a, b) => a.fullName.localeCompare(b.fullName))
+      .map(toApiInstructorSummary),
   });
 });
 

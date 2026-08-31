@@ -375,7 +375,7 @@ components:
         teachos: { $ref: "#/components/schemas/SyncSourceStatus" }
     InstructorsReport:
       type: object
-      required: [kpis, darwin_match, department, payroll, campuses, managers, deployment, mentors]
+      required: [kpis, darwin_match, department, payroll, campuses, managers, deployment, mentors, instructors]
       properties:
         kpis:
           type: object
@@ -414,6 +414,10 @@ components:
         mentors:
           type: array
           items: { $ref: "#/components/schemas/ReportPerson" }
+        instructors:
+          type: array
+          description: Every person counted in kpis.total_instructor_count, sorted by name. Backs a click-to-expand details view under the headline count.
+          items: { $ref: "#/components/schemas/InstructorSummary" }
     DeptBucketReport:
       type: object
       properties:
@@ -441,3 +445,19 @@ components:
         full_name: { type: string }
         employee_id: { type: ["string", "null"] }
         designation: { type: ["string", "null"] }
+    InstructorSummary:
+      type: object
+      properties:
+        id: { type: number }
+        full_name: { type: string }
+        employee_id: { type: ["string", "null"] }
+        designation: { type: ["string", "null"] }
+        department: { type: ["string", "null"] }
+        dept_bucket: { type: ["string", "null"] }
+        dept_area: { type: ["string", "null"] }
+        is_payroll: { type: boolean }
+        deployment_status: { type: ["string", "null"] }
+        institutes:
+          type: array
+          items: { type: string }
+        manager: { type: ["string", "null"] }
