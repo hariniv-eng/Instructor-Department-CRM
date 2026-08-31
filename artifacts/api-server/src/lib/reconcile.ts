@@ -135,7 +135,14 @@ export const recomputeStatuses = async () => {
     const excludedOverride = findOverride<ExcludedOverride>(row, EXCLUDED_EMPLOYEES);
     const deptInfo = classifyDepartment(row.department, row.teachosCategory);
     const isDeptExclusion = deptInfo.bucket === "excluded_ops_managers" || deptInfo.bucket === "mentor";
-    const payrollConverted = !excludedOverride && !isDeptExclusion ? findOverride<PayrollConvertedOverride>(row, PAYROLL_CONVERTED_EMPLOYEES) : undefined;
+    // Payroll-converted status comes from either source: the hand-maintained
+    // override list (a human decision, always wins if present) or a name
+    // match against the most recently uploaded "Payroll Candidates" file
+    // (reconcilePayrollCandidates() below sets payrollCandidateMatched).
+    const payrollConverted = !excludedOverride && !isDeptExclusion
+      ? findOverride<PayrollConvertedOverride>(row, PAYROLL_CONVERTED_EMPLOYEES)
+        ?? (row.payrollCandidateMatched ? { fullName: row.fullName, reason: "Matched the uploaded Payroll Candidates reference file", decidedDate: new Date().toISOString().slice(0, 10) } satisfies PayrollConvertedOverride : undefined)
+      : undefined;
     const exit = findExit(row, exits);
     const deploymentStatus = classifyDeployment(row.institutes);
 
@@ -344,6 +351,84 @@ export async function reconcileExits(rows: SheetRow[]) {
       exitDate: cell(item, "Exit Date", "exit_date"),
       notes: cell(item, "Reason", "reason") ?? match.notes,
     }).where(eq(instructorsTable.id, match.id));
+    matchedCount += 1;
+  }
+  return { matched: matchedCount, unmatched: unmatchedCount, total_rows: rows.length };
+}
+
+// TeachOS's own API/BigQuery data has no employee ID at all (see bigquery.ts
+// header comment) — this is the standing workaround: a periodically-uploaded
+// reference file that DOES carry employee_id per TeachOS instructor (from a
+// separate bulk-load/onboarding export), matched here by teachos_user_id
+// first, normalized name as fallback, same precedence classificationOverrides.ts
+// uses. Only ever fills in employeeId on an EXISTING inTeachos=true row —
+// never creates new instructors and never touches anyone not already in
+// TeachOS's own roster. People with no match here simply keep employeeId
+// null and are set aside per the standing pipeline (see
+// TEACHOS_INSTRUCTOR_COUNT_RULES.md) until a future reference file resolves
+// them.
+export async function reconcileTeachosEmployeeIdReference(rows: SheetRow[]) {
+  let matchedCount = 0;
+  let unmatchedCount = 0;
+  let conflictCount = 0;
+  const people = await db.select().from(instructorsTable).where(eq(instructorsTable.inTeachos, true));
+  const byTeachosId = new Map(people.filter((p) => p.teachosUserId).map((p) => [p.teachosUserId as string, p]));
+  const byName = new Map(people.map((p) => [normalize(p.fullName), p]));
+  for (const item of rows) {
+    const teachosUserId = cell(item, "Instructor User Id", "instructor_user_id");
+    const employeeId = cell(item, "Employee Id", "employee_id");
+    const fullName = cell(item, "Employee Name", "Instructor Name", "instructor_name", "full_name");
+    if (!employeeId) continue;
+    const match = (teachosUserId && byTeachosId.get(teachosUserId)) || (fullName ? byName.get(normalize(fullName)) : undefined);
+    if (!match) {
+      unmatchedCount += 1;
+      continue;
+    }
+    try {
+      await db.update(instructorsTable).set({ employeeId }).where(eq(instructorsTable.id, match.id));
+      match.employeeId = employeeId;
+      matchedCount += 1;
+    } catch {
+      // Unique constraint on employeeId — this employee_id is already on a
+      // DIFFERENT row (a genuine data conflict between sources). Leave that
+      // other row's employeeId as-is rather than crashing the whole upload;
+      // flag it for manual review the same way classificationOverrides.ts
+      // conflicts are flagged.
+      await db.update(instructorsTable).set({
+        notes: `TeachOS ID reference file lists employee_id ${employeeId} for this person, but that id is already assigned to a different record. Needs manual review.`,
+      }).where(eq(instructorsTable.id, match.id));
+      conflictCount += 1;
+    }
+  }
+  return { matched: matchedCount, unmatched: unmatchedCount, conflicts: conflictCount, total_rows: rows.length };
+}
+
+// The payroll-candidates reference file (Employee Name, Employee ID — no
+// TeachOS id) — matched by normalized name only, since that's the only key
+// it shares with the instructor register. A match sets payrollCandidateMatched,
+// which recomputeStatuses() treats as equivalent to a hand-maintained
+// PAYROLL_CONVERTED_EMPLOYEES override entry. "Raw snapshot, fully
+// replaced": every row's flag is reset before processing this upload, same
+// pattern as the other sources.
+export async function reconcilePayrollCandidates(rows: SheetRow[]) {
+  let matchedCount = 0;
+  let unmatchedCount = 0;
+  await db.update(instructorsTable).set({ payrollCandidateMatched: false, payrollCandidateNote: null });
+  const people = await db.select().from(instructorsTable).where(eq(instructorsTable.inTeachos, true));
+  const byName = new Map(people.map((p) => [normalize(p.fullName), p]));
+  for (const item of rows) {
+    const fullName = cell(item, "Employee Name", "Full Name", "full_name");
+    const employeeId = cell(item, "Employee Id", "employee_id");
+    if (!fullName) continue;
+    const match = byName.get(normalize(fullName));
+    if (!match) {
+      unmatchedCount += 1;
+      continue;
+    }
+    const conflict = employeeId && match.employeeId && employeeId !== match.employeeId
+      ? `Payroll candidates file lists employee_id ${employeeId} for this name — conflicts with ${match.employeeId} already on file. Needs manual review.`
+      : null;
+    await db.update(instructorsTable).set({ payrollCandidateMatched: true, payrollCandidateNote: conflict }).where(eq(instructorsTable.id, match.id));
     matchedCount += 1;
   }
   return { matched: matchedCount, unmatched: unmatchedCount, total_rows: rows.length };

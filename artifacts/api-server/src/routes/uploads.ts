@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { desc } from "drizzle-orm";
 import { db, uploadsTable } from "@workspace/db";
-import { reconcileDarwin, reconcileDarwinFullRosterFallback, reconcileTeachos, reconcileExits, recomputeStatuses, cell, type SheetRow } from "../lib/reconcile";
+import { reconcileDarwin, reconcileDarwinFullRosterFallback, reconcileTeachos, reconcileExits, reconcileTeachosEmployeeIdReference, reconcilePayrollCandidates, recomputeStatuses, cell, type SheetRow } from "../lib/reconcile";
 
 const router: IRouter = Router();
 const toApiUpload = (row: typeof uploadsTable.$inferSelect) => ({ id: row.id, source: row.source, filename: row.filename, row_count: row.rowCount, uploaded_at: row.uploadedAt.toISOString() });
@@ -36,6 +36,12 @@ router.post("/uploads", async (req, res) => {
       await reconcileDarwinFullRosterFallback(body.rows);
     }
     if (body.source === "TeachOS") await reconcileTeachos(body.rows);
+    // These two are the employee-ID-mapping pipeline's reference files —
+    // upload them any time after a TeachOS upload has populated the roster;
+    // they only fill in fields on existing inTeachos=true rows, never create
+    // new instructors. See TEACHOS_INSTRUCTOR_COUNT_RULES.md.
+    if (body.source === "TeachOS ID Reference") await reconcileTeachosEmployeeIdReference(body.rows);
+    if (body.source === "Payroll Candidates") await reconcilePayrollCandidates(body.rows);
     if (body.source === "Exit List") await reconcileExits(body.rows);
     await recomputeStatuses();
   }

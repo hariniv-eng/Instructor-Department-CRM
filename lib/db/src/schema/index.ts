@@ -101,6 +101,22 @@ export const instructorsTable = pgTable("instructors", {
   // institute other than the "Training Institute" placeholder counts as a
   // real campus deployment.
   deploymentStatus: text("deployment_status"),
+  // --- TeachOS employee-ID mapping pipeline (see reconcileTeachosEmployeeIdReference()
+  // and reconcilePayrollCandidates() in lib/reconcile.ts) ---
+  // True when this person's name was found in the most recently uploaded
+  // "Payroll Candidates" reference file. Combined with the static
+  // PAYROLL_CONVERTED_EMPLOYEES override list in classificationOverrides.ts
+  // by recomputeStatuses() when deciding classification = "payroll_converted"
+  // — either source is sufficient. Reset to false for everyone at the start
+  // of every "Payroll Candidates" upload (raw snapshot, fully replaced).
+  payrollCandidateMatched: boolean("payroll_candidate_matched").notNull().default(false),
+  // Set instead of silently overwriting when a "Payroll Candidates" upload
+  // finds a name match whose employee_id conflicts with the employeeId
+  // already on file (e.g. from the TeachOS ID reference or Darwin) — mirrors
+  // the same conflict-flagging principle classificationOverrides.ts uses,
+  // just for upload-derived matches instead of hand-maintained ones. null
+  // when there's no conflict to review.
+  payrollCandidateNote: text("payroll_candidate_note"),
 });
 
 export const uploadsTable = pgTable("uploads", {
