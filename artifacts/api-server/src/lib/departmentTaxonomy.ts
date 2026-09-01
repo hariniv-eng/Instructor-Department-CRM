@@ -21,7 +21,7 @@
 // and the plain hyphen some exported sheets use ("Instructors - Frontend
 // Technologies") — real department strings seen in this org as of 2026-08-29.
 
-export type DeptBucket = "tech" | "non_tech" | "excluded_ops_managers" | "mentor" | null;
+export type DeptBucket = "tech" | "non_tech" | "excluded_ops_managers" | "mentor" | "instructor_ops" | null;
 
 export interface DeptClassification {
   bucket: DeptBucket;
@@ -59,11 +59,26 @@ const CATEGORY_FALLBACK: Record<string, Exclude<DeptBucket, null>> = {
   MATH: "non_tech",
 };
 
-export function classifyDepartment(department: string | null, teachosCategory: string | null): DeptClassification {
+export function classifyDepartment(department: string | null, teachosCategory: string | null, designation: string | null = null): DeptClassification {
   const dept = (department ?? "").trim();
   if (dept) {
     for (const rule of RULES) {
-      if (rule.match.test(dept)) return { bucket: rule.bucket, area: rule.area };
+      if (rule.match.test(dept)) {
+        // Within an actual Instructors sub-department (tech/non_tech), the
+        // Darwin designation decides who's really an Instructor vs a Mentor
+        // embedded in that department vs Instructor Team Operations staff
+        // filed under an instructor sub-department. Department-level rules
+        // (Delivery Support -> excluded_ops_managers, Mentors -> mentor)
+        // are untouched by this — it only refines tech/non_tech.
+        if (rule.bucket === "tech" || rule.bucket === "non_tech") {
+          const title = (designation ?? "").trim();
+          if (title && !/instructor/i.test(title)) {
+            if (/mentor/i.test(title)) return { bucket: "mentor", area: rule.area };
+            return { bucket: "instructor_ops", area: rule.area };
+          }
+        }
+        return { bucket: rule.bucket, area: rule.area };
+      }
     }
   }
   const category = (teachosCategory ?? "").trim().toUpperCase();

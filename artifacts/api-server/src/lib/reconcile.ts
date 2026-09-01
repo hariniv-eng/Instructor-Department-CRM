@@ -154,9 +154,8 @@ export const recomputeStatuses = async () => {
     // (Delivery Support -> ops/managers, Mentors -> mentor); then the
     // payroll-converted override; only then the ordinary Darwin/TeachOS
     // presence rules. See departmentTaxonomy.ts for the department matching.
-    const excludedOverride = findOverride<ExcludedOverride>(row, EXCLUDED_EMPLOYEES);
-    const deptInfo = classifyDepartment(row.department, row.teachosCategory);
-    const isDeptExclusion = deptInfo.bucket === "excluded_ops_managers" || deptInfo.bucket === "mentor";
+    const deptInfo = classifyDepartment(row.department, row.teachosCategory, row.designation);
+    const isDeptExclusion = deptInfo.bucket === "excluded_ops_managers" || deptInfo.bucket === "mentor" || deptInfo.bucket === "instructor_ops";
     // Payroll-converted status comes from either source: the hand-maintained
     // override list (a human decision, always wins if present) or a name
     // match against the most recently uploaded "Payroll Candidates" file
@@ -176,14 +175,14 @@ export const recomputeStatuses = async () => {
       classification = excludedOverride.classification;
       classificationReason = excludedOverride.reason;
       computedStatus = "excluded";
-    } else if (deptInfo.bucket === "excluded_ops_managers") {
-      classification = "excluded_ops_managers";
-      classificationReason = "Delivery Support (Ops and Central Managers) department — not an instructor role";
-      computedStatus = "excluded";
-    } else if (deptInfo.bucket === "mentor") {
+      } else if (deptInfo.bucket === "mentor") {
       classification = "mentor";
       classificationReason = "Mentors department — tracked as its own section, not counted as an instructor";
       computedStatus = "mentor";
+    } else if (deptInfo.bucket === "instructor_ops") {
+      classification = "instructor_ops";
+      classificationReason = "Instructors department, but designation isn't an Instructor or Mentor role — tracked as Instructor Team Operations, not counted as an instructor";
+      computedStatus = "instructor_ops";
     } else if (payrollConverted) {
       classification = "payroll_converted";
       classificationReason = payrollConverted.reason;
