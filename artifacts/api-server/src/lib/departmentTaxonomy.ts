@@ -21,7 +21,13 @@
 // and the plain hyphen some exported sheets use ("Instructors - Frontend
 // Technologies") — real department strings seen in this org as of 2026-08-29.
 
-export type DeptBucket = "tech" | "non_tech" | "excluded_ops_managers" | "mentor" | "instructor_ops" | null;
+export type DeptBucket =
+  | "tech"
+  | "non_tech"
+  | "excluded_ops_managers"
+  | "mentor"
+  | "instructor_ops"
+  | null;
 
 export interface DeptClassification {
   bucket: DeptBucket;
@@ -41,10 +47,22 @@ const RULES: Rule[] = [
   { match: /backend systems/i, bucket: "tech", area: "Backend" },
   { match: /data structures/i, bucket: "tech", area: "DSA" },
   { match: /gen\s*ai\b/i, bucket: "tech", area: "GenAI" },
-  { match: /artificial intelligence.*emerging technologies/i, bucket: "tech", area: "Artificial Intelligence & Emerging Technologies" },
-  { match: /interdisciplinary.*applied sciences/i, bucket: "tech", area: "Interdisciplinary & Applied Sciences" },
+  {
+    match: /artificial intelligence.*emerging technologies/i,
+    bucket: "tech",
+    area: "Artificial Intelligence & Emerging Technologies",
+  },
+  {
+    match: /interdisciplinary.*applied sciences/i,
+    bucket: "tech",
+    area: "Interdisciplinary & Applied Sciences",
+  },
   { match: /english.*communication/i, bucket: "non_tech", area: "English" },
-  { match: /quantitative aptitude|logical reasoning/i, bucket: "non_tech", area: "Aptitude" },
+  {
+    match: /quantitative aptitude|logical reasoning/i,
+    bucket: "non_tech",
+    area: "Aptitude",
+  },
   { match: /mathematical sciences/i, bucket: "non_tech", area: "Math" },
 ];
 
@@ -59,7 +77,11 @@ const CATEGORY_FALLBACK: Record<string, Exclude<DeptBucket, null>> = {
   MATH: "non_tech",
 };
 
-export function classifyDepartment(department: string | null, teachosCategory: string | null, designation: string | null = null): DeptClassification {
+export function classifyDepartment(
+  department: string | null,
+  teachosCategory: string | null,
+  designation: string | null = null,
+): DeptClassification {
   const dept = (department ?? "").trim();
   if (dept) {
     for (const rule of RULES) {
@@ -72,9 +94,10 @@ export function classifyDepartment(department: string | null, teachosCategory: s
         // are untouched by this — it only refines tech/non_tech.
         if (rule.bucket === "tech" || rule.bucket === "non_tech") {
           const title = (designation ?? "").trim();
-          if (title && !/instructor/i.test(title)) {
-            if (/mentor/i.test(title)) return { bucket: "mentor", area: rule.area };
-            return { bucket: "instructor_ops", area: rule.area };
+          if (title && !/instructor|trainer|trainee/i.test(title)) {
+            if (/mentor/i.test(title))
+              return { bucket: "mentor", area: rule.area };
+            return { bucket: "excluded_ops_managers", area: null };
           }
         }
         return { bucket: rule.bucket, area: rule.area };
@@ -82,7 +105,8 @@ export function classifyDepartment(department: string | null, teachosCategory: s
     }
   }
   const category = (teachosCategory ?? "").trim().toUpperCase();
-  if (category && CATEGORY_FALLBACK[category]) return { bucket: CATEGORY_FALLBACK[category], area: null };
+  if (category && CATEGORY_FALLBACK[category])
+    return { bucket: CATEGORY_FALLBACK[category], area: null };
   return { bucket: null, area: null };
 }
 
@@ -95,7 +119,9 @@ const TRAINING_INSTITUTE = "training institute";
 export type DeploymentStatus = "deployed" | "in_training" | null;
 
 export function classifyDeployment(institutes: string[]): DeploymentStatus {
-  const normalized = institutes.map((i) => i.trim().toLowerCase()).filter(Boolean);
+  const normalized = institutes
+    .map((i) => i.trim().toLowerCase())
+    .filter(Boolean);
   if (!normalized.length) return null;
   const hasRealCampus = normalized.some((i) => i !== TRAINING_INSTITUTE);
   if (hasRealCampus) return "deployed";
