@@ -154,6 +154,7 @@ export const recomputeStatuses = async () => {
     // (Delivery Support -> ops/managers, Mentors -> mentor); then the
     // payroll-converted override; only then the ordinary Darwin/TeachOS
     // presence rules. See departmentTaxonomy.ts for the department matching.
+    const excludedOverride = findOverride<ExcludedOverride>(row, EXCLUDED_EMPLOYEES);
     const deptInfo = classifyDepartment(row.department, row.teachosCategory, row.designation);
     const isDeptExclusion = deptInfo.bucket === "excluded_ops_managers" || deptInfo.bucket === "mentor" || deptInfo.bucket === "instructor_ops";
     // Payroll-converted status comes from either source: the hand-maintained
@@ -175,7 +176,11 @@ export const recomputeStatuses = async () => {
       classification = excludedOverride.classification;
       classificationReason = excludedOverride.reason;
       computedStatus = "excluded";
-      } else if (deptInfo.bucket === "mentor") {
+    } else if (deptInfo.bucket === "excluded_ops_managers") {
+      classification = "excluded_ops_managers";
+      classificationReason = "Delivery Support (Ops and Central Managers) department — not an instructor role";
+      computedStatus = "excluded";
+    } else if (deptInfo.bucket === "mentor") {
       classification = "mentor";
       classificationReason = "Mentors department — tracked as its own section, not counted as an instructor";
       computedStatus = "mentor";
