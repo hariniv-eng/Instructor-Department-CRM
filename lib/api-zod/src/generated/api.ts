@@ -27,7 +27,10 @@ export const ListInstructorsQueryParams = zod.object({
   "designation": zod.coerce.string().optional(),
   "source": zod.coerce.string().optional(),
   "classification": zod.coerce.string().optional(),
-  "exit_flag": zod.coerce.string().optional()
+  "exit_flag": zod.coerce.string().optional(),
+  "dept_bucket": zod.coerce.string().optional(),
+  "dept_area": zod.coerce.string().optional(),
+  "institute": zod.coerce.string().optional()
 })
 
 export const ListInstructorsResponseItem = zod.object({

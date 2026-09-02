@@ -273,5 +273,8 @@ designation?: string;
 source?: string;
 classification?: string;
 exit_flag?: string;
+dept_bucket?: string;
+dept_area?: string;
+institute?: string;
 };
 
