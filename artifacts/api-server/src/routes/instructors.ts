@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { and, asc, eq, ilike, or } from "drizzle-orm";
+import { and, arrayContains, asc, eq, ilike, or } from "drizzle-orm";
 import { db, instructorsTable } from "@workspace/db";
 
 const router: IRouter = Router();
@@ -48,8 +48,31 @@ const toApiInstructor = (row: typeof instructorsTable.$inferSelect) => ({
   in_darwin_full_roster: row.inDarwinFullRoster,
 });
 
+// The Instructor Details UI's three-way "Classification" filter (Instructor
+// / Mentor / Excluded) is coarser than the deptBucket column itself:
+// deptBucket "tech" and "non_tech" both mean "counted as an instructor",
+// and "excluded_ops_managers"/"instructor_ops" both mean "excluded". This
+// maps the UI-facing value onto the set of deptBucket values it covers —
+// see lib/departmentTaxonomy.ts for what each deptBucket value means.
+const CLASSIFICATION_GROUPS: Record<string, string[]> = {
+  instructor: ["tech", "non_tech"],
+  mentor: ["mentor"],
+  excluded: ["excluded_ops_managers", "instructor_ops"],
+};
+
 router.get("/instructors", async (req, res) => {
-  const { search, status, sub_department: subDepartment, designation, source, classification, exit_flag: exitFlag } = req.query as Record<string, string | undefined>;
+  const {
+    search,
+    status,
+    sub_department: subDepartment,
+    designation,
+    source,
+    classification,
+    exit_flag: exitFlag,
+    dept_bucket: deptBucketParam,
+    dept_area: deptArea,
+    institute,
+  } = req.query as Record<string, string | undefined>;
   const conditions = [];
   if (search) conditions.push(or(ilike(instructorsTable.fullName, `%${search}%`), ilike(instructorsTable.employeeId, `%${search}%`), ilike(instructorsTable.orgEmail, `%${search}%`)));
   if (status) conditions.push(or(eq(instructorsTable.manualStatus, status), eq(instructorsTable.computedStatus, status)));
@@ -57,9 +80,19 @@ router.get("/instructors", async (req, res) => {
   if (designation) conditions.push(eq(instructorsTable.designation, designation));
   if (source === "darwin") conditions.push(eq(instructorsTable.inDarwin, true));
   if (source === "teachos") conditions.push(eq(instructorsTable.inTeachos, true));
+  if (source === "both") conditions.push(and(eq(instructorsTable.inDarwin, true), eq(instructorsTable.inTeachos, true)));
   if (classification) conditions.push(eq(instructorsTable.classification, classification));
   if (exitFlag === "true") conditions.push(eq(instructorsTable.exitFlag, true));
   if (exitFlag === "false") conditions.push(eq(instructorsTable.exitFlag, false));
+  // dept_bucket accepts either a raw deptBucket value ("tech", "non_tech",
+  // "mentor", "excluded_ops_managers", "instructor_ops") or one of the
+  // three UI-facing group names above ("instructor" / "mentor" / "excluded").
+  if (deptBucketParam) {
+    const group = CLASSIFICATION_GROUPS[deptBucketParam];
+    conditions.push(group ? or(...group.map((value) => eq(instructorsTable.deptBucket, value))) : eq(instructorsTable.deptBucket, deptBucketParam));
+  }
+  if (deptArea) conditions.push(eq(instructorsTable.deptArea, deptArea));
+  if (institute) conditions.push(arrayContains(instructorsTable.institutes, [institute]));
   const rows = await db.select().from(instructorsTable).where(conditions.length ? and(...conditions) : undefined).orderBy(asc(instructorsTable.fullName));
   res.json(rows.map(toApiInstructor));
 });

@@ -53,6 +53,17 @@ export default function DashboardPage() {
   return <div className="mx-auto max-w-[1500px]">
     <PageIntro eyebrow="Command center / 09:42 IST" title="Good morning, Aarav." description="A clear read on the instructor workforce, source integrity, and the exceptions worth your attention." action={<button type="button" data-testid="button-refresh-dashboard" onClick={() => queryClient.invalidateQueries({ queryKey: getGetDashboardQueryKey() })} className="inline-flex items-center gap-2 self-start rounded-lg border border-border bg-card px-3.5 py-2.5 text-[12px] font-bold text-foreground transition-colors hover:bg-secondary lg:self-auto"><RefreshCw size={14} /> Refresh data</button>} />
 
+    {/* 1. KPI row — leads the page, ahead of the instructor-count banner. */}
+    {dashboardQuery.isLoading && <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">{[1, 2, 3, 4].map((item) => <SkeletonBlock key={item} className="h-[126px]" />)}</div>}
+    {dashboardQuery.isError && <div className="mb-5"><QueryError message="Dashboard data is unavailable right now." /></div>}
+    {dashboard && <section className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4 animate-rise">
+      <KpiCard label="Total instructors" value={formatKpi(total)} meta="Current register" icon={<UsersRound size={17} />} tone="navy" />
+      <KpiCard label="Active in TeachOS" value={formatKpi(active)} meta="Access confirmed" icon={<CircleAlert size={17} />} tone="teal" />
+      <KpiCard label="Exceptions" value={formatKpi(exceptions)} meta="Needs review" icon={<CircleAlert size={17} />} tone="saffron" alert />
+      <KpiCard label="Exits this month" value={formatKpi(exits)} meta="Exit list signal" icon={<CalendarDays size={17} />} tone="coral" />
+    </section>}
+
+    {/* 2. Standing-rule banner — the instructor-count drill-down. */}
     <section className="mb-5 rounded-xl border border-primary bg-primary p-6 text-primary-foreground shadow-xs sm:p-7">
       <p className="font-mono-ui text-[10px] uppercase tracking-[0.17em] text-primary-foreground/65">Standing rule / TeachOS instructor count</p>
       {reportQuery.isLoading && <div className="mt-3 h-12 w-40 animate-pulse rounded bg-primary-foreground/15" />}
@@ -71,10 +82,10 @@ export default function DashboardPage() {
           {showInstructorDetails ? <ChevronUp size={22} className="text-primary-foreground/70" /> : <ChevronDown size={22} className="text-primary-foreground/70" />}
         </button>
         <div className="flex flex-wrap gap-x-8 gap-y-3 text-[12px]">
-          <div><p className="font-mono-ui uppercase tracking-[0.1em] text-primary-foreground/55">Matched — instructor dept</p><p className="mt-1 text-[17px] font-bold">{formatKpi(report.darwin_match?.matched_primary)}</p></div>
-          <div><p className="font-mono-ui uppercase tracking-[0.1em] text-primary-foreground/55">Matched — full roster</p><p className="mt-1 text-[17px] font-bold">{formatKpi(report.darwin_match?.matched_full_roster_fallback)}</p></div>
+          <div><p className="font-mono-ui uppercase tracking-[0.1em] text-primary-foreground/55">Total instructor count</p><p className="mt-1 text-[17px] font-bold">{formatKpi(report.kpis.total_instructor_count)}</p></div>
+          <div><p className="font-mono-ui uppercase tracking-[0.1em] text-primary-foreground/55">Total mentor count</p><p className="mt-1 text-[17px] font-bold">{formatKpi(report.kpis.mentors_count)}</p></div>
+          <div><p className="font-mono-ui uppercase tracking-[0.1em] text-primary-foreground/55">Ops team (excluded)</p><p className="mt-1 text-[17px] font-bold">{formatKpi(report.kpis.excluded_count)}</p></div>
           <div><p className="font-mono-ui uppercase tracking-[0.1em] text-primary-foreground/55">Payroll converted</p><p className="mt-1 text-[17px] font-bold">{formatKpi(report.kpis.payroll_count)}</p></div>
-          <div><p className="font-mono-ui uppercase tracking-[0.1em] text-primary-foreground/55">Mentors (separate)</p><p className="mt-1 text-[17px] font-bold">{formatKpi(report.kpis.mentors_count)}</p></div>
         </div>
       </div>}
       {report && showInstructorDetails && <div className="mt-6">
@@ -116,27 +127,35 @@ export default function DashboardPage() {
       </div>}
     </section>
 
-    {dashboardQuery.isLoading && <div className="space-y-5"><div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{[1, 2, 3, 4].map((item) => <SkeletonBlock key={item} className="h-[126px]" />)}</div><div className="grid gap-5 lg:grid-cols-[1.35fr_.65fr]"><SkeletonBlock className="h-[340px]" /><SkeletonBlock className="h-[340px]" /></div></div>}
-    {dashboardQuery.isError && <QueryError message="Dashboard data is unavailable right now." />}
+    {dashboardQuery.isLoading && <div className="space-y-5"><SkeletonBlock className="h-[260px]" /><div className="grid gap-5 lg:grid-cols-[1.35fr_.65fr]"><SkeletonBlock className="h-[340px]" /><SkeletonBlock className="h-[340px]" /></div></div>}
     {dashboard && <div className="space-y-5 animate-rise">
-      <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <KpiCard label="Total instructors" value={formatKpi(total)} meta="Current register" icon={<UsersRound size={17} />} tone="navy" />
-        <KpiCard label="Active in TeachOS" value={formatKpi(active)} meta="Access confirmed" icon={<CircleAlert size={17} />} tone="teal" />
-        <KpiCard label="Exceptions" value={formatKpi(exceptions)} meta="Needs review" icon={<CircleAlert size={17} />} tone="saffron" alert />
-        <KpiCard label="Exits this month" value={formatKpi(exits)} meta="Exit list signal" icon={<CalendarDays size={17} />} tone="coral" />
-      </section>
+      {/* 3. Glance row — system posture, classification breakdown, and role mix grouped into one row instead of two separate two-column grids. */}
+      <section className="grid gap-5 lg:grid-cols-[.8fr_1.2fr_1fr]">
+        <div className="rounded-xl border border-border bg-[#e9f0f5] p-5 sm:p-6">
+          <p className="font-mono-ui text-[10px] uppercase tracking-[0.17em] text-primary/65">System posture</p>
+          <h2 className="mt-1 text-[15px] font-extrabold tracking-[-0.03em]">Reconciliation is steady.</h2>
+          <div className="mt-6 grid grid-cols-2 gap-3"><div className="rounded-lg border border-[#d4e1ea] bg-card/70 p-3"><p className="font-mono-ui text-[10px] text-muted-foreground">DARWIN</p><p className="mt-2 text-lg font-extrabold">Live</p><span className="mt-1 block text-[11px] text-[#398473]">Connected</span></div><div className="rounded-lg border border-[#d4e1ea] bg-card/70 p-3"><p className="font-mono-ui text-[10px] text-muted-foreground">TEACHOS</p><p className="mt-2 text-lg font-extrabold">Live</p><span className="mt-1 block text-[11px] text-[#398473]">Connected</span></div></div>
+          <Link href="/uploads" data-testid="link-open-uploads" className="mt-5 inline-flex items-center gap-1 text-[12px] font-bold text-primary hover:underline">Inspect source history <ArrowUpRight size={14} /></Link>
+        </div>
 
-      <section className="rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6">
-        <div className="mb-5 flex items-start justify-between"><div><p className="font-mono-ui text-[10px] uppercase tracking-[0.17em] text-muted-foreground">Standing rule / TeachOS instructor count</p><h2 className="mt-1 text-[16px] font-extrabold tracking-[-0.03em]">Classification breakdown</h2></div></div>
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
-          <ClassificationStat label="Counted as instructors" value={formatKpi(kpis.counted_as_instructors)} />
-          <ClassificationStat label="Active, no exit record" value={formatKpi(kpis.active_no_exit_record)} />
-          <ClassificationStat label="Exit-flagged" value={formatKpi(kpis.exit_flagged)} tone="amber" />
-          <ClassificationStat label="Payroll converted" value={formatKpi(kpis.payroll_converted)} tone="indigo" />
-          <ClassificationStat label="Excluded (other dept)" value={formatKpi(kpis.excluded)} tone="muted" />
+        <div className="rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6">
+          <div className="mb-5 flex items-start justify-between"><div><p className="font-mono-ui text-[10px] uppercase tracking-[0.17em] text-muted-foreground">Standing rule / TeachOS instructor count</p><h2 className="mt-1 text-[16px] font-extrabold tracking-[-0.03em]">Classification breakdown</h2></div></div>
+          <div className="grid grid-cols-2 gap-3">
+            <ClassificationStat label="Counted as instructors" value={formatKpi(kpis.counted_as_instructors)} />
+            <ClassificationStat label="Active, no exit record" value={formatKpi(kpis.active_no_exit_record)} />
+            <ClassificationStat label="Exit-flagged" value={formatKpi(kpis.exit_flagged)} tone="amber" />
+            <ClassificationStat label="Payroll converted" value={formatKpi(kpis.payroll_converted)} tone="indigo" />
+            <ClassificationStat label="Excluded (other dept)" value={formatKpi(kpis.excluded)} tone="muted" />
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6">
+          <div className="mb-5 flex items-start justify-between"><div><p className="font-mono-ui text-[10px] uppercase tracking-[0.17em] text-muted-foreground">Role mix</p><h2 className="mt-1 text-[16px] font-extrabold tracking-[-0.03em]">Most represented designations</h2></div><ArrowDownRight size={17} className="text-muted-foreground" /></div>
+          <div className="space-y-3">{dashboard.designations.slice(0, 6).map((item) => <div key={item.name} className="flex items-center justify-between border-b border-border/70 pb-2.5 text-[12px]"><span className="font-semibold">{item.name}</span><span className="font-mono-ui text-muted-foreground">{item.count}</span></div>)}</div>
         </div>
       </section>
 
+      {/* 4. Charts row — movement + sub-department, kept together as the two visual/chart blocks. */}
       <section className="grid gap-5 lg:grid-cols-[1.35fr_.65fr]">
         <div className="rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6">
           <div className="mb-7 flex items-start justify-between">
@@ -156,19 +175,6 @@ export default function DashboardPage() {
         <div className="rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6">
           <div className="mb-6 flex items-start justify-between"><div><p className="font-mono-ui text-[10px] uppercase tracking-[0.17em] text-muted-foreground">Distribution</p><h2 className="mt-1 text-[17px] font-extrabold tracking-[-0.03em]">By sub-department</h2></div><Link href="/instructors" data-testid="link-view-instructors-distribution" className="text-muted-foreground hover:text-foreground"><ArrowUpRight size={17} /></Link></div>
           <div className="space-y-5">{dashboard.sub_departments.slice(0, 5).map((item, index) => <div key={item.name}><div className="mb-2 flex justify-between text-[12px]"><span className="font-semibold">{item.name}</span><span className="font-mono-ui text-muted-foreground">{item.count}</span></div><div className="h-2 overflow-hidden rounded-full bg-secondary"><div className={`h-full rounded-full ${index === 0 ? 'bg-primary' : index === 1 ? 'bg-[#5a9b9a]' : index === 2 ? 'bg-accent' : 'bg-[#9fb4c9]'}`} style={{ width: `${(item.count / maxDept) * 100}%` }} /></div></div>)}</div>
-        </div>
-      </section>
-
-      <section className="grid gap-5 lg:grid-cols-[.8fr_1.2fr]">
-        <div className="rounded-xl border border-border bg-[#e9f0f5] p-5 sm:p-6">
-          <p className="font-mono-ui text-[10px] uppercase tracking-[0.17em] text-primary/65">System posture</p>
-          <h2 className="mt-1 text-[17px] font-extrabold tracking-[-0.03em]">Reconciliation is steady.</h2>
-          <div className="mt-6 grid grid-cols-2 gap-3"><div className="rounded-lg border border-[#d4e1ea] bg-card/70 p-3"><p className="font-mono-ui text-[10px] text-muted-foreground">DARWIN</p><p className="mt-2 text-lg font-extrabold">Live</p><span className="mt-1 block text-[11px] text-[#398473]">Connected</span></div><div className="rounded-lg border border-[#d4e1ea] bg-card/70 p-3"><p className="font-mono-ui text-[10px] text-muted-foreground">TEACHOS</p><p className="mt-2 text-lg font-extrabold">Live</p><span className="mt-1 block text-[11px] text-[#398473]">Connected</span></div></div>
-          <Link href="/uploads" data-testid="link-open-uploads" className="mt-5 inline-flex items-center gap-1 text-[12px] font-bold text-primary hover:underline">Inspect source history <ArrowUpRight size={14} /></Link>
-        </div>
-        <div className="rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6">
-          <div className="mb-5 flex items-start justify-between"><div><p className="font-mono-ui text-[10px] uppercase tracking-[0.17em] text-muted-foreground">Role mix</p><h2 className="mt-1 text-[17px] font-extrabold tracking-[-0.03em]">Most represented designations</h2></div><ArrowDownRight size={17} className="text-muted-foreground" /></div>
-          <div className="grid gap-x-8 gap-y-4 sm:grid-cols-2">{dashboard.designations.slice(0, 6).map((item) => <div key={item.name} className="flex items-center justify-between border-b border-border/70 pb-3 text-[12px]"><span className="font-semibold">{item.name}</span><span className="font-mono-ui text-muted-foreground">{item.count}</span></div>)}</div>
         </div>
       </section>
     </div>}

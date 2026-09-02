@@ -61,6 +61,21 @@ paths:
         - in: query
           name: exit_flag
           schema: { type: string }
+        - in: query
+          name: dept_bucket
+          description: >-
+            Either a raw dept_bucket value (tech, non_tech, mentor,
+            excluded_ops_managers, instructor_ops) or one of the three
+            UI-facing group names (instructor, mentor, excluded).
+          schema: { type: string }
+        - in: query
+          name: dept_area
+          description: "Subject/sub-area within a tech or non_tech dept_bucket, e.g. Frontend, Backend, DSA, GenAI, Math, English, Aptitude."
+          schema: { type: string }
+        - in: query
+          name: institute
+          description: Filters to instructors whose institutes array contains this campus/university name.
+          schema: { type: string }
       responses:
         "200":
           description: Instructor records

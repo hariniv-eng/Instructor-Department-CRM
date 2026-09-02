@@ -5,7 +5,7 @@
 // behavior stays identical regardless of where the rows came from.
 
 import { and, eq } from "drizzle-orm";
-import { db, instructorsTable, darwinboxExitsTable } from "@workspace/db";
+import { db, instructorsTable, darwinboxExitsTable, teachosIdReferenceTable } from "@workspace/db";
 import { EXCLUDED_EMPLOYEES, PAYROLL_CONVERTED_EMPLOYEES, type ExcludedOverride, type PayrollConvertedOverride } from "../data/classificationOverrides";
 import { classifyDepartment, classifyDeployment } from "./departmentTaxonomy";
 
@@ -259,10 +259,31 @@ export async function reconcileTeachos(rows: SheetRow[]) {
   let matchedCount = 0;
   await db.update(instructorsTable).set({ inTeachos: false, teachosRole: null, teachosCategory: null, teachosManager: null, institutes: [] });
   const people = await db.select().from(instructorsTable);
+  // Durable employee-ID bridge from the most recent "TeachOS ID Reference"
+  // upload/sync (see teachosIdReferenceTable + reconcileTeachosEmployeeIdReference
+  // below). Consulting it here — not just as a later one-off patch step —
+  // lets a TeachOS instructor whose name string doesn't closely match their
+  // Darwin name (nickname, spacing, transliteration, honorific) still
+  // resolve to the SAME existing person instead of being inserted as a
+  // duplicate "needs_review" record.
+  const bridgeByTeachosId = new Map(
+    (await db.select().from(teachosIdReferenceTable))
+      .filter((row) => row.instructorUserId)
+      .map((row) => [row.instructorUserId as string, row.employeeId]),
+  );
   for (const item of rows) {
     const fullName = cell(item, "instructor_name", "Instructor Name");
     if (!fullName) continue;
-    const match = findMatch(people, fullName);
+    const teachosUserId = cell(item, "instructor_user_id", "TeachOS User Id");
+    // Prefer an employee_id carried directly on the row itself — true as of
+    // the niat_instructor_details source (switched from
+    // niat_instructor_managers_and_instructors_details, which had no
+    // employee-ID column at all) — over the separately-persisted bridge
+    // table, which exists as a fallback for any source that doesn't carry
+    // employee_id inline.
+    const rowEmployeeId = cell(item, "Employee Id", "employee_id");
+    const bridgedEmployeeId = teachosUserId ? bridgeByTeachosId.get(teachosUserId) : undefined;
+    const match = findMatch(people, fullName, rowEmployeeId ?? bridgedEmployeeId);
     const institute = cell(item, "institute_name", "Institute Name");
     const values = {
       teachosUserId: cell(item, "instructor_user_id", "TeachOS User Id"),
@@ -272,16 +293,47 @@ export async function reconcileTeachos(rows: SheetRow[]) {
       teachosManager: cell(item, "instructor_manager", "Instructor Manager"),
       inTeachos: true,
       institutes: institute ? [institute] : [],
+      // Only set when the row actually carries one (niat_instructor_details
+      // does; older/manual sources may not) — omitted entirely rather than
+      // set to null/undefined so a match found purely by name doesn't wipe
+      // out an employeeId already on file from Darwin.
+      ...(rowEmployeeId ? { employeeId: rowEmployeeId } : {}),
     };
-    if (match) {
-      const institutes = institute ? Array.from(new Set([...match.institutes, institute])) : match.institutes;
-      await db.update(instructorsTable).set({ ...values, institutes }).where(eq(instructorsTable.id, match.id));
-      match.institutes = institutes;
-      matchedCount += 1;
-    } else {
-      const [created] = await db.insert(instructorsTable).values({ ...values, inDarwin: false, computedStatus: "needs_review", notes: possibleMatchNote(people, fullName) }).returning();
-      people.push(created);
-      newCount += 1;
+    try {
+      if (match) {
+        const institutes = institute ? Array.from(new Set([...match.institutes, institute])) : match.institutes;
+        await db.update(instructorsTable).set({ ...values, institutes }).where(eq(instructorsTable.id, match.id));
+        match.institutes = institutes;
+        match.employeeId = rowEmployeeId ?? match.employeeId;
+        matchedCount += 1;
+      } else {
+        const [created] = await db.insert(instructorsTable).values({ ...values, inDarwin: false, computedStatus: "needs_review", notes: possibleMatchNote(people, fullName) }).returning();
+        people.push(created);
+        newCount += 1;
+      }
+    } catch {
+      // Unique constraint on employeeId — this row's employee_id is already
+      // on a DIFFERENT record (a genuine data conflict, e.g. two TeachOS
+      // accounts resolving to the same person). Fall back to writing
+      // everything except employeeId, and leave a note instead of crashing
+      // the whole sync/upload — mirrors the conflict handling in
+      // reconcileTeachosEmployeeIdReference() below.
+      const { employeeId: _dropped, ...safeValues } = values;
+      if (match) {
+        const institutes = institute ? Array.from(new Set([...match.institutes, institute])) : match.institutes;
+        await db.update(instructorsTable).set({ ...safeValues, institutes }).where(eq(instructorsTable.id, match.id));
+        match.institutes = institutes;
+        matchedCount += 1;
+      } else {
+        const [created] = await db.insert(instructorsTable).values({
+          ...safeValues,
+          inDarwin: false,
+          computedStatus: "needs_review",
+          notes: `TeachOS lists employee_id ${rowEmployeeId} for this person, but that id is already assigned to a different record. Needs manual review.`,
+        }).returning();
+        people.push(created);
+        newCount += 1;
+      }
     }
   }
   return { new: newCount, matched: matchedCount, total_rows: rows.length };
@@ -405,6 +457,18 @@ export async function reconcileTeachosEmployeeIdReference(rows: SheetRow[]) {
     const employeeId = cell(item, "Employee Id", "employee_id");
     const fullName = cell(item, "Employee Name", "Instructor Name", "instructor_name", "full_name");
     if (!employeeId) continue;
+    // Persist this instructor_user_id -> employee_id mapping durably, so a
+    // later reconcileTeachos() run (a fresh upload, or the live TeachOS
+    // sync) can consult it during matching instead of relying on fuzzy
+    // full-name string equality alone. Keyed on instructorUserId — a row
+    // without one can't be looked back up by a future TeachOS row anyway
+    // (reconcileTeachos matches on instructor_user_id), so it's skipped here.
+    if (teachosUserId) {
+      await db
+        .insert(teachosIdReferenceTable)
+        .values({ instructorUserId: teachosUserId, employeeId, fullName })
+        .onConflictDoUpdate({ target: teachosIdReferenceTable.instructorUserId, set: { employeeId, fullName, syncedAt: new Date() } });
+    }
     const match = (teachosUserId && byTeachosId.get(teachosUserId)) || (fullName ? byName.get(normalize(fullName)) : undefined);
     if (!match) {
       unmatchedCount += 1;

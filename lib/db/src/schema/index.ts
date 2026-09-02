@@ -178,12 +178,31 @@ export const teachosDeploymentTable = pgTable("teachos_deployment", {
   syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// Durable employee-ID bridge from the "TeachOS ID Reference" upload/sync
+// (instructor_user_id -> employee_id, plus the name on file at the time).
+// Previously this data was only ever applied as a one-time patch onto
+// whatever instructorsTable rows already existed
+// (reconcileTeachosEmployeeIdReference in lib/reconcile.ts) and then
+// discarded — so a later TeachOS upload/sync had no way to use it and could
+// only match people by fuzzy full-name string equality, creating a
+// duplicate "needs_review" record for anyone whose TeachOS name didn't
+// closely match their Darwin name. Persisting it here lets
+// reconcileTeachos() consult it directly during matching instead.
+export const teachosIdReferenceTable = pgTable("teachos_id_reference", {
+  id: serial("id").primaryKey(),
+  instructorUserId: text("instructor_user_id").unique(),
+  employeeId: text("employee_id").notNull(),
+  fullName: text("full_name"),
+  syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const insertInstructorSchema = createInsertSchema(instructorsTable);
 export const insertUploadSchema = createInsertSchema(uploadsTable);
 export const insertDarwinboxActiveSchema = createInsertSchema(darwinboxActiveTable);
 export const insertDarwinboxExitsSchema = createInsertSchema(darwinboxExitsTable);
 export const insertDarwinboxFullRosterSchema = createInsertSchema(darwinboxFullRosterTable);
 export const insertTeachosDeploymentSchema = createInsertSchema(teachosDeploymentTable);
+export const insertTeachosIdReferenceSchema = createInsertSchema(teachosIdReferenceTable);
 export type Instructor = typeof instructorsTable.$inferSelect;
 export type InsertInstructor = z.infer<typeof insertInstructorSchema>;
 export type Upload = typeof uploadsTable.$inferSelect;
@@ -196,3 +215,5 @@ export type DarwinboxFullRoster = typeof darwinboxFullRosterTable.$inferSelect;
 export type InsertDarwinboxFullRoster = z.infer<typeof insertDarwinboxFullRosterSchema>;
 export type TeachosDeployment = typeof teachosDeploymentTable.$inferSelect;
 export type InsertTeachosDeployment = z.infer<typeof insertTeachosDeploymentSchema>;
+export type TeachosIdReference = typeof teachosIdReferenceTable.$inferSelect;
+export type InsertTeachosIdReference = z.infer<typeof insertTeachosIdReferenceSchema>;
