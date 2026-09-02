@@ -528,7 +528,15 @@ export async function reconcilePayrollCandidates(rows: SheetRow[]) {
   let matchedCount = 0;
   let unmatchedCount = 0;
   await db.update(instructorsTable).set({ payrollCandidateMatched: false, payrollCandidateNote: null });
-  const people = await db.select().from(instructorsTable).where(eq(instructorsTable.inTeachos, true));
+  // Payroll-converted people are, by definition, NOT in Darwin (Darwin is
+  // the official HRMS; payroll-converted instructors are paid outside it,
+  // that's the whole reason they need this separate reference file). Match
+  // the Payroll Candidates file only against the "leftover" pool — TeachOS
+  // instructors who never matched a Darwin record during reconcileTeachos()
+  // — instead of every TeachOS row. This also prevents an accidental name
+  // collision from flagging an already-correctly-classified Darwin employee
+  // as payroll_converted.
+  const people = await db.select().from(instructorsTable).where(and(eq(instructorsTable.inTeachos, true), eq(instructorsTable.inDarwin, false)));
   const byName = new Map(people.map((p) => [normalize(p.fullName), p]));
   for (const item of rows) {
     const fullName = cell(item, "Employee Name", "Full Name", "full_name");
