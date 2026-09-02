@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { desc } from "drizzle-orm";
-import { db, uploadsTable } from "@workspace/db";
+import { db, uploadsTable, instructorsTable, teachosIdReferenceTable } from "@workspace/db";
 import { reconcileDarwin, reconcileDarwinFullRosterFallback, reconcileTeachos, reconcileExits, reconcileTeachosEmployeeIdReference, reconcilePayrollCandidates, recomputeStatuses, cell, type SheetRow } from "../lib/reconcile";
 
 const router: IRouter = Router();
@@ -48,4 +48,27 @@ router.post("/uploads", async (req, res) => {
   const [row] = await db.insert(uploadsTable).values({ source: body.source, filename: body.filename, rowCount: body.row_count }).returning();
   res.status(201).json(toApiUpload(row));
 });
+// One-off admin endpoint for the pre-launch data-seeding phase — wipes the
+// instructor register clean so a fresh Darwin/TeachOS/Payroll upload
+// sequence starts from zero instead of layering onto leftover state from a
+// prior (possibly buggy) reconciliation run. Reachable over the public
+// deployment URL specifically because Workspace Shell scripts don't
+// reliably share the deployed app's own DATABASE_URL/Secrets — running the
+// wipe through this route guarantees it hits the exact DB the app is
+// actually serving from. Requires a body of {"confirm": "RESET"} as a
+// minimal guard against an accidental call — this is not real
+// authentication and should be removed or properly secured before this CRM
+// has real users depending on its data.
+router.post("/admin/reset-instructors", async (req, res) => {
+  const body = req.body as { confirm?: string };
+  if (body.confirm !== "RESET") {
+    res.status(400).json({ ok: false, error: 'Send {"confirm":"RESET"} in the request body to proceed.' });
+    return;
+  }
+  await db.delete(instructorsTable);
+  await db.delete(uploadsTable);
+  await db.delete(teachosIdReferenceTable);
+  res.json({ ok: true, message: "instructors, uploads, and teachos_id_reference tables cleared." });
+});
+
 export default router;
