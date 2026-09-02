@@ -150,8 +150,20 @@ export default function DashboardPage() {
         </div>
 
         <div className="rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6">
-          <div className="mb-5 flex items-start justify-between"><div><p className="font-mono-ui text-[10px] uppercase tracking-[0.17em] text-muted-foreground">Role mix</p><h2 className="mt-1 text-[16px] font-extrabold tracking-[-0.03em]">Most represented designations</h2></div><ArrowDownRight size={17} className="text-muted-foreground" /></div>
-          <div className="space-y-3">{dashboard.designations.slice(0, 6).map((item) => <div key={item.name} className="flex items-center justify-between border-b border-border/70 pb-2.5 text-[12px]"><span className="font-semibold">{item.name}</span><span className="font-mono-ui text-muted-foreground">{item.count}</span></div>)}</div>
+          <div className="mb-5 flex items-start justify-between"><div><p className="font-mono-ui text-[10px] uppercase tracking-[0.17em] text-muted-foreground">Role mix &middot; by subject area</p><h2 className="mt-1 text-[16px] font-extrabold tracking-[-0.03em]">Instructors by subject</h2></div><ArrowDownRight size={17} className="text-muted-foreground" /></div>
+          {/* Grouped by classified subject area (Frontend/Backend/GenAI/...,
+              English/Aptitude/Math), not raw designation title — an
+              "Instructor" and a "Faculty Trainee" in the same department are
+              both counted instructors in the same area, and showing them as
+              separate line items understated each area's real headcount.
+              Source: report.department.{tech,non_tech}.areas (same
+              classification the Subject filter on Instructor Details uses),
+              not dashboard.designations. */}
+          <div className="max-h-[280px] space-y-3 overflow-y-auto pr-1">
+            {[...(report?.department?.tech?.areas ?? []), ...(report?.department?.non_tech?.areas ?? [])]
+              .sort((a, b) => b.count - a.count)
+              .map((item) => <div key={item.area} className="flex items-center justify-between border-b border-border/70 pb-2.5 text-[12px]"><span className="font-semibold">{item.area}</span><span className="font-mono-ui text-muted-foreground">{item.count}</span></div>)}
+          </div>
         </div>
       </section>
 
@@ -173,8 +185,8 @@ export default function DashboardPage() {
           </div> : <div className="grid h-[230px] place-items-center text-[12px] text-muted-foreground">No movement recorded yet.</div>}
         </div>
         <div className="rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6">
-          <div className="mb-6 flex items-start justify-between"><div><p className="font-mono-ui text-[10px] uppercase tracking-[0.17em] text-muted-foreground">Distribution</p><h2 className="mt-1 text-[17px] font-extrabold tracking-[-0.03em]">By sub-department</h2></div><Link href="/instructors" data-testid="link-view-instructors-distribution" className="text-muted-foreground hover:text-foreground"><ArrowUpRight size={17} /></Link></div>
-          <div className="space-y-5">{dashboard.sub_departments.slice(0, 5).map((item, index) => <div key={item.name}><div className="mb-2 flex justify-between text-[12px]"><span className="font-semibold">{item.name}</span><span className="font-mono-ui text-muted-foreground">{item.count}</span></div><div className="h-2 overflow-hidden rounded-full bg-secondary"><div className={`h-full rounded-full ${index === 0 ? 'bg-primary' : index === 1 ? 'bg-[#5a9b9a]' : index === 2 ? 'bg-accent' : 'bg-[#9fb4c9]'}`} style={{ width: `${(item.count / maxDept) * 100}%` }} /></div></div>)}</div>
+          <div className="mb-6 flex items-start justify-between"><div><p className="font-mono-ui text-[10px] uppercase tracking-[0.17em] text-muted-foreground">Distribution &middot; {dashboard.sub_departments.length} groups</p><h2 className="mt-1 text-[17px] font-extrabold tracking-[-0.03em]">By sub-department</h2></div><Link href="/instructors" data-testid="link-view-instructors-distribution" className="text-muted-foreground hover:text-foreground"><ArrowUpRight size={17} /></Link></div>
+          <div className="max-h-[280px] space-y-5 overflow-y-auto pr-1">{dashboard.sub_departments.map((item, index) => <div key={item.name}><div className="mb-2 flex justify-between text-[12px]"><span className="font-semibold">{item.name}</span><span className="font-mono-ui text-muted-foreground">{item.count}</span></div><div className="h-2 overflow-hidden rounded-full bg-secondary"><div className={`h-full rounded-full ${index === 0 ? 'bg-primary' : index === 1 ? 'bg-[#5a9b9a]' : index === 2 ? 'bg-accent' : 'bg-[#9fb4c9]'}`} style={{ width: `${(item.count / maxDept) * 100}%` }} /></div></div>)}</div>
         </div>
       </section>
     </div>}
