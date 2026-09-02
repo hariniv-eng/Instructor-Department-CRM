@@ -11,7 +11,6 @@ import { desc } from "drizzle-orm";
 import { config } from "../lib/connectors/config";
 import { fetchDarwinRowsBoth, DarwinboxError } from "../lib/connectors/darwinbox";
 import { fetchExitRows, DarwinboxExitsError } from "../lib/connectors/darwinboxExits";
-import { fetchTeachosRows, BigQueryTeachosError } from "../lib/connectors/bigquery";
 import { fetchNiatInstructorDetailsRows, NiatInstructorDetailsError } from "../lib/connectors/niatInstructorDetails";
 import { storeDarwinboxActive, storeDarwinboxExits, storeDarwinboxFullRoster, storeTeachosDeployment } from "../lib/storeRaw";
 import { reconcileDarwin, reconcileDarwinFullRosterFallback, reconcileTeachos, reconcileTeachosEmployeeIdReference, recomputeStatuses } from "../lib/reconcile";
@@ -76,14 +75,25 @@ async function runDarwinboxExitsSync(): Promise<SyncResult> {
 
 async function runTeachosSync(): Promise<SyncResult> {
   try {
-    const rows = await fetchTeachosRows();
+    // Switched from fetchTeachosRows() (bigquery.ts, table
+    // niat_instructor_managers_and_instructors_details) to
+    // fetchNiatInstructorDetailsRows() (niatInstructorDetails.ts, table
+    // niat_instructor_details) — the latter carries employee_id inline on
+    // every row, which reconcileTeachos() now reads directly and matches on
+    // first (see the rowEmployeeId handling there), instead of relying on
+    // fragile full-name string matching that produced duplicate
+    // "needs_review" records for anyone whose TeachOS/Darwin name spellings
+    // didn't line up exactly. Tradeoff: niat_instructor_details has no
+    // instructor_manager / instructor_manager_mail columns, so
+    // teachosManager goes unset via this path for now.
+    const rows = await fetchNiatInstructorDetailsRows();
     const stored = await storeTeachosDeployment(rows);
     await reconcileTeachos(rows);
     await recomputeStatuses();
-    await db.insert(uploadsTable).values({ source: "TeachOS", filename: "BigQuery sync (raw + reconciled)", rowCount: stored });
+    await db.insert(uploadsTable).values({ source: "TeachOS", filename: "BigQuery sync (niat_instructor_details, raw + reconciled)", rowCount: stored });
     return { ok: true, source: "teachos_live", stored, synced_at: new Date().toISOString() };
   } catch (e) {
-    const message = e instanceof BigQueryTeachosError ? e.message : `Unexpected error: ${(e as Error).message}`;
+    const message = e instanceof NiatInstructorDetailsError ? e.message : `Unexpected error: ${(e as Error).message}`;
     return { ok: false, source: "teachos_live", error: message, synced_at: new Date().toISOString() };
   }
 }
