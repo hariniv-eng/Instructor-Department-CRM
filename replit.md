@@ -1,10 +1,11 @@
-# [Project name]
+# Instructor Department CRM
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+An internal instructor-operations CRM for tracking headcount, source reconciliation, department classification, uploads, and workforce status.
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
+- Start the `artifacts/instructor-crm: web` workflow for the Vite frontend.
+- Start the `artifacts/api-server: API Server` workflow for the Express API.
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
@@ -22,15 +23,22 @@ _Replace the heading above with the project's name, and this line with one sente
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/instructor-crm/` — React/Vite CRM frontend, served at `/`
+- `artifacts/api-server/` — Express API, served at `/api`
+- `lib/api-spec/openapi.yaml` — source of truth for API contracts
+- `lib/api-client-react/` and `lib/api-zod/` — generated API client and validation types
+- `lib/db/src/schema/index.ts` — Drizzle database schema
+- `artifacts/instructor-crm/src/index.css` — frontend theme and global styles
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- Frontend and API run as separate artifact-owned workflows and communicate through relative `/api` URLs.
+- API response types are generated from the OpenAPI contract; regenerate after changing the contract.
+- The development database schema is managed with Drizzle and initialized with the DB package's `push` script.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+The app provides an instructor workforce dashboard, searchable instructor records, source upload history, reconciliation status, and reporting across departments, campuses, managers, payroll classification, and deployment state.
 
 ## User preferences
 
@@ -38,7 +46,9 @@ _Populate as you build — explicit user instructions worth remembering across s
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- A fresh database must run `pnpm --filter @workspace/db run push` before the dashboard APIs will work.
+- The CRM starts with an empty database. Populate it through source uploads or configured live-sync connectors.
+- Do not run `pnpm dev` at the workspace root; use the artifact workflows.
 
 ## Pointers
 

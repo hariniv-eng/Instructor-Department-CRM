@@ -447,6 +447,18 @@ components:
         designation: { type: ["string", "null"] }
     InstructorSummary:
       type: object
+      required:
+        - id
+        - full_name
+        - employee_id
+        - designation
+        - department
+        - dept_bucket
+        - dept_area
+        - is_payroll
+        - deployment_status
+        - institutes
+        - manager
       properties:
         id: { type: number }
         full_name: { type: string }

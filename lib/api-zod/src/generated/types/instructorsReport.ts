@@ -11,6 +11,7 @@ import type { InstructorsReportDepartment } from './instructorsReportDepartment'
 import type { InstructorsReportDeployment } from './instructorsReportDeployment';
 import type { InstructorsReportKpis } from './instructorsReportKpis';
 import type { InstructorsReportPayroll } from './instructorsReportPayroll';
+import type { InstructorSummary } from './instructorSummary';
 import type { ReportPerson } from './reportPerson';
 
 export interface InstructorsReport {
@@ -23,4 +24,6 @@ export interface InstructorsReport {
   managers: GroupedInstructors[];
   deployment: InstructorsReportDeployment;
   mentors: ReportPerson[];
+  /** Every person counted in kpis.total_instructor_count, sorted by name. Backs a click-to-expand details view under the headline count. */
+  instructors: InstructorSummary[];
 }

@@ -417,7 +417,20 @@ export const GetReportsInstructorsResponse = zod.object({
   "full_name": zod.string().optional(),
   "employee_id": zod.string().nullish(),
   "designation": zod.string().nullish()
-}))
+})),
+  "instructors": zod.array(zod.object({
+  "id": zod.number(),
+  "full_name": zod.string(),
+  "employee_id": zod.string().nullable(),
+  "designation": zod.string().nullable(),
+  "department": zod.string().nullable(),
+  "dept_bucket": zod.string().nullable(),
+  "dept_area": zod.string().nullable(),
+  "is_payroll": zod.boolean(),
+  "deployment_status": zod.string().nullable(),
+  "institutes": zod.array(zod.string()),
+  "manager": zod.string().nullable()
+})).describe('Every person counted in kpis.total_instructor_count, sorted by name. Backs a click-to-expand details view under the headline count.')
 })
 
 

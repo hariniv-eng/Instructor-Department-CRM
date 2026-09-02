@@ -253,6 +253,27 @@ export interface GroupedInstructors {
   instructors?: ReportPerson[];
 }
 
+export interface InstructorSummary {
+  id: number;
+  full_name: string;
+  /** @nullable */
+  employee_id: string | null;
+  /** @nullable */
+  designation: string | null;
+  /** @nullable */
+  department: string | null;
+  /** @nullable */
+  dept_bucket: string | null;
+  /** @nullable */
+  dept_area: string | null;
+  is_payroll: boolean;
+  /** @nullable */
+  deployment_status: string | null;
+  institutes: string[];
+  /** @nullable */
+  manager: string | null;
+}
+
 export interface InstructorsReport {
   /** total_instructor_count is the headline "TeachOS instructor count" figure. */
   kpis: InstructorsReportKpis;
@@ -263,6 +284,8 @@ export interface InstructorsReport {
   managers: GroupedInstructors[];
   deployment: InstructorsReportDeployment;
   mentors: ReportPerson[];
+  /** Every person counted in kpis.total_instructor_count, sorted by name. Backs a click-to-expand details view under the headline count. */
+  instructors: InstructorSummary[];
 }
 
 export type ListInstructorsParams = {
