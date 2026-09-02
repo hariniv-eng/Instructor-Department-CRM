@@ -12,8 +12,9 @@ import { config } from "../lib/connectors/config";
 import { fetchDarwinRowsBoth, DarwinboxError } from "../lib/connectors/darwinbox";
 import { fetchExitRows, DarwinboxExitsError } from "../lib/connectors/darwinboxExits";
 import { fetchTeachosRows, BigQueryTeachosError } from "../lib/connectors/bigquery";
+import { fetchNiatInstructorDetailsRows, NiatInstructorDetailsError } from "../lib/connectors/niatInstructorDetails";
 import { storeDarwinboxActive, storeDarwinboxExits, storeDarwinboxFullRoster, storeTeachosDeployment } from "../lib/storeRaw";
-import { reconcileDarwin, reconcileDarwinFullRosterFallback, reconcileTeachos, recomputeStatuses } from "../lib/reconcile";
+import { reconcileDarwin, reconcileDarwinFullRosterFallback, reconcileTeachos, reconcileTeachosEmployeeIdReference, recomputeStatuses } from "../lib/reconcile";
 import { LAST_SYNC, type SyncResult } from "../lib/syncState";
 
 const router: IRouter = Router();
@@ -87,6 +88,36 @@ async function runTeachosSync(): Promise<SyncResult> {
   }
 }
 
+async function runNiatInstructorDetailsSync(): Promise<SyncResult> {
+  try {
+    const rows = await fetchNiatInstructorDetailsRows();
+    const result = await reconcileTeachosEmployeeIdReference(rows);
+    await recomputeStatuses();
+    await db.insert(uploadsTable).values({ source: "NIAT Instructor Details", filename: "BigQuery sync (employee ID mapping)", rowCount: rows.length });
+    console.log(`niat_instructor_details sync: matched=${result.matched} unmatched=${result.unmatched} conflicts=${result.conflicts} total_rows=${result.total_rows}`);
+    return { ok: true, source: "niat_instructor_details_live", stored: rows.length, synced_at: new Date().toISOString() };
+  } catch (e) {
+    const message = e instanceof NiatInstructorDetailsError ? e.message : `Unexpected error: ${(e as Error).message}`;
+    return { ok: false, source: "niat_instructor_details_live", error: message, synced_at: new Date().toISOString() };
+  }
+}
+
+router.post("/sync/niat-instructor-details", async (_req, res) => {
+  const result = await runNiatInstructorDetailsSync();
+  LAST_SYNC.niat_instructor_details_live = result;
+  res.json(result);
+});
+
+router.get("/sync/niat-instructor-details/data", async (_req, res) => {
+  try {
+    const rows = await fetchNiatInstructorDetailsRows();
+    res.json({ count: rows.length, rows });
+  } catch (e) {
+    const message = e instanceof NiatInstructorDetailsError ? e.message : `Unexpected error: ${(e as Error).message}`;
+    res.status(500).json({ ok: false, error: message });
+  }
+});
+
 router.post("/sync/darwinbox", async (_req, res) => {
   const result = await runDarwinboxSync();
   LAST_SYNC.darwinbox_live = result;
@@ -110,6 +141,7 @@ router.get("/sync/status", (_req, res) => {
     darwinbox: { auto_sync_interval_hours: config.DARWINBOX_SYNC_INTERVAL_HOURS, last_sync: LAST_SYNC.darwinbox_live },
     darwinbox_exits: { auto_sync_interval_hours: config.DARWINBOX_EXITS_SYNC_INTERVAL_HOURS, last_sync: LAST_SYNC.darwinbox_exits_live },
     teachos: { auto_sync_interval_hours: config.BIGQUERY_SYNC_INTERVAL_HOURS, last_sync: LAST_SYNC.teachos_live },
+    niat_instructor_details: { auto_sync_interval_hours: 0, last_sync: LAST_SYNC.niat_instructor_details_live },
   });
 });
 
