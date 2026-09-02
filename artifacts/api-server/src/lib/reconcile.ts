@@ -299,40 +299,64 @@ export async function reconcileTeachos(rows: SheetRow[]) {
       // out an employeeId already on file from Darwin.
       ...(rowEmployeeId ? { employeeId: rowEmployeeId } : {}),
     };
-    try {
+    // instructorsTable has TWO separate unique constraints that a TeachOS row
+    // can collide with: employee_id (this person's employee_id is already on
+    // a different record) and teachos_user_id (this exact TeachOS account is
+    // already on a different record — e.g. leftover state from an earlier
+    // reconciliation run, or a genuine duplicate/legacy account). Retry with
+    // whichever specific field(s) postgres names as the conflict dropped,
+    // rather than assuming it's always employeeId — a wrong assumption here
+    // previously surfaced as an unhandled 500 on the whole upload/sync
+    // instead of a per-row skip. See classificationOverrides.ts-style
+    // conflict-flagging used elsewhere in this file for the same pattern.
+    const write = async (vals: typeof values | Omit<typeof values, "employeeId" | "teachosUserId">) => {
       if (match) {
         const institutes = institute ? Array.from(new Set([...match.institutes, institute])) : match.institutes;
-        await db.update(instructorsTable).set({ ...values, institutes }).where(eq(instructorsTable.id, match.id));
+        await db.update(instructorsTable).set({ ...vals, institutes }).where(eq(instructorsTable.id, match.id));
         match.institutes = institutes;
-        match.employeeId = rowEmployeeId ?? match.employeeId;
+        if ("employeeId" in vals && vals.employeeId) match.employeeId = vals.employeeId;
         matchedCount += 1;
       } else {
-        const [created] = await db.insert(instructorsTable).values({ ...values, inDarwin: false, computedStatus: "needs_review", notes: possibleMatchNote(people, fullName) }).returning();
+        const [created] = await db.insert(instructorsTable).values({ ...vals, inDarwin: false, computedStatus: "needs_review", notes: possibleMatchNote(people, fullName) }).returning();
         people.push(created);
         newCount += 1;
       }
-    } catch {
-      // Unique constraint on employeeId — this row's employee_id is already
-      // on a DIFFERENT record (a genuine data conflict, e.g. two TeachOS
-      // accounts resolving to the same person). Fall back to writing
-      // everything except employeeId, and leave a note instead of crashing
-      // the whole sync/upload — mirrors the conflict handling in
-      // reconcileTeachosEmployeeIdReference() below.
-      const { employeeId: _dropped, ...safeValues } = values;
+    };
+    try {
+      await write(values);
+    } catch (e) {
+      // node-postgres populates .constraint on a unique_violation (23505),
+      // but check .detail too (e.g. 'Key (teachos_user_id)=(...) already
+      // exists.') in case it doesn't survive drizzle's error wrapping —
+      // belt-and-suspenders so a naming quirk here can't reproduce the
+      // unhandled-500 failure mode this replaces.
+      const cause = (e as { cause?: { constraint?: string; detail?: string } })?.cause;
+      const signal = `${cause?.constraint ?? ""} ${cause?.detail ?? ""}`;
+      const droppedFields: string[] = [];
+      let safeValues = { ...values };
+      if (signal.includes("employee_id") || signal.trim() === "") {
+        const { employeeId: _e, ...rest } = safeValues;
+        safeValues = rest as typeof safeValues;
+        droppedFields.push(`employee_id ${rowEmployeeId}`);
+      }
+      if (signal.includes("teachos_user_id")) {
+        const { teachosUserId: _t, ...rest } = safeValues;
+        safeValues = rest as typeof safeValues;
+        droppedFields.push(`teachos_user_id ${teachosUserId}`);
+      }
+      try {
+        await write(safeValues);
+      } catch {
+        // Still conflicting even with both unique fields dropped — give up
+        // on this row rather than crashing the whole upload/sync; it'll show
+        // up as a name-only "needs_review" entry for manual cleanup.
+        droppedFields.push("(and a second conflict on retry — needs manual review)");
+        if (!match) console.warn(`reconcileTeachos: dropped row for "${fullName}" (${teachosUserId}) — repeated unique-constraint conflict on insert.`);
+      }
       if (match) {
-        const institutes = institute ? Array.from(new Set([...match.institutes, institute])) : match.institutes;
-        await db.update(instructorsTable).set({ ...safeValues, institutes }).where(eq(instructorsTable.id, match.id));
-        match.institutes = institutes;
-        matchedCount += 1;
-      } else {
-        const [created] = await db.insert(instructorsTable).values({
-          ...safeValues,
-          inDarwin: false,
-          computedStatus: "needs_review",
-          notes: `TeachOS lists employee_id ${rowEmployeeId} for this person, but that id is already assigned to a different record. Needs manual review.`,
-        }).returning();
-        people.push(created);
-        newCount += 1;
+        await db.update(instructorsTable).set({
+          notes: `TeachOS lists ${droppedFields.join(", ")} for this person, but that value is already assigned to a different record. Needs manual review.`,
+        }).where(eq(instructorsTable.id, match.id));
       }
     }
   }
