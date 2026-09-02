@@ -5,7 +5,7 @@
 // behavior stays identical regardless of where the rows came from.
 
 import { and, eq } from "drizzle-orm";
-import { db, instructorsTable, darwinboxExitsTable } from "@workspace/db";
+import { db, instructorsTable, darwinboxExitsTable, teachosIdReferenceTable } from "@workspace/db";
 import { EXCLUDED_EMPLOYEES, PAYROLL_CONVERTED_EMPLOYEES, type ExcludedOverride, type PayrollConvertedOverride } from "../data/classificationOverrides";
 import { classifyDepartment, classifyDeployment } from "./departmentTaxonomy";
 
@@ -259,10 +259,24 @@ export async function reconcileTeachos(rows: SheetRow[]) {
   let matchedCount = 0;
   await db.update(instructorsTable).set({ inTeachos: false, teachosRole: null, teachosCategory: null, teachosManager: null, institutes: [] });
   const people = await db.select().from(instructorsTable);
+  // Durable employee-ID bridge from the most recent "TeachOS ID Reference"
+  // upload/sync (see teachosIdReferenceTable + reconcileTeachosEmployeeIdReference
+  // below). Consulting it here — not just as a later one-off patch step —
+  // lets a TeachOS instructor whose name string doesn't closely match their
+  // Darwin name (nickname, spacing, transliteration, honorific) still
+  // resolve to the SAME existing person instead of being inserted as a
+  // duplicate "needs_review" record.
+  const bridgeByTeachosId = new Map(
+    (await db.select().from(teachosIdReferenceTable))
+      .filter((row) => row.instructorUserId)
+      .map((row) => [row.instructorUserId as string, row.employeeId]),
+  );
   for (const item of rows) {
     const fullName = cell(item, "instructor_name", "Instructor Name");
     if (!fullName) continue;
-    const match = findMatch(people, fullName);
+    const teachosUserId = cell(item, "instructor_user_id", "TeachOS User Id");
+    const bridgedEmployeeId = teachosUserId ? bridgeByTeachosId.get(teachosUserId) : undefined;
+    const match = findMatch(people, fullName, bridgedEmployeeId);
     const institute = cell(item, "institute_name", "Institute Name");
     const values = {
       teachosUserId: cell(item, "instructor_user_id", "TeachOS User Id"),
@@ -405,6 +419,18 @@ export async function reconcileTeachosEmployeeIdReference(rows: SheetRow[]) {
     const employeeId = cell(item, "Employee Id", "employee_id");
     const fullName = cell(item, "Employee Name", "Instructor Name", "instructor_name", "full_name");
     if (!employeeId) continue;
+    // Persist this instructor_user_id -> employee_id mapping durably, so a
+    // later reconcileTeachos() run (a fresh upload, or the live TeachOS
+    // sync) can consult it during matching instead of relying on fuzzy
+    // full-name string equality alone. Keyed on instructorUserId — a row
+    // without one can't be looked back up by a future TeachOS row anyway
+    // (reconcileTeachos matches on instructor_user_id), so it's skipped here.
+    if (teachosUserId) {
+      await db
+        .insert(teachosIdReferenceTable)
+        .values({ instructorUserId: teachosUserId, employeeId, fullName })
+        .onConflictDoUpdate({ target: teachosIdReferenceTable.instructorUserId, set: { employeeId, fullName, syncedAt: new Date() } });
+    }
     const match = (teachosUserId && byTeachosId.get(teachosUserId)) || (fullName ? byName.get(normalize(fullName)) : undefined);
     if (!match) {
       unmatchedCount += 1;
