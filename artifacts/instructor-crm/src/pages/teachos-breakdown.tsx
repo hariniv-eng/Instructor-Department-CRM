@@ -89,7 +89,7 @@ export default function TeachosBreakdownPage() {
       />
       <BucketPanel
         title="Payroll converted"
-        subtitle="No Darwin record, but confirmed against the Payroll Candidates reference file"
+        subtitle="No Darwin record — confirmed payroll-converted via the frozen, hand-reviewed reference list (no longer driven by a live file upload)"
         icon={<Wallet size={18} />}
         bucket={data.not_mapped.payroll_converted}
         emptyLabel="No payroll-converted candidates"
@@ -107,7 +107,7 @@ export default function TeachosBreakdownPage() {
       />
       <BucketPanel
         title="Needs review"
-        subtitle="No Darwin record anywhere, not on the payroll list, no exclusion override — genuinely unresolved"
+        subtitle="No Darwin record anywhere, not on the frozen payroll-converted list, no exclusion override — genuinely unresolved"
         icon={<ListChecks size={18} />}
         bucket={data.not_mapped.needs_review}
         emptyLabel="Nothing left to review"

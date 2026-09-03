@@ -72,10 +72,11 @@ router.get("/reports/instructors", async (_req, res) => {
   //   (a) got an employee_id (via the TeachOS ID reference upload or
   //       Darwin) AND matched Darwin's Instructors-department data directly
   //       (inDarwin && !inDarwinFullRoster) — "normal" instructors, or
-  //   (b) got an employee_id but did NOT match Darwin, and IS confirmed in
-  //       the uploaded Payroll Candidates reference (classification ===
-  //       "payroll_converted", which recomputeStatuses() sets from either
-  //       the hand-maintained override list or payrollCandidateMatched).
+  //   (b) got an employee_id but did NOT match Darwin, and IS confirmed
+  //       payroll-converted (classification === "payroll_converted", which
+  //       recomputeStatuses() now sets only from the frozen, hand-maintained
+  //       PAYROLL_CONVERTED_EMPLOYEES override list — no longer from a live
+  //       Payroll Candidates file upload, removed 2026-09-03).
   // Anyone who never got an employee_id at all is set aside (not counted,
   // not "excluded" either — just pending a future reference file). Anyone
   // with an employee_id who matched neither Darwin nor the payroll

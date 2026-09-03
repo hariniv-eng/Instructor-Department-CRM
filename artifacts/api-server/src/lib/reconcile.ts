@@ -144,13 +144,13 @@ export const recomputeStatuses = async () => {
     const excludedOverride = findOverride<ExcludedOverride>(row, EXCLUDED_EMPLOYEES);
     const deptInfo = classifyDepartment(row.department, row.teachosCategory, row.designation);
     const isDeptExclusion = deptInfo.bucket === "excluded_ops_managers" || deptInfo.bucket === "mentor" || deptInfo.bucket === "instructor_ops";
-    // Payroll-converted status comes from either source: the hand-maintained
-    // override list (a human decision, always wins if present) or a name
-    // match against the most recently uploaded "Payroll Candidates" file
-    // (reconcilePayrollCandidates() below sets payrollCandidateMatched).
+    // Payroll-converted status now comes ONLY from the hand-maintained
+    // override list (a one-time human decision, frozen as of 2026-09-03) —
+    // we no longer match against a live-uploaded "Payroll Candidates" file
+    // (see the removed reconcilePayrollCandidates()); a fresh payroll upload
+    // no longer changes anyone's classification.
     const payrollConverted = !excludedOverride && !isDeptExclusion
       ? findOverride<PayrollConvertedOverride>(row, PAYROLL_CONVERTED_EMPLOYEES)
-        ?? (row.payrollCandidateMatched ? { fullName: row.fullName, reason: "Matched the uploaded Payroll Candidates reference file", decidedDate: new Date().toISOString().slice(0, 10) } satisfies PayrollConvertedOverride : undefined)
       : undefined;
     const exit = findExit(row, exits);
     const deploymentStatus = classifyDeployment(row.institutes);
@@ -504,41 +504,8 @@ export async function reconcileTeachosEmployeeIdReference(rows: SheetRow[]) {
   return { matched: matchedCount, unmatched: unmatchedCount, conflicts: conflictCount, total_rows: rows.length };
 }
 
-// The payroll-candidates reference file (Employee Name, Employee ID — no
-// TeachOS id) — matched by normalized name only, since that's the only key
-// it shares with the instructor register. A match sets payrollCandidateMatched,
-// which recomputeStatuses() treats as equivalent to a hand-maintained
-// PAYROLL_CONVERTED_EMPLOYEES override entry. "Raw snapshot, fully
-// replaced": every row's flag is reset before processing this upload, same
-// pattern as the other sources.
-export async function reconcilePayrollCandidates(rows: SheetRow[]) {
-  let matchedCount = 0;
-  let unmatchedCount = 0;
-  await db.update(instructorsTable).set({ payrollCandidateMatched: false, payrollCandidateNote: null });
-  // Payroll-converted people are, by definition, NOT in Darwin (Darwin is
-  // the official HRMS; payroll-converted instructors are paid outside it,
-  // that's the whole reason they need this separate reference file). Match
-  // the Payroll Candidates file only against the "leftover" pool — TeachOS
-  // instructors who never matched a Darwin record during reconcileTeachos()
-  // — instead of every TeachOS row. This also prevents an accidental name
-  // collision from flagging an already-correctly-classified Darwin employee
-  // as payroll_converted.
-  const people = await db.select().from(instructorsTable).where(and(eq(instructorsTable.inTeachos, true), eq(instructorsTable.inDarwin, false)));
-  const byName = new Map(people.map((p) => [normalize(p.fullName), p]));
-  for (const item of rows) {
-    const fullName = cell(item, "Employee Name", "Full Name", "full_name");
-    const employeeId = cell(item, "Employee Id", "employee_id");
-    if (!fullName) continue;
-    const match = byName.get(normalize(fullName));
-    if (!match) {
-      unmatchedCount += 1;
-      continue;
-    }
-    const conflict = employeeId && match.employeeId && employeeId !== match.employeeId
-      ? `Payroll candidates file lists employee_id ${employeeId} for this name — conflicts with ${match.employeeId} already on file. Needs manual review.`
-      : null;
-    await db.update(instructorsTable).set({ payrollCandidateMatched: true, payrollCandidateNote: conflict }).where(eq(instructorsTable.id, match.id));
-    matchedCount += 1;
-  }
-  return { matched: matchedCount, unmatched: unmatchedCount, total_rows: rows.length };
-}
+// reconcilePayrollCandidates() was removed 2026-09-03 — payroll-converted
+// status now comes only from the frozen PAYROLL_CONVERTED_EMPLOYEES override
+// list in classificationOverrides.ts (see recomputeStatuses() above). A
+// "Payroll Candidates" upload no longer does anything; the upload option was
+// removed from the frontend too.
