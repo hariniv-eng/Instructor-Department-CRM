@@ -6,7 +6,7 @@
 
 import { and, eq } from "drizzle-orm";
 import { db, instructorsTable, darwinboxExitsTable, teachosIdReferenceTable } from "@workspace/db";
-import { EXCLUDED_EMPLOYEES, PAYROLL_CONVERTED_EMPLOYEES, type ExcludedOverride, type PayrollConvertedOverride } from "../data/classificationOverrides";
+import { EXCLUDED_EMPLOYEES, type ExcludedOverride } from "../data/classificationOverrides";
 import { classifyDepartment, classifyDeployment } from "./departmentTaxonomy";
 
 export type SheetRow = Record<string, unknown>;
@@ -144,16 +144,23 @@ export const recomputeStatuses = async () => {
     const excludedOverride = findOverride<ExcludedOverride>(row, EXCLUDED_EMPLOYEES);
     const deptInfo = classifyDepartment(row.department, row.teachosCategory, row.designation);
     const isDeptExclusion = deptInfo.bucket === "excluded_ops_managers" || deptInfo.bucket === "mentor" || deptInfo.bucket === "instructor_ops";
-    // Payroll-converted status now comes ONLY from the hand-maintained
-    // override list (a one-time human decision, frozen as of 2026-09-03) —
-    // we no longer match against a live-uploaded "Payroll Candidates" file
-    // (see the removed reconcilePayrollCandidates()); a fresh payroll upload
-    // no longer changes anyone's classification.
-    const payrollConverted = !excludedOverride && !isDeptExclusion
-      ? findOverride<PayrollConvertedOverride>(row, PAYROLL_CONVERTED_EMPLOYEES)
-      : undefined;
     const exit = findExit(row, exits);
     const deploymentStatus = classifyDeployment(row.institutes);
+    // Payroll-converted status is now fully computed for the TeachOS-only
+    // "leftover" pool — never matched Darwin at all, neither the primary
+    // Instructors-department pass nor the full 3,000+ roster fallback pass
+    // (a full-roster match means inDarwin=true here, so falls out of this
+    // pool automatically and is handled by the ordinary Darwin/TeachOS
+    // presence rules below instead) — via a 3-step cascade that replaces
+    // the frozen PAYROLL_CONVERTED_EMPLOYEES override list entirely
+    // (2026-09-03):
+    //   1. Has a Darwin exit record? -> exit_candidate, set aside as a
+    //      likely-departed employee, not counted as payroll.
+    //   2. TeachOS institute is IIT Kharagpur? -> iit_kharagpur_team, its
+    //      own team, not counted as payroll.
+    //   3. Everyone still left in the pool -> payroll_converted.
+    const isTeachosOnlyLeftover = !!row.inTeachos && !row.inDarwin;
+    const isIitKharagpurCampus = (row.institutes ?? []).some((institute) => /kharagpur/i.test(institute));
 
     let classification: string | null = null;
     let classificationReason: string | null = null;
@@ -175,9 +182,17 @@ export const recomputeStatuses = async () => {
       classification = "instructor_ops";
       classificationReason = "Instructors department, but designation isn't an Instructor or Mentor role — tracked as Instructor Team Operations, not counted as an instructor";
       computedStatus = "instructor_ops";
-    } else if (payrollConverted) {
+    } else if (isTeachosOnlyLeftover && exit) {
+      classification = "exit_candidate";
+      classificationReason = `Darwin exit record found (status: ${exit.status ?? "unknown"}) — set aside from the payroll pipeline as a likely-departed employee, not counted as payroll-converted.`;
+      computedStatus = "exit_candidate";
+    } else if (isTeachosOnlyLeftover && isIitKharagpurCampus) {
+      classification = "iit_kharagpur_team";
+      classificationReason = "TeachOS institute is IIT Kharagpur — tracked as its own team, not counted as a payroll-converted instructor.";
+      computedStatus = "iit_kharagpur_team";
+    } else if (isTeachosOnlyLeftover) {
       classification = "payroll_converted";
-      classificationReason = payrollConverted.reason;
+      classificationReason = "No Darwin record anywhere (primary Instructors department or full 3,000+ roster), no Darwin exit record, not IIT Kharagpur — remainder of the payroll-conversion pipeline.";
       computedStatus = "payroll_converted";
     } else {
       computedStatus = row.inDarwin && row.darwinEmployeeStatus === "Active"
@@ -505,7 +520,9 @@ export async function reconcileTeachosEmployeeIdReference(rows: SheetRow[]) {
 }
 
 // reconcilePayrollCandidates() was removed 2026-09-03 — payroll-converted
-// status now comes only from the frozen PAYROLL_CONVERTED_EMPLOYEES override
-// list in classificationOverrides.ts (see recomputeStatuses() above). A
-// "Payroll Candidates" upload no longer does anything; the upload option was
-// removed from the frontend too.
+// status is now fully computed by recomputeStatuses() above (exit check,
+// then IIT Kharagpur campus check, then remainder = payroll_converted) for
+// the TeachOS-only pool that never matches Darwin at all. The
+// PAYROLL_CONVERTED_EMPLOYEES hand-maintained override list was retired the
+// same day for the same reason. A "Payroll Candidates" upload no longer
+// does anything; the upload option was removed from the frontend too.
