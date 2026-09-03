@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { desc } from "drizzle-orm";
 import { db, uploadsTable, instructorsTable, teachosIdReferenceTable } from "@workspace/db";
-import { reconcileDarwin, reconcileDarwinFullRosterFallback, reconcileTeachos, reconcileExits, reconcileTeachosEmployeeIdReference, reconcilePayrollCandidates, recomputeStatuses, cell, type SheetRow } from "../lib/reconcile";
+import { reconcileDarwin, reconcileDarwinFullRosterFallback, reconcileTeachos, reconcileExits, reconcileTeachosEmployeeIdReference, recomputeStatuses, cell, type SheetRow } from "../lib/reconcile";
 
 const router: IRouter = Router();
 const toApiUpload = (row: typeof uploadsTable.$inferSelect) => ({ id: row.id, source: row.source, filename: row.filename, row_count: row.rowCount, uploaded_at: row.uploadedAt.toISOString() });
@@ -41,7 +41,10 @@ router.post("/uploads", async (req, res) => {
     // they only fill in fields on existing inTeachos=true rows, never create
     // new instructors. See TEACHOS_INSTRUCTOR_COUNT_RULES.md.
     if (body.source === "TeachOS ID Reference") await reconcileTeachosEmployeeIdReference(body.rows);
-    if (body.source === "Payroll Candidates") await reconcilePayrollCandidates(body.rows);
+    // "Payroll Candidates" uploads no longer feed classification (removed
+    // 2026-09-03 — payroll-converted status is now frozen to the
+    // hand-maintained PAYROLL_CONVERTED_EMPLOYEES override list); the upload
+    // option itself was also dropped from the frontend.
     if (body.source === "Exit List") await reconcileExits(body.rows);
     await recomputeStatuses();
   }

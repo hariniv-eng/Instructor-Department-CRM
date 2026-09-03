@@ -56,7 +56,13 @@ router.get("/reports/instructors", async (_req, res) => {
   // below rather than being silently dropped.
   const mentors = rows.filter((r) => r.classification === "mentor");
   const excludedRows = rows.filter((r) => r.classification === "excluded_other_department" || r.classification === "excluded_non_department_team" || r.classification === "excluded_ops_managers");
-  const instructorRows = rows.filter((r) => r.classification !== "mentor" && r.classification !== "excluded_other_department" && r.classification !== "excluded_non_department_team" && r.classification !== "excluded_ops_managers");
+  // Exit candidates and the IIT Kharagpur team are set aside the same way
+  // mentors/excluded people are — a real category, not silently dropped,
+  // but not counted as an instructor either (see reconcile.ts's payroll
+  // cascade, 2026-09-03).
+  const exitCandidateRows = rows.filter((r) => r.classification === "exit_candidate");
+  const iitKharagpurRows = rows.filter((r) => r.classification === "iit_kharagpur_team");
+  const instructorRows = rows.filter((r) => r.classification !== "mentor" && r.classification !== "excluded_other_department" && r.classification !== "excluded_non_department_team" && r.classification !== "excluded_ops_managers" && r.classification !== "exit_candidate" && r.classification !== "iit_kharagpur_team");
 
   // How the "matched" figure breaks down by where the Darwin match came
   // from: primary Instructors-department sync vs the full-roster fallback
@@ -72,10 +78,11 @@ router.get("/reports/instructors", async (_req, res) => {
   //   (a) got an employee_id (via the TeachOS ID reference upload or
   //       Darwin) AND matched Darwin's Instructors-department data directly
   //       (inDarwin && !inDarwinFullRoster) — "normal" instructors, or
-  //   (b) got an employee_id but did NOT match Darwin, and IS confirmed in
-  //       the uploaded Payroll Candidates reference (classification ===
-  //       "payroll_converted", which recomputeStatuses() sets from either
-  //       the hand-maintained override list or payrollCandidateMatched).
+  //   (b) got an employee_id but did NOT match Darwin, and IS confirmed
+  //       payroll-converted (classification === "payroll_converted", the
+  //       remainder of recomputeStatuses()'s exit-candidate / IIT-Kharagpur
+  //       / payroll cascade for the TeachOS-only pool — see reconcile.ts,
+  //       2026-09-03).
   // Anyone who never got an employee_id at all is set aside (not counted,
   // not "excluded" either — just pending a future reference file). Anyone
   // with an employee_id who matched neither Darwin nor the payroll
@@ -157,6 +164,8 @@ router.get("/reports/instructors", async (_req, res) => {
       exited_excluded_from_count: exitedInstructorRows.length,
       mentors_count: mentors.length,
       excluded_count: excludedRows.length,
+      exit_candidates_count: exitCandidateRows.length,
+      iit_kharagpur_count: iitKharagpurRows.length,
       // New employee-ID-mapping pipeline breakdown (see comment above
       // countedInstructorRows): who's actually feeding the headline total,
       // and who's sitting in each of the two "not counted yet" buckets.
@@ -190,6 +199,8 @@ router.get("/reports/instructors", async (_req, res) => {
       unknown: unknownDeploymentRows.length,
     },
     mentors: mentors.map(toApiPerson),
+    exit_candidates: exitCandidateRows.map(toApiPerson),
+    iit_kharagpur_team: iitKharagpurRows.map(toApiPerson),
     // Set-aside buckets from the employee-ID-mapping pipeline — not counted
     // in kpis.total_instructor_count, but surfaced so they're reviewable
     // instead of silently dropped.
@@ -211,12 +222,15 @@ router.get("/reports/instructors", async (_req, res) => {
 // A dedicated breakdown of the TeachOS side of the standing rule, for the
 // "TeachOS Breakdown" dashboard tab: how many TeachOS instructors exist,
 // how many cleanly matched Darwin's Instructors department, and — of the
-// ones that didn't — where each one actually landed (found in Darwin under
-// a different department, confirmed payroll-converted, individually
-// excluded, or genuinely unresolved). The four "not mapped" buckets are
-// mutually exclusive and sum to not_mapped.total: other_department requires
-// in_darwin=true (matched via reconcileDarwinFullRosterFallback()), the
-// other three all require in_darwin=false.
+// ones that didn't — where each one actually landed. For the pool that
+// never matches Darwin at all (other_department requires in_darwin=true,
+// matched via reconcileDarwinFullRosterFallback() — everyone else here has
+// in_darwin=false), recomputeStatuses() now runs an exhaustive cascade:
+// individually excluded, then a Darwin exit record (exit_candidates), then
+// an IIT Kharagpur institute (iit_kharagpur), then whatever's left is
+// payroll_converted — so needs_review should normally end up empty, but is
+// kept as a safety-net bucket. All "not mapped" buckets are mutually
+// exclusive and sum to not_mapped.total.
 const toApiCandidate = (row: InstructorRow) => ({
   id: row.id,
   full_name: row.fullName,
@@ -239,9 +253,17 @@ router.get("/reports/teachos-breakdown", async (_req, res) => {
 
   const otherDepartmentRows = notMappedRows.filter((r) => r.inDarwin && r.inDarwinFullRoster);
   const notInDarwinRows = notMappedRows.filter((r) => !r.inDarwin);
-  const payrollRows = notInDarwinRows.filter((r) => r.classification === "payroll_converted");
   const excludedRows = notInDarwinRows.filter((r) => r.classification === "excluded_other_department" || r.classification === "excluded_non_department_team");
-  const needsReviewRows = notInDarwinRows.filter((r) => r.classification !== "payroll_converted" && r.classification !== "excluded_other_department" && r.classification !== "excluded_non_department_team");
+  const exitCandidateRows = notInDarwinRows.filter((r) => r.classification === "exit_candidate");
+  const iitKharagpurRows = notInDarwinRows.filter((r) => r.classification === "iit_kharagpur_team");
+  const payrollRows = notInDarwinRows.filter((r) => r.classification === "payroll_converted");
+  const needsReviewRows = notInDarwinRows.filter((r) =>
+    r.classification !== "excluded_other_department"
+    && r.classification !== "excluded_non_department_team"
+    && r.classification !== "exit_candidate"
+    && r.classification !== "iit_kharagpur_team"
+    && r.classification !== "payroll_converted"
+  );
 
   res.json({
     total_active: rows.length,
@@ -254,6 +276,14 @@ router.get("/reports/teachos-breakdown", async (_req, res) => {
       other_department: {
         count: otherDepartmentRows.length,
         people: otherDepartmentRows.map(toApiCandidate),
+      },
+      exit_candidates: {
+        count: exitCandidateRows.length,
+        people: exitCandidateRows.map(toApiCandidate),
+      },
+      iit_kharagpur: {
+        count: iitKharagpurRows.length,
+        people: iitKharagpurRows.map(toApiCandidate),
       },
       payroll_converted: {
         count: payrollRows.length,
@@ -296,6 +326,9 @@ router.get("/reports/darwin-breakdown", async (_req, res) => {
   const instructorRows = rows.filter(
     (r) => !r.classification && (r.deptBucket === "tech" || r.deptBucket === "non_tech"),
   );
+  // Mentors get their own headline number alongside Instructors — they're a
+  // real, legitimate category the department carries, not an "other" in the
+  // leftover sense the others.* buckets below represent.
   const mentorRows = rows.filter((r) => r.classification === "mentor");
   const opsRows = rows.filter(
     (r) => r.classification === "excluded_ops_managers" || r.classification === "instructor_ops",
@@ -315,6 +348,8 @@ router.get("/reports/darwin-breakdown", async (_req, res) => {
     byArea[key] = (byArea[key] ?? 0) + 1;
   }
 
+  const othersTotal = opsRows.length + excludedRows.length + payrollEdgeCaseRows.length + otherRows.length;
+
   res.json({
     total_darwin_instructors_dept: rows.length,
     instructors: {
@@ -322,9 +357,9 @@ router.get("/reports/darwin-breakdown", async (_req, res) => {
       by_area: byArea,
       people: instructorRows.map(toApiCandidate),
     },
+    mentors: { count: mentorRows.length, people: mentorRows.map(toApiCandidate) },
     others: {
-      total: rows.length - instructorRows.length,
-      mentors: { count: mentorRows.length, people: mentorRows.map(toApiCandidate) },
+      total: othersTotal,
       ops_delivery_support: { count: opsRows.length, people: opsRows.map(toApiCandidate) },
       excluded: { count: excludedRows.length, people: excludedRows.map(toApiCandidate) },
       payroll_edge_case: { count: payrollEdgeCaseRows.length, people: payrollEdgeCaseRows.map(toApiCandidate) },

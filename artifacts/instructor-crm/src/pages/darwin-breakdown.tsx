@@ -5,9 +5,9 @@ import { PageIntro, EmptyState, QueryError, SkeletonBlock, TopStat, MiniStat, Bu
 type DarwinBreakdown = {
   total_darwin_instructors_dept: number;
   instructors: { count: number; by_area: Record<string, number>; people: Bucket['people'] };
+  mentors: Bucket;
   others: {
     total: number;
-    mentors: Bucket;
     ops_delivery_support: Bucket;
     excluded: Bucket;
     payroll_edge_case: Bucket;
@@ -49,9 +49,10 @@ export default function DarwinBreakdownPage() {
 
     {data && <div className="space-y-5 animate-rise">
       {/* Headline KPI row */}
-      <section className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+      <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <TopStat label="Darwin Instructors dept" value={formatKpi(data.total_darwin_instructors_dept)} meta="Darwinbox, department = Instructors – ..." icon={<Building2 size={17} />} tone="navy" />
         <TopStat label="Actual instructors" value={formatKpi(data.instructors.count)} meta={`${pct(data.instructors.count, data.total_darwin_instructors_dept)} of the department`} icon={<GraduationCap size={17} />} tone="teal" />
+        <TopStat label="Mentors" value={formatKpi(data.mentors.count)} meta={`${pct(data.mentors.count, data.total_darwin_instructors_dept)} of the department`} icon={<Users size={17} />} tone="indigo" />
         <TopStat label="Others" value={formatKpi(data.others.total)} meta={`${pct(data.others.total, data.total_darwin_instructors_dept)} of the department`} icon={<ShieldQuestion size={17} />} tone="saffron" alert />
       </section>
 
@@ -63,8 +64,7 @@ export default function DarwinBreakdownPage() {
             <h2 className="mt-1 text-[16px] font-extrabold tracking-[-0.03em]">Who else the department carries</h2>
           </div>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          <MiniStat label="Mentors" value={data.others.mentors.count} meta="Mentors dept, or Mentor-titled" tone="indigo" />
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <MiniStat label="Ops / Delivery Support" value={data.others.ops_delivery_support.count} meta="Central managers, not teaching" tone="muted" />
           <MiniStat label="Excluded" value={data.others.excluded.count} meta="Individually reviewed, not an instructor" tone="amber" />
           <MiniStat label="Payroll edge case" value={data.others.payroll_edge_case.count} meta="Payroll-converted despite a Darwin match" tone="green" />
@@ -100,10 +100,10 @@ export default function DarwinBreakdownPage() {
         title="Mentors"
         subtitle="Mentors department, or a Mentor-titled person embedded in a tech/non-tech sub-department"
         icon={<GraduationCap size={18} />}
-        bucket={data.others.mentors}
+        bucket={data.mentors}
         emptyLabel="No mentors"
         columns={['name', 'employee_id', 'darwin_dept', 'designation']}
-        defaultOpen={true}
+        defaultOpen={false}
       />
       <BucketPanel
         title="Ops / Delivery Support"
