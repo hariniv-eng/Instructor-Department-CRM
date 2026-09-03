@@ -9,6 +9,7 @@ import DashboardPage from '@/pages/dashboard';
 import InstructorDetailPage from '@/pages/instructor-detail';
 import InstructorsPage from '@/pages/instructors';
 import UploadsPage from '@/pages/uploads';
+import TeachosBreakdownPage from '@/pages/teachos-breakdown';
 import {
   Route,
   Switch,
@@ -28,6 +29,7 @@ function Router() {
           <Route path="/" component={DashboardPage} />
           <Route path="/instructors" component={InstructorsPage} />
           <Route path="/instructors/:id" component={InstructorDetailPage} />
+          <Route path="/teachos-breakdown" component={TeachosBreakdownPage} />
           <Route path="/uploads" component={UploadsPage} />
           <Route component={NotFound} />
         </Switch>

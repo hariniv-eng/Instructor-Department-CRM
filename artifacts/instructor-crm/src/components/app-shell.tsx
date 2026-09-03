@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Bell, ChevronRight, Database, LayoutDashboard, Menu, UploadCloud, UsersRound, X } from 'lucide-react';
+import { Bell, ChevronRight, Database, GitBranch, LayoutDashboard, Menu, UploadCloud, UsersRound, X } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 
 const navItems = [
   { href: '/', label: 'Overview', icon: LayoutDashboard },
   { href: '/instructors', label: 'Instructors', icon: UsersRound },
+  { href: '/teachos-breakdown', label: 'TeachOS Breakdown', icon: GitBranch },
   { href: '/uploads', label: 'Source uploads', icon: UploadCloud },
 ];
 
@@ -75,7 +76,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Menu size={18} />
             </button>
             <div className="hidden items-center gap-2 text-[12px] text-muted-foreground sm:flex">
-              <span>Instructor Department</span><ChevronRight size={13} /><span className="font-semibold text-foreground">{location === '/' ? 'Overview' : location.startsWith('/uploads') ? 'Source uploads' : 'Instructors'}</span>
+              <span>Instructor Department</span><ChevronRight size={13} /><span className="font-semibold text-foreground">{location === '/' ? 'Overview' : location.startsWith('/uploads') ? 'Source uploads' : location.startsWith('/teachos-breakdown') ? 'TeachOS Breakdown' : 'Instructors'}</span>
             </div>
             <span className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-muted-foreground sm:hidden">ID / OPS</span>
           </div>
