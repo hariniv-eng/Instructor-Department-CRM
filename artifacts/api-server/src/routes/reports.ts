@@ -296,6 +296,9 @@ router.get("/reports/darwin-breakdown", async (_req, res) => {
   const instructorRows = rows.filter(
     (r) => !r.classification && (r.deptBucket === "tech" || r.deptBucket === "non_tech"),
   );
+  // Mentors get their own headline number alongside Instructors — they're a
+  // real, legitimate category the department carries, not an "other" in the
+  // leftover sense the others.* buckets below represent.
   const mentorRows = rows.filter((r) => r.classification === "mentor");
   const opsRows = rows.filter(
     (r) => r.classification === "excluded_ops_managers" || r.classification === "instructor_ops",
@@ -315,6 +318,8 @@ router.get("/reports/darwin-breakdown", async (_req, res) => {
     byArea[key] = (byArea[key] ?? 0) + 1;
   }
 
+  const othersTotal = opsRows.length + excludedRows.length + payrollEdgeCaseRows.length + otherRows.length;
+
   res.json({
     total_darwin_instructors_dept: rows.length,
     instructors: {
@@ -322,9 +327,9 @@ router.get("/reports/darwin-breakdown", async (_req, res) => {
       by_area: byArea,
       people: instructorRows.map(toApiCandidate),
     },
+    mentors: { count: mentorRows.length, people: mentorRows.map(toApiCandidate) },
     others: {
-      total: rows.length - instructorRows.length,
-      mentors: { count: mentorRows.length, people: mentorRows.map(toApiCandidate) },
+      total: othersTotal,
       ops_delivery_support: { count: opsRows.length, people: opsRows.map(toApiCandidate) },
       excluded: { count: excludedRows.length, people: excludedRows.map(toApiCandidate) },
       payroll_edge_case: { count: payrollEdgeCaseRows.length, people: payrollEdgeCaseRows.map(toApiCandidate) },
