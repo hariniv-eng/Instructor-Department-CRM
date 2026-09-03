@@ -207,4 +207,130 @@ router.get("/reports/instructors", async (_req, res) => {
   });
 });
 
+
+// A dedicated breakdown of the TeachOS side of the standing rule, for the
+// "TeachOS Breakdown" dashboard tab: how many TeachOS instructors exist,
+// how many cleanly matched Darwin's Instructors department, and — of the
+// ones that didn't — where each one actually landed (found in Darwin under
+// a different department, confirmed payroll-converted, individually
+// excluded, or genuinely unresolved). The four "not mapped" buckets are
+// mutually exclusive and sum to not_mapped.total: other_department requires
+// in_darwin=true (matched via reconcileDarwinFullRosterFallback()), the
+// other three all require in_darwin=false.
+const toApiCandidate = (row: InstructorRow) => ({
+  id: row.id,
+  full_name: row.fullName,
+  employee_id: row.employeeId,
+  teachos_category: row.teachosCategory,
+  department: row.department,
+  designation: row.designation,
+  dept_bucket: row.deptBucket,
+  dept_area: row.deptArea,
+  classification: row.classification,
+  classification_reason: row.classificationReason,
+  notes: row.notes,
+});
+
+router.get("/reports/teachos-breakdown", async (_req, res) => {
+  const rows = (await db.select().from(instructorsTable)).filter((r) => r.inTeachos);
+
+  const matchedPrimaryRows = rows.filter((r) => r.inDarwin && !r.inDarwinFullRoster);
+  const notMappedRows = rows.filter((r) => !(r.inDarwin && !r.inDarwinFullRoster));
+
+  const otherDepartmentRows = notMappedRows.filter((r) => r.inDarwin && r.inDarwinFullRoster);
+  const notInDarwinRows = notMappedRows.filter((r) => !r.inDarwin);
+  const payrollRows = notInDarwinRows.filter((r) => r.classification === "payroll_converted");
+  const excludedRows = notInDarwinRows.filter((r) => r.classification === "excluded_other_department" || r.classification === "excluded_non_department_team");
+  const needsReviewRows = notInDarwinRows.filter((r) => r.classification !== "payroll_converted" && r.classification !== "excluded_other_department" && r.classification !== "excluded_non_department_team");
+
+  res.json({
+    total_active: rows.length,
+    matched_with_darwin: {
+      count: matchedPrimaryRows.length,
+      people: matchedPrimaryRows.map(toApiCandidate),
+    },
+    not_mapped: {
+      total: notMappedRows.length,
+      other_department: {
+        count: otherDepartmentRows.length,
+        people: otherDepartmentRows.map(toApiCandidate),
+      },
+      payroll_converted: {
+        count: payrollRows.length,
+        people: payrollRows.map(toApiCandidate),
+      },
+      excluded: {
+        count: excludedRows.length,
+        people: excludedRows.map(toApiCandidate),
+      },
+      needs_review: {
+        count: needsReviewRows.length,
+        people: needsReviewRows.map(toApiCandidate),
+      },
+    },
+  });
+});
+
+// A dedicated breakdown of the Darwin side of the standing rule, for the
+// "Darwin" dashboard tab: how many people sit in Darwin's Instructors
+// department (the primary-pass match — in_darwin=true and NOT
+// in_darwin_full_roster, i.e. matched directly against an "Instructors –
+// ..." department string, not via the full-roster fallback into some other
+// department — these rows are the ones that add up to the confirmed 586
+// total), how many of those are genuine instructors, and who the "others"
+// are: mentors (Mentors department, or a Mentor-titled person embedded in
+// a tech/non-tech sub-department), Delivery Support ops/central managers
+// (same "excluded_ops_managers" bucket covers both the dedicated Delivery
+// Support department and a non-instructor designation found inside a tech/
+// non-tech sub-department — see departmentTaxonomy.ts), individually
+// excluded people (human-reviewed overrides in classificationOverrides.ts),
+// a payroll-converted edge case (should normally be empty now that
+// reconcilePayrollCandidates() only matches people with in_darwin=false,
+// kept here in case that ever changes), and anything left uncategorized.
+// Buckets are mutually exclusive and sum to total_darwin_instructors_dept.
+router.get("/reports/darwin-breakdown", async (_req, res) => {
+  const rows = (await db.select().from(instructorsTable)).filter(
+    (r) => r.inDarwin && !r.inDarwinFullRoster,
+  );
+
+  const instructorRows = rows.filter(
+    (r) => !r.classification && (r.deptBucket === "tech" || r.deptBucket === "non_tech"),
+  );
+  const mentorRows = rows.filter((r) => r.classification === "mentor");
+  const opsRows = rows.filter(
+    (r) => r.classification === "excluded_ops_managers" || r.classification === "instructor_ops",
+  );
+  const excludedRows = rows.filter(
+    (r) => r.classification === "excluded_other_department" || r.classification === "excluded_non_department_team",
+  );
+  const payrollEdgeCaseRows = rows.filter((r) => r.classification === "payroll_converted");
+  const classifiedIds = new Set(
+    [...instructorRows, ...mentorRows, ...opsRows, ...excludedRows, ...payrollEdgeCaseRows].map((r) => r.id),
+  );
+  const otherRows = rows.filter((r) => !classifiedIds.has(r.id));
+
+  const byArea: Record<string, number> = {};
+  for (const r of instructorRows) {
+    const key = r.deptArea ?? "(unspecified)";
+    byArea[key] = (byArea[key] ?? 0) + 1;
+  }
+
+  res.json({
+    total_darwin_instructors_dept: rows.length,
+    instructors: {
+      count: instructorRows.length,
+      by_area: byArea,
+      people: instructorRows.map(toApiCandidate),
+    },
+    others: {
+      total: rows.length - instructorRows.length,
+      mentors: { count: mentorRows.length, people: mentorRows.map(toApiCandidate) },
+      ops_delivery_support: { count: opsRows.length, people: opsRows.map(toApiCandidate) },
+      excluded: { count: excludedRows.length, people: excludedRows.map(toApiCandidate) },
+      payroll_edge_case: { count: payrollEdgeCaseRows.length, people: payrollEdgeCaseRows.map(toApiCandidate) },
+      uncategorized: { count: otherRows.length, people: otherRows.map(toApiCandidate) },
+    },
+  });
+});
+
 export default router;

@@ -42,7 +42,7 @@ export interface PayrollConvertedOverride {
   decidedDate: string;
 }
 
-// 5 people found in TeachOS deployment data whose real designation/
+// 6 people found in TeachOS deployment data whose real designation/
 // department isn't a teaching/instructor role at all (see the standing
 // rule) — excluded from every instructor count, though they may still
 // appear in the raw TeachOS table itself.
@@ -52,6 +52,7 @@ export const EXCLUDED_EMPLOYEES: ExcludedOverride[] = [
   { employeeId: "NW0001240", fullName: "Tejaswini Venkata", classification: "excluded_other_department", reason: "Head of Department - English and Communication Skills (Content – Aptitude & English) — HOD/managerial role, not a teaching/instructor designation", decidedDate: "2026-08-27" },
   { employeeId: "NW0003135", fullName: "Uday Kiran Palepu", classification: "excluded_other_department", reason: "Center Head (Student Success) — center management role, not a teaching/instructor designation", decidedDate: "2026-08-27" },
   { employeeId: "NW0001135", fullName: "Sireesha Maddikari", classification: "excluded_non_department_team", reason: "User-directed: classified as non-department team despite an Instructor designation (Learning Outcomes Academy)", decidedDate: "2026-08-27" },
+  { teachosUserId: "657a9e364eaa4241a013f6483fdd2b6e", employeeId: "NW0006137", fullName: "Chandil Gauthami", classification: "excluded_other_department", reason: "Product Manager (Instructor Platform, NWD_P_IP) — a platform/engineering role, not a teaching/instructor designation, despite the department name containing \"Instructor\". Found via full-roster cross-check (2026-09-03): not in the Instructors department at all, but does exist elsewhere in Darwin.", decidedDate: "2026-09-03" },
 ];
 
 // 30 people found in TeachOS deployment data with no direct Darwin match:

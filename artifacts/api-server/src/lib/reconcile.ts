@@ -28,19 +28,6 @@ export const findMatch = (rows: Array<typeof instructorsTable.$inferSelect>, nam
   return rows.find((item) => normalize(item.fullName) === normalized) ?? rows.find((item) => normalize(item.fullName).replaceAll(" ", "") === normalized.replaceAll(" ", ""));
 };
 
-export const similarity = (left: string, right: string) => {
-  const source = normalize(left);
-  const target = normalize(right);
-  const matrix = Array.from({ length: source.length + 1 }, (_, row) => Array.from({ length: target.length + 1 }, (_, column) => row === 0 ? column : column === 0 ? row : 0));
-  for (let row = 1; row <= source.length; row += 1) for (let column = 1; column <= target.length; column += 1) matrix[row][column] = Math.min(matrix[row - 1][column] + 1, matrix[row][column - 1] + 1, matrix[row - 1][column - 1] + (source[row - 1] === target[column - 1] ? 0 : 1));
-  return source && target ? 1 - matrix[source.length][target.length] / Math.max(source.length, target.length) : 0;
-};
-
-export const possibleMatchNote = (rows: Array<typeof instructorsTable.$inferSelect>, name: string) => {
-  const candidate = rows.map((row) => ({ name: row.fullName, score: similarity(name, row.fullName) })).sort((left, right) => right.score - left.score)[0];
-  return candidate && candidate.score >= 0.62 && candidate.score < 1 ? `Possible match: ${candidate.name} (${Math.round(candidate.score * 100)}% confidence). Review before merging.` : null;
-};
-
 // --- TeachOS instructor-count classification -------------------------------
 // Applies the maintained override lists (../data/classificationOverrides.ts)
 // plus live Darwinbox exit-record matching on top of whatever
@@ -246,7 +233,7 @@ export async function reconcileDarwin(rows: SheetRow[]) {
       await db.update(instructorsTable).set(values).where(eq(instructorsTable.id, match.id));
       matchedCount += 1;
     } else {
-      const [created] = await db.insert(instructorsTable).values({ ...values, inTeachos: false, institutes: [], computedStatus: "pending_deployment", notes: possibleMatchNote(people, fullName) }).returning();
+      const [created] = await db.insert(instructorsTable).values({ ...values, inTeachos: false, institutes: [], computedStatus: "pending_deployment", notes: null }).returning();
       people.push(created);
       newCount += 1;
     }
@@ -317,7 +304,7 @@ export async function reconcileTeachos(rows: SheetRow[]) {
         if ("employeeId" in vals && vals.employeeId) match.employeeId = vals.employeeId;
         matchedCount += 1;
       } else {
-        const [created] = await db.insert(instructorsTable).values({ ...vals, inDarwin: false, computedStatus: "needs_review", notes: possibleMatchNote(people, fullName) }).returning();
+        const [created] = await db.insert(instructorsTable).values({ ...vals, inDarwin: false, computedStatus: "needs_review", notes: null }).returning();
         people.push(created);
         newCount += 1;
       }

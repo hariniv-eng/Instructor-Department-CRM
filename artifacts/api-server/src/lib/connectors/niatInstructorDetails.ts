@@ -27,6 +27,16 @@ const EXPECTED_COLUMNS: Record<string, string> = {
   employee_id: "nw_instructor_id",
   instructor_name: "instructor_name",
   instructor_status: "instructor_status",
+  // Added so a live sync carries the same fields the manually-uploaded
+  // niat_instructor_details extracts already do — without these,
+  // reconcileTeachos() would silently write null institutes/role/category
+  // for every live-synced row (it reads exactly these column names via
+  // cell()). instructor_manager is deliberately NOT here — this table has
+  // no manager column at all (see reconcile.ts's teachosManager comment).
+  institute_name: "institute_name",
+  institute_type: "institute_type",
+  instructor_category: "instructor_category",
+  instructor_role: "instructor_role",
 };
 
 function assertConfigured() {
@@ -59,7 +69,14 @@ function tableRef(): string {
   return `${config.BIGQUERY_PROJECT_ID}.${config.BIGQUERY_DATASET}.${TABLE_NAME}`;
 }
 
-/** Fetches instructor_user_id + nw_instructor_id (employee ID) rows, mapped to reconcileTeachosEmployeeIdReference()'s expected snake_case keys. */
+/**
+ * Fetches niat_instructor_details rows (employee ID plus the institute/role/
+ * category fields reconcileTeachos() needs), mapped to reconcile.ts's
+ * expected snake_case keys. Deliberately does NOT filter on
+ * instructor_status — active and inactive instructors both come through as
+ * long as they have a non-blank employee id; recomputeStatuses() is what
+ * decides active/needs_review/etc. downstream, not this query.
+ */
 export async function fetchNiatInstructorDetailsRows(): Promise<SheetRow[]> {
   const bq = client();
   const ref = tableRef();
