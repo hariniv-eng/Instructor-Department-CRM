@@ -92,9 +92,9 @@ export default function DashboardPage() {
     {reportQuery.isLoading && <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">{[1, 2, 3].map((item) => <SkeletonBlock key={item} className="h-[126px]" />)}</div>}
     {reportQuery.isError && <div className="mb-5"><QueryError message="Dashboard data is unavailable right now." /></div>}
     {report && <section className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3 animate-rise">
-      <KpiCard label="Instructors" value={formatKpi(report.kpis.total_instructor_count)} meta="Matched with Darwin + payroll" icon={<UsersRound size={17} />} tone="navy" />
-      <KpiCard label="Mentors" value={formatKpi(report.kpis.mentors_count)} meta="Darwin — Mentors department" icon={<GraduationCap size={17} />} tone="teal" />
-      <KpiCard label="Operations team" value={formatKpi(report.kpis.ops_team_count)} meta="Darwin — Delivery Support (Ops)" icon={<Briefcase size={17} />} tone="coral" />
+      <KpiCard label="Instructors" value={formatKpi(report.kpis.total_instructor_count)} meta="Matched with Darwin + payroll" icon={<UsersRound size={17} />} tone="navy" breakdown={report.access_breakdown?.instructors} />
+      <KpiCard label="Mentors" value={formatKpi(report.kpis.mentors_count)} meta="Darwin — Mentors department" icon={<GraduationCap size={17} />} tone="teal" breakdown={report.access_breakdown?.mentors} />
+      <KpiCard label="Operations team" value={formatKpi(report.kpis.ops_team_count)} meta="Darwin — Delivery Support (Ops)" icon={<Briefcase size={17} />} tone="coral" breakdown={report.access_breakdown?.ops_team} />
     </section>}
 
     {/* 2. Standing-rule banner — the instructor-count drill-down. */}
@@ -260,7 +260,19 @@ function ClassificationStat({ label, value, tone = 'default' }: { label: string;
   return <div className="rounded-lg border border-border/70 bg-[#f8fafb] p-3"><p className="font-mono-ui text-[10px] uppercase tracking-[0.1em] text-muted-foreground">{label}</p><p className={`mt-2 text-[20px] font-extrabold tracking-[-0.04em] ${toneClass}`}>{value}</p></div>;
 }
 
-function KpiCard({ label, value, meta, icon, tone, alert = false }: { label: string; value: string; meta: string; icon: React.ReactNode; tone: 'navy' | 'teal' | 'saffron' | 'coral'; alert?: boolean }) {
+type AccessBreakdown = { darwin_only?: number; both?: number; teachos_only?: number };
+
+function KpiCard({ label, value, meta, icon, tone, alert = false, breakdown }: { label: string; value: string; meta: string; icon: React.ReactNode; tone: 'navy' | 'teal' | 'saffron' | 'coral'; alert?: boolean; breakdown?: AccessBreakdown }) {
   const tones = { navy: 'bg-primary text-primary-foreground', teal: 'bg-[#dff0eb] text-[#256e65]', saffron: 'bg-accent text-accent-foreground', coral: 'bg-[#f6e4de] text-[#9b4434]' };
-  return <div className={`relative overflow-hidden rounded-xl border border-border p-4 shadow-xs transition-transform hover:-translate-y-0.5 sm:p-5 ${tone === 'navy' ? 'border-primary bg-primary text-primary-foreground' : 'bg-card'}`}><div className="flex items-start justify-between"><p className={`text-[11px] font-bold ${tone === 'navy' ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>{label}</p><span className={`grid h-8 w-8 place-items-center rounded-lg ${tones[tone]}`}>{icon}</span></div><p className="mt-5 text-[27px] font-extrabold tracking-[-0.06em]">{value}</p><p className={`mt-1 font-mono-ui text-[10px] uppercase tracking-[0.1em] ${tone === 'navy' ? 'text-primary-foreground/55' : alert ? 'text-[#a36b00]' : 'text-muted-foreground'}`}>{meta}</p></div>;
+  const onNavy = tone === 'navy';
+  return <div className={`relative overflow-hidden rounded-xl border border-border p-4 shadow-xs transition-transform hover:-translate-y-0.5 sm:p-5 ${onNavy ? 'border-primary bg-primary text-primary-foreground' : 'bg-card'}`}>
+    <div className="flex items-start justify-between"><p className={`text-[11px] font-bold ${onNavy ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>{label}</p><span className={`grid h-8 w-8 place-items-center rounded-lg ${tones[tone]}`}>{icon}</span></div>
+    <p className="mt-5 text-[27px] font-extrabold tracking-[-0.06em]">{value}</p>
+    <p className={`mt-1 font-mono-ui text-[10px] uppercase tracking-[0.1em] ${onNavy ? 'text-primary-foreground/55' : alert ? 'text-[#a36b00]' : 'text-muted-foreground'}`}>{meta}</p>
+    {breakdown && <div className={`mt-4 grid grid-cols-3 gap-2 border-t pt-3 ${onNavy ? 'border-primary-foreground/15' : 'border-border/70'}`}>
+      <div><p className={`font-mono-ui text-[9px] uppercase tracking-[0.07em] ${onNavy ? 'text-primary-foreground/55' : 'text-muted-foreground'}`}>Darwin only</p><p className="mt-1 text-[15px] font-bold tracking-[-0.02em]">{formatKpi(breakdown.darwin_only)}</p></div>
+      <div><p className={`font-mono-ui text-[9px] uppercase tracking-[0.07em] ${onNavy ? 'text-primary-foreground/55' : 'text-muted-foreground'}`}>Both</p><p className="mt-1 text-[15px] font-bold tracking-[-0.02em]">{formatKpi(breakdown.both)}</p></div>
+      <div><p className={`font-mono-ui text-[9px] uppercase tracking-[0.07em] ${onNavy ? 'text-primary-foreground/55' : 'text-muted-foreground'}`}>TeachOS only</p><p className="mt-1 text-[15px] font-bold tracking-[-0.02em]">{formatKpi(breakdown.teachos_only)}</p></div>
+    </div>}
+  </div>;
 }

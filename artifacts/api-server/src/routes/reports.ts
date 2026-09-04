@@ -70,12 +70,13 @@ router.get("/reports/instructors", async (_req, res) => {
   // Darwin-scoped `mentors` list above).
   const excludedRows = rows.filter((r) => r.classification === "excluded_other_department" || r.classification === "excluded_non_department_team" || r.classification === "excluded_ops_managers");
   // Operations team, specifically: Darwin's own "Delivery Support (Ops and
-  // Central Managers)" department (see departmentTaxonomy.ts). This is a
-  // subset of excludedRows above — excludedRows also folds in individually
-  // human-reviewed exclusions from classificationOverrides.ts that have
-  // nothing to do with the Ops team — so this is the precise figure for an
-  // "Operations team" headline number (2026-09-04).
-  const opsTeamRows = rows.filter((r) => r.classification === "excluded_ops_managers");
+  // Central Managers)" department (see departmentTaxonomy.ts), individually
+  // reviewed Ops overrides included (classificationOverrides.ts). Scoped
+  // across ALL rows (2026-09-04, matching the Mentors precedent above) —
+  // not just TeachOS-active ones — so a Darwin Ops person who was never
+  // onboarded into TeachOS still counts here, same reasoning as the
+  // Mentors 85-vs-90 fix.
+  const opsTeamRows = allRows.filter((r) => r.classification === "excluded_ops_managers");
   // The IIT Kharagpur team is set aside the same way mentors/excluded
   // people are — a real category, not silently dropped, but not counted as
   // an instructor either (see reconcile.ts's payroll cascade, 2026-09-03).
@@ -210,6 +211,26 @@ router.get("/reports/instructors", async (_req, res) => {
   const inTrainingRows = countedInstructorRows.filter((r) => r.deploymentStatus === "in_training");
   const unknownDeploymentRows = countedInstructorRows.filter((r) => !r.deploymentStatus);
 
+  // Darwin-only / TeachOS-only / both-access split for the three Overview
+  // KPI cards (2026-09-04, per request): cuts each category's own
+  // already-computed population (countedInstructorRows / mentors /
+  // opsTeamRows) a different way, by which source(s) actually have a
+  // record for that person. Note Mentors' teachos_only is structurally
+  // always 0 today: classifyDepartment() (departmentTaxonomy.ts) can only
+  // ever produce classification "mentor" from a Darwin department string,
+  // so a TeachOS-only row (no Darwin record at all) can never be
+  // classified as a mentor under the current rules.
+  const accessSplit = (list: InstructorRow[]) => ({
+    darwin_only: list.filter((r) => r.inDarwin && !r.inTeachos).length,
+    both: list.filter((r) => r.inDarwin && r.inTeachos).length,
+    teachos_only: list.filter((r) => !r.inDarwin && r.inTeachos).length,
+  });
+  const accessBreakdown = {
+    instructors: accessSplit(countedInstructorRows),
+    mentors: accessSplit(mentors),
+    ops_team: accessSplit(opsTeamRows),
+  };
+
   res.json({
     kpis: {
       total_instructor_count: countedInstructorRows.length,
@@ -266,6 +287,7 @@ router.get("/reports/instructors", async (_req, res) => {
     instructors: [...countedInstructorRows]
       .sort((a, b) => a.fullName.localeCompare(b.fullName))
       .map(toApiInstructorSummary),
+    access_breakdown: accessBreakdown,
   });
 });
 

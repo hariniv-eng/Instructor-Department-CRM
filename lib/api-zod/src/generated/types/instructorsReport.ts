@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { GroupedInstructors } from './groupedInstructors';
+import type { InstructorsReportAccessBreakdown } from './instructorsReportAccessBreakdown';
 import type { InstructorsReportDarwinMatch } from './instructorsReportDarwinMatch';
 import type { InstructorsReportDepartment } from './instructorsReportDepartment';
 import type { InstructorsReportDeployment } from './instructorsReportDeployment';
@@ -26,4 +27,5 @@ export interface InstructorsReport {
   mentors: ReportPerson[];
   /** Every person counted in kpis.total_instructor_count, sorted by name. Backs a click-to-expand details view under the headline count. */
   instructors: InstructorSummary[];
+  access_breakdown?: InstructorsReportAccessBreakdown;
 }

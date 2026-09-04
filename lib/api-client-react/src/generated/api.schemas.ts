@@ -235,6 +235,18 @@ export type InstructorsReportDeployment = {
   unknown?: number;
 };
 
+export type AccessSplit = {
+  darwin_only?: number;
+  both?: number;
+  teachos_only?: number;
+};
+
+export type InstructorsReportAccessBreakdown = {
+  instructors?: AccessSplit;
+  mentors?: AccessSplit;
+  ops_team?: AccessSplit;
+};
+
 export interface ReportPerson {
   id?: number;
   full_name?: string;
@@ -286,6 +298,7 @@ export interface InstructorsReport {
   mentors: ReportPerson[];
   /** Every person counted in kpis.total_instructor_count, sorted by name. Backs a click-to-expand details view under the headline count. */
   instructors: InstructorSummary[];
+  access_breakdown?: InstructorsReportAccessBreakdown;
 }
 
 export type ListInstructorsParams = {
