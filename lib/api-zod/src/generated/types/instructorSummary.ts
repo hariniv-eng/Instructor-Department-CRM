@@ -12,6 +12,8 @@ export interface InstructorSummary {
   /** @nullable */
   employee_id: string | null;
   /** @nullable */
+  teachos_user_id: string | null;
+  /** @nullable */
   designation: string | null;
   /** @nullable */
   department: string | null;

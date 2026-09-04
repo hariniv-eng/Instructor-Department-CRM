@@ -488,6 +488,7 @@ components:
         - id
         - full_name
         - employee_id
+        - teachos_user_id
         - designation
         - department
         - dept_bucket
@@ -500,6 +501,7 @@ components:
         id: { type: number }
         full_name: { type: string }
         employee_id: { type: ["string", "null"] }
+        teachos_user_id: { type: ["string", "null"] }
         designation: { type: ["string", "null"] }
         department: { type: ["string", "null"] }
         dept_bucket: { type: ["string", "null"] }

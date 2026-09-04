@@ -1,162 +1,138 @@
 import { useMemo, useState } from 'react';
-import { AlertTriangle, Filter, GraduationCap, Layers, Mail, Plus, Search, ShieldOff, SlidersHorizontal, UserRound, X } from 'lucide-react';
+import { Briefcase, GraduationCap, Plus, Search, UsersRound, X } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
-import { getListInstructorsQueryKey, useCreateInstructor, useListInstructors } from '@workspace/api-client-react';
-import type { Instructor, InstructorInput } from '@workspace/api-client-react';
+import { useCreateInstructor, useGetReportsInstructors, getGetReportsInstructorsQueryKey } from '@workspace/api-client-react';
+import type { AccessSplit, InstructorInput, InstructorSummary } from '@workspace/api-client-react';
 import { Link } from 'wouter';
 import { PageIntro, EmptyState, QueryError, SkeletonBlock } from '@/components/ui-pieces';
 
-const statusOptions = ['All statuses', 'Active', 'Exception', 'Exited', 'Pending'];
+type CategoryKey = 'instructors' | 'mentors' | 'ops_team';
 
-// TeachOS instructor-count classification filter — see
-// artifacts/api-server/src/data/classificationOverrides.ts and
-// TEACHOS_INSTRUCTOR_COUNT_RULES.md. Values match instructorsTable.classification exactly.
-// This is a narrower, human-reviewed-override dimension than the
-// Instructor/Mentor/Excluded split below (bucketOptions) — a record can be
-// classification=null and still be a plain counted instructor.
-const classificationOptions: Array<{ value: string; label: string }> = [
-  { value: 'All classifications', label: 'All classifications' },
-  { value: 'excluded_other_department', label: 'Excluded — other department' },
-  { value: 'excluded_non_department_team', label: 'Excluded — non-department team' },
-  { value: 'payroll_converted', label: 'Payroll converted instructor' },
+// Each tab's people list is the same union of darwin_only + both + teachos_only
+// that backs the matching Overview KPI card's count -- so "165 Instructors" here
+// always agrees with the "Instructors" number on the Overview tab. See
+// artifacts/api-server/src/routes/reports.ts's accessBreakdown for the source.
+const CATEGORY_TABS: { key: CategoryKey; label: string; icon: typeof UsersRound; description: string }[] = [
+  { key: 'instructors', label: 'Instructors', icon: UsersRound, description: 'Everyone counted toward the TeachOS instructor count.' },
+  { key: 'mentors', label: 'Mentors', icon: GraduationCap, description: 'Darwin — Mentors department.' },
+  { key: 'ops_team', label: 'Operations team', icon: Briefcase, description: 'Darwin — Delivery Support (Ops), filed under Operations rather than Instructor or Mentor.' },
 ];
 
-// Primary bucket split, driven by dept_bucket (see departmentTaxonomy.ts):
-// tech + non_tech => "instructor", mentor => "mentor",
-// excluded_ops_managers + instructor_ops => "excluded". Matches the group
-// names routes/instructors.ts's CLASSIFICATION_GROUPS accepts directly.
-const bucketOptions: Array<{ value: 'all' | 'instructor' | 'mentor' | 'excluded'; label: string }> = [
-  { value: 'instructor', label: 'Instructor' },
-  { value: 'mentor', label: 'Mentor' },
-  { value: 'excluded', label: 'Excluded' },
-  { value: 'all', label: 'All' },
-];
-
-const subjectOptions = ['All subjects', 'Frontend', 'Backend', 'DSA', 'GenAI', 'Math', 'English', 'Aptitude', 'Artificial Intelligence & Emerging Technologies', 'Interdisciplinary & Applied Sciences'];
-
-const sourceOptions: Array<{ value: string; label: string }> = [
-  { value: 'All sources', label: 'All sources' },
-  { value: 'darwin', label: 'In Darwin' },
-  { value: 'teachos', label: 'In TeachOS' },
-  { value: 'both', label: 'In both' },
-];
-
-function statusLabel(instructor: Instructor) {
-  return instructor.manual_status || instructor.computed_status || 'Pending';
+function formatCount(value: number | undefined) {
+  return typeof value === 'number' ? value.toLocaleString('en-IN') : '—';
 }
 
-function statusStyle(status: string) {
-  const normalized = status.toLowerCase();
-  if (normalized.includes('excluded')) return 'bg-secondary text-muted-foreground line-through decoration-2';
-  if (normalized === 'payroll_converted' || normalized.includes('payroll')) return 'bg-[#e6e9fb] text-[#4a4fb0]';
-  if (normalized.includes('active') || normalized.includes('match')) return 'bg-[#dff0eb] text-[#287469]';
-  if (normalized.includes('exit') || normalized.includes('inactive')) return 'bg-[#f6e4de] text-[#9b4434]';
-  if (normalized.includes('exception') || normalized.includes('mismatch')) return 'bg-[#fff1c9] text-[#8b6207]';
-  return 'bg-secondary text-muted-foreground';
+function mergedPeople(split: AccessSplit | undefined): InstructorSummary[] {
+  if (!split) return [];
+  const merged = [...(split.darwin_only?.people ?? []), ...(split.both?.people ?? []), ...(split.teachos_only?.people ?? [])];
+  return merged.sort((a, b) => a.full_name.localeCompare(b.full_name));
 }
 
-// Combines the Instructor/Mentor/Excluded pill with the Tech/Non-tech
-// select into the single dept_bucket query param routes/instructors.ts
-// expects — see CLASSIFICATION_GROUPS in that file for what each value
-// resolves to server-side.
-function deptBucketParam(bucket: 'all' | 'instructor' | 'mentor' | 'excluded', techFilter: string): string | undefined {
-  if (bucket === 'mentor') return 'mentor';
-  if (bucket === 'excluded') return 'excluded';
-  if (techFilter === 'Tech') return 'tech';
-  if (techFilter === 'Non-tech') return 'non_tech';
-  if (bucket === 'instructor') return 'instructor';
-  return undefined;
+function initials(name: string) {
+  return name.split(' ').map((part) => part[0]).filter(Boolean).slice(0, 2).join('');
 }
 
 export default function InstructorsPage() {
   const queryClient = useQueryClient();
+  const reportQuery = useGetReportsInstructors();
+  const report = reportQuery.data;
+  const [category, setCategory] = useState<CategoryKey>('instructors');
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState('All statuses');
-  const [department, setDepartment] = useState('All departments');
-  const [classification, setClassification] = useState('All classifications');
-  const [exitFlaggedOnly, setExitFlaggedOnly] = useState(false);
-  const [bucket, setBucket] = useState<'all' | 'instructor' | 'mentor' | 'excluded'>('all');
-  const [techFilter, setTechFilter] = useState('Tech + Non-tech');
-  const [subject, setSubject] = useState('All subjects');
-  const [university, setUniversity] = useState('All universities');
-  const [source, setSource] = useState('All sources');
   const [createOpen, setCreateOpen] = useState(false);
-  const params = useMemo(() => ({
-    search: search || undefined,
-    status: status === 'All statuses' ? undefined : status,
-    sub_department: department === 'All departments' ? undefined : department,
-    classification: classification === 'All classifications' ? undefined : classification,
-    exit_flag: exitFlaggedOnly ? 'true' : undefined,
-    dept_bucket: deptBucketParam(bucket, techFilter),
-    dept_area: subject === 'All subjects' ? undefined : subject,
-    institute: university === 'All universities' ? undefined : university,
-    source: source === 'All sources' ? undefined : source,
-  }), [search, status, department, classification, exitFlaggedOnly, bucket, techFilter, subject, university, source]);
-  const instructorsQuery = useListInstructors(params, { query: { queryKey: getListInstructorsQueryKey(params) } });
-  const instructors = instructorsQuery.data ?? [];
-  const departments = Array.from(new Set(instructors.map((item) => item.sub_department).filter(Boolean))) as string[];
-  const universities = Array.from(new Set(instructors.flatMap((item) => item.institutes ?? []).filter(Boolean))) as string[];
-  const filtersActive = search || status !== 'All statuses' || department !== 'All departments' || classification !== 'All classifications' || exitFlaggedOnly || bucket !== 'all' || techFilter !== 'Tech + Non-tech' || subject !== 'All subjects' || university !== 'All universities' || source !== 'All sources';
-  const clearFilters = () => {
-    setSearch(''); setStatus('All statuses'); setDepartment('All departments'); setClassification('All classifications'); setExitFlaggedOnly(false);
-    setBucket('all'); setTechFilter('Tech + Non-tech'); setSubject('All subjects'); setUniversity('All universities'); setSource('All sources');
-  };
+
+  const split = report?.access_breakdown?.[category];
+  const allPeople = useMemo(() => mergedPeople(split), [split]);
+  const people = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return allPeople;
+    return allPeople.filter((person) => person.full_name.toLowerCase().includes(query) || (person.employee_id ?? '').toLowerCase().includes(query) || (person.teachos_user_id ?? '').toLowerCase().includes(query));
+  }, [allPeople, search]);
+
+  const activeTab = CATEGORY_TABS.find((tab) => tab.key === category)!;
 
   return <div className="mx-auto max-w-[1500px]">
-    <PageIntro eyebrow="Workforce register / Darwin + TeachOS" title="Instructor records" description="Search the reconciled register, open a record, and resolve the small set of people who need a human decision." action={<button type="button" data-testid="button-add-instructor" onClick={() => setCreateOpen(true)} className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-[12px] font-bold text-primary-foreground shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"><Plus size={15} /> Add instructor</button>} />
-
-    <div className="mb-3 flex flex-col gap-3 rounded-xl border border-border bg-card p-3 shadow-xs lg:flex-row lg:items-center">
-      <div className="relative flex-1"><Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" /><input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search name, employee ID, email..." data-testid="input-search-instructors" className="h-10 w-full rounded-lg border border-border bg-background pl-9 pr-3 text-[12px] outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-primary focus:ring-2 focus:ring-ring/25" /></div>
-      <div className="flex flex-wrap gap-2">
-        <div className="flex gap-1 rounded-lg bg-secondary p-1" role="group" aria-label="Filter by classification">
-          {bucketOptions.map((option) => <button key={option.value} type="button" data-testid={`button-bucket-${option.value}`} onClick={() => setBucket(option.value)} aria-pressed={bucket === option.value} className={`rounded-md px-2.5 py-1.5 text-[11.5px] font-bold transition-colors ${bucket === option.value ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'}`}>{option.label}</button>)}
-        </div>
-        <select value={techFilter} onChange={(event) => setTechFilter(event.target.value)} data-testid="select-filter-tech" className="h-10 appearance-none rounded-lg border border-border bg-background px-3 text-[12px] font-semibold outline-none focus:border-primary"><option>Tech + Non-tech</option><option>Tech</option><option>Non-tech</option></select>
-        <div className="relative"><Filter size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" /><select value={status} onChange={(event) => setStatus(event.target.value)} data-testid="select-filter-status" className="h-10 appearance-none rounded-lg border border-border bg-background pl-9 pr-8 text-[12px] font-semibold outline-none focus:border-primary"><option>{statusOptions[0]}</option>{statusOptions.slice(1).map((item) => <option key={item}>{item}</option>)}</select></div>
-        <div className="relative"><SlidersHorizontal size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" /><select value={department} onChange={(event) => setDepartment(event.target.value)} data-testid="select-filter-department" className="h-10 max-w-[190px] appearance-none rounded-lg border border-border bg-background pl-9 pr-8 text-[12px] font-semibold outline-none focus:border-primary"><option>All departments</option>{departments.map((item) => <option key={item}>{item}</option>)}</select></div>
-        <div className="relative"><ShieldOff size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" /><select value={classification} onChange={(event) => setClassification(event.target.value)} data-testid="select-filter-classification" className="h-10 max-w-[220px] appearance-none rounded-lg border border-border bg-background pl-9 pr-8 text-[12px] font-semibold outline-none focus:border-primary">{classificationOptions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></div>
-        <button type="button" data-testid="button-toggle-exit-flagged" onClick={() => setExitFlaggedOnly((current) => !current)} aria-pressed={exitFlaggedOnly} className={`inline-flex h-10 items-center gap-1.5 rounded-lg border px-3 text-[12px] font-bold transition-colors ${exitFlaggedOnly ? 'border-[#c99a3a] bg-[#fff7db] text-[#79601a]' : 'border-border bg-background text-muted-foreground hover:bg-secondary'}`}><AlertTriangle size={14} /> Exit-flagged only</button>
-      </div>
-    </div>
+    <PageIntro
+      eyebrow="Workforce register / Darwin + TeachOS"
+      title="Instructor records"
+      description="Instructors, Mentors, and the Operations team -- each list is exactly who the matching Overview card counts."
+      action={<button type="button" data-testid="button-add-instructor" onClick={() => setCreateOpen(true)} className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-[12px] font-bold text-primary-foreground shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"><Plus size={15} /> Add instructor</button>}
+    />
 
     <div className="mb-5 flex flex-col gap-3 rounded-xl border border-border bg-card p-3 shadow-xs lg:flex-row lg:items-center">
-      <div className="flex flex-wrap gap-2">
-        <div className="relative"><GraduationCap size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" /><select value={subject} onChange={(event) => setSubject(event.target.value)} data-testid="select-filter-subject" className="h-10 max-w-[220px] appearance-none rounded-lg border border-border bg-background pl-9 pr-8 text-[12px] font-semibold outline-none focus:border-primary">{subjectOptions.map((item) => <option key={item}>{item}</option>)}</select></div>
-        <div className="relative"><Layers size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" /><select value={university} onChange={(event) => setUniversity(event.target.value)} data-testid="select-filter-university" className="h-10 max-w-[240px] appearance-none rounded-lg border border-border bg-background pl-9 pr-8 text-[12px] font-semibold outline-none focus:border-primary"><option>All universities</option>{universities.map((item) => <option key={item}>{item}</option>)}</select></div>
-        <select value={source} onChange={(event) => setSource(event.target.value)} data-testid="select-filter-source" className="h-10 max-w-[180px] appearance-none rounded-lg border border-border bg-background px-3 text-[12px] font-semibold outline-none focus:border-primary">{sourceOptions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select>
+      <div className="flex flex-wrap gap-1 rounded-lg bg-secondary p-1" role="group" aria-label="Filter by category">
+        {CATEGORY_TABS.map((tab) => {
+          const Icon = tab.icon;
+          const isActive = category === tab.key;
+          return <button key={tab.key} type="button" data-testid={`button-category-${tab.key}`} onClick={() => setCategory(tab.key)} aria-pressed={isActive} className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-bold transition-colors ${isActive ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'}`}>
+            <Icon size={14} /> {tab.label}
+            <span className="ml-1 font-mono-ui text-[10px] opacity-70">{formatCount(report?.kpis[category === 'instructors' ? 'total_instructor_count' : category === 'mentors' ? 'mentors_count' : 'ops_team_count'])}</span>
+          </button>;
+        })}
       </div>
-      {filtersActive && <button type="button" data-testid="button-clear-filters" onClick={clearFilters} className="inline-flex h-10 items-center gap-1 rounded-lg px-2.5 text-[12px] font-bold text-muted-foreground hover:bg-secondary hover:text-foreground lg:ml-auto"><X size={14} /> Clear all filters</button>}
+      <div className="relative flex-1"><Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" /><input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search name, employee ID, or TeachOS user ID..." data-testid="input-search-instructors" className="h-10 w-full rounded-lg border border-border bg-background pl-9 pr-3 text-[12px] outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-primary focus:ring-2 focus:ring-ring/25" /></div>
     </div>
 
-    <div className="mb-4 flex items-center justify-between"><p className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-muted-foreground"><span data-testid="text-instructor-count">{instructors.length}</span> records in view</p><span className="font-mono-ui text-[10px] text-muted-foreground">SORTED BY · NAME</span></div>
+    <div className="mb-4 flex flex-col gap-1">
+      <p className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-muted-foreground"><span data-testid="text-instructor-count">{people.length}</span> {activeTab.label.toLowerCase()} in view</p>
+      <p className="text-[11px] text-muted-foreground">{activeTab.description}</p>
+    </div>
 
-    {instructorsQuery.isLoading && <div className="overflow-hidden rounded-xl border border-border bg-card"><div className="space-y-3 p-4">{[1, 2, 3, 4, 5].map((item) => <SkeletonBlock key={item} className="h-12" />)}</div></div>}
-    {instructorsQuery.isError && <QueryError message="The instructor register could not be loaded." />}
-    {!instructorsQuery.isLoading && !instructorsQuery.isError && instructors.length === 0 && <EmptyState title="No instructors match this view" description="Try a broader search or clear one of the register filters." />}
-    {!instructorsQuery.isLoading && !instructorsQuery.isError && instructors.length > 0 && <div className="overflow-hidden rounded-xl border border-border bg-card shadow-xs">
-      <div className="hidden grid-cols-[minmax(230px,1.6fr)_minmax(120px,.8fr)_minmax(140px,1fr)_minmax(110px,.75fr)_minmax(150px,.9fr)_40px] gap-4 border-b border-border bg-[#f4f7f9] px-5 py-3.5 text-left font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground lg:grid"><span>Instructor</span><span>Employee ID</span><span>Department</span><span>Sources</span><span>Status</span><span /></div>
-      <div>{instructors.map((instructor) => <InstructorRow key={instructor.id} instructor={instructor} />)}</div>
-    </div>}
-    {createOpen && <CreateInstructorDialog onClose={() => setCreateOpen(false)} onCreated={() => { setCreateOpen(false); queryClient.invalidateQueries({ queryKey: getListInstructorsQueryKey(params) }); }} />}
+    {reportQuery.isLoading && <div className="overflow-hidden rounded-xl border border-border bg-card"><div className="space-y-3 p-4">{[1, 2, 3, 4, 5].map((item) => <SkeletonBlock key={item} className="h-12" />)}</div></div>}
+    {reportQuery.isError && <QueryError message="The instructor register could not be loaded." />}
+    {!reportQuery.isLoading && !reportQuery.isError && people.length === 0 && <EmptyState title={`No ${activeTab.label.toLowerCase()} match this search`} description="Try a broader search or clear the search box." />}
+    {!reportQuery.isLoading && !reportQuery.isError && people.length > 0 && <CategoryTable category={category} people={people} />}
+
+    {createOpen && <CreateInstructorDialog onClose={() => setCreateOpen(false)} onCreated={() => { setCreateOpen(false); queryClient.invalidateQueries({ queryKey: getGetReportsInstructorsQueryKey() }); }} />}
   </div>;
 }
 
-function InstructorRow({ instructor }: { instructor: Instructor }) {
-  const status = statusLabel(instructor);
-  return <Link href={`/instructors/${instructor.id}`} data-testid={`link-instructor-${instructor.id}`} className="group grid gap-3 border-b border-border/70 px-4 py-4 transition-colors last:border-0 hover:bg-[#f8fafb] lg:grid-cols-[minmax(230px,1.6fr)_minmax(120px,.8fr)_minmax(140px,1fr)_minmax(110px,.75fr)_minmax(150px,.9fr)_40px] lg:items-center lg:gap-4 lg:px-5">
-    <div className="flex min-w-0 items-center gap-3"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#e1eaf1] text-[11px] font-extrabold text-primary">{instructor.full_name.split(' ').map((part) => part[0]).slice(0, 2).join('')}</span><span className="min-w-0"><span className="block truncate text-[13px] font-bold text-foreground">{instructor.full_name}</span><span className="mt-0.5 flex items-center gap-1 truncate text-[11px] text-muted-foreground"><Mail size={11} /> {instructor.org_email || 'No email recorded'}</span></span></div>
-    <div className="hidden font-mono-ui text-[11px] text-muted-foreground lg:block">{instructor.employee_id || '—'}</div>
-    <div className="hidden text-[12px] text-muted-foreground lg:block">{instructor.dept_area || instructor.sub_department || instructor.department || 'Unassigned'}</div>
-    <div className="flex items-center gap-1.5 text-[12px] lg:block">
-      <span title={instructor.in_darwin ? 'In Darwinbox' : 'Not in Darwinbox'} className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[9.5px] font-extrabold ${instructor.in_darwin ? 'bg-[#dff0eb] text-[#287469]' : 'bg-secondary text-muted-foreground'}`}>D</span>
-      <span title={instructor.in_teachos ? 'In TeachOS' : 'Not in TeachOS'} className={`ml-1 inline-flex items-center rounded-md px-1.5 py-0.5 text-[9.5px] font-extrabold ${instructor.in_teachos ? 'bg-[#dff0eb] text-[#287469]' : 'bg-secondary text-muted-foreground'}`}>T</span>
-      <span className="ml-2 text-[11px] text-muted-foreground lg:hidden">{instructor.employee_id || 'No employee ID'}</span>
+// Column set is per-category: Instructors get Subject + Payroll (the two
+// things the user singled out for this bucket); Mentors get Subject instead
+// of Payroll; Operations team gets Department in place of a subject, since
+// ops rows aren't teaching one. Campus (the institutes list) is common to all three.
+// Rows are Links (for click-through to the instructor detail page), so this
+// uses a CSS grid rather than a real <table> -- an <a> can't be a direct
+// child of <tbody> -- matching the grid-row pattern this page already used.
+// Tailwind's build-time scanner only picks up class names it can find as
+// complete literal text in the source, so each category's grid template is
+// spelled out in full below rather than assembled from interpolated pieces
+// -- a dynamically-built arbitrary-value class silently gets no CSS at all.
+function gridColsClass(category: CategoryKey): string {
+  if (category === 'instructors') return 'lg:grid-cols-[minmax(220px,1.6fr)_minmax(110px,.8fr)_minmax(140px,.9fr)_minmax(110px,.8fr)_minmax(160px,1.1fr)_minmax(90px,.7fr)]';
+  if (category === 'mentors') return 'lg:grid-cols-[minmax(220px,1.6fr)_minmax(110px,.8fr)_minmax(140px,.9fr)_minmax(110px,.8fr)_minmax(200px,1.3fr)]';
+  return 'lg:grid-cols-[minmax(220px,1.6fr)_minmax(110px,.8fr)_minmax(140px,.9fr)_minmax(170px,1fr)_minmax(200px,1.3fr)]';
+}
+
+function CategoryTable({ category, people }: { category: CategoryKey; people: InstructorSummary[] }) {
+  const columns = gridColsClass(category);
+  return <div className="overflow-hidden rounded-xl border border-border bg-card shadow-xs">
+    <div className={`hidden gap-4 border-b border-border bg-[#f4f7f9] px-5 py-3.5 text-left font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground lg:grid ${columns}`}>
+      <span>{category === 'ops_team' ? 'Team member' : category === 'mentors' ? 'Mentor' : 'Instructor'}</span>
+      <span>Employee ID</span>
+      <span>TeachOS User ID</span>
+      <span>{category === 'ops_team' ? 'Department' : 'Subject'}</span>
+      <span>Campus</span>
+      {category === 'instructors' && <span>Payroll</span>}
     </div>
-    <div className="flex flex-wrap items-center gap-1.5">
-      <span data-testid={`status-instructor-${instructor.id}`} className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] ${statusStyle(status)}`}>{status}</span>
-      {instructor.exit_flag && <span title={instructor.exit_flag_status || 'Exit record on file'} className="inline-flex items-center gap-1 rounded-full bg-[#fff1c9] px-2 py-1 text-[9px] font-extrabold uppercase tracking-[0.06em] text-[#8b6207]"><AlertTriangle size={10} /> {instructor.exit_flag_status || 'Exit flagged'}</span>}
+    <div>{people.map((person) => <PersonRow key={person.id} category={category} person={person} columns={columns} />)}</div>
+  </div>;
+}
+
+function PersonRow({ category, person, columns }: { category: CategoryKey; person: InstructorSummary; columns: string }) {
+  const campus = person.institutes && person.institutes.length > 0 ? person.institutes.join(', ') : '—';
+  return <Link href={`/instructors/${person.id}`} data-testid={`link-instructor-${person.id}`} className={`group grid gap-3 border-b border-border/70 px-4 py-4 transition-colors last:border-0 hover:bg-[#f8fafb] lg:items-center lg:gap-4 lg:px-5 ${columns}`}>
+    <div className="flex min-w-0 items-center gap-3">
+      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#e1eaf1] text-[11px] font-extrabold text-primary">{initials(person.full_name)}</span>
+      <span className="min-w-0">
+        <span className="block truncate text-[13px] font-bold text-foreground">{person.full_name}</span>
+        {person.designation && <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">{person.designation}</span>}
+      </span>
     </div>
-    <div className="hidden text-right text-muted-foreground transition-transform group-hover:translate-x-1 lg:block">→</div>
+    <div className="font-mono-ui text-[11px] text-muted-foreground"><span className="text-muted-foreground/70 lg:hidden">Employee ID </span>{person.employee_id || '—'}</div>
+    <div className="font-mono-ui text-[11px] text-muted-foreground"><span className="text-muted-foreground/70 lg:hidden">TeachOS User ID </span>{person.teachos_user_id || ''}</div>
+    <div className="text-[12px] text-muted-foreground">{category === 'ops_team' ? (person.department || '—') : (person.dept_area || '—')}</div>
+    <div className="text-[12px] text-muted-foreground">{campus}</div>
+    {category === 'instructors' && <div>{person.is_payroll ? <span className="inline-flex rounded-full bg-[#e6e9fb] px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] text-[#4a4fb0]">Payroll</span> : <span className="text-muted-foreground">—</span>}</div>}
   </Link>;
 }
 
