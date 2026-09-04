@@ -128,8 +128,32 @@ router.get("/reports/instructors", async (_req, res) => {
   const exitedInstructorRows = instructorRows.filter((r) => r.exitFlag || r.manualStatus === "exited");
 
   const noEmployeeIdRows = activeInstructorRows.filter((r) => !hasEmployeeId(r));
-  const countedInstructorRows = activeInstructorRows.filter((r) => hasEmployeeId(r) && (matchedDarwinPrimary(r) || isPayrollConverted(r)));
   const otherDepartmentRows = activeInstructorRows.filter((r) => hasEmployeeId(r) && !matchedDarwinPrimary(r) && !isPayrollConverted(r));
+
+  // "Total instructor count" redefined 2026-09-04, per request, to apply
+  // across the ENTIRE dashboard, not just the headline kpi: Darwin's own
+  // instructor headcount (matched Darwin's Instructors department directly,
+  // genuine Tech/Non-tech instructor, no override classification — the same
+  // population /reports/darwin-breakdown's "instructors" bucket uses,
+  // regardless of TeachOS onboarding status) PLUS the TeachOS "Payroll"
+  // bucket (active in TeachOS, never matched Darwin at all — the same
+  // population /reports/teachos-breakdown's "Payroll" bucket uses, which
+  // already folds in the former Needs-review remainder). This population —
+  // not the older employee-ID-mapping pipeline above (still computed, for
+  // the no_employee_id/other_department diagnostic kpis only) — is what
+  // countedInstructorRows is now built from, so every breakdown below
+  // (department, campus, manager, deployment, payroll split, the
+  // click-to-expand instructor list, and the CSV download) reflects it too.
+  const darwinInstructorsForCount = allRows.filter((r) => r.inDarwin && !r.inDarwinFullRoster && !r.classification && (r.deptBucket === "tech" || r.deptBucket === "non_tech"));
+  const teachosOnlyForPayrollCount = allRows.filter((r) => r.inTeachos && !r.inDarwin);
+  const payrollConvertedForCount = teachosOnlyForPayrollCount.filter((r) => r.classification === "payroll_converted");
+  const needsReviewForCount = teachosOnlyForPayrollCount.filter((r) =>
+    r.classification !== "excluded_other_department"
+    && r.classification !== "excluded_non_department_team"
+    && r.classification !== "iit_kharagpur_team"
+    && r.classification !== "payroll_converted"
+  );
+  const countedInstructorRows: InstructorRow[] = [...darwinInstructorsForCount, ...payrollConvertedForCount, ...needsReviewForCount];
 
   // Requirement #2: Tech vs Non-tech, with sub-areas within each.
   const byDeptBucket = (bucket: "tech" | "non_tech") => {
@@ -148,8 +172,8 @@ router.get("/reports/instructors", async (_req, res) => {
   const unclassifiedDept = countedInstructorRows.filter((r) => !r.deptBucket).length;
 
   // Requirement #3: payroll vs non-payroll.
-  const payrollRows = countedInstructorRows.filter((r) => r.classification === "payroll_converted");
-  const nonPayrollRows = countedInstructorRows.filter((r) => r.classification !== "payroll_converted");
+  const payrollRows = [...payrollConvertedForCount, ...needsReviewForCount];
+  const nonPayrollRows = darwinInstructorsForCount;
 
   // Requirement #4: campus level — grouped by each entry in `institutes`
   // (excluding the "Training Institute" placeholder, which requirement #6
@@ -236,9 +260,8 @@ router.get("/reports/instructors", async (_req, res) => {
     other_department: otherDepartmentRows.map(toApiInstructorSummary),
     // Flat list backing the click-to-expand details view under the total
     // instructor count card — every person counted in
-    // kpis.total_instructor_count (has an employee_id AND either matched
-    // Darwin's Instructors-department data directly, or is a confirmed
-    // payroll-converted instructor — see comment above countedInstructorRows),
+    // kpis.total_instructor_count (Darwin's own instructor headcount plus
+    // the TeachOS Payroll bucket — see comment above countedInstructorRows),
     // sorted by name.
     instructors: [...countedInstructorRows]
       .sort((a, b) => a.fullName.localeCompare(b.fullName))
