@@ -1,6 +1,6 @@
-import { ArrowDownRight, ArrowUpRight, CalendarDays, ChevronDown, ChevronUp, CircleAlert, Download, RefreshCw, UsersRound } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, Briefcase, ChevronDown, ChevronUp, GraduationCap, Download, RefreshCw, UsersRound } from 'lucide-react';
 import { useState } from 'react';
-import { useGetDashboard, getGetDashboardQueryKey, useGetReportsInstructors } from '@workspace/api-client-react';
+import { useGetDashboard, getGetDashboardQueryKey, useGetReportsInstructors, getGetReportsInstructorsQueryKey } from '@workspace/api-client-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'wouter';
 import { PageIntro, QueryError, SkeletonBlock } from '@/components/ui-pieces';
@@ -77,24 +77,24 @@ export default function DashboardPage() {
   const [showInstructorDetails, setShowInstructorDetails] = useState(false);
   const dashboard = dashboardQuery.data;
   const kpis = dashboard?.kpis ?? {};
-  const total = kpis.total_instructors ?? kpis.total ?? kpis.headcount;
-  const active = kpis.active ?? kpis.active_instructors;
-  const exceptions = kpis.exceptions ?? kpis.exception_count ?? kpis.mismatches;
-  const exits = kpis.exits ?? kpis.exits_this_month;
   const maxTrend = Math.max(...(dashboard?.monthly_trend ?? []).flatMap((item) => [item.joiners, item.exits]), 1);
   const maxDept = Math.max(...(dashboard?.sub_departments ?? []).map((item) => item.count), 1);
 
   return <div className="mx-auto max-w-[1500px]">
-    <PageIntro eyebrow="Command center / 09:42 IST" title="Faculty Command Center (FCC)" description="A clear read on the instructor workforce, source integrity, and the exceptions worth your attention." action={<button type="button" data-testid="button-refresh-dashboard" onClick={() => queryClient.invalidateQueries({ queryKey: getGetDashboardQueryKey() })} className="inline-flex items-center gap-2 self-start rounded-lg border border-border bg-card px-3.5 py-2.5 text-[12px] font-bold text-foreground transition-colors hover:bg-secondary lg:self-auto"><RefreshCw size={14} /> Refresh data</button>} />
+    <PageIntro eyebrow="Command center / 09:42 IST" title="Faculty Command Center (FCC)" description="A clear read on the instructor workforce, source integrity, and the exceptions worth your attention." action={<button type="button" data-testid="button-refresh-dashboard" onClick={() => { queryClient.invalidateQueries({ queryKey: getGetDashboardQueryKey() }); queryClient.invalidateQueries({ queryKey: getGetReportsInstructorsQueryKey() }); }} className="inline-flex items-center gap-2 self-start rounded-lg border border-border bg-card px-3.5 py-2.5 text-[12px] font-bold text-foreground transition-colors hover:bg-secondary lg:self-auto"><RefreshCw size={14} /> Refresh data</button>} />
 
-    {/* 1. KPI row — leads the page, ahead of the instructor-count banner. */}
-    {dashboardQuery.isLoading && <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">{[1, 2, 3, 4].map((item) => <SkeletonBlock key={item} className="h-[126px]" />)}</div>}
-    {dashboardQuery.isError && <div className="mb-5"><QueryError message="Dashboard data is unavailable right now." /></div>}
-    {dashboard && <section className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4 animate-rise">
-      <KpiCard label="Total instructors" value={formatKpi(total)} meta="Current register" icon={<UsersRound size={17} />} tone="navy" />
-      <KpiCard label="Active in TeachOS" value={formatKpi(active)} meta="Access confirmed" icon={<CircleAlert size={17} />} tone="teal" />
-      <KpiCard label="Exceptions" value={formatKpi(exceptions)} meta="Needs review" icon={<CircleAlert size={17} />} tone="saffron" alert />
-      <KpiCard label="Exits this month" value={formatKpi(exits)} meta="Exit list signal" icon={<CalendarDays size={17} />} tone="coral" />
+    {/* 1. KPI row — leads the page, ahead of the instructor-count banner.
+        Three headline counts, each anchored on Darwin's own department data
+        (see reports.ts /reports/instructors): Instructors (matched with
+        Darwin directly, plus confirmed payroll-converted), Mentors (Darwin's
+        "Mentors" department), Operations team (Darwin's "Delivery Support
+        (Ops and Central Managers)" department). */}
+    {reportQuery.isLoading && <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">{[1, 2, 3].map((item) => <SkeletonBlock key={item} className="h-[126px]" />)}</div>}
+    {reportQuery.isError && <div className="mb-5"><QueryError message="Dashboard data is unavailable right now." /></div>}
+    {report && <section className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3 animate-rise">
+      <KpiCard label="Instructors" value={formatKpi(report.kpis.total_instructor_count)} meta="Matched with Darwin + payroll" icon={<UsersRound size={17} />} tone="navy" />
+      <KpiCard label="Mentors" value={formatKpi(report.kpis.mentors_count)} meta="Darwin — Mentors department" icon={<GraduationCap size={17} />} tone="teal" />
+      <KpiCard label="Operations team" value={formatKpi(report.kpis.ops_team_count)} meta="Darwin — Delivery Support (Ops)" icon={<Briefcase size={17} />} tone="coral" />
     </section>}
 
     {/* 2. Standing-rule banner — the instructor-count drill-down. */}

@@ -56,6 +56,13 @@ router.get("/reports/instructors", async (_req, res) => {
   // below rather than being silently dropped.
   const mentors = rows.filter((r) => r.classification === "mentor");
   const excludedRows = rows.filter((r) => r.classification === "excluded_other_department" || r.classification === "excluded_non_department_team" || r.classification === "excluded_ops_managers");
+  // Operations team, specifically: Darwin's own "Delivery Support (Ops and
+  // Central Managers)" department (see departmentTaxonomy.ts). This is a
+  // subset of excludedRows above — excludedRows also folds in individually
+  // human-reviewed exclusions from classificationOverrides.ts that have
+  // nothing to do with the Ops team — so this is the precise figure for an
+  // "Operations team" headline number (2026-09-04).
+  const opsTeamRows = rows.filter((r) => r.classification === "excluded_ops_managers");
   // The IIT Kharagpur team is set aside the same way mentors/excluded
   // people are — a real category, not silently dropped, but not counted as
   // an instructor either (see reconcile.ts's payroll cascade, 2026-09-03).
@@ -166,6 +173,7 @@ router.get("/reports/instructors", async (_req, res) => {
       exited_excluded_from_count: exitedInstructorRows.length,
       mentors_count: mentors.length,
       excluded_count: excludedRows.length,
+      ops_team_count: opsTeamRows.length,
       iit_kharagpur_count: iitKharagpurRows.length,
       // New employee-ID-mapping pipeline breakdown (see comment above
       // countedInstructorRows): who's actually feeding the headline total,
