@@ -51,7 +51,10 @@ export const EXCLUDED_EMPLOYEES: ExcludedOverride[] = [
 
 // PAYROLL_CONVERTED_EMPLOYEES was retired 2026-09-03 — payroll-converted
 // status is now fully computed by recomputeStatuses() (reconcile.ts) for
-// the TeachOS-only pool that never matches Darwin at all: a Darwin exit
-// record sets exit_candidate, a TeachOS institute of "IIT Kharagpur" sets
-// iit_kharagpur_team, and everyone left over is payroll_converted. No
-// hand-maintained list is consulted for this anymore.
+// the TeachOS-only pool that never matches Darwin at all: a TeachOS
+// institute of "IIT Kharagpur" sets iit_kharagpur_team (its own team,
+// reported together with "other department" as of 2026-09-04), and
+// everyone left over is payroll_converted — including anyone with a Darwin
+// exit record on file (folded into payroll_converted 2026-09-04; there's no
+// separate exit_candidate classification anymore). No hand-maintained list
+// is consulted for this anymore.
