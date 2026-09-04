@@ -25,7 +25,7 @@
 // row rarely has a resolved employeeId on the instructors table (that's
 // exactly why these particular people needed a manual override).
 
-export type ExcludedClassification = "excluded_other_department" | "excluded_non_department_team";
+export type ExcludedClassification = "excluded_other_department" | "excluded_non_department_team" | "excluded_ops_managers";
 
 export interface ExcludedOverride {
   teachosUserId?: string;
@@ -36,7 +36,7 @@ export interface ExcludedOverride {
   decidedDate: string;
 }
 
-// 6 people found in TeachOS deployment data whose real designation/
+// 7 people found in TeachOS deployment data whose real designation/
 // department isn't a teaching/instructor role at all (see the standing
 // rule) — excluded from every instructor count, though they may still
 // appear in the raw TeachOS table itself.
@@ -47,6 +47,7 @@ export const EXCLUDED_EMPLOYEES: ExcludedOverride[] = [
   { employeeId: "NW0003135", fullName: "Uday Kiran Palepu", classification: "excluded_other_department", reason: "Center Head (Student Success) — center management role, not a teaching/instructor designation", decidedDate: "2026-08-27" },
   { employeeId: "NW0001135", fullName: "Sireesha Maddikari", classification: "excluded_non_department_team", reason: "User-directed: classified as non-department team despite an Instructor designation (Learning Outcomes Academy)", decidedDate: "2026-08-27" },
   { teachosUserId: "657a9e364eaa4241a013f6483fdd2b6e", employeeId: "NW0006137", fullName: "Chandil Gauthami", classification: "excluded_other_department", reason: "Product Manager (Instructor Platform, NWD_P_IP) — a platform/engineering role, not a teaching/instructor designation, despite the department name containing \"Instructor\". Found via full-roster cross-check (2026-09-03): not in the Instructors department at all, but does exist elsewhere in Darwin.", decidedDate: "2026-09-03" },
+  { employeeId: "NW0007365", fullName: "Shaik Musharaf", classification: "excluded_ops_managers", reason: "Darwin lists this person under Instructors — Frontend Technologies as \"Software Engineering Mentor\" (NWD_ID_FT_SEM), which would otherwise classify as a Mentor. User-directed (2026-09-04): file under Ops team for now instead — not Mentor, not Instructor. (Previously filed as Other department earlier the same day; superseded by this decision. Also previously wrongly caught by a different Shaik Musharaf's exclusion entry above — employee NW0005088, a Video Editor — purely because findOverride() fell back to a name-only match; that matching bug was fixed 2026-09-04.)", decidedDate: "2026-09-04" },
 ];
 
 // PAYROLL_CONVERTED_EMPLOYEES was retired 2026-09-03 — payroll-converted
@@ -76,11 +77,8 @@ export interface OtherDepartmentOverride {
 // employeeId (or teachosUserId) ONLY — never by name alone, so a shared
 // full name with someone else can never misfile this entry onto the wrong
 // person (see the findOverride() fix in reconcile.ts, 2026-09-04).
-export const OTHER_DEPARTMENT_EMPLOYEES: OtherDepartmentOverride[] = [
-  {
-    employeeId: "NW0007365",
-    fullName: "Shaik Musharaf",
-    reason: "Darwin lists this person under Instructors – Frontend Technologies as \"Software Engineering Mentor\" (NWD_ID_FT_SEM), which would otherwise classify as a Mentor. Decided (2026-09-04): file under Other department instead, not Mentor and not Instructor. (This employee ID was previously being wrongly caught by a different Shaik Musharaf's exclusion entry above — employee NW0005088, a Video Editor — purely because findOverride() fell back to a name-only match; that matching bug is fixed as of this same date.)",
-    decidedDate: "2026-09-04",
-  },
-];
+// Currently empty — Shaik Musharaf (NW0007365), the only person ever filed
+// here, was reclassified to Ops team (EXCLUDED_EMPLOYEES above) on
+// 2026-09-04, the same day he was first added here. Left in place for the
+// next person who needs this treatment.
+export const OTHER_DEPARTMENT_EMPLOYEES: OtherDepartmentOverride[] = [];
