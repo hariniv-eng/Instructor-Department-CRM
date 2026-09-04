@@ -235,10 +235,15 @@ export type InstructorsReportDeployment = {
   unknown?: number;
 };
 
+export type AccessBucket = {
+  count?: number;
+  people?: InstructorSummary[];
+};
+
 export type AccessSplit = {
-  darwin_only?: number;
-  both?: number;
-  teachos_only?: number;
+  darwin_only?: AccessBucket;
+  both?: AccessBucket;
+  teachos_only?: AccessBucket;
 };
 
 export type InstructorsReportAccessBreakdown = {

@@ -440,13 +440,21 @@ components:
             instructors: { $ref: "#/components/schemas/AccessSplit" }
             mentors: { $ref: "#/components/schemas/AccessSplit" }
             ops_team: { $ref: "#/components/schemas/AccessSplit" }
+    AccessBucket:
+      type: object
+      description: One darwin_only/both/teachos_only bucket -- a count plus the actual people in it, for the click-to-drill-down view.
+      properties:
+        count: { type: number }
+        people:
+          type: array
+          items: { $ref: "#/components/schemas/InstructorSummary" }
     AccessSplit:
       type: object
-      description: How many of a category's total have a Darwin record only, a TeachOS record only, or both.
+      description: How a category's total splits by data source -- Darwin record only, TeachOS record only, or both -- each with its own people list.
       properties:
-        darwin_only: { type: number }
-        both: { type: number }
-        teachos_only: { type: number }
+        darwin_only: { $ref: "#/components/schemas/AccessBucket" }
+        both: { $ref: "#/components/schemas/AccessBucket" }
+        teachos_only: { $ref: "#/components/schemas/AccessBucket" }
     DeptBucketReport:
       type: object
       properties:

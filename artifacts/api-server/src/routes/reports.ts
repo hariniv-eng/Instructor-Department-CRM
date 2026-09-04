@@ -215,20 +215,28 @@ router.get("/reports/instructors", async (_req, res) => {
   // KPI cards (2026-09-04, per request): cuts each category's own
   // already-computed population (countedInstructorRows / mentors /
   // opsTeamRows) a different way, by which source(s) actually have a
-  // record for that person. Note Mentors' teachos_only is structurally
-  // always 0 today: classifyDepartment() (departmentTaxonomy.ts) can only
-  // ever produce classification "mentor" from a Darwin department string,
-  // so a TeachOS-only row (no Darwin record at all) can never be
-  // classified as a mentor under the current rules.
-  const accessSplit = (list: InstructorRow[]) => ({
-    darwin_only: list.filter((r) => r.inDarwin && !r.inTeachos).length,
-    both: list.filter((r) => r.inDarwin && r.inTeachos).length,
-    teachos_only: list.filter((r) => !r.inDarwin && r.inTeachos).length,
+  // record for that person, and — per a follow-up request the same day —
+  // includes the actual people in each of the nine resulting buckets (not
+  // just counts), so the dashboard can drill from a KPI card down to a
+  // person list without a second endpoint. Note Mentors' teachos_only is
+  // structurally always 0 today: classifyDepartment()
+  // (departmentTaxonomy.ts) can only ever produce classification "mentor"
+  // from a Darwin department string, so a TeachOS-only row (no Darwin
+  // record at all) can never be classified as a mentor under the current
+  // rules.
+  const toAccessBucket = (list: InstructorRow[]) => ({
+    count: list.length,
+    people: list.map(toApiInstructorSummary),
+  });
+  const buildAccessSplit = (list: InstructorRow[]) => ({
+    darwin_only: toAccessBucket(list.filter((r) => r.inDarwin && !r.inTeachos)),
+    both: toAccessBucket(list.filter((r) => r.inDarwin && r.inTeachos)),
+    teachos_only: toAccessBucket(list.filter((r) => !r.inDarwin && r.inTeachos)),
   });
   const accessBreakdown = {
-    instructors: accessSplit(countedInstructorRows),
-    mentors: accessSplit(mentors),
-    ops_team: accessSplit(opsTeamRows),
+    instructors: buildAccessSplit(countedInstructorRows),
+    mentors: buildAccessSplit(mentors),
+    ops_team: buildAccessSplit(opsTeamRows),
   };
 
   res.json({

@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './accessBucket';
 export * from './accessSplit';
 export * from './dashboard';
 export * from './dashboardDesignationsItem';
