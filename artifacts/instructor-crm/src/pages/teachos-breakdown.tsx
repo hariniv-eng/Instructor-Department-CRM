@@ -1,13 +1,15 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Database, GitBranch, ListChecks, RefreshCw, ShieldAlert, Users, UserX, Wallet } from 'lucide-react';
+import { Database, GitBranch, RefreshCw, ShieldAlert, Users, UserX, Wallet } from 'lucide-react';
 import { PageIntro, EmptyState, QueryError, SkeletonBlock, TopStat, MiniStat, BucketPanel, formatKpi, pct, type Bucket } from '@/components/ui-pieces';
 
 // As of 2026-09-04: anyone not matched directly against Darwin's
 // Instructors department resolves to just two real outcomes — "Other
-// department" (a real Darwin match under a different department, or the
-// IIT Kharagpur team, now folded in here) or "Payroll" (the exhaustive
-// remainder, which now also absorbs anyone with a Darwin exit record —
-// there's no separate "Exit candidates" bucket anymore).
+// department" (a real Darwin match under a different department, the IIT
+// Kharagpur team, or an individually-reviewed override, all folded in here)
+// or "Payroll" (the exhaustive remainder, which now also absorbs anyone
+// with a Darwin exit record and the former "Needs review" safety-net
+// remainder — there's no separate "Exit candidates" or "Needs review"
+// bucket anymore).
 type TeachosBreakdown = {
   total_active: number;
   matched_with_darwin: Bucket;
@@ -16,7 +18,6 @@ type TeachosBreakdown = {
     other_department: Bucket;
     payroll_converted: Bucket;
     excluded: Bucket;
-    needs_review: Bucket;
   };
 };
 
@@ -43,7 +44,7 @@ export default function TeachosBreakdownPage() {
     <PageIntro
       eyebrow="Standing rule / TeachOS reconciliation"
       title="TeachOS Breakdown"
-      description="Every active TeachOS instructor, split by how they resolved against Darwin: a clean match, a match under a different department (including the IIT Kharagpur team), a confirmed payroll conversion (including anyone with a Darwin exit record on file), an individual exclusion, or genuinely unresolved."
+      description="Every active TeachOS instructor, split by how they resolved against Darwin: a clean match, a match under a different department (including the IIT Kharagpur team), a confirmed payroll conversion (including anyone with a Darwin exit record on file), or an individual exclusion."
       action={<button type="button" data-testid="button-refresh-teachos-breakdown" onClick={refresh} className="inline-flex items-center gap-2 self-start rounded-lg border border-border bg-card px-3.5 py-2.5 text-[12px] font-bold text-foreground transition-colors hover:bg-secondary lg:self-auto"><RefreshCw size={14} /> Refresh</button>}
     />
 
@@ -66,11 +67,10 @@ export default function TeachosBreakdownPage() {
             <h2 className="mt-1 text-[16px] font-extrabold tracking-[-0.03em]">Where each one actually landed</h2>
           </div>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-3">
           <MiniStat label="Other department" value={data.not_mapped.other_department.count} meta="Wrong dept, or IIT Kharagpur team" tone="indigo" />
           <MiniStat label="Payroll" value={data.not_mapped.payroll_converted.count} meta="Remainder, incl. exit records" tone="green" />
           <MiniStat label="Excluded" value={data.not_mapped.excluded.count} meta="Individually reviewed, not an instructor" tone="saffron" />
-          <MiniStat label="Needs review" value={data.not_mapped.needs_review.count} meta="Unresolved — no match anywhere" tone="navy" />
         </div>
       </section>
 
@@ -95,7 +95,7 @@ export default function TeachosBreakdownPage() {
       />
       <BucketPanel
         title="Payroll"
-        subtitle="No Darwin record, not IIT Kharagpur — the remainder of the pipeline, including anyone with a Darwin exit record on file"
+        subtitle="No Darwin record, not IIT Kharagpur — the exhaustive remainder of the pipeline, including anyone with a Darwin exit record on file"
         icon={<Wallet size={18} />}
         bucket={data.not_mapped.payroll_converted}
         emptyLabel="No payroll candidates"
@@ -109,15 +109,6 @@ export default function TeachosBreakdownPage() {
         bucket={data.not_mapped.excluded}
         emptyLabel="No individual exclusions"
         columns={['name', 'employee_id', 'category', 'reason']}
-        defaultOpen={true}
-      />
-      <BucketPanel
-        title="Needs review"
-        subtitle="Didn't land in any bucket above — shouldn't normally happen now that the pipeline is exhaustive, kept as a safety net"
-        icon={<ListChecks size={18} />}
-        bucket={data.not_mapped.needs_review}
-        emptyLabel="Nothing left to review"
-        columns={['name', 'employee_id', 'category']}
         defaultOpen={true}
       />
 

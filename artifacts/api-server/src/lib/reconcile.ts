@@ -6,7 +6,7 @@
 
 import { and, eq } from "drizzle-orm";
 import { db, instructorsTable, darwinboxExitsTable, teachosIdReferenceTable } from "@workspace/db";
-import { EXCLUDED_EMPLOYEES, type ExcludedOverride } from "../data/classificationOverrides";
+import { EXCLUDED_EMPLOYEES, type ExcludedOverride, OTHER_DEPARTMENT_EMPLOYEES, type OtherDepartmentOverride } from "../data/classificationOverrides";
 import { classifyDepartment, classifyDeployment } from "./departmentTaxonomy";
 
 export type SheetRow = Record<string, unknown>;
@@ -37,15 +37,25 @@ export const findMatch = (rows: Array<typeof instructorsTable.$inferSelect>, nam
 type InstructorRow = typeof instructorsTable.$inferSelect;
 
 // teachosUserId first (exact match against TeachOS's stable instructor_user_id);
-// falls back to normalized full name when either side has no teachosUserId
-// recorded. Mirrors findMatch()'s employeeId-then-name fallback above.
-function findOverride<T extends { teachosUserId?: string; fullName: string }>(row: InstructorRow, list: T[]): T | undefined {
+// then employeeId (exact match, when both sides carry one); only falls back
+// to a normalized full-name match for an override entry that names no
+// employeeId at all. That last fallback used to apply unconditionally,
+// which let one override entry silently catch a completely different
+// person who merely shared the same full name — e.g. NW0007365 "Shaik
+// Musharaf" was being wrongly matched (and excluded) by an entry meant for
+// NW0005088, a different "Shaik Musharaf" (2026-09-04). An employeeId
+// present on both sides is authoritative enough to rule that out entirely.
+function findOverride<T extends { teachosUserId?: string; employeeId?: string; fullName: string }>(row: InstructorRow, list: T[]): T | undefined {
   if (row.teachosUserId) {
     const byId = list.find((entry) => entry.teachosUserId && entry.teachosUserId === row.teachosUserId);
     if (byId) return byId;
   }
+  if (row.employeeId) {
+    const byEmployeeId = list.find((entry) => entry.employeeId && entry.employeeId === row.employeeId);
+    if (byEmployeeId) return byEmployeeId;
+  }
   const normalizedRowName = normalize(row.fullName);
-  return list.find((entry) => normalize(entry.fullName) === normalizedRowName);
+  return list.find((entry) => !entry.employeeId && normalize(entry.fullName) === normalizedRowName);
 }
 
 interface ExitInfo {
@@ -137,11 +147,16 @@ export const recomputeStatuses = async () => {
   const exits = await loadLatestExitsByPerson();
   await Promise.all(rows.map((row) => {
     // Priority: an individual, human-reviewed override (classificationOverrides.ts)
-    // always wins first; then the two department-level exclusion rules
-    // (Delivery Support -> ops/managers, Mentors -> mentor); then the
-    // payroll-converted override; only then the ordinary Darwin/TeachOS
-    // presence rules. See departmentTaxonomy.ts for the department matching.
+    // always wins first — EXCLUDED_EMPLOYEES, then OTHER_DEPARTMENT_EMPLOYEES
+    // (2026-09-04: people who DO match Darwin's Instructors department
+    // directly but a human has deliberately filed under "Other department"
+    // instead of instructor/mentor) — then the two department-level
+    // exclusion rules (Delivery Support -> ops/managers, Mentors -> mentor);
+    // then the payroll-converted override; only then the ordinary
+    // Darwin/TeachOS presence rules. See departmentTaxonomy.ts for the
+    // department matching.
     const excludedOverride = findOverride<ExcludedOverride>(row, EXCLUDED_EMPLOYEES);
+    const otherDepartmentOverride = findOverride<OtherDepartmentOverride>(row, OTHER_DEPARTMENT_EMPLOYEES);
     const deptInfo = classifyDepartment(row.department, row.teachosCategory, row.designation);
     const isDeptExclusion = deptInfo.bucket === "excluded_ops_managers" || deptInfo.bucket === "mentor" || deptInfo.bucket === "instructor_ops";
     const exit = findExit(row, exits);
@@ -175,6 +190,10 @@ export const recomputeStatuses = async () => {
       classification = excludedOverride.classification;
       classificationReason = excludedOverride.reason;
       computedStatus = "excluded";
+    } else if (otherDepartmentOverride) {
+      classification = "other_department_manual";
+      classificationReason = otherDepartmentOverride.reason;
+      computedStatus = "other_department";
     } else if (deptInfo.bucket === "excluded_ops_managers") {
       classification = "excluded_ops_managers";
       classificationReason = "Delivery Support (Ops and Central Managers) department — not an instructor role";

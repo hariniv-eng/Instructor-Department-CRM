@@ -58,3 +58,29 @@ export const EXCLUDED_EMPLOYEES: ExcludedOverride[] = [
 // exit record on file (folded into payroll_converted 2026-09-04; there's no
 // separate exit_candidate classification anymore). No hand-maintained list
 // is consulted for this anymore.
+
+export interface OtherDepartmentOverride {
+  teachosUserId?: string;
+  employeeId?: string;
+  fullName: string;
+  reason: string;
+  decidedDate: string;
+}
+
+// Individually reviewed: people who DO match Darwin's Instructors
+// department directly (so without this override they'd show up counted as
+// an instructor or a mentor), but a human has decided they belong in the
+// "Other department" bucket instead — not an instructor, not a mentor, and
+// not a hard exclusion either. Same spirit as EXCLUDED_EMPLOYEES above:
+// only grows from a real reviewed decision per person. Matched by
+// employeeId (or teachosUserId) ONLY — never by name alone, so a shared
+// full name with someone else can never misfile this entry onto the wrong
+// person (see the findOverride() fix in reconcile.ts, 2026-09-04).
+export const OTHER_DEPARTMENT_EMPLOYEES: OtherDepartmentOverride[] = [
+  {
+    employeeId: "NW0007365",
+    fullName: "Shaik Musharaf",
+    reason: "Darwin lists this person under Instructors – Frontend Technologies as \"Software Engineering Mentor\" (NWD_ID_FT_SEM), which would otherwise classify as a Mentor. Decided (2026-09-04): file under Other department instead, not Mentor and not Instructor. (This employee ID was previously being wrongly caught by a different Shaik Musharaf's exclusion entry above — employee NW0005088, a Video Editor — purely because findOverride() fell back to a name-only match; that matching bug is fixed as of this same date.)",
+    decidedDate: "2026-09-04",
+  },
+];
