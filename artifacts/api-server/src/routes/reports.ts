@@ -50,11 +50,24 @@ router.get("/reports/instructors", async (_req, res) => {
   // TeachOS instructor count" and would otherwise inflate this report.
   const rows = allRows.filter((r) => r.inTeachos);
 
+  // Mentors count (2026-09-04, per request): sourced from Darwin directly,
+  // not scoped to TeachOS — same population /reports/darwin-breakdown's
+  // mentors bucket uses (matched Darwin's Instructors department primary
+  // pass, classification "mentor"), regardless of whether that person has
+  // ever been onboarded into TeachOS. The Overview standing-rule figure and
+  // the Darwin Breakdown tab were showing two different numbers (85 vs 90)
+  // for what's supposed to be the same headline count — the gap was mentors
+  // Darwin has on file who don't have a TeachOS record yet at all. Taking
+  // the Darwin count as the source of truth resolves that discrepancy.
+  const mentors = allRows.filter((r) => r.inDarwin && !r.inDarwinFullRoster && r.classification === "mentor");
   // "Counted as instructors" excludes: individual excluded overrides,
   // Delivery Support (Ops and Central Managers), and Mentors — none of
   // these are instructor roles. Mentors get their own reported section
-  // below rather than being silently dropped.
-  const mentors = rows.filter((r) => r.classification === "mentor");
+  // above (Darwin-scoped) rather than being silently dropped, but the
+  // instructor-pool exclusion below still needs to check every TeachOS-
+  // active row's own classification (a TeachOS-active mentor is still
+  // excluded here even if, in some edge case, they weren't in the
+  // Darwin-scoped `mentors` list above).
   const excludedRows = rows.filter((r) => r.classification === "excluded_other_department" || r.classification === "excluded_non_department_team" || r.classification === "excluded_ops_managers");
   // Operations team, specifically: Darwin's own "Delivery Support (Ops and
   // Central Managers)" department (see departmentTaxonomy.ts). This is a
