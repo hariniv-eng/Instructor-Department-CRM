@@ -106,7 +106,9 @@ export default function InstructorsPage() {
 function gridColsClass(category: CategoryKey): string {
   if (category === 'instructors') return 'grid-cols-[260px_130px_280px_160px_220px_130px]';
   if (category === 'mentors') return 'grid-cols-[260px_130px_280px_160px_240px]';
-  return 'grid-cols-[260px_130px_280px_260px_220px]';
+  // Operations team has no Campus column -- ops rows aren't deployed to a
+  // teaching campus the way instructors and mentors are.
+  return 'grid-cols-[260px_130px_280px_280px]';
 }
 
 function CategoryTable({ category, people }: { category: CategoryKey; people: InstructorSummary[] }) {
@@ -119,7 +121,7 @@ function CategoryTable({ category, people }: { category: CategoryKey; people: In
           <span>Employee ID</span>
           <span>TeachOS User ID</span>
           <span>{category === 'ops_team' ? 'Department' : 'Subject'}</span>
-          <span>Campus</span>
+          {category !== 'ops_team' && <span>Campus</span>}
           {category === 'instructors' && <span>Payroll</span>}
         </div>
         <div>{people.map((person) => <PersonRow key={person.id} category={category} person={person} columns={columns} />)}</div>
@@ -141,7 +143,7 @@ function PersonRow({ category, person, columns }: { category: CategoryKey; perso
     <div className="truncate font-mono-ui text-[11px] text-muted-foreground">{person.employee_id || '—'}</div>
     <div className="truncate font-mono-ui text-[11px] text-muted-foreground">{person.teachos_user_id || ''}</div>
     <div className="truncate text-[12px] text-muted-foreground">{category === 'ops_team' ? (person.department || '—') : (person.dept_area || '—')}</div>
-    <div className="truncate text-[12px] text-muted-foreground">{campus}</div>
+    {category !== 'ops_team' && <div className="truncate text-[12px] text-muted-foreground">{campus}</div>}
     {category === 'instructors' && <div>{person.is_payroll ? <span className="inline-flex rounded-full bg-[#e6e9fb] px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] text-[#4a4fb0]">Payroll</span> : <span className="inline-flex rounded-full bg-secondary px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] text-muted-foreground">Nxtwave</span>}</div>}
   </Link>;
 }
