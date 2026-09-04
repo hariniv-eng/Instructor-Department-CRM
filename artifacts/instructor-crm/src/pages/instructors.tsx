@@ -65,7 +65,7 @@ export default function InstructorsPage() {
           const isActive = category === tab.key;
           return <button key={tab.key} type="button" data-testid={`button-category-${tab.key}`} onClick={() => setCategory(tab.key)} aria-pressed={isActive} className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-bold transition-colors ${isActive ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'}`}>
             <Icon size={14} /> {tab.label}
-            <span className="ml-1 font-mono-ui text-[10px] opacity-70">{formatCount(report?.kpis[category === 'instructors' ? 'total_instructor_count' : category === 'mentors' ? 'mentors_count' : 'ops_team_count'])}</span>
+            <span className="ml-1 font-mono-ui text-[10px] opacity-70">{formatCount(report?.kpis[tab.key === 'instructors' ? 'total_instructor_count' : tab.key === 'mentors' ? 'mentors_count' : 'ops_team_count'])}</span>
           </button>;
         })}
       </div>
