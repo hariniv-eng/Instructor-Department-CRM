@@ -5,9 +5,10 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { AccessBucket } from './accessBucket';
 
 export type AccessSplit = {
-  darwin_only?: number;
-  both?: number;
-  teachos_only?: number;
+  darwin_only?: AccessBucket;
+  both?: AccessBucket;
+  teachos_only?: AccessBucket;
 };
