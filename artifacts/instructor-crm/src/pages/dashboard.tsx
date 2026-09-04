@@ -1,9 +1,37 @@
 import { ArrowDownRight, ArrowUpRight, CalendarDays, ChevronDown, ChevronUp, CircleAlert, Download, RefreshCw, UsersRound } from 'lucide-react';
 import { useState } from 'react';
 import { useGetDashboard, getGetDashboardQueryKey, useGetReportsInstructors } from '@workspace/api-client-react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'wouter';
 import { PageIntro, QueryError, SkeletonBlock } from '@/components/ui-pieces';
+
+// Same query keys the Darwin/TeachOS Breakdown pages use for these two
+// endpoints -- sharing the cache key means visiting either breakdown tab
+// (or this one) reuses the same fetch instead of re-requesting it.
+type TeachosBreakdownSummary = { total_active: number; matched_with_darwin: { count: number }; not_mapped: { payroll_converted: { count: number } } };
+type DarwinBreakdownSummary = { total_darwin_instructors_dept: number };
+
+function useTeachosBreakdownSummary() {
+  return useQuery<TeachosBreakdownSummary>({
+    queryKey: ['reports', 'teachos-breakdown'],
+    queryFn: async () => {
+      const response = await fetch('/api/reports/teachos-breakdown');
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json();
+    },
+  });
+}
+
+function useDarwinBreakdownSummary() {
+  return useQuery<DarwinBreakdownSummary>({
+    queryKey: ['reports', 'darwin-breakdown'],
+    queryFn: async () => {
+      const response = await fetch('/api/reports/darwin-breakdown');
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json();
+    },
+  });
+}
 
 function formatKpi(value: number | undefined) {
   return typeof value === 'number' ? value.toLocaleString('en-IN') : '—';
@@ -39,7 +67,13 @@ export default function DashboardPage() {
   const queryClient = useQueryClient();
   const dashboardQuery = useGetDashboard();
   const reportQuery = useGetReportsInstructors();
+  const teachosBreakdownQuery = useTeachosBreakdownSummary();
+  const darwinBreakdownQuery = useDarwinBreakdownSummary();
   const report = reportQuery.data;
+  const teachosSummary = teachosBreakdownQuery.data;
+  const darwinSummary = darwinBreakdownQuery.data;
+  const sourceCountsLoading = teachosBreakdownQuery.isLoading || darwinBreakdownQuery.isLoading;
+  const sourceCountsError = teachosBreakdownQuery.isError || darwinBreakdownQuery.isError;
   const [showInstructorDetails, setShowInstructorDetails] = useState(false);
   const dashboard = dashboardQuery.data;
   const kpis = dashboard?.kpis ?? {};
@@ -88,6 +122,34 @@ export default function DashboardPage() {
           <div><p className="font-mono-ui uppercase tracking-[0.1em] text-primary-foreground/55">Payroll converted</p><p className="mt-1 text-[17px] font-bold">{formatKpi(report.kpis.payroll_count)}</p></div>
         </div>
       </div>}
+
+      {/* Source vs. match counts -- Darwin data, TeachOS data, how many of
+          TeachOS matched Darwin directly, and how many resolved to payroll. */}
+      <div className="mt-6 border-t border-primary-foreground/15 pt-5">
+        <p className="font-mono-ui text-[10px] uppercase tracking-[0.1em] text-primary-foreground/55">Source data &amp; matching</p>
+        {sourceCountsLoading && <div className="mt-3 h-16 w-full animate-pulse rounded bg-primary-foreground/15" />}
+        {sourceCountsError && <p className="mt-3 text-[13px] text-primary-foreground/80">Source counts are unavailable right now.</p>}
+        {!sourceCountsLoading && !sourceCountsError && <div className="mt-3 overflow-x-auto rounded-lg border border-primary-foreground/20">
+          <table className="w-full min-w-[480px] text-left text-[13px]">
+            <thead>
+              <tr className="border-b border-primary-foreground/20 bg-primary-foreground/5">
+                <th className="px-4 py-2.5 font-mono-ui text-[10px] font-semibold uppercase tracking-[0.08em] text-primary-foreground/60">Darwin data</th>
+                <th className="px-4 py-2.5 font-mono-ui text-[10px] font-semibold uppercase tracking-[0.08em] text-primary-foreground/60">TeachOS data</th>
+                <th className="px-4 py-2.5 font-mono-ui text-[10px] font-semibold uppercase tracking-[0.08em] text-primary-foreground/60">Matching count</th>
+                <th className="px-4 py-2.5 font-mono-ui text-[10px] font-semibold uppercase tracking-[0.08em] text-primary-foreground/60">Payroll count</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td className="px-4 py-3 text-[19px] font-extrabold tracking-[-0.03em]">{formatKpi(darwinSummary?.total_darwin_instructors_dept)}</td>
+                <td className="px-4 py-3 text-[19px] font-extrabold tracking-[-0.03em]">{formatKpi(teachosSummary?.total_active)}</td>
+                <td className="px-4 py-3 text-[19px] font-extrabold tracking-[-0.03em]">{formatKpi(teachosSummary?.matched_with_darwin.count)}</td>
+                <td className="px-4 py-3 text-[19px] font-extrabold tracking-[-0.03em]">{formatKpi(teachosSummary?.not_mapped.payroll_converted.count)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>}
+      </div>
       {report && showInstructorDetails && <div className="mt-6">
         <div className="mb-2 flex items-center justify-between">
           <p className="text-[12px] font-semibold text-primary-foreground/75">{formatKpi(report.instructors.length)} instructors</p>
