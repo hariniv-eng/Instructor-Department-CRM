@@ -93,34 +93,44 @@ export default function InstructorsPage() {
 // Rows are Links (for click-through to the instructor detail page), so this
 // uses a CSS grid rather than a real <table> -- an <a> can't be a direct
 // child of <tbody> -- matching the grid-row pattern this page already used.
+// Columns are fixed pixel widths, not fr/minmax, and the header + rows sit
+// together inside one horizontally-scrolling container: a full 32-character
+// TeachOS user ID doesn't fit alongside the other columns, and letting the
+// grid compress it was what made the ID visually run into the Subject
+// column next to it. Fixed widths never compress -- the row scrolls
+// sideways instead, per the user's explicit ask for a horizontal scrollbar.
 // Tailwind's build-time scanner only picks up class names it can find as
 // complete literal text in the source, so each category's grid template is
 // spelled out in full below rather than assembled from interpolated pieces
 // -- a dynamically-built arbitrary-value class silently gets no CSS at all.
 function gridColsClass(category: CategoryKey): string {
-  if (category === 'instructors') return 'lg:grid-cols-[minmax(220px,1.6fr)_minmax(110px,.8fr)_minmax(140px,.9fr)_minmax(110px,.8fr)_minmax(160px,1.1fr)_minmax(90px,.7fr)]';
-  if (category === 'mentors') return 'lg:grid-cols-[minmax(220px,1.6fr)_minmax(110px,.8fr)_minmax(140px,.9fr)_minmax(110px,.8fr)_minmax(200px,1.3fr)]';
-  return 'lg:grid-cols-[minmax(220px,1.6fr)_minmax(110px,.8fr)_minmax(140px,.9fr)_minmax(170px,1fr)_minmax(200px,1.3fr)]';
+  if (category === 'instructors') return 'grid-cols-[260px_130px_280px_160px_220px_130px]';
+  if (category === 'mentors') return 'grid-cols-[260px_130px_280px_160px_240px]';
+  return 'grid-cols-[260px_130px_280px_260px_220px]';
 }
 
 function CategoryTable({ category, people }: { category: CategoryKey; people: InstructorSummary[] }) {
   const columns = gridColsClass(category);
   return <div className="overflow-hidden rounded-xl border border-border bg-card shadow-xs">
-    <div className={`hidden gap-4 border-b border-border bg-[#f4f7f9] px-5 py-3.5 text-left font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground lg:grid ${columns}`}>
-      <span>{category === 'ops_team' ? 'Team member' : category === 'mentors' ? 'Mentor' : 'Instructor'}</span>
-      <span>Employee ID</span>
-      <span>TeachOS User ID</span>
-      <span>{category === 'ops_team' ? 'Department' : 'Subject'}</span>
-      <span>Campus</span>
-      {category === 'instructors' && <span>Payroll</span>}
+    <div className="overflow-x-auto">
+      <div className="w-max min-w-full">
+        <div className={`grid gap-4 border-b border-border bg-[#f4f7f9] px-5 py-3.5 text-left font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground ${columns}`}>
+          <span>{category === 'ops_team' ? 'Team member' : category === 'mentors' ? 'Mentor' : 'Instructor'}</span>
+          <span>Employee ID</span>
+          <span>TeachOS User ID</span>
+          <span>{category === 'ops_team' ? 'Department' : 'Subject'}</span>
+          <span>Campus</span>
+          {category === 'instructors' && <span>Payroll</span>}
+        </div>
+        <div>{people.map((person) => <PersonRow key={person.id} category={category} person={person} columns={columns} />)}</div>
+      </div>
     </div>
-    <div>{people.map((person) => <PersonRow key={person.id} category={category} person={person} columns={columns} />)}</div>
   </div>;
 }
 
 function PersonRow({ category, person, columns }: { category: CategoryKey; person: InstructorSummary; columns: string }) {
   const campus = person.institutes && person.institutes.length > 0 ? person.institutes.join(', ') : '—';
-  return <Link href={`/instructors/${person.id}`} data-testid={`link-instructor-${person.id}`} className={`group grid gap-3 border-b border-border/70 px-4 py-4 transition-colors last:border-0 hover:bg-[#f8fafb] lg:items-center lg:gap-4 lg:px-5 ${columns}`}>
+  return <Link href={`/instructors/${person.id}`} data-testid={`link-instructor-${person.id}`} className={`group grid items-center gap-4 border-b border-border/70 px-5 py-4 transition-colors last:border-0 hover:bg-[#f8fafb] ${columns}`}>
     <div className="flex min-w-0 items-center gap-3">
       <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#e1eaf1] text-[11px] font-extrabold text-primary">{initials(person.full_name)}</span>
       <span className="min-w-0">
@@ -128,11 +138,11 @@ function PersonRow({ category, person, columns }: { category: CategoryKey; perso
         {person.designation && <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">{person.designation}</span>}
       </span>
     </div>
-    <div className="font-mono-ui text-[11px] text-muted-foreground"><span className="text-muted-foreground/70 lg:hidden">Employee ID </span>{person.employee_id || '—'}</div>
-    <div className="font-mono-ui text-[11px] text-muted-foreground"><span className="text-muted-foreground/70 lg:hidden">TeachOS User ID </span>{person.teachos_user_id || ''}</div>
-    <div className="text-[12px] text-muted-foreground">{category === 'ops_team' ? (person.department || '—') : (person.dept_area || '—')}</div>
-    <div className="text-[12px] text-muted-foreground">{campus}</div>
-    {category === 'instructors' && <div>{person.is_payroll ? <span className="inline-flex rounded-full bg-[#e6e9fb] px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] text-[#4a4fb0]">Payroll</span> : <span className="text-muted-foreground">—</span>}</div>}
+    <div className="truncate font-mono-ui text-[11px] text-muted-foreground">{person.employee_id || '—'}</div>
+    <div className="truncate font-mono-ui text-[11px] text-muted-foreground">{person.teachos_user_id || ''}</div>
+    <div className="truncate text-[12px] text-muted-foreground">{category === 'ops_team' ? (person.department || '—') : (person.dept_area || '—')}</div>
+    <div className="truncate text-[12px] text-muted-foreground">{campus}</div>
+    {category === 'instructors' && <div>{person.is_payroll ? <span className="inline-flex rounded-full bg-[#e6e9fb] px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] text-[#4a4fb0]">Payroll</span> : <span className="inline-flex rounded-full bg-secondary px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] text-muted-foreground">Nxtwave</span>}</div>}
   </Link>;
 }
 
