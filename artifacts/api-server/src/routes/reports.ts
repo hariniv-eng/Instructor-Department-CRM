@@ -20,6 +20,7 @@ const toApiInstructorSummary = (row: InstructorRow) => ({
   id: row.id,
   full_name: row.fullName,
   employee_id: row.employeeId,
+  teachos_user_id: row.teachosUserId,
   designation: row.designation,
   department: row.department,
   dept_bucket: row.deptBucket,
