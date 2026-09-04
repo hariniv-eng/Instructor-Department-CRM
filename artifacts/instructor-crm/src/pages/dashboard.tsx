@@ -85,7 +85,7 @@ export default function DashboardPage() {
   const maxDept = Math.max(...(dashboard?.sub_departments ?? []).map((item) => item.count), 1);
 
   return <div className="mx-auto max-w-[1500px]">
-    <PageIntro eyebrow="Command center / 09:42 IST" title="Good morning, Aarav." description="A clear read on the instructor workforce, source integrity, and the exceptions worth your attention." action={<button type="button" data-testid="button-refresh-dashboard" onClick={() => queryClient.invalidateQueries({ queryKey: getGetDashboardQueryKey() })} className="inline-flex items-center gap-2 self-start rounded-lg border border-border bg-card px-3.5 py-2.5 text-[12px] font-bold text-foreground transition-colors hover:bg-secondary lg:self-auto"><RefreshCw size={14} /> Refresh data</button>} />
+    <PageIntro eyebrow="Command center / 09:42 IST" title="Faculty Command Center (FCC)" description="A clear read on the instructor workforce, source integrity, and the exceptions worth your attention." action={<button type="button" data-testid="button-refresh-dashboard" onClick={() => queryClient.invalidateQueries({ queryKey: getGetDashboardQueryKey() })} className="inline-flex items-center gap-2 self-start rounded-lg border border-border bg-card px-3.5 py-2.5 text-[12px] font-bold text-foreground transition-colors hover:bg-secondary lg:self-auto"><RefreshCw size={14} /> Refresh data</button>} />
 
     {/* 1. KPI row — leads the page, ahead of the instructor-count banner. */}
     {dashboardQuery.isLoading && <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">{[1, 2, 3, 4].map((item) => <SkeletonBlock key={item} className="h-[126px]" />)}</div>}

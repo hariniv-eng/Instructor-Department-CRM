@@ -151,13 +151,18 @@ export const recomputeStatuses = async () => {
     // Instructors-department pass nor the full 3,000+ roster fallback pass
     // (a full-roster match means inDarwin=true here, so falls out of this
     // pool automatically and is handled by the ordinary Darwin/TeachOS
-    // presence rules below instead) — via a 3-step cascade that replaces
-    // the frozen PAYROLL_CONVERTED_EMPLOYEES override list entirely
-    // (2026-09-03):
-    //   1. Has a Darwin exit record? -> exit_candidate, set aside as a
-    //      likely-departed employee, not counted as payroll.
+    // presence rules below instead) — via a cascade that replaces the
+    // frozen PAYROLL_CONVERTED_EMPLOYEES override list entirely
+    // (2026-09-03), later simplified (2026-09-04) to fold the Darwin-exit
+    // case into payroll_converted instead of its own bucket, per request:
+    //   1. Has a Darwin exit record? -> payroll_converted, with the reason
+    //      text noting the exit record. (The separate exitFlag/
+    //      exitFlagStatus/exitFlagDate columns below still record this too,
+    //      for the "flag, don't subtract" annotation used elsewhere — it's
+    //      just no longer its own classification/bucket.)
     //   2. TeachOS institute is IIT Kharagpur? -> iit_kharagpur_team, its
-    //      own team, not counted as payroll.
+    //      own team, not counted as payroll (reported together with
+    //      "other department" as of 2026-09-04 — see reports.ts).
     //   3. Everyone still left in the pool -> payroll_converted.
     const isTeachosOnlyLeftover = !!row.inTeachos && !row.inDarwin;
     const isIitKharagpurCampus = (row.institutes ?? []).some((institute) => /kharagpur/i.test(institute));
@@ -183,9 +188,9 @@ export const recomputeStatuses = async () => {
       classificationReason = "Instructors department, but designation isn't an Instructor or Mentor role — tracked as Instructor Team Operations, not counted as an instructor";
       computedStatus = "instructor_ops";
     } else if (isTeachosOnlyLeftover && exit) {
-      classification = "exit_candidate";
-      classificationReason = `Darwin exit record found (status: ${exit.status ?? "unknown"}) — set aside from the payroll pipeline as a likely-departed employee, not counted as payroll-converted.`;
-      computedStatus = "exit_candidate";
+      classification = "payroll_converted";
+      classificationReason = `No Darwin record anywhere (primary Instructors department or full 3,000+ roster) — payroll-converted, with a Darwin exit record also on file (status: ${exit.status ?? "unknown"}), combined into the Payroll bucket (2026-09-04).`;
+      computedStatus = "payroll_converted";
     } else if (isTeachosOnlyLeftover && isIitKharagpurCampus) {
       classification = "iit_kharagpur_team";
       classificationReason = "TeachOS institute is IIT Kharagpur — tracked as its own team, not counted as a payroll-converted instructor.";

@@ -24,8 +24,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Database size={19} strokeWidth={2.4} />
             </span>
             <span>
-              <span className="block text-[14px] font-extrabold tracking-[-0.02em]">Instructor Dept</span>
-              <span className="font-mono-ui mt-0.5 block text-[9px] uppercase tracking-[0.18em] text-sidebar-foreground/55">Operations CRM</span>
+              <span className="block text-[14px] font-extrabold tracking-[-0.02em]">Faculty Command Center</span>
+              <span className="font-mono-ui mt-0.5 block text-[9px] uppercase tracking-[0.18em] text-sidebar-foreground/55">FCC</span>
             </span>
           </Link>
           <button type="button" aria-label="Close navigation" data-testid="button-close-navigation" onClick={() => setMobileOpen(false)} className="rounded-md p-1 text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground md:hidden">
