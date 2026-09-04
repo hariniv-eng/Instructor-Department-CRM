@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './accessSplit';
 export * from './dashboard';
 export * from './dashboardDesignationsItem';
 export * from './dashboardKpis';
@@ -18,6 +19,7 @@ export * from './healthStatus';
 export * from './instructor';
 export * from './instructorInput';
 export * from './instructorsReport';
+export * from './instructorsReportAccessBreakdown';
 export * from './instructorsReportDarwinMatch';
 export * from './instructorsReportDepartment';
 export * from './instructorsReportDeployment';

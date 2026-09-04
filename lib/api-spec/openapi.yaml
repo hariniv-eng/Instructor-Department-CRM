@@ -433,6 +433,20 @@ components:
           type: array
           description: Every person counted in kpis.total_instructor_count, sorted by name. Backs a click-to-expand details view under the headline count.
           items: { $ref: "#/components/schemas/InstructorSummary" }
+        access_breakdown:
+          type: object
+          description: Darwin-only / TeachOS-only / both-access split for the Instructors, Mentors, and Operations team KPI cards (2026-09-04).
+          properties:
+            instructors: { $ref: "#/components/schemas/AccessSplit" }
+            mentors: { $ref: "#/components/schemas/AccessSplit" }
+            ops_team: { $ref: "#/components/schemas/AccessSplit" }
+    AccessSplit:
+      type: object
+      description: How many of a category's total have a Darwin record only, a TeachOS record only, or both.
+      properties:
+        darwin_only: { type: number }
+        both: { type: number }
+        teachos_only: { type: number }
     DeptBucketReport:
       type: object
       properties:
