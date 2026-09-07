@@ -1,4 +1,4 @@
-import { Briefcase, GraduationCap, RefreshCw, UsersRound, X } from 'lucide-react';
+import { Briefcase, Building2, GraduationCap, RefreshCw, UsersRound, X } from 'lucide-react';
 import { useState } from 'react';
 import { useGetReportsInstructors, getGetReportsInstructorsQueryKey, type AccessSplit, type InstructorSummary } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -9,10 +9,11 @@ function formatKpi(value: number | undefined) {
   return typeof value === 'number' ? value.toLocaleString('en-IN') : '—';
 }
 
-type AccessCardKey = 'instructors' | 'mentors' | 'ops_team';
+type AccessCardKey = 'department' | 'instructors' | 'mentors' | 'ops_team';
 type AccessTabKey = 'darwin_only' | 'both' | 'teachos_only';
 
 const ACCESS_CARD_LABELS: Record<AccessCardKey, string> = {
+  department: 'Instructor Department',
   instructors: 'Instructors',
   mentors: 'Mentors',
   ops_team: 'Operations team',
@@ -24,16 +25,19 @@ const ACCESS_TABS: { key: AccessTabKey; label: string }[] = [
   { key: 'teachos_only', label: 'Only TeachOS' },
 ];
 
-// The Overview tab is deliberately just these 3 cards (2026-09-04, per
+// The Overview tab is deliberately just these cards (2026-09-04, per
 // request -- everything else that used to live here, the standing-rule
 // banner, source-match table, classification/role-mix glance row, and the
 // movement/sub-department charts, was removed): Instructors (matched with
 // Darwin directly, plus confirmed payroll-converted), Mentors (Darwin's
 // "Mentors" department), Operations team (Darwin's "Delivery Support (Ops
-// and Central Managers)" department, individual Ops overrides included).
-// Clicking a card opens an access drill-down below it: three buttons --
-// Only Darwin / Both / Only TeachOS -- each showing that bucket's actual
-// people (see access_breakdown in reports.ts /reports/instructors).
+// and Central Managers)" department, individual Ops overrides included),
+// plus a 4th "Instructor Department" card (2026-09-07) that rolls all three
+// of those up into one total. Clicking a card opens an access drill-down
+// below it: three buttons -- Only Darwin / Both / Only TeachOS -- each
+// showing that bucket's actual people (see access_breakdown in reports.ts
+// /reports/instructors; "department" there is the union of instructors +
+// mentors + ops_team).
 export default function DashboardPage() {
   const queryClient = useQueryClient();
   const reportQuery = useGetReportsInstructors();
@@ -53,13 +57,14 @@ export default function DashboardPage() {
     <PageIntro
       eyebrow="Command center / 09:42 IST"
       title="Faculty Command Center (FCC)"
-      description="Instructors, Mentors, and Operations team -- each broken down by which system actually has access: Darwin only, TeachOS only, or both."
+      description="Instructor Department, Instructors, Mentors, and Operations team -- each broken down by which system actually has access: Darwin only, TeachOS only, or both."
       action={<button type="button" data-testid="button-refresh-dashboard" onClick={() => queryClient.invalidateQueries({ queryKey: getGetReportsInstructorsQueryKey() })} className="inline-flex items-center gap-2 self-start rounded-lg border border-border bg-card px-3.5 py-2.5 text-[12px] font-bold text-foreground transition-colors hover:bg-secondary lg:self-auto"><RefreshCw size={14} /> Refresh data</button>}
     />
 
-    {reportQuery.isLoading && <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">{[1, 2, 3].map((item) => <SkeletonBlock key={item} className="h-[126px]" />)}</div>}
+    {reportQuery.isLoading && <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">{[1, 2, 3, 4].map((item) => <SkeletonBlock key={item} className="h-[126px]" />)}</div>}
     {reportQuery.isError && <QueryError message="Dashboard data is unavailable right now." />}
-    {report && <section className="grid grid-cols-1 gap-3 sm:grid-cols-3 animate-rise">
+    {report && <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 animate-rise">
+      <KpiCard label="Instructor Department" value={formatKpi(report.kpis.department_total_count)} meta="Instructors + Mentors + Ops team" icon={<Building2 size={17} />} tone="saffron" breakdown={report.access_breakdown?.department} active={activeAccessCard === 'department'} onClick={() => toggleAccessCard('department')} />
       <KpiCard label="Instructors" value={formatKpi(report.kpis.total_instructor_count)} meta="Matched with Darwin + payroll" icon={<UsersRound size={17} />} tone="navy" breakdown={report.access_breakdown?.instructors} active={activeAccessCard === 'instructors'} onClick={() => toggleAccessCard('instructors')} />
       <KpiCard label="Mentors" value={formatKpi(report.kpis.mentors_count)} meta="Darwin — Mentors department" icon={<GraduationCap size={17} />} tone="teal" breakdown={report.access_breakdown?.mentors} active={activeAccessCard === 'mentors'} onClick={() => toggleAccessCard('mentors')} />
       <KpiCard label="Operations team" value={formatKpi(report.kpis.ops_team_count)} meta="Darwin — Delivery Support (Ops)" icon={<Briefcase size={17} />} tone="coral" breakdown={report.access_breakdown?.ops_team} active={activeAccessCard === 'ops_team'} onClick={() => toggleAccessCard('ops_team')} />

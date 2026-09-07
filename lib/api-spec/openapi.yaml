@@ -519,8 +519,9 @@ components:
           items: { $ref: "#/components/schemas/InstructorSummary" }
         access_breakdown:
           type: object
-          description: Darwin-only / TeachOS-only / both-access split for the Instructors, Mentors, and Operations team KPI cards (2026-09-04).
+          description: Darwin-only / TeachOS-only / both-access split for the Instructor Department, Instructors, Mentors, and Operations team KPI cards (2026-09-04; department card added 2026-09-07). "department" is the union of instructors + mentors + ops_team (mutually exclusive populations, safe to sum).
           properties:
+            department: { $ref: "#/components/schemas/AccessSplit" }
             instructors: { $ref: "#/components/schemas/AccessSplit" }
             mentors: { $ref: "#/components/schemas/AccessSplit" }
             ops_team: { $ref: "#/components/schemas/AccessSplit" }

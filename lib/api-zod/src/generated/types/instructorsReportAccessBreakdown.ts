@@ -8,6 +8,7 @@
 import type { AccessSplit } from './accessSplit';
 
 export type InstructorsReportAccessBreakdown = {
+  department?: AccessSplit;
   instructors?: AccessSplit;
   mentors?: AccessSplit;
   ops_team?: AccessSplit;

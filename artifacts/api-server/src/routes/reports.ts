@@ -238,7 +238,19 @@ router.get("/reports/instructors", async (_req, res) => {
     both: toAccessBucket(list.filter((r) => r.inDarwin && r.inTeachos)),
     teachos_only: toAccessBucket(list.filter((r) => !r.inDarwin && r.inTeachos)),
   });
+  // The 4th "Instructor Department" Overview card (2026-09, per request) --
+  // the whole department in one rollup: Instructors + Mentors + Operations
+  // team together. Safe to concatenate rather than re-deriving from allRows:
+  // these three lists are already mutually exclusive by construction --
+  // countedInstructorRows requires either no classification at all (the
+  // Darwin tech/non_tech population) or !inDarwin (the TeachOS-only payroll
+  // population), mentors requires classification === "mentor" (and
+  // inDarwin), opsTeamRows requires classification ===
+  // "excluded_ops_managers" (and inDarwin) -- a row can only ever match one
+  // of those three shapes.
+  const departmentRows: InstructorRow[] = [...countedInstructorRows, ...mentors, ...opsTeamRows];
   const accessBreakdown = {
+    department: buildAccessSplit(departmentRows),
     instructors: buildAccessSplit(countedInstructorRows),
     mentors: buildAccessSplit(mentors),
     ops_team: buildAccessSplit(opsTeamRows),
@@ -246,6 +258,9 @@ router.get("/reports/instructors", async (_req, res) => {
 
   res.json({
     kpis: {
+      // Instructors + Mentors + Operations team combined -- backs the
+      // "Instructor Department" Overview card (see departmentRows above).
+      department_total_count: departmentRows.length,
       total_instructor_count: countedInstructorRows.length,
       total_including_exited: instructorRows.length,
       exited_excluded_from_count: exitedInstructorRows.length,

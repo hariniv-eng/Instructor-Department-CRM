@@ -247,6 +247,7 @@ export type AccessSplit = {
 };
 
 export type InstructorsReportAccessBreakdown = {
+  department?: AccessSplit;
   instructors?: AccessSplit;
   mentors?: AccessSplit;
   ops_team?: AccessSplit;
