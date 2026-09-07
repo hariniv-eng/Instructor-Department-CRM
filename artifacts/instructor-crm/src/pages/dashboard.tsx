@@ -10,7 +10,7 @@ function formatKpi(value: number | undefined) {
 }
 
 type AccessCardKey = 'department' | 'instructors' | 'mentors' | 'ops_team';
-type AccessTabKey = 'darwin_only' | 'both' | 'teachos_only';
+type AccessTabKey = 'all' | 'both' | 'darwin_only' | 'teachos_only';
 
 const ACCESS_CARD_LABELS: Record<AccessCardKey, string> = {
   department: 'Instructor Department',
@@ -19,10 +19,24 @@ const ACCESS_CARD_LABELS: Record<AccessCardKey, string> = {
   ops_team: 'Operations team',
 };
 
+// "All" (2026-09-07, per request) isn't one of the backend's three access
+// buckets -- it's the union of all of them, computed client-side in
+// AccessDrilldown below, since darwin_only/both/teachos_only are already
+// mutually exclusive and safe to concatenate without dedup.
 const ACCESS_TABS: { key: AccessTabKey; label: string }[] = [
+  { key: 'all', label: 'All' },
   { key: 'both', label: 'Both' },
   { key: 'darwin_only', label: 'Only Darwin' },
   { key: 'teachos_only', label: 'Only TeachOS' },
+];
+
+// Same Both / Darwin only / TeachOS only order as ACCESS_TABS above, used
+// for each KpiCard's own inline breakdown row (2026-09-07, per request --
+// it previously listed Darwin only first, out of step with the tabs).
+const CARD_BREAKDOWN_ORDER: { key: 'both' | 'darwin_only' | 'teachos_only'; label: string }[] = [
+  { key: 'both', label: 'Both' },
+  { key: 'darwin_only', label: 'Darwin only' },
+  { key: 'teachos_only', label: 'TeachOS only' },
 ];
 
 // The Overview tab is deliberately just these cards (2026-09-04, per
@@ -72,6 +86,7 @@ export default function DashboardPage() {
 
     {report && activeAccessCard && <AccessDrilldown
       label={ACCESS_CARD_LABELS[activeAccessCard]}
+      category={activeAccessCard}
       split={report.access_breakdown?.[activeAccessCard]}
       tab={activeAccessTab}
       onTabChange={setActiveAccessTab}
@@ -107,26 +122,65 @@ function KpiCard({ label, value, meta, icon, tone, alert = false, breakdown, act
     <p className="mt-5 text-[27px] font-extrabold tracking-[-0.06em]">{value}</p>
     <p className={`mt-1 font-mono-ui text-[10px] uppercase tracking-[0.1em] ${onNavy ? 'text-primary-foreground/55' : alert ? 'text-[#a36b00]' : 'text-muted-foreground'}`}>{meta}</p>
     {breakdown && <div className={`mt-4 grid grid-cols-3 gap-2 border-t pt-3 ${onNavy ? 'border-primary-foreground/15' : 'border-border/70'}`}>
-      <div><p className={`font-mono-ui text-[9px] uppercase tracking-[0.07em] ${onNavy ? 'text-primary-foreground/55' : 'text-muted-foreground'}`}>Darwin only</p><p className="mt-1 text-[15px] font-bold tracking-[-0.02em]">{formatKpi(breakdown.darwin_only?.count)}</p></div>
-      <div><p className={`font-mono-ui text-[9px] uppercase tracking-[0.07em] ${onNavy ? 'text-primary-foreground/55' : 'text-muted-foreground'}`}>Both</p><p className="mt-1 text-[15px] font-bold tracking-[-0.02em]">{formatKpi(breakdown.both?.count)}</p></div>
-      <div><p className={`font-mono-ui text-[9px] uppercase tracking-[0.07em] ${onNavy ? 'text-primary-foreground/55' : 'text-muted-foreground'}`}>TeachOS only</p><p className="mt-1 text-[15px] font-bold tracking-[-0.02em]">{formatKpi(breakdown.teachos_only?.count)}</p></div>
+      {CARD_BREAKDOWN_ORDER.map((t) => <div key={t.key} className="flex flex-col">
+        {/* min-h + leading here is what keeps the number below lined up across
+            all three columns (2026-09-07, per request) -- "Both" is short
+            enough to never wrap, but "Darwin only" / "TeachOS only" can, on
+            a narrow card, sit on two lines and would otherwise push their
+            own number down while "Both"'s stayed put a line higher. */}
+        <p className={`min-h-[23px] font-mono-ui text-[9px] leading-[1.3] uppercase tracking-[0.07em] ${onNavy ? 'text-primary-foreground/55' : 'text-muted-foreground'}`}>{t.label}</p>
+        <p className="mt-1 text-[15px] font-bold tracking-[-0.02em]">{formatKpi(breakdown[t.key]?.count)}</p>
+      </div>)}
     </div>}
     <p className={`mt-3 text-[10px] font-bold uppercase tracking-[0.08em] ${onNavy ? 'text-primary-foreground/70' : 'text-primary'}`}>{active ? 'Hide people list ▲' : 'View people list ▼'}</p>
   </button>;
 }
 
-function AccessDrilldown({ label, split, tab, onTabChange, onClose }: {
+function AccessDrilldown({ label, category, split, tab, onTabChange, onClose }: {
   label: string;
+  category: AccessCardKey;
   split?: AccessSplit;
   tab: AccessTabKey;
   onTabChange: (tab: AccessTabKey) => void;
   onClose: () => void;
 }) {
-  const bucket = split?.[tab];
-  const people: InstructorSummary[] = bucket?.people ?? [];
+  // "All" (2026-09-07, per request) is the union of the three real buckets
+  // -- darwin_only/both/teachos_only are mutually exclusive by construction
+  // (see reports.ts's buildAccessSplit), so a plain concatenation is safe,
+  // no id-dedup needed. Sorted by name since it's assembled from three
+  // separately-ordered lists.
+  const people: InstructorSummary[] = tab === 'all'
+    ? [...(split?.darwin_only?.people ?? []), ...(split?.both?.people ?? []), ...(split?.teachos_only?.people ?? [])].sort((a, b) => a.full_name.localeCompare(b.full_name))
+    : (split?.[tab]?.people ?? []);
+  const tabCount = (key: AccessTabKey) => key === 'all'
+    ? (split?.darwin_only?.count ?? 0) + (split?.both?.count ?? 0) + (split?.teachos_only?.count ?? 0)
+    : split?.[key]?.count;
+  // Designation (Darwin's "Designation" column, see reports.ts's
+  // toApiInstructorSummary) is only surfaced here for the Operations team
+  // drill-down (2026-09-07, per request) -- Instructors/Mentors/Department
+  // already carry Subject/Campus context the way Ops rows don't.
+  const showDesignation = category === 'ops_team';
+  // Instructors/Mentors show two explicit manager columns instead of one
+  // ambiguous "Manager" column (2026-09-07, per request): Capability
+  // Manager (TeachOS's own instructor_manager assignment, strict -- no
+  // Darwin fallback) and Manager (Darwin) (Darwin's own Direct Manager
+  // field, equally strict -- no TeachOS fallback). These are two different
+  // concepts that both used to collapse into one `manager` field's
+  // fallback chain; see capability_manager / darwin_manager in reports.ts.
+  // Operations team and the Department rollup keep the single general
+  // "Manager" column (still that same fallback chain) as before.
+  const showSplitManagers = category === 'instructors' || category === 'mentors';
   const handleDownload = () => {
-    const headers = ['Name', 'Employee ID', 'Department', 'Campus', 'Manager'];
-    const rows = people.map((p) => [p.full_name, p.employee_id ?? '', p.dept_area ?? p.department ?? '', p.institutes?.join(', ') ?? '', p.manager ?? '']);
+    const managerHeaders = showSplitManagers ? ['Capability Manager', 'Manager (Darwin)'] : ['Manager'];
+    const headers = ['Name', ...(showDesignation ? ['Designation'] : []), 'Employee ID', 'Department', 'Campus', ...managerHeaders];
+    const rows = people.map((p) => [
+      p.full_name,
+      ...(showDesignation ? [p.designation ?? ''] : []),
+      p.employee_id ?? '',
+      p.dept_area ?? p.department ?? '',
+      p.institutes?.join(', ') ?? '',
+      ...(showSplitManagers ? [p.capability_manager ?? '', p.darwin_manager ?? ''] : [p.manager ?? '']),
+    ]);
     downloadCsv(`${slugify(label)}-${tab.replaceAll('_', '-')}.csv`, toCsv(headers, rows));
   };
 
@@ -153,7 +207,7 @@ function AccessDrilldown({ label, split, tab, onTabChange, onClose }: {
           onClick={() => onTabChange(t.key)}
           className={`rounded-lg border px-3.5 py-2 text-[12px] font-bold transition-colors ${isActive ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-secondary text-foreground hover:bg-border/50'}`}
         >
-          {t.label} <span className="ml-1 font-mono-ui opacity-75">{formatKpi(split?.[t.key]?.count)}</span>
+          {t.label} <span className="ml-1 font-mono-ui opacity-75">{formatKpi(tabCount(t.key))}</span>
         </button>;
       })}
     </div>
@@ -162,21 +216,27 @@ function AccessDrilldown({ label, split, tab, onTabChange, onClose }: {
         <thead className="sticky top-0 bg-secondary font-mono-ui text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
           <tr>
             <th className="px-3 py-2">Name</th>
+            {showDesignation && <th className="px-3 py-2">Designation</th>}
             <th className="px-3 py-2">Employee ID</th>
             <th className="px-3 py-2">Department</th>
             <th className="px-3 py-2">Campus</th>
-            <th className="px-3 py-2">Manager</th>
+            {showSplitManagers
+              ? <><th className="px-3 py-2">Capability Manager</th><th className="px-3 py-2">Manager (Darwin)</th></>
+              : <th className="px-3 py-2">Manager</th>}
           </tr>
         </thead>
         <tbody>
           {people.map((p) => <tr key={p.id} className="border-t border-border/70">
             <td className="px-3 py-2 font-semibold">{p.full_name}</td>
+            {showDesignation && <td className="px-3 py-2 text-muted-foreground">{p.designation ?? '—'}</td>}
             <td className="px-3 py-2 font-mono-ui text-muted-foreground">{p.employee_id ?? '—'}</td>
             <td className="px-3 py-2 text-muted-foreground">{p.dept_area ?? p.department ?? '—'}</td>
             <td className="px-3 py-2 text-muted-foreground">{p.institutes?.join(', ') || '—'}</td>
-            <td className="px-3 py-2 text-muted-foreground">{p.manager ?? '—'}</td>
+            {showSplitManagers
+              ? <><td className="px-3 py-2 text-muted-foreground">{p.capability_manager ?? '—'}</td><td className="px-3 py-2 text-muted-foreground">{p.darwin_manager ?? '—'}</td></>
+              : <td className="px-3 py-2 text-muted-foreground">{p.manager ?? '—'}</td>}
           </tr>)}
-          {people.length === 0 && <tr><td colSpan={5} className="px-3 py-8 text-center text-muted-foreground">No one in this bucket.</td></tr>}
+          {people.length === 0 && <tr><td colSpan={5 + (showDesignation ? 1 : 0) + (showSplitManagers ? 2 : 1)} className="px-3 py-8 text-center text-muted-foreground">No one in this bucket.</td></tr>}
         </tbody>
       </table>
     </div>

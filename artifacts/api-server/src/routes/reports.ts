@@ -30,6 +30,20 @@ const toApiInstructorSummary = (row: InstructorRow) => ({
   deployment_status: row.deploymentStatus,
   institutes: row.institutes,
   manager: row.teachosManager || row.directManager || null,
+  // Strict Capability Manager (TeachOS's own instructor_manager assignment,
+  // see reconcileCapabilityManager() in reconcile.ts) -- unlike `manager`
+  // above, this deliberately does NOT fall back to Darwin's Direct Manager,
+  // since that's a different concept (org hierarchy, not TeachOS capability
+  // assignment). Used to replace the "Manager" column with "Capability
+  // Manager" for Instructors/Mentors in the Overview drill-down (2026-09-07,
+  // per request) -- Operations team keeps showing `manager` as before.
+  capability_manager: row.teachosManager || null,
+  // Darwin's own "Direct Manager" field, shown as its own explicit column
+  // alongside capability_manager (2026-09-07, per request) rather than only
+  // living inside `manager`'s fallback -- these are two different concepts
+  // (Darwin org-hierarchy manager vs. TeachOS Capability Manager) and the
+  // Overview drill-down now shows both side by side for Instructors/Mentors.
+  darwin_manager: row.directManager || null,
 });
 
 // This is the single reporting surface for the breakdowns requested on top

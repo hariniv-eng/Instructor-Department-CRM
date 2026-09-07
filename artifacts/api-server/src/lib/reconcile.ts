@@ -543,6 +543,41 @@ export async function reconcileTeachosEmployeeIdReference(rows: SheetRow[]) {
   return { matched: matchedCount, unmatched: unmatchedCount, conflicts: conflictCount, total_rows: rows.length };
 }
 
+// Supplementary enrichment pass, same shape as reconcileTeachosEmployeeIdReference()
+// above: patches ONE field (teachosManager -- exposed to the frontend as
+// "Capability Manager" for Instructors/Mentors, see reports.ts's
+// toApiInstructorSummary) onto rows the primary TeachOS sync already
+// matched, keyed on teachos_user_id. Never creates rows, never touches
+// anyone not already inTeachos=true. See capabilityManager.ts's header
+// comment for why this needs its own separate BigQuery table/query at all
+// -- the live sync's main table (niat_instructor_details) dropped the
+// manager column entirely when it switched over for reliable employee-ID
+// matching (2026-09), so this is how that assignment gets back onto each
+// row without reintroducing the employee-ID matching problems that switch
+// was meant to fix.
+export async function reconcileCapabilityManager(rows: SheetRow[]) {
+  let matchedCount = 0;
+  let unmatchedCount = 0;
+  const people = await db.select().from(instructorsTable).where(eq(instructorsTable.inTeachos, true));
+  const byTeachosId = new Map(people.filter((p) => p.teachosUserId).map((p) => [p.teachosUserId as string, p]));
+  for (const item of rows) {
+    const teachosUserId = cell(item, "instructor_user_id", "Instructor User Id");
+    const manager = cell(item, "instructor_manager", "Instructor Manager");
+    if (!teachosUserId || !manager) continue;
+    const match = byTeachosId.get(teachosUserId);
+    if (!match) {
+      unmatchedCount += 1;
+      continue;
+    }
+    if (match.teachosManager !== manager) {
+      await db.update(instructorsTable).set({ teachosManager: manager }).where(eq(instructorsTable.id, match.id));
+      match.teachosManager = manager;
+    }
+    matchedCount += 1;
+  }
+  return { matched: matchedCount, unmatched: unmatchedCount, total_rows: rows.length };
+}
+
 // reconcilePayrollCandidates() was removed 2026-09-03 — payroll-converted
 // status is now fully computed by recomputeStatuses() above (exit check,
 // then IIT Kharagpur campus check, then remainder = payroll_converted) for

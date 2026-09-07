@@ -292,6 +292,10 @@ export interface InstructorSummary {
   institutes: string[];
   /** @nullable */
   manager: string | null;
+  /** @nullable */
+  capability_manager: string | null;
+  /** @nullable */
+  darwin_manager: string | null;
 }
 
 export interface InstructorsReport {

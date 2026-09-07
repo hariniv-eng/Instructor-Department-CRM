@@ -12,8 +12,9 @@ import { config } from "../lib/connectors/config";
 import { fetchDarwinRowsBoth, DarwinboxError } from "../lib/connectors/darwinbox";
 import { fetchExitRows, DarwinboxExitsError } from "../lib/connectors/darwinboxExits";
 import { fetchNiatInstructorDetailsRows, NiatInstructorDetailsError } from "../lib/connectors/niatInstructorDetails";
+import { fetchCapabilityManagerRows } from "../lib/connectors/capabilityManager";
 import { storeDarwinboxActive, storeDarwinboxExits, storeDarwinboxFullRoster, storeTeachosDeployment } from "../lib/storeRaw";
-import { reconcileDarwin, reconcileDarwinFullRosterFallback, reconcileTeachos, reconcileTeachosEmployeeIdReference, recomputeStatuses } from "../lib/reconcile";
+import { reconcileDarwin, reconcileDarwinFullRosterFallback, reconcileTeachos, reconcileTeachosEmployeeIdReference, reconcileCapabilityManager, recomputeStatuses } from "../lib/reconcile";
 import { LAST_SYNC, type SyncResult } from "../lib/syncState";
 
 const router: IRouter = Router();
@@ -85,10 +86,28 @@ async function runTeachosSync(): Promise<SyncResult> {
     // "needs_review" records for anyone whose TeachOS/Darwin name spellings
     // didn't line up exactly. Tradeoff: niat_instructor_details has no
     // instructor_manager / instructor_manager_mail columns, so
-    // teachosManager goes unset via this path for now.
+    // teachosManager goes unset via this path alone -- see the
+    // reconcileCapabilityManager() call below, which patches it back on
+    // from the older table as a second, non-fatal step.
     const rows = await fetchNiatInstructorDetailsRows();
     const stored = await storeTeachosDeployment(rows);
     await reconcileTeachos(rows);
+
+    // Capability Manager enrichment (2026-09-07, per request): a separate
+    // query against the older niat_instructor_managers_and_instructors_details
+    // table, which still carries instructor_manager -- patched onto the
+    // rows just matched above via teachos_user_id (see
+    // reconcileCapabilityManager()). Deliberately non-fatal: if this table
+    // is ever renamed/inaccessible, the primary employee-ID sync above must
+    // still succeed rather than fail the whole "Sync Now" over a field
+    // that's supplementary to begin with.
+    try {
+      const managerRows = await fetchCapabilityManagerRows();
+      await reconcileCapabilityManager(managerRows);
+    } catch (e) {
+      console.error("Capability Manager enrichment failed (non-fatal):", e instanceof Error ? e.message : e);
+    }
+
     await recomputeStatuses();
     await db.insert(uploadsTable).values({ source: "TeachOS", filename: "BigQuery sync (niat_instructor_details, raw + reconciled)", rowCount: stored });
     return { ok: true, source: "teachos_live", stored, synced_at: new Date().toISOString() };

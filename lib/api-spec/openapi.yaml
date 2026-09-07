@@ -582,6 +582,8 @@ components:
         - deployment_status
         - institutes
         - manager
+        - capability_manager
+        - darwin_manager
       properties:
         id: { type: number }
         full_name: { type: string }
@@ -597,3 +599,13 @@ components:
           type: array
           items: { type: string }
         manager: { type: ["string", "null"] }
+        # TeachOS's own Capability Manager assignment (instructor_manager),
+        # with no fallback to Darwin's Direct Manager -- see
+        # toApiInstructorSummary in reports.ts. Backs the "Capability
+        # Manager" column shown for Instructors/Mentors in the Overview
+        # drill-down (2026-09-07); Operations team keeps showing `manager`.
+        capability_manager: { type: ["string", "null"] }
+        # Darwin's own "Direct Manager" field, shown as its own column
+        # ("Manager (Darwin)") alongside capability_manager for
+        # Instructors/Mentors in the Overview drill-down (2026-09-07).
+        darwin_manager: { type: ["string", "null"] }
