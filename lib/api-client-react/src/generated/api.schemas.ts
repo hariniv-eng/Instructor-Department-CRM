@@ -321,3 +321,23 @@ dept_area?: string;
 institute?: string;
 };
 
+
+export interface AppUser {
+  id: number;
+  email: string;
+  full_name: string;
+  role: 'admin' | 'manager';
+  is_active: boolean;
+  /** @nullable */
+  last_login_at?: string | null;
+}
+
+export interface LoginInput {
+  email: string;
+  password: string;
+}
+
+export interface ChangePasswordInput {
+  current_password: string;
+  new_password: string;
+}
