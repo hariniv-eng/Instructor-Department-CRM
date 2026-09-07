@@ -2,7 +2,8 @@ import { Briefcase, GraduationCap, RefreshCw, UsersRound, X } from 'lucide-react
 import { useState } from 'react';
 import { useGetReportsInstructors, getGetReportsInstructorsQueryKey, type AccessSplit, type InstructorSummary } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
-import { PageIntro, QueryError, SkeletonBlock } from '@/components/ui-pieces';
+import { PageIntro, QueryError, SkeletonBlock, DownloadCsvButton } from '@/components/ui-pieces';
+import { downloadCsv, slugify, toCsv } from '@/lib/csv';
 
 function formatKpi(value: number | undefined) {
   return typeof value === 'number' ? value.toLocaleString('en-IN') : '—';
@@ -18,8 +19,8 @@ const ACCESS_CARD_LABELS: Record<AccessCardKey, string> = {
 };
 
 const ACCESS_TABS: { key: AccessTabKey; label: string }[] = [
-  { key: 'darwin_only', label: 'Only Darwin' },
   { key: 'both', label: 'Both' },
+  { key: 'darwin_only', label: 'Only Darwin' },
   { key: 'teachos_only', label: 'Only TeachOS' },
 ];
 
@@ -118,15 +119,24 @@ function AccessDrilldown({ label, split, tab, onTabChange, onClose }: {
 }) {
   const bucket = split?.[tab];
   const people: InstructorSummary[] = bucket?.people ?? [];
+  const handleDownload = () => {
+    const headers = ['Name', 'Employee ID', 'Department', 'Campus', 'Manager'];
+    const rows = people.map((p) => [p.full_name, p.employee_id ?? '', p.dept_area ?? p.department ?? '', p.institutes?.join(', ') ?? '', p.manager ?? '']);
+    downloadCsv(`${slugify(label)}-${tab.replaceAll('_', '-')}.csv`, toCsv(headers, rows));
+  };
+
   return <section className="mt-5 rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6 animate-rise">
     <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
       <div>
         <p className="font-mono-ui text-[10px] uppercase tracking-[0.17em] text-muted-foreground">{label} — by data source</p>
         <h2 className="mt-1 text-[16px] font-extrabold tracking-[-0.03em]">Who has access where</h2>
       </div>
-      <button type="button" data-testid="button-close-access-drilldown" onClick={onClose} className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-[11px] font-bold text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
-        <X size={13} /> Close
-      </button>
+      <div className="flex items-center gap-2">
+        <DownloadCsvButton onClick={handleDownload} disabled={people.length === 0} testId="button-download-access-drilldown" />
+        <button type="button" data-testid="button-close-access-drilldown" onClick={onClose} className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-[11px] font-bold text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
+          <X size={13} /> Close
+        </button>
+      </div>
     </div>
     <div className="flex flex-wrap gap-2">
       {ACCESS_TABS.map((t) => {

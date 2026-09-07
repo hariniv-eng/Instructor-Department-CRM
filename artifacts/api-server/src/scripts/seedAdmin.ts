@@ -2,6 +2,15 @@
 // accounts for the CRM's app_users table. Safe to re-run — an email that
 // already has an account is skipped, nothing is overwritten.
 //
+// 2026-09: Manager has no login of its own anymore — the app's /access
+// chooser sends an unauthenticated visit either to /login (Admin) or
+// straight into a public, read-only "Manager view" with no account needed
+// (see App.tsx, and requireAuth+requireRole("admin") on the backend routes
+// that stay gated). A manager row seeded here still gets created, but
+// /auth/login now rejects any non-admin role — so seeding one currently has
+// no effect through the app. Left in place since Manager login may come
+// back later; harmless to seed or to skip.
+//
 // Usage (from artifacts/api-server/):
 //   pnpm run seed:app-users
 //

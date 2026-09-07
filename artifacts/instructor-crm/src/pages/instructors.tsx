@@ -4,7 +4,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useCreateInstructor, useGetReportsInstructors, getGetReportsInstructorsQueryKey } from '@workspace/api-client-react';
 import type { AccessSplit, InstructorInput, InstructorSummary } from '@workspace/api-client-react';
 import { Link } from 'wouter';
-import { PageIntro, EmptyState, QueryError, SkeletonBlock } from '@/components/ui-pieces';
+import { PageIntro, EmptyState, QueryError, SkeletonBlock, DownloadCsvButton } from '@/components/ui-pieces';
+import { downloadCsv, slugify, toCsv } from '@/lib/csv';
+import { useAuth } from '@/hooks/use-auth';
 
 type CategoryKey = 'instructors' | 'mentors' | 'ops_team';
 
@@ -34,6 +36,7 @@ function initials(name: string) {
 
 export default function InstructorsPage() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const reportQuery = useGetReportsInstructors();
   const report = reportQuery.data;
   const [category, setCategory] = useState<CategoryKey>('instructors');
@@ -55,7 +58,7 @@ export default function InstructorsPage() {
       eyebrow="Workforce register / Darwin + TeachOS"
       title="Instructor records"
       description="Instructors, Mentors, and the Operations team -- each list is exactly who the matching Overview card counts."
-      action={<button type="button" data-testid="button-add-instructor" onClick={() => setCreateOpen(true)} className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-[12px] font-bold text-primary-foreground shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"><Plus size={15} /> Add instructor</button>}
+      action={user ? <button type="button" data-testid="button-add-instructor" onClick={() => setCreateOpen(true)} className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-[12px] font-bold text-primary-foreground shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"><Plus size={15} /> Add instructor</button> : undefined}
     />
 
     <div className="mb-5 flex flex-col gap-3 rounded-xl border border-border bg-card p-3 shadow-xs lg:flex-row lg:items-center">
@@ -72,9 +75,12 @@ export default function InstructorsPage() {
       <div className="relative flex-1"><Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" /><input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search name, employee ID, or TeachOS user ID..." data-testid="input-search-instructors" className="h-10 w-full rounded-lg border border-border bg-background pl-9 pr-3 text-[12px] outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-primary focus:ring-2 focus:ring-ring/25" /></div>
     </div>
 
-    <div className="mb-4 flex flex-col gap-1">
-      <p className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-muted-foreground"><span data-testid="text-instructor-count">{people.length}</span> {activeTab.label.toLowerCase()} in view</p>
-      <p className="text-[11px] text-muted-foreground">{activeTab.description}</p>
+    <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+      <div className="flex flex-col gap-1">
+        <p className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-muted-foreground"><span data-testid="text-instructor-count">{people.length}</span> {activeTab.label.toLowerCase()} in view</p>
+        <p className="text-[11px] text-muted-foreground">{activeTab.description}</p>
+      </div>
+      <DownloadCsvButton onClick={() => downloadInstructorsCsv(category, people)} disabled={people.length === 0} testId="button-download-instructors-csv" />
     </div>
 
     {reportQuery.isLoading && <div className="overflow-hidden rounded-xl border border-border bg-card"><div className="space-y-3 p-4">{[1, 2, 3, 4, 5].map((item) => <SkeletonBlock key={item} className="h-12" />)}</div></div>}
@@ -109,6 +115,23 @@ function gridColsClass(category: CategoryKey): string {
   // Operations team has no Campus column -- ops rows aren't deployed to a
   // teaching campus the way instructors and mentors are.
   return 'grid-cols-[260px_130px_280px_280px]';
+}
+
+// Column set mirrors gridColsClass/CategoryTable below exactly, so the CSV
+// always matches what's on screen for the active category tab.
+function downloadInstructorsCsv(category: CategoryKey, people: InstructorSummary[]) {
+  const headers = [category === 'ops_team' ? 'Team member' : category === 'mentors' ? 'Mentor' : 'Instructor', 'Employee ID', 'TeachOS User ID', category === 'ops_team' ? 'Department' : 'Subject'];
+  if (category !== 'ops_team') headers.push('Campus');
+  if (category === 'instructors') headers.push('Payroll');
+
+  const rows = people.map((person) => {
+    const row: string[] = [person.full_name, person.employee_id ?? '', person.teachos_user_id ?? '', category === 'ops_team' ? (person.department ?? '') : (person.dept_area ?? '')];
+    if (category !== 'ops_team') row.push(person.institutes?.join(', ') ?? '');
+    if (category === 'instructors') row.push(person.is_payroll ? 'Payroll' : 'Nxtwave');
+    return row;
+  });
+
+  downloadCsv(`${slugify(category)}.csv`, toCsv(headers, rows));
 }
 
 function CategoryTable({ category, people }: { category: CategoryKey; people: InstructorSummary[] }) {

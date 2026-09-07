@@ -10,16 +10,19 @@ import { requireAuth, requireRole } from "../middlewares/auth";
 
 const router: IRouter = Router();
 
-// Public — no session required.
+// Public — no session required: health, Admin login/logout/me, and
+// everything the no-login "Manager view" reads for the Overview +
+// Instructors tabs (instructorRouter's GET routes, /reports/instructors).
+// There is no "manager" login anymore (2026-09) — the Instructors tab's
+// write routes (create/edit) self-protect with their own
+// requireAuth+requireRole("admin") inside instructors.ts, and
+// /reports/darwin-breakdown + /reports/teachos-breakdown self-protect the
+// same way inside reports.ts, since the rest of each of those router files
+// needs to stay public/mixed rather than gated as a whole at this level.
 router.use(healthRouter);
 router.use(authRouter);
-
-// Both admin and manager: the Overview + Instructors tabs read these.
-// (reportsRouter also serves /reports/darwin-breakdown and
-// /reports/teachos-breakdown, which are further restricted to admin-only
-// via a per-route requireRole("admin") inside reports.ts itself.)
-router.use(requireAuth, instructorRouter);
-router.use(requireAuth, reportsRouter);
+router.use(instructorRouter);
+router.use(reportsRouter);
 
 // Admin-only: Darwin/TeachOS breakdown detail, source uploads, live syncs.
 router.use(requireAuth, requireRole("admin"), dashboardRouter);

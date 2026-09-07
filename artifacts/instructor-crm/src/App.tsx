@@ -12,7 +12,9 @@ import UploadsPage from '@/pages/uploads';
 import TeachosBreakdownPage from '@/pages/teachos-breakdown';
 import DarwinBreakdownPage from '@/pages/darwin-breakdown';
 import LoginPage from '@/pages/login';
+import AccessChoicePage from '@/pages/access-choice';
 import { AuthProvider, useAuth } from '@/hooks/use-auth';
+import { isManagerViewChosen } from '@/hooks/use-view-mode';
 import {
   Route,
   Switch,
@@ -22,9 +24,16 @@ import {
 
 const queryClient = new QueryClient();
 
-// Paths the "manager" role can't see — Darwin/TeachOS breakdown detail and
-// source uploads stay admin-only (see requireRole("admin") on the matching
-// backend routes). Overview ("/") and Instructors are open to both roles.
+// Paths that stay Admin-only — Darwin/TeachOS breakdown detail and source
+// uploads (see requireAuth+requireRole("admin") on the matching backend
+// routes). Overview ("/") and Instructors are what "Manager view" shows.
+//
+// 2026-09: there's no Manager *login* anymore — the /access chooser sends
+// someone either to /login (Admin) or straight into these public paths as
+// "Manager view" (isManagerViewChosen(), a per-tab sessionStorage flag set
+// by /access — see hooks/use-view-mode.ts). Any actual session user is
+// necessarily Admin now, since the backend's /auth/login rejects any other
+// role (see api-server/src/routes/auth.ts).
 const ADMIN_ONLY_PATHS = ['/darwin-breakdown', '/teachos-breakdown', '/uploads'];
 
 function FullscreenLoader() {
@@ -35,25 +44,27 @@ function FullscreenLoader() {
   );
 }
 
-// Redirects to /login when unauthenticated, and keeps a "manager" account
-// off the admin-only tabs even if they type the URL directly.
+// Sends an unauthenticated visit to /login (Admin-only paths) or to the
+// /access chooser (everything else, unless Manager view was already chosen
+// this tab) — and keeps an Admin-only path out of reach for Manager view
+// even if someone types the URL directly.
 function Guard({ children }: { children: ReactNode }) {
   const { user, isLoading } = useAuth();
   const [location, setLocation] = useLocation();
+  const isAdminOnlyPath = ADMIN_ONLY_PATHS.some((path) => location === path || location.startsWith(`${path}/`));
+  const hasManagerView = isManagerViewChosen();
 
   useEffect(() => {
-    if (isLoading) return;
-    if (!user) {
+    if (isLoading || user) return;
+    if (isAdminOnlyPath) {
       setLocation('/login');
-      return;
+    } else if (!hasManagerView) {
+      setLocation('/access');
     }
-    if (user.role === 'manager' && ADMIN_ONLY_PATHS.some((path) => location === path || location.startsWith(`${path}/`))) {
-      setLocation('/');
-    }
-  }, [isLoading, user, location, setLocation]);
+  }, [isLoading, user, isAdminOnlyPath, hasManagerView, setLocation]);
 
   if (isLoading) return <FullscreenLoader />;
-  if (!user) return <FullscreenLoader />;
+  if (!user && (isAdminOnlyPath || !hasManagerView)) return <FullscreenLoader />;
 
   return <>{children}</>;
 }
@@ -62,6 +73,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/login" component={LoginPage} />
+      <Route path="/access" component={AccessChoicePage} />
       <Route>
         {/* Keep a shared shell (sidebar, navbar) outside the boundary so it
             survives a page crash. */}

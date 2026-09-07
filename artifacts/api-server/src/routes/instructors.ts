@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { and, arrayContains, asc, eq, ilike, or } from "drizzle-orm";
 import { db, instructorsTable } from "@workspace/db";
+import { requireAuth, requireRole } from "../middlewares/auth";
 
 const router: IRouter = Router();
 const toApiInstructor = (row: typeof instructorsTable.$inferSelect) => ({
@@ -106,7 +107,12 @@ router.get("/instructors/:id", async (req, res): Promise<void> => {
   res.json(toApiInstructor(row));
 });
 
-router.post("/instructors", async (req, res) => {
+// Reads (list/detail) are public — this is what the no-login "Manager view"
+// reads for the Overview + Instructors tabs (see routes/index.ts). Writes
+// stay Admin-only: with no login on the read side there's no identity to
+// hold accountable for a create/edit, so those two routes self-protect here
+// rather than relying on router-level mounting.
+router.post("/instructors", requireAuth, requireRole("admin"), async (req, res) => {
   const body = req.body as Record<string, string | null | undefined>;
   const [row] = await db.insert(instructorsTable).values({
     fullName: body.fullName ?? body.full_name ?? "Unnamed instructor",
@@ -121,7 +127,7 @@ router.post("/instructors", async (req, res) => {
   res.status(201).json(toApiInstructor(row));
 });
 
-router.patch("/instructors/:id", async (req, res): Promise<void> => {
+router.patch("/instructors/:id", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {
   const body = req.body as Record<string, string | null | undefined>;
   const [row] = await db.update(instructorsTable).set({
     manualStatus: body.manual_status,

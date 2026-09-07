@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Bell, Building2, ChevronRight, Database, GitBranch, LayoutDashboard, LogOut, Menu, UploadCloud, UsersRound, X } from 'lucide-react';
+import { Bell, Building2, ChevronRight, Database, Eye, GitBranch, LayoutDashboard, LogIn, LogOut, Menu, UploadCloud, UsersRound, X } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { useAuth, ROLE_LABELS } from '@/hooks/use-auth';
 import type { AppUser } from '@workspace/api-client-react';
@@ -32,8 +32,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const { user, logout } = useAuth();
   const navItems = navItemsForRole(user?.role);
-  const displayName = user?.full_name ?? 'Signed in';
-  const roleLabel = user ? ROLE_LABELS[user.role] : '';
+  // No session at all means "Manager view" (2026-09: Manager has no login
+  // of its own anymore, see App.tsx's Guard) -- there's no name to show and
+  // nothing to sign out of, just a way back into /login for Admin.
+  const displayName = user?.full_name ?? 'Manager view';
+  const roleLabel = user ? ROLE_LABELS[user.role] : 'Read-only, no sign-in';
 
   return (
     <div className="min-h-[100dvh] bg-background">
@@ -79,14 +82,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <p className="font-mono-ui mt-3 text-[10px] text-sidebar-foreground/40">LAST CHECK · 09:42 IST</p>
           </div>
           <div className="mt-4 flex items-center gap-3 border-t border-sidebar-border px-2 pt-4">
-            <div className="grid h-8 w-8 place-items-center rounded-full bg-[#d4e1ee] text-[11px] font-extrabold text-[#263d58]">{initials(displayName)}</div>
+            <div className="grid h-8 w-8 place-items-center rounded-full bg-[#d4e1ee] text-[11px] font-extrabold text-[#263d58]">{user ? initials(displayName) : <Eye size={14} />}</div>
             <div className="min-w-0 flex-1">
               <p className="truncate text-[12px] font-bold">{displayName}</p>
               <p className="font-mono-ui truncate text-[10px] text-sidebar-foreground/45">{roleLabel}</p>
             </div>
-            <button type="button" aria-label="Sign out" title="Sign out" data-testid="button-sign-out" onClick={() => logout()} className="rounded-md p-1.5 text-sidebar-foreground/50 hover:bg-sidebar-accent hover:text-sidebar-foreground">
-              <LogOut size={15} />
-            </button>
+            {user
+              ? <button type="button" aria-label="Sign out" title="Sign out" data-testid="button-sign-out" onClick={() => logout()} className="rounded-md p-1.5 text-sidebar-foreground/50 hover:bg-sidebar-accent hover:text-sidebar-foreground">
+                  <LogOut size={15} />
+                </button>
+              : <Link href="/login" aria-label="Sign in as Admin" title="Sign in as Admin" data-testid="link-sign-in-admin" className="rounded-md p-1.5 text-sidebar-foreground/50 hover:bg-sidebar-accent hover:text-sidebar-foreground">
+                  <LogIn size={15} />
+                </Link>}
           </div>
         </div>
       </aside>
@@ -116,10 +123,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Link href="/instructors" data-testid="link-notification-instructors" onClick={() => setNotificationsOpen(false)} className="mt-3 inline-flex text-[12px] font-bold text-primary hover:underline">Review queue <ChevronRight size={14} /></Link>
             </div>}
             <div className="ml-2 hidden h-8 w-px bg-border sm:block" />
-            <button type="button" aria-label="Sign out" title="Sign out" data-testid="button-profile" onClick={() => logout()} className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-secondary">
-              <span className="grid h-8 w-8 place-items-center rounded-full bg-[#d4e1ee] text-[11px] font-extrabold text-[#263d58]">{initials(displayName)}</span>
-              <span className="hidden sm:block"><span className="block text-[12px] font-bold leading-4">{displayName}</span><span className="font-mono-ui block text-[9px] text-muted-foreground">{roleLabel}</span></span>
-            </button>
+            {user
+              ? <button type="button" aria-label="Sign out" title="Sign out" data-testid="button-profile" onClick={() => logout()} className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-secondary">
+                  <span className="grid h-8 w-8 place-items-center rounded-full bg-[#d4e1ee] text-[11px] font-extrabold text-[#263d58]">{initials(displayName)}</span>
+                  <span className="hidden sm:block"><span className="block text-[12px] font-bold leading-4">{displayName}</span><span className="font-mono-ui block text-[9px] text-muted-foreground">{roleLabel}</span></span>
+                </button>
+              : <Link href="/login" data-testid="link-header-sign-in-admin" className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-secondary">
+                  <span className="grid h-8 w-8 place-items-center rounded-full bg-secondary text-muted-foreground"><LogIn size={15} /></span>
+                  <span className="hidden sm:block"><span className="block text-[12px] font-bold leading-4">{displayName}</span><span className="font-mono-ui block text-[9px] text-muted-foreground">Sign in as Admin</span></span>
+                </Link>}
           </div>
         </header>
         <main className="min-h-[calc(100dvh-76px)] px-5 py-7 sm:px-8 lg:px-10">{children}</main>

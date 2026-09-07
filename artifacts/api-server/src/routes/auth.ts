@@ -29,9 +29,12 @@ router.post("/auth/login", async (req, res) => {
     .limit(1);
   const user = rows[0];
 
-  // Same generic message whether the email doesn't exist or the password is
-  // wrong — don't let a login attempt confirm which accounts exist.
-  if (!user || !user.isActive) {
+  // Same generic message whether the email doesn't exist, the password is
+  // wrong, or the account isn't an Admin account — this sign-in form is
+  // Admin-only now (2026-09: the Manager role has no login of its own
+  // anymore, see routes/index.ts), and none of those three cases should be
+  // distinguishable from a failed login attempt.
+  if (!user || !user.isActive || user.role !== "admin") {
     res.status(401).json({ error: "Invalid email or password" });
     return;
   }

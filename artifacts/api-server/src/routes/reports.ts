@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, instructorsTable } from "@workspace/db";
-import { requireRole } from "../middlewares/auth";
+import { requireAuth, requireRole } from "../middlewares/auth";
 
 const router: IRouter = Router();
 
@@ -40,6 +40,9 @@ const toApiInstructorSummary = (row: InstructorRow) => ({
 // recomputeStatuses() (reconcile.ts) is what keeps classification/
 // dept_bucket/dept_area/deployment_status current on every sync or upload,
 // this route just aggregates whatever's already there.
+// Public — no session required. This is what the no-login "Manager view"
+// reads for the Overview + Instructors tabs (see routes/index.ts); Darwin
+// Breakdown and TeachOS Breakdown below stay Admin-only.
 router.get("/reports/instructors", async (_req, res) => {
   const allRows = await db.select().from(instructorsTable);
 
@@ -333,7 +336,7 @@ const toApiCandidate = (row: InstructorRow) => ({
   notes: row.notes,
 });
 
-router.get("/reports/teachos-breakdown", requireRole("admin"), async (_req, res) => {
+router.get("/reports/teachos-breakdown", requireAuth, requireRole("admin"), async (_req, res) => {
   const rows = (await db.select().from(instructorsTable)).filter((r) => r.inTeachos);
 
   // "other_department_manual" (2026-09-04): an individually-reviewed
@@ -419,7 +422,7 @@ router.get("/reports/teachos-breakdown", requireRole("admin"), async (_req, res)
 // reconcilePayrollCandidates() only matches people with in_darwin=false,
 // kept here in case that ever changes), and anything left uncategorized.
 // Buckets are mutually exclusive and sum to total_darwin_instructors_dept.
-router.get("/reports/darwin-breakdown", requireRole("admin"), async (_req, res) => {
+router.get("/reports/darwin-breakdown", requireAuth, requireRole("admin"), async (_req, res) => {
   const rows = (await db.select().from(instructorsTable)).filter(
     (r) => r.inDarwin && !r.inDarwinFullRoster,
   );

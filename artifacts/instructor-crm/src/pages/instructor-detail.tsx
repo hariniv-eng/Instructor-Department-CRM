@@ -5,8 +5,10 @@ import { getGetInstructorQueryKey, getListInstructorsQueryKey, useGetInstructor,
 import type { InstructorUpdate } from '@workspace/api-client-react';
 import { Link, useLocation, useParams } from 'wouter';
 import { PageIntro, QueryError, SaveButton, SkeletonBlock } from '@/components/ui-pieces';
+import { useAuth } from '@/hooks/use-auth';
 
 export default function InstructorDetailPage() {
+  const { user } = useAuth();
   const params = useParams<{ id: string }>();
   const id = Number(params.id);
   const [, setLocation] = useLocation();
@@ -54,18 +56,31 @@ export default function InstructorDetailPage() {
           <div className="mt-4 grid gap-3 text-[12px]"><InfoRow compact label="TeachOS role" value={instructor.teachos_role} testId="text-detail-teachos-role" /><InfoRow compact label="Category" value={instructor.teachos_category} testId="text-detail-teachos-category" /></div>
         </section>
       </div>
-      <form onSubmit={submit} className="rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6">
-        <div className="flex items-start justify-between"><div><p className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Operator review</p><h2 className="mt-1 text-[18px] font-extrabold tracking-[-0.03em]">Exception handling</h2><p className="mt-1 text-[12px] text-muted-foreground">Manual fields are preserved alongside source-derived status.</p></div><FileText size={18} className="text-muted-foreground" /></div>
-        <div className="mt-7 space-y-5">
-          <label className="block"><span className="mb-1.5 block text-[11px] font-bold">Manual status</span><select value={form.manual_status || ''} onChange={(event) => setForm((current) => ({ ...current, manual_status: event.target.value }))} data-testid="select-manual-status" className="h-11 w-full rounded-lg border border-input bg-background px-3 text-[12px] font-semibold outline-none focus:border-primary focus:ring-2 focus:ring-ring/25"><option value="">Use computed status</option><option value="Active">Active</option><option value="Exception">Exception</option><option value="Exited">Exited</option><option value="Pending">Pending</option></select></label>
-          <label className="block"><span className="mb-1.5 block text-[11px] font-bold">Exit date</span><input type="date" value={form.exit_date || ''} onChange={(event) => setForm((current) => ({ ...current, exit_date: event.target.value }))} data-testid="input-exit-date" className="h-11 w-full rounded-lg border border-input bg-background px-3 text-[12px] outline-none focus:border-primary focus:ring-2 focus:ring-ring/25" /></label>
-          <label className="block"><span className="mb-1.5 block text-[11px] font-bold">Converted university</span><input value={form.converted_university_name || ''} onChange={(event) => setForm((current) => ({ ...current, converted_university_name: event.target.value }))} data-testid="input-converted-university" placeholder="Add if this instructor has converted" className="h-11 w-full rounded-lg border border-input bg-background px-3 text-[12px] outline-none placeholder:text-muted-foreground/65 focus:border-primary focus:ring-2 focus:ring-ring/25" /></label>
-          <label className="block"><span className="mb-1.5 block text-[11px] font-bold">Operator notes</span><textarea value={form.notes || ''} onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} data-testid="textarea-instructor-notes" rows={7} placeholder="Leave context for the next reviewer..." className="w-full resize-none rounded-lg border border-input bg-background px-3 py-3 text-[12px] leading-5 outline-none placeholder:text-muted-foreground/65 focus:border-primary focus:ring-2 focus:ring-ring/25" /></label>
-        </div>
-        {updateInstructor.isError && <p data-testid="status-update-error" className="mt-5 rounded-lg bg-[#fff0ec] px-3 py-2 text-[12px] font-semibold text-[#9b4434]">Save failed. The source record was not changed.</p>}
-        {saved && <p data-testid="status-update-success" className="mt-5 flex items-center gap-2 rounded-lg bg-[#e5f3ed] px-3 py-2 text-[12px] font-semibold text-[#287469]"><CheckCircle2 size={15} /> Changes saved to the operator layer.</p>}
-        <div className="mt-7 flex justify-end"><SaveButton pending={updateInstructor.isPending} /></div>
-      </form>
+      {user
+        ? <form onSubmit={submit} className="rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6">
+            <div className="flex items-start justify-between"><div><p className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Operator review</p><h2 className="mt-1 text-[18px] font-extrabold tracking-[-0.03em]">Exception handling</h2><p className="mt-1 text-[12px] text-muted-foreground">Manual fields are preserved alongside source-derived status.</p></div><FileText size={18} className="text-muted-foreground" /></div>
+            <div className="mt-7 space-y-5">
+              <label className="block"><span className="mb-1.5 block text-[11px] font-bold">Manual status</span><select value={form.manual_status || ''} onChange={(event) => setForm((current) => ({ ...current, manual_status: event.target.value }))} data-testid="select-manual-status" className="h-11 w-full rounded-lg border border-input bg-background px-3 text-[12px] font-semibold outline-none focus:border-primary focus:ring-2 focus:ring-ring/25"><option value="">Use computed status</option><option value="Active">Active</option><option value="Exception">Exception</option><option value="Exited">Exited</option><option value="Pending">Pending</option></select></label>
+              <label className="block"><span className="mb-1.5 block text-[11px] font-bold">Exit date</span><input type="date" value={form.exit_date || ''} onChange={(event) => setForm((current) => ({ ...current, exit_date: event.target.value }))} data-testid="input-exit-date" className="h-11 w-full rounded-lg border border-input bg-background px-3 text-[12px] outline-none focus:border-primary focus:ring-2 focus:ring-ring/25" /></label>
+              <label className="block"><span className="mb-1.5 block text-[11px] font-bold">Converted university</span><input value={form.converted_university_name || ''} onChange={(event) => setForm((current) => ({ ...current, converted_university_name: event.target.value }))} data-testid="input-converted-university" placeholder="Add if this instructor has converted" className="h-11 w-full rounded-lg border border-input bg-background px-3 text-[12px] outline-none placeholder:text-muted-foreground/65 focus:border-primary focus:ring-2 focus:ring-ring/25" /></label>
+              <label className="block"><span className="mb-1.5 block text-[11px] font-bold">Operator notes</span><textarea value={form.notes || ''} onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} data-testid="textarea-instructor-notes" rows={7} placeholder="Leave context for the next reviewer..." className="w-full resize-none rounded-lg border border-input bg-background px-3 py-3 text-[12px] leading-5 outline-none placeholder:text-muted-foreground/65 focus:border-primary focus:ring-2 focus:ring-ring/25" /></label>
+            </div>
+            {updateInstructor.isError && <p data-testid="status-update-error" className="mt-5 rounded-lg bg-[#fff0ec] px-3 py-2 text-[12px] font-semibold text-[#9b4434]">Save failed. The source record was not changed.</p>}
+            {saved && <p data-testid="status-update-success" className="mt-5 flex items-center gap-2 rounded-lg bg-[#e5f3ed] px-3 py-2 text-[12px] font-semibold text-[#287469]"><CheckCircle2 size={15} /> Changes saved to the operator layer.</p>}
+            <div className="mt-7 flex justify-end"><SaveButton pending={updateInstructor.isPending} /></div>
+          </form>
+        // Manager view is read-only (no login, see App.tsx's Guard) --
+        // same four fields, plain text instead of an editable form, since
+        // the backend's PATCH /instructors/:id is Admin-only now.
+        : <section className="rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6">
+            <div className="flex items-start justify-between"><div><p className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Operator review</p><h2 className="mt-1 text-[18px] font-extrabold tracking-[-0.03em]">Exception handling</h2><p className="mt-1 text-[12px] text-muted-foreground">Read-only in Manager view -- sign in as Admin to edit.</p></div><FileText size={18} className="text-muted-foreground" /></div>
+            <div className="mt-7 space-y-4">
+              <InfoRow compact label="Manual status" value={form.manual_status} testId="text-detail-manual-status" />
+              <InfoRow compact label="Exit date" value={formatDate(form.exit_date)} testId="text-detail-form-exit-date" />
+              <InfoRow compact label="Converted university" value={form.converted_university_name} testId="text-detail-converted-university" />
+              <InfoRow compact label="Operator notes" value={form.notes} testId="text-detail-operator-notes" />
+            </div>
+          </section>}
     </div>
     <section className="mt-5 rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6"><p className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Additional context</p><div className="mt-4 grid gap-4 text-[12px] sm:grid-cols-3"><InfoRow compact label="Workspace" value={instructor.workspace} testId="text-detail-workspace" /><InfoRow compact label="Institutes" value={instructor.institutes?.join(', ')} testId="text-detail-institutes" /><InfoRow compact label="Darwin status" value={instructor.darwin_employee_status} testId="text-detail-darwin-status" /></div></section>
     <section className="mt-5 rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6"><p className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-muted-foreground">TeachOS instructor-count classification</p><div className="mt-4 grid gap-4 text-[12px] sm:grid-cols-2"><InfoRow compact label="Classification" value={instructor.classification ? classificationLabel(instructor.classification) : null} testId="text-detail-classification" /><InfoRow compact label="Reason" value={instructor.classification_reason} testId="text-detail-classification-reason" /><InfoRow compact label="Exit record" value={instructor.exit_flag ? (instructor.exit_flag_status || 'On file') : 'None on file'} testId="text-detail-exit-flag-status" /><InfoRow compact label="Exit record date" value={formatDate(instructor.exit_flag_date)} testId="text-detail-exit-flag-date" /></div></section>

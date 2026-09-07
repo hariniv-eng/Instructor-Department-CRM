@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { AlertTriangle, Check, ChevronDown, ChevronUp, CircleCheck, LoaderCircle } from 'lucide-react';
+import { AlertTriangle, Check, ChevronDown, ChevronUp, CircleCheck, Download, LoaderCircle } from 'lucide-react';
+import { downloadCsv, slugify, toCsv } from '@/lib/csv';
 
 export function PageIntro({ eyebrow, title, description, action }: { eyebrow: string; title: string; description?: string; action?: React.ReactNode }) {
   return <div className="mb-7 flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
@@ -35,6 +36,22 @@ export function EmptyState({ title, description }: { title: string; description:
 export function SaveButton({ pending, children = 'Save changes' }: { pending: boolean; children?: React.ReactNode }) {
   return <button type="submit" disabled={pending} data-testid="button-save-changes" className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-[12px] font-bold text-primary-foreground shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md disabled:cursor-wait disabled:opacity-70">
     {pending ? <LoaderCircle size={15} className="animate-spin" /> : <Check size={15} />}{children}
+  </button>;
+}
+
+// Shared "Download CSV" button used on every people table across the app
+// (Instructors register, Overview drill-down, Darwin/TeachOS breakdown
+// panels). `testId` is required rather than defaulted, since several of
+// these buttons can appear on one page at once (one per breakdown panel).
+export function DownloadCsvButton({ onClick, disabled = false, label = 'Download CSV', testId }: { onClick: () => void; disabled?: boolean; label?: string; testId: string }) {
+  return <button
+    type="button"
+    onClick={onClick}
+    disabled={disabled}
+    data-testid={testId}
+    className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-[11px] font-bold text-foreground transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-45"
+  >
+    <Download size={13} /> {label}
   </button>;
 }
 
@@ -120,28 +137,56 @@ const COLUMN_LABELS: Record<CandidateColumn, string> = {
   reason: 'Reason',
 };
 
+// Mirrors the per-column rendering in the <td> below -- kept as a separate
+// function (rather than sharing one code path) so the on-screen "—" for a
+// missing value doesn't leak into the exported CSV, which uses a blank
+// cell instead so spreadsheet sorting/filtering isn't confused by it.
+function candidateColumnValue(person: Candidate, column: CandidateColumn): string {
+  switch (column) {
+    case 'name': return person.full_name;
+    case 'employee_id': return person.employee_id ?? '';
+    case 'category': return person.teachos_category ?? '';
+    case 'darwin_dept': return person.department ?? '';
+    case 'designation': return person.designation ?? '';
+    case 'dept_area': return person.dept_area ?? '';
+    case 'reason': return person.classification_reason ?? person.notes ?? '';
+  }
+}
+
 export function BucketPanel({ title, subtitle, icon, bucket, emptyLabel, columns, defaultOpen }: { title: string; subtitle: string; icon: React.ReactNode; bucket: Bucket; emptyLabel: string; columns: CandidateColumn[]; defaultOpen: boolean }) {
   const [open, setOpen] = useState(defaultOpen && bucket.count > 0);
+  const toggle = () => setOpen((value) => !value);
+  const downloadTestId = `button-download-${title.toLowerCase().replaceAll(' ', '-')}`;
+  const handleDownload = () => {
+    const headers = columns.map((column) => COLUMN_LABELS[column]);
+    const rows = bucket.people.map((person) => columns.map((column) => candidateColumnValue(person, column)));
+    downloadCsv(`${slugify(title)}.csv`, toCsv(headers, rows));
+  };
 
   return <section className="rounded-xl border border-border bg-card shadow-xs">
-    <button
-      type="button"
-      data-testid={`button-toggle-${title.toLowerCase().replaceAll(' ', '-')}`}
-      onClick={() => setOpen((value) => !value)}
-      className="flex w-full items-center justify-between gap-4 p-5 text-left sm:p-6"
-    >
-      <div className="flex items-center gap-3">
+    <div className="flex w-full items-center justify-between gap-4 p-5 sm:p-6">
+      <button
+        type="button"
+        data-testid={`button-toggle-${title.toLowerCase().replaceAll(' ', '-')}`}
+        onClick={toggle}
+        className="flex min-w-0 flex-1 items-center gap-3 text-left"
+      >
         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-secondary text-foreground">{icon}</span>
-        <div>
+        <div className="min-w-0">
           <div className="flex items-center gap-2">
             <h2 className="text-[15px] font-extrabold tracking-[-0.03em]">{title}</h2>
             <span className="font-mono-ui rounded-full bg-secondary px-2 py-0.5 text-[11px] font-bold text-foreground">{formatKpi(bucket.count)}</span>
           </div>
           <p className="mt-1 max-w-2xl text-[12px] leading-5 text-muted-foreground">{subtitle}</p>
         </div>
+      </button>
+      <div className="flex shrink-0 items-center gap-2">
+        <DownloadCsvButton onClick={handleDownload} disabled={bucket.count === 0} testId={downloadTestId} />
+        <button type="button" aria-label={open ? `Collapse ${title}` : `Expand ${title}`} onClick={toggle} className="rounded-md p-1 text-muted-foreground hover:bg-secondary hover:text-foreground">
+          {open ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+        </button>
       </div>
-      {open ? <ChevronUp size={18} className="shrink-0 text-muted-foreground" /> : <ChevronDown size={18} className="shrink-0 text-muted-foreground" />}
-    </button>
+    </div>
     {open && <div className="border-t border-border px-5 pb-5 sm:px-6 sm:pb-6">
       {!bucket.people.length
         ? <div className="pt-5"><EmptyState title={emptyLabel} description="Nothing in this bucket right now." /></div>
