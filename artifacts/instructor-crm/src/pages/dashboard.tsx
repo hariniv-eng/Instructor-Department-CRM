@@ -160,16 +160,19 @@ function AccessDrilldown({ label, category, split, tab, onTabChange, onClose }: 
   // drill-down (2026-09-07, per request) -- Instructors/Mentors/Department
   // already carry Subject/Campus context the way Ops rows don't.
   const showDesignation = category === 'ops_team';
-  // Instructors/Mentors show two explicit manager columns instead of one
-  // ambiguous "Manager" column (2026-09-07, per request): Capability
-  // Manager (TeachOS's own instructor_manager assignment, strict -- no
-  // Darwin fallback) and Manager (Darwin) (Darwin's own Direct Manager
-  // field, equally strict -- no TeachOS fallback). These are two different
-  // concepts that both used to collapse into one `manager` field's
-  // fallback chain; see capability_manager / darwin_manager in reports.ts.
-  // Operations team and the Department rollup keep the single general
-  // "Manager" column (still that same fallback chain) as before.
-  const showSplitManagers = category === 'instructors' || category === 'mentors';
+  // Instructors/Mentors/Department show two explicit manager columns
+  // instead of one ambiguous "Manager" column (2026-09-07, per request;
+  // extended to the Department rollup card 2026-09-07 per follow-up
+  // request): Capability Manager (TeachOS's own instructor_manager
+  // assignment, strict -- no Darwin fallback) and Manager (Darwin)
+  // (Darwin's own Direct Manager field, equally strict -- no TeachOS
+  // fallback). These are two different concepts that both used to
+  // collapse into one `manager` field's fallback chain; see
+  // capability_manager / darwin_manager in reports.ts.
+  // Operations team keeps the single general "Manager" column (still
+  // that same fallback chain) as before -- it already gets its own
+  // Designation column instead.
+  const showSplitManagers = category === 'instructors' || category === 'mentors' || category === 'department';
   const handleDownload = () => {
     const managerHeaders = showSplitManagers ? ['Capability Manager', 'Manager (Darwin)'] : ['Manager'];
     const headers = ['Name', ...(showDesignation ? ['Designation'] : []), 'Employee ID', 'Department', 'Campus', ...managerHeaders];
