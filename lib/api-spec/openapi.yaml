@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Login/session for the Admin and Manager dashboard accounts
   - name: instructors
     description: Instructor records and review
   - name: dashboard
@@ -34,6 +36,65 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  # NOTE: these auth paths/schemas were hand-written to match this file's
+  # existing style rather than produced by `pnpm --filter @workspace/api-spec
+  # run codegen` (that tool doesn't run in the sandbox this was built in) —
+  # re-run codegen once on a machine where it works, to regenerate
+  # lib/api-zod and lib/api-client-react's generated/ files for real.
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Log in with email + password, sets the session cookie
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LoginInput" }
+      responses:
+        "200":
+          description: Logged in
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AppUser" }
+        "401":
+          description: Invalid email or password
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Log out, clears the session cookie
+      responses:
+        "204":
+          description: Logged out
+  /auth/me:
+    get:
+      operationId: getCurrentUser
+      tags: [auth]
+      summary: Get the logged-in user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AppUser" }
+        "401":
+          description: Not authenticated
+  /auth/password:
+    post:
+      operationId: changePassword
+      tags: [auth]
+      summary: Change the logged-in user's own password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ChangePasswordInput" }
+      responses:
+        "204":
+          description: Password changed
+        "401":
+          description: Not authenticated, or current_password is incorrect
   /instructors:
     get:
       operationId: listInstructors
@@ -347,6 +408,29 @@ components:
         filename: { type: string }
         row_count: { type: number }
         uploaded_at: { type: string, format: date-time }
+    AppUser:
+      type: object
+      description: A dashboard login account (not an instructor record).
+      required: [id, email, full_name, role, is_active]
+      properties:
+        id: { type: number }
+        email: { type: string }
+        full_name: { type: string }
+        role: { type: string, enum: [admin, manager] }
+        is_active: { type: boolean }
+        last_login_at: { type: string, nullable: true }
+    LoginInput:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string }
+        password: { type: string }
+    ChangePasswordInput:
+      type: object
+      required: [current_password, new_password]
+      properties:
+        current_password: { type: string }
+        new_password: { type: string }
     UploadInput:
       type: object
       required: [source, filename, row_count]

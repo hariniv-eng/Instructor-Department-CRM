@@ -217,3 +217,48 @@ export type TeachosDeployment = typeof teachosDeploymentTable.$inferSelect;
 export type InsertTeachosDeployment = z.infer<typeof insertTeachosDeploymentSchema>;
 export type TeachosIdReference = typeof teachosIdReferenceTable.$inferSelect;
 export type InsertTeachosIdReference = z.infer<typeof insertTeachosIdReferenceSchema>;
+
+// --- App login (Admin / Manager dashboard access) ---
+// Two seeded accounts control what the deployed dashboard shows:
+//  - "admin": every tab (Overview, Instructors, Darwin Breakdown, TeachOS
+//    Breakdown, Source uploads).
+//  - "manager": Overview + Instructors only (headcount and the
+//    instructor/mentor/ops bifurcation) — no Darwin/TeachOS breakdown detail,
+//    no uploads/sync. See requireRole() in
+//    artifacts/api-server/src/middlewares/auth.ts for where this is enforced.
+// This is unrelated to instructorsTable — that's faculty/instructor records,
+// this is who may log into the CRM itself.
+export const appUsersTable = pgTable("app_users", {
+  id: serial("id").primaryKey(),
+  // Always stored lowercased; compare against a lowercased input.
+  email: text("email").notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  passwordSalt: text("password_salt").notNull(),
+  fullName: text("full_name").notNull(),
+  // "admin" | "manager" — see comment above.
+  role: text("role").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
+});
+
+// Opaque server-side session, looked up by the random token stored in the
+// browser's httpOnly session_token cookie (see lib/auth.ts in api-server).
+// Deliberately not a signed/JWT cookie — the token itself carries no claims,
+// so there's nothing to sign; every request re-checks this row (and
+// isActive/expiresAt) rather than trusting anything encoded client-side.
+export const appSessionsTable = pgTable("app_sessions", {
+  id: serial("id").primaryKey(),
+  token: text("token").notNull().unique(),
+  userId: integer("user_id").notNull().references(() => appUsersTable.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+});
+
+export const insertAppUserSchema = createInsertSchema(appUsersTable).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertAppSessionSchema = createInsertSchema(appSessionsTable).omit({ id: true, createdAt: true });
+export type AppUser = typeof appUsersTable.$inferSelect;
+export type InsertAppUser = z.infer<typeof insertAppUserSchema>;
+export type AppSession = typeof appSessionsTable.$inferSelect;
+export type InsertAppSession = z.infer<typeof insertAppSessionSchema>;

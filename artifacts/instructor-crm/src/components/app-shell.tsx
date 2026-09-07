@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { Bell, Building2, ChevronRight, Database, GitBranch, LayoutDashboard, Menu, UploadCloud, UsersRound, X } from 'lucide-react';
+import { Bell, Building2, ChevronRight, Database, GitBranch, LayoutDashboard, LogOut, Menu, UploadCloud, UsersRound, X } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
+import { useAuth, ROLE_LABELS } from '@/hooks/use-auth';
+import type { AppUser } from '@workspace/api-client-react';
 
-const navItems = [
+const ALL_NAV_ITEMS = [
   { href: '/', label: 'Overview', icon: LayoutDashboard },
   { href: '/instructors', label: 'Instructors', icon: UsersRound },
   { href: '/darwin-breakdown', label: 'Darwin Breakdown', icon: Building2 },
@@ -10,10 +12,28 @@ const navItems = [
   { href: '/uploads', label: 'Source uploads', icon: UploadCloud },
 ];
 
+// "manager" only sees the Overview + Instructors headcount view — Darwin/
+// TeachOS breakdown detail and source uploads are admin-only (mirrors
+// ADMIN_ONLY_PATHS in App.tsx and requireRole("admin") on the backend).
+function navItemsForRole(role: AppUser['role'] | undefined) {
+  if (role === 'admin') return ALL_NAV_ITEMS;
+  return ALL_NAV_ITEMS.filter((item) => item.href === '/' || item.href === '/instructors');
+}
+
+function initials(fullName: string) {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  return (parts[0][0] + (parts[1]?.[0] ?? '')).toUpperCase();
+}
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const { user, logout } = useAuth();
+  const navItems = navItemsForRole(user?.role);
+  const displayName = user?.full_name ?? 'Signed in';
+  const roleLabel = user ? ROLE_LABELS[user.role] : '';
 
   return (
     <div className="min-h-[100dvh] bg-background">
@@ -59,11 +79,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <p className="font-mono-ui mt-3 text-[10px] text-sidebar-foreground/40">LAST CHECK · 09:42 IST</p>
           </div>
           <div className="mt-4 flex items-center gap-3 border-t border-sidebar-border px-2 pt-4">
-            <div className="grid h-8 w-8 place-items-center rounded-full bg-[#d4e1ee] text-[11px] font-extrabold text-[#263d58]">AS</div>
-            <div className="min-w-0">
-              <p className="truncate text-[12px] font-bold">Aarav Shah</p>
-              <p className="font-mono-ui truncate text-[10px] text-sidebar-foreground/45">OPS ADMIN</p>
+            <div className="grid h-8 w-8 place-items-center rounded-full bg-[#d4e1ee] text-[11px] font-extrabold text-[#263d58]">{initials(displayName)}</div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[12px] font-bold">{displayName}</p>
+              <p className="font-mono-ui truncate text-[10px] text-sidebar-foreground/45">{roleLabel}</p>
             </div>
+            <button type="button" aria-label="Sign out" title="Sign out" data-testid="button-sign-out" onClick={() => logout()} className="rounded-md p-1.5 text-sidebar-foreground/50 hover:bg-sidebar-accent hover:text-sidebar-foreground">
+              <LogOut size={15} />
+            </button>
           </div>
         </div>
       </aside>
@@ -93,9 +116,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Link href="/instructors" data-testid="link-notification-instructors" onClick={() => setNotificationsOpen(false)} className="mt-3 inline-flex text-[12px] font-bold text-primary hover:underline">Review queue <ChevronRight size={14} /></Link>
             </div>}
             <div className="ml-2 hidden h-8 w-px bg-border sm:block" />
-            <button type="button" data-testid="button-profile" className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-secondary">
-              <span className="grid h-8 w-8 place-items-center rounded-full bg-[#d4e1ee] text-[11px] font-extrabold text-[#263d58]">AS</span>
-              <span className="hidden sm:block"><span className="block text-[12px] font-bold leading-4">Aarav Shah</span><span className="font-mono-ui block text-[9px] text-muted-foreground">OPS ADMIN</span></span>
+            <button type="button" aria-label="Sign out" title="Sign out" data-testid="button-profile" onClick={() => logout()} className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-secondary">
+              <span className="grid h-8 w-8 place-items-center rounded-full bg-[#d4e1ee] text-[11px] font-extrabold text-[#263d58]">{initials(displayName)}</span>
+              <span className="hidden sm:block"><span className="block text-[12px] font-bold leading-4">{displayName}</span><span className="font-mono-ui block text-[9px] text-muted-foreground">{roleLabel}</span></span>
             </button>
           </div>
         </header>
