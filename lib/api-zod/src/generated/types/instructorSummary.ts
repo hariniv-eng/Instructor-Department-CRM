@@ -26,8 +26,6 @@ export interface InstructorSummary {
   deployment_status: string | null;
   institutes: string[];
   /** @nullable */
-  manager: string | null;
-  /** @nullable */
   capability_manager: string | null;
   /** @nullable */
   darwin_manager: string | null;

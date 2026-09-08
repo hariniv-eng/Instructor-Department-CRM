@@ -160,29 +160,26 @@ function AccessDrilldown({ label, category, split, tab, onTabChange, onClose }: 
   // drill-down (2026-09-07, per request) -- Instructors/Mentors/Department
   // already carry Subject/Campus context the way Ops rows don't.
   const showDesignation = category === 'ops_team';
-  // Instructors/Mentors/Department show two explicit manager columns
-  // instead of one ambiguous "Manager" column (2026-09-07, per request;
-  // extended to the Department rollup card 2026-09-07 per follow-up
-  // request): Capability Manager (TeachOS's own instructor_manager
-  // assignment, strict -- no Darwin fallback) and Manager (Darwin)
-  // (Darwin's own Direct Manager field, equally strict -- no TeachOS
-  // fallback). These are two different concepts that both used to
-  // collapse into one `manager` field's fallback chain; see
-  // capability_manager / darwin_manager in reports.ts.
-  // Operations team keeps the single general "Manager" column (still
-  // that same fallback chain) as before -- it already gets its own
-  // Designation column instead.
-  const showSplitManagers = category === 'instructors' || category === 'mentors' || category === 'department';
+  // Every card now shows two explicit manager columns instead of one
+  // ambiguous "Manager" column that used to silently fall back between
+  // the two (2026-09-07, per request; extended to Department, then to
+  // Operations team and the underlying `manager` field removed entirely
+  // 2026-09-08, per follow-up request): Capability Manager (TeachOS's own
+  // instructor_manager assignment, strict -- no Darwin fallback) and
+  // Manager (Darwin) (Darwin's own Direct Manager field, equally strict --
+  // no TeachOS fallback). See capability_manager / darwin_manager in
+  // reports.ts -- the old combined `manager` field no longer exists on
+  // InstructorSummary at all.
   const handleDownload = () => {
-    const managerHeaders = showSplitManagers ? ['Capability Manager', 'Manager (Darwin)'] : ['Manager'];
-    const headers = ['Name', ...(showDesignation ? ['Designation'] : []), 'Employee ID', 'Department', 'Campus', ...managerHeaders];
+    const headers = ['Name', ...(showDesignation ? ['Designation'] : []), 'Employee ID', 'Department', 'Campus', 'Capability Manager', 'Manager (Darwin)'];
     const rows = people.map((p) => [
       p.full_name,
       ...(showDesignation ? [p.designation ?? ''] : []),
       p.employee_id ?? '',
       p.dept_area ?? p.department ?? '',
       p.institutes?.join(', ') ?? '',
-      ...(showSplitManagers ? [p.capability_manager ?? '', p.darwin_manager ?? ''] : [p.manager ?? '']),
+      p.capability_manager ?? '',
+      p.darwin_manager ?? '',
     ]);
     downloadCsv(`${slugify(label)}-${tab.replaceAll('_', '-')}.csv`, toCsv(headers, rows));
   };
@@ -223,9 +220,8 @@ function AccessDrilldown({ label, category, split, tab, onTabChange, onClose }: 
             <th className="px-3 py-2">Employee ID</th>
             <th className="px-3 py-2">Department</th>
             <th className="px-3 py-2">Campus</th>
-            {showSplitManagers
-              ? <><th className="px-3 py-2">Capability Manager</th><th className="px-3 py-2">Manager (Darwin)</th></>
-              : <th className="px-3 py-2">Manager</th>}
+            <th className="px-3 py-2">Capability Manager</th>
+            <th className="px-3 py-2">Manager (Darwin)</th>
           </tr>
         </thead>
         <tbody>
@@ -235,11 +231,10 @@ function AccessDrilldown({ label, category, split, tab, onTabChange, onClose }: 
             <td className="px-3 py-2 font-mono-ui text-muted-foreground">{p.employee_id ?? '—'}</td>
             <td className="px-3 py-2 text-muted-foreground">{p.dept_area ?? p.department ?? '—'}</td>
             <td className="px-3 py-2 text-muted-foreground">{p.institutes?.join(', ') || '—'}</td>
-            {showSplitManagers
-              ? <><td className="px-3 py-2 text-muted-foreground">{p.capability_manager ?? '—'}</td><td className="px-3 py-2 text-muted-foreground">{p.darwin_manager ?? '—'}</td></>
-              : <td className="px-3 py-2 text-muted-foreground">{p.manager ?? '—'}</td>}
+            <td className="px-3 py-2 text-muted-foreground">{p.capability_manager ?? '—'}</td>
+            <td className="px-3 py-2 text-muted-foreground">{p.darwin_manager ?? '—'}</td>
           </tr>)}
-          {people.length === 0 && <tr><td colSpan={5 + (showDesignation ? 1 : 0) + (showSplitManagers ? 2 : 1)} className="px-3 py-8 text-center text-muted-foreground">No one in this bucket.</td></tr>}
+          {people.length === 0 && <tr><td colSpan={6 + (showDesignation ? 1 : 0)} className="px-3 py-8 text-center text-muted-foreground">No one in this bucket.</td></tr>}
         </tbody>
       </table>
     </div>

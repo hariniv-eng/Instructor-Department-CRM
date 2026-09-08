@@ -29,20 +29,15 @@ const toApiInstructorSummary = (row: InstructorRow) => ({
   is_payroll: row.classification === "payroll_converted",
   deployment_status: row.deploymentStatus,
   institutes: row.institutes,
-  manager: row.teachosManager || row.directManager || null,
-  // Strict Capability Manager (TeachOS's own instructor_manager assignment,
-  // see reconcileCapabilityManager() in reconcile.ts) -- unlike `manager`
-  // above, this deliberately does NOT fall back to Darwin's Direct Manager,
-  // since that's a different concept (org hierarchy, not TeachOS capability
-  // assignment). Used to replace the "Manager" column with "Capability
-  // Manager" for Instructors/Mentors in the Overview drill-down (2026-09-07,
-  // per request) -- Operations team keeps showing `manager` as before.
+  // Capability Manager (TeachOS's own instructor_manager assignment, see
+  // reconcileCapabilityManager() in reconcile.ts) and Manager (Darwin)
+  // (Darwin's own Direct Manager field) are two different concepts -- org
+  // hierarchy vs. TeachOS capability assignment -- shown as two explicit
+  // columns everywhere in the Overview drill-down (2026-09-07/08, per
+  // request). The old combined `manager` field (teachosManager || directManager
+  // fallback) has been removed entirely (2026-09-08, per request) now that
+  // every card shows both explicit columns instead of one ambiguous one.
   capability_manager: row.teachosManager || null,
-  // Darwin's own "Direct Manager" field, shown as its own explicit column
-  // alongside capability_manager (2026-09-07, per request) rather than only
-  // living inside `manager`'s fallback -- these are two different concepts
-  // (Darwin org-hierarchy manager vs. TeachOS Capability Manager) and the
-  // Overview drill-down now shows both side by side for Instructors/Mentors.
   darwin_manager: row.directManager || null,
 });
 
