@@ -15,7 +15,7 @@ import { fetchNiatInstructorDetailsRows, NiatInstructorDetailsError } from "../l
 import { fetchCapabilityManagerRows } from "../lib/connectors/capabilityManager";
 import { storeDarwinboxActive, storeDarwinboxExits, storeDarwinboxFullRoster, storeTeachosDeployment } from "../lib/storeRaw";
 import { reconcileDarwin, reconcileDarwinFullRosterFallback, reconcileTeachos, reconcileTeachosEmployeeIdReference, reconcileCapabilityManager, recomputeStatuses } from "../lib/reconcile";
-import { LAST_SYNC, type SyncResult } from "../lib/syncState";
+import { LAST_SYNC, LAST_CAPABILITY_MANAGER_SYNC, setLastCapabilityManagerSync, type SyncResult } from "../lib/syncState";
 
 const router: IRouter = Router();
 
@@ -103,9 +103,12 @@ async function runTeachosSync(): Promise<SyncResult> {
     // that's supplementary to begin with.
     try {
       const managerRows = await fetchCapabilityManagerRows();
-      await reconcileCapabilityManager(managerRows);
+      const result = await reconcileCapabilityManager(managerRows);
+      setLastCapabilityManagerSync({ ok: true, ...result, synced_at: new Date().toISOString() });
     } catch (e) {
-      console.error("Capability Manager enrichment failed (non-fatal):", e instanceof Error ? e.message : e);
+      const message = e instanceof Error ? e.message : String(e);
+      console.error("Capability Manager enrichment failed (non-fatal):", message);
+      setLastCapabilityManagerSync({ ok: false, error: message, synced_at: new Date().toISOString() });
     }
 
     await recomputeStatuses();
@@ -171,6 +174,12 @@ router.get("/sync/status", (_req, res) => {
     darwinbox_exits: { auto_sync_interval_hours: config.DARWINBOX_EXITS_SYNC_INTERVAL_HOURS, last_sync: LAST_SYNC.darwinbox_exits_live },
     teachos: { auto_sync_interval_hours: config.BIGQUERY_SYNC_INTERVAL_HOURS, last_sync: LAST_SYNC.teachos_live },
     niat_instructor_details: { auto_sync_interval_hours: 0, last_sync: LAST_SYNC.niat_instructor_details_live },
+    // Capability Manager enrichment (2026-09-08, per request): a separate,
+    // non-fatal sub-step of the TeachOS sync above -- teachos.last_sync can
+    // say ok:true even when this failed silently, so it's tracked and
+    // surfaced on its own here. Check this field's `error` after clicking
+    // Sync Now for TeachOS if the Capability Manager column stays empty.
+    capability_manager_enrichment: { last_sync: LAST_CAPABILITY_MANAGER_SYNC.current },
   });
 });
 
