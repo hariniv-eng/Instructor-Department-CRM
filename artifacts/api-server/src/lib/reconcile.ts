@@ -7,6 +7,7 @@
 import { and, eq } from "drizzle-orm";
 import { db, instructorsTable, darwinboxExitsTable, teachosIdReferenceTable } from "@workspace/db";
 import { EXCLUDED_EMPLOYEES, type ExcludedOverride, OTHER_DEPARTMENT_EMPLOYEES, type OtherDepartmentOverride } from "../data/classificationOverrides";
+import { VALID_CAPABILITY_MANAGERS } from "../data/validCapabilityManagers";
 import { classifyDepartment, classifyDeployment } from "./departmentTaxonomy";
 
 export type SheetRow = Record<string, unknown>;
@@ -555,15 +556,68 @@ export async function reconcileTeachosEmployeeIdReference(rows: SheetRow[]) {
 // matching (2026-09), so this is how that assignment gets back onto each
 // row without reintroducing the employee-ID matching problems that switch
 // was meant to fix.
+// The BigQuery source this reads from carries up to ~8 candidate
+// "instructor_manager" rows per instructor -- stale/historical assignments
+// mixed in alongside the current one, evidently -- so a manager name has to
+// actually be on the maintained VALID_CAPABILITY_MANAGERS roster (see
+// ../data/validCapabilityManagers.ts) to be accepted. Every other candidate
+// is skipped rather than written, so a person's teachosManager only ever
+// ends up as either a real, confirmed Capability Manager or left unset --
+// never an arbitrary/wrong name (e.g. "Ranjith", "Rajat" -- both observed
+// candidates for real instructors, neither an actual Capability Manager).
+const VALID_CAPABILITY_MANAGER_SET = new Set(VALID_CAPABILITY_MANAGERS.map((name) => normalize(name)));
+
+// "Garlapati Prudhvi Raj" is a real Capability Manager, but he also shows up
+// as a candidate row for far more instructors than the others -- evidently
+// some kind of default/fallback assignee in the source data, not always the
+// person's real manager (2026-09-08, per request). So he's treated as
+// lowest priority: if an instructor has ANY other valid Capability Manager
+// among their candidate rows, that one wins and Prudhvi is dropped, even if
+// his row is also present. He's only accepted when he's the sole valid
+// candidate for that person.
+const LOW_PRIORITY_MANAGER = normalize("Garlapati Prudhvi Raj");
+
 export async function reconcileCapabilityManager(rows: SheetRow[]) {
   let matchedCount = 0;
   let unmatchedCount = 0;
+  let invalidCount = 0;
+  let droppedLowPriorityCount = 0;
+  // Wipe first, same as reconcileTeachos() does for its own fields -- a
+  // stale/invalid value from before this filter existed (e.g. "Ranjith",
+  // written when any of the up-to-8 BigQuery candidates was accepted
+  // uncritically) must not linger just because this run doesn't happen to
+  // find a *replacement* value for that person.
+  await db.update(instructorsTable).set({ teachosManager: null }).where(eq(instructorsTable.inTeachos, true));
   const people = await db.select().from(instructorsTable).where(eq(instructorsTable.inTeachos, true));
   const byTeachosId = new Map(people.filter((p) => p.teachosUserId).map((p) => [p.teachosUserId as string, p]));
+
+  // Group every valid candidate row by teachos_user_id first -- can't
+  // decide anything per-row anymore now that Prudhvi's priority depends on
+  // what ELSE that same instructor was mapped to among their up-to-8 rows.
+  const validCandidatesByTeachosId = new Map<string, string[]>();
   for (const item of rows) {
     const teachosUserId = cell(item, "instructor_user_id", "Instructor User Id");
     const manager = cell(item, "instructor_manager", "Instructor Manager");
     if (!teachosUserId || !manager) continue;
+    if (!VALID_CAPABILITY_MANAGER_SET.has(normalize(manager))) {
+      invalidCount += 1;
+      continue;
+    }
+    const list = validCandidatesByTeachosId.get(teachosUserId) ?? [];
+    if (!list.some((existing) => normalize(existing) === normalize(manager))) list.push(manager);
+    validCandidatesByTeachosId.set(teachosUserId, list);
+  }
+
+  for (const [teachosUserId, candidates] of validCandidatesByTeachosId) {
+    const nonLowPriority = candidates.filter((c) => normalize(c) !== LOW_PRIORITY_MANAGER);
+    let manager: string;
+    if (nonLowPriority.length > 0) {
+      manager = nonLowPriority[0];
+      if (candidates.length > nonLowPriority.length) droppedLowPriorityCount += 1;
+    } else {
+      // Only candidate(s) present are Prudhvi -- accept him as the fallback.
+      manager = candidates[0];
+    }
     const match = byTeachosId.get(teachosUserId);
     if (!match) {
       unmatchedCount += 1;
@@ -575,7 +629,7 @@ export async function reconcileCapabilityManager(rows: SheetRow[]) {
     }
     matchedCount += 1;
   }
-  return { matched: matchedCount, unmatched: unmatchedCount, total_rows: rows.length };
+  return { matched: matchedCount, unmatched: unmatchedCount, invalid: invalidCount, droppedLowPriority: droppedLowPriorityCount, total_rows: rows.length };
 }
 
 // reconcilePayrollCandidates() was removed 2026-09-03 — payroll-converted

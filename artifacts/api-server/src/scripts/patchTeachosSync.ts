@@ -104,7 +104,7 @@ async function main() {
   try {
     const managerRows = await fetchCapabilityManagerRows();
     const result = await reconcileCapabilityManager(managerRows);
-    console.log(`Capability Manager enrichment OK: matched=${result.matched} unmatched=${result.unmatched} total_rows=${result.total_rows}`);
+    console.log(`Capability Manager enrichment OK: matched=${result.matched} unmatched=${result.unmatched} invalid=${result.invalid} droppedLowPriority=${result.droppedLowPriority} total_rows=${result.total_rows}`);
   } catch (e) {
     console.error("Capability Manager enrichment FAILED (non-fatal, continuing):", e instanceof Error ? e.message : e);
   }

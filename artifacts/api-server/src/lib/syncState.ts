@@ -24,7 +24,23 @@ export const LAST_SYNC: Record<"darwinbox_live" | "darwinbox_exits_live" | "teac
 // the actual error is one authenticated request away instead of requiring
 // a trip through the Replit deployment's own log viewer.
 export type CapabilityManagerSyncResult =
-  | { ok: true; matched: number; unmatched: number; total_rows: number; synced_at: string }
+  | {
+      ok: true;
+      matched: number;
+      unmatched: number;
+      // Candidate rows skipped because their manager name wasn't on the
+      // maintained VALID_CAPABILITY_MANAGERS roster (see
+      // ../data/validCapabilityManagers.ts) -- noise from the up-to-8
+      // candidate rows the source carries per instructor.
+      invalid: number;
+      // Times "Garlapati Prudhvi Raj" was a valid candidate but got passed
+      // over in favor of another valid manager also present for that
+      // person -- see validCapabilityManagers.ts for why he's lowest
+      // priority.
+      droppedLowPriority: number;
+      total_rows: number;
+      synced_at: string;
+    }
   | { ok: false; error: string; synced_at: string };
 
 // A single-key record (not a reassigned `let`), matching LAST_SYNC's shape
