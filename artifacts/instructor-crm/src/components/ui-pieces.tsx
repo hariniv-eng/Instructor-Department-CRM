@@ -82,6 +82,7 @@ export type Candidate = {
   classification: string | null;
   classification_reason: string | null;
   notes: string | null;
+  date_of_joining: string | null;
 };
 
 export type Bucket = { count: number; people: Candidate[] };
@@ -125,7 +126,7 @@ export function MiniStat({ label, value, meta, tone }: { label: string; value: n
   </div>;
 }
 
-export type CandidateColumn = 'name' | 'employee_id' | 'category' | 'darwin_dept' | 'designation' | 'dept_area' | 'reason';
+export type CandidateColumn = 'name' | 'employee_id' | 'category' | 'darwin_dept' | 'designation' | 'dept_area' | 'reason' | 'date_of_joining';
 
 const COLUMN_LABELS: Record<CandidateColumn, string> = {
   name: 'Name',
@@ -135,6 +136,7 @@ const COLUMN_LABELS: Record<CandidateColumn, string> = {
   designation: 'Designation',
   dept_area: 'Area',
   reason: 'Reason',
+  date_of_joining: 'Date of joining',
 };
 
 // Mirrors the per-column rendering in the <td> below -- kept as a separate
@@ -150,6 +152,7 @@ function candidateColumnValue(person: Candidate, column: CandidateColumn): strin
     case 'designation': return person.designation ?? '';
     case 'dept_area': return person.dept_area ?? '';
     case 'reason': return person.classification_reason ?? person.notes ?? '';
+    case 'date_of_joining': return person.date_of_joining ?? '';
   }
 }
 
@@ -205,6 +208,7 @@ export function BucketPanel({ title, subtitle, icon, bucket, emptyLabel, columns
                   {column === 'designation' && (person.designation ?? '—')}
                   {column === 'dept_area' && (person.dept_area ?? '—')}
                   {column === 'reason' && (person.classification_reason ?? person.notes ?? '—')}
+                  {column === 'date_of_joining' && (person.date_of_joining ?? '—')}
                 </td>)}
               </tr>)}
             </tbody>

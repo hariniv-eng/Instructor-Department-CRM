@@ -1,12 +1,10 @@
 import { useMemo, useState } from 'react';
-import { Briefcase, GraduationCap, Plus, Search, UsersRound, X } from 'lucide-react';
-import { useQueryClient } from '@tanstack/react-query';
-import { useCreateInstructor, useGetReportsInstructors, getGetReportsInstructorsQueryKey } from '@workspace/api-client-react';
-import type { AccessSplit, InstructorInput, InstructorSummary } from '@workspace/api-client-react';
+import { Briefcase, GraduationCap, Search, UsersRound } from 'lucide-react';
+import { useGetReportsInstructors } from '@workspace/api-client-react';
+import type { AccessSplit, InstructorSummary } from '@workspace/api-client-react';
 import { Link } from 'wouter';
 import { PageIntro, EmptyState, QueryError, SkeletonBlock, DownloadCsvButton } from '@/components/ui-pieces';
 import { downloadCsv, slugify, toCsv } from '@/lib/csv';
-import { useAuth } from '@/hooks/use-auth';
 
 type CategoryKey = 'instructors' | 'mentors' | 'ops_team';
 
@@ -35,13 +33,10 @@ function initials(name: string) {
 }
 
 export default function InstructorsPage() {
-  const queryClient = useQueryClient();
-  const { user } = useAuth();
   const reportQuery = useGetReportsInstructors();
   const report = reportQuery.data;
   const [category, setCategory] = useState<CategoryKey>('instructors');
   const [search, setSearch] = useState('');
-  const [createOpen, setCreateOpen] = useState(false);
 
   const split = report?.access_breakdown?.[category];
   const allPeople = useMemo(() => mergedPeople(split), [split]);
@@ -58,7 +53,6 @@ export default function InstructorsPage() {
       eyebrow="Workforce register / Darwin + TeachOS"
       title="Instructor records"
       description="Instructors, Mentors, and the Operations team -- each list is exactly who the matching Overview card counts."
-      action={user ? <button type="button" data-testid="button-add-instructor" onClick={() => setCreateOpen(true)} className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-[12px] font-bold text-primary-foreground shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"><Plus size={15} /> Add instructor</button> : undefined}
     />
 
     <div className="mb-5 flex flex-col gap-3 rounded-xl border border-border bg-card p-3 shadow-xs lg:flex-row lg:items-center">
@@ -87,8 +81,6 @@ export default function InstructorsPage() {
     {reportQuery.isError && <QueryError message="The instructor register could not be loaded." />}
     {!reportQuery.isLoading && !reportQuery.isError && people.length === 0 && <EmptyState title={`No ${activeTab.label.toLowerCase()} match this search`} description="Try a broader search or clear the search box." />}
     {!reportQuery.isLoading && !reportQuery.isError && people.length > 0 && <CategoryTable category={category} people={people} />}
-
-    {createOpen && <CreateInstructorDialog onClose={() => setCreateOpen(false)} onCreated={() => { setCreateOpen(false); queryClient.invalidateQueries({ queryKey: getGetReportsInstructorsQueryKey() }); }} />}
   </div>;
 }
 
@@ -171,31 +163,3 @@ function PersonRow({ category, person, columns }: { category: CategoryKey; perso
   </Link>;
 }
 
-function CreateInstructorDialog({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
-  const createInstructor = useCreateInstructor();
-  const [form, setForm] = useState<InstructorInput>({ full_name: '', employee_id: '', org_email: '', sub_department: '', designation: '' });
-  const setField = (field: keyof InstructorInput, value: string) => setForm((current) => ({ ...current, [field]: value }));
-  const submit = (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!form.full_name.trim()) return;
-    createInstructor.mutate({ data: form }, { onSuccess: onCreated });
-  };
-  return <div className="fixed inset-0 z-50 grid place-items-center bg-[#142238]/45 p-4" role="dialog" aria-modal="true" aria-labelledby="create-instructor-title">
-    <form onSubmit={submit} className="w-full max-w-[520px] rounded-2xl border border-border bg-card p-6 shadow-2xl animate-rise">
-      <div className="flex items-start justify-between"><div><p className="font-mono-ui text-[10px] uppercase tracking-[0.17em] text-muted-foreground">New record</p><h2 id="create-instructor-title" className="mt-1 text-[20px] font-extrabold tracking-[-0.04em]">Add instructor</h2></div><button type="button" aria-label="Close add instructor dialog" data-testid="button-close-create-instructor" onClick={onClose} className="rounded-lg p-2 text-muted-foreground hover:bg-secondary hover:text-foreground"><X size={17} /></button></div>
-      <div className="mt-6 grid gap-4 sm:grid-cols-2">
-        <Field label="Full name" required value={form.full_name} onChange={(value) => setField('full_name', value)} testId="input-new-full-name" />
-        <Field label="Employee ID" value={form.employee_id || ''} onChange={(value) => setField('employee_id', value)} testId="input-new-employee-id" />
-        <Field label="Work email" type="email" value={form.org_email || ''} onChange={(value) => setField('org_email', value)} testId="input-new-email" />
-        <Field label="Sub-department" value={form.sub_department || ''} onChange={(value) => setField('sub_department', value)} testId="input-new-sub-department" />
-        <Field label="Designation" value={form.designation || ''} onChange={(value) => setField('designation', value)} testId="input-new-designation" />
-      </div>
-      {createInstructor.isError && <p data-testid="status-create-error" className="mt-4 rounded-lg bg-[#fff0ec] px-3 py-2 text-[12px] font-semibold text-[#9b4434]">Could not create this record. Please try again.</p>}
-      <div className="mt-7 flex justify-end gap-2"><button type="button" data-testid="button-cancel-create" onClick={onClose} className="rounded-lg px-4 py-2.5 text-[12px] font-bold text-muted-foreground hover:bg-secondary">Cancel</button><button type="submit" disabled={createInstructor.isPending} data-testid="button-submit-create" className="rounded-lg bg-primary px-4 py-2.5 text-[12px] font-bold text-primary-foreground disabled:opacity-60">{createInstructor.isPending ? 'Creating…' : 'Create record'}</button></div>
-    </form>
-  </div>;
-}
-
-function Field({ label, value, onChange, testId, type = 'text', required = false }: { label: string; value: string; onChange: (value: string) => void; testId: string; type?: string; required?: boolean }) {
-  return <label className="block"><span className="mb-1.5 block text-[11px] font-bold text-foreground/75">{label}{required && <span className="ml-1 text-[#c34d39]">*</span>}</span><input required={required} type={type} value={value} onChange={(event) => onChange(event.target.value)} data-testid={testId} className="h-10 w-full rounded-lg border border-input bg-background px-3 text-[12px] outline-none focus:border-primary focus:ring-2 focus:ring-ring/25" /></label>;
-}

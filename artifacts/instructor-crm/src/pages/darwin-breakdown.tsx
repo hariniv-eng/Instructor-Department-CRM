@@ -93,7 +93,7 @@ export default function DarwinBreakdownPage() {
         icon={<Users size={18} />}
         bucket={data.instructors}
         emptyLabel="No instructors"
-        columns={['name', 'employee_id', 'darwin_dept', 'designation', 'dept_area']}
+        columns={['name', 'employee_id', 'darwin_dept', 'designation', 'dept_area', 'date_of_joining']}
         defaultOpen={false}
       />
       <BucketPanel
@@ -102,7 +102,7 @@ export default function DarwinBreakdownPage() {
         icon={<GraduationCap size={18} />}
         bucket={data.mentors}
         emptyLabel="No mentors"
-        columns={['name', 'employee_id', 'darwin_dept', 'designation']}
+        columns={['name', 'employee_id', 'darwin_dept', 'designation', 'date_of_joining']}
         defaultOpen={false}
       />
       <BucketPanel
@@ -111,7 +111,7 @@ export default function DarwinBreakdownPage() {
         icon={<UserCog size={18} />}
         bucket={data.others.ops_delivery_support}
         emptyLabel="No ops/central managers"
-        columns={['name', 'employee_id', 'darwin_dept', 'designation']}
+        columns={['name', 'employee_id', 'darwin_dept', 'designation', 'date_of_joining']}
         defaultOpen={true}
       />
       <BucketPanel
@@ -120,7 +120,7 @@ export default function DarwinBreakdownPage() {
         icon={<ShieldX size={18} />}
         bucket={data.others.excluded}
         emptyLabel="No individual exclusions"
-        columns={['name', 'employee_id', 'darwin_dept', 'designation', 'reason']}
+        columns={['name', 'employee_id', 'darwin_dept', 'designation', 'date_of_joining', 'reason']}
         defaultOpen={true}
       />
       <BucketPanel
@@ -129,7 +129,7 @@ export default function DarwinBreakdownPage() {
         icon={<Wallet size={18} />}
         bucket={data.others.payroll_edge_case}
         emptyLabel="None — payroll conversions normally have no Darwin match"
-        columns={['name', 'employee_id', 'darwin_dept', 'designation', 'reason']}
+        columns={['name', 'employee_id', 'darwin_dept', 'designation', 'date_of_joining', 'reason']}
         defaultOpen={true}
       />
       <BucketPanel
@@ -138,7 +138,7 @@ export default function DarwinBreakdownPage() {
         icon={<ShieldQuestion size={18} />}
         bucket={data.others.uncategorized}
         emptyLabel="Nothing left uncategorized"
-        columns={['name', 'employee_id', 'darwin_dept', 'designation']}
+        columns={['name', 'employee_id', 'darwin_dept', 'designation', 'date_of_joining']}
         defaultOpen={true}
       />
 
