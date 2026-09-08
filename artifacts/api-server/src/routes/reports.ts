@@ -358,6 +358,10 @@ const toApiCandidate = (row: InstructorRow) => ({
   classification: row.classification,
   classification_reason: row.classificationReason,
   notes: row.notes,
+  // Darwin's Date of joining (2026-09-08, per request) -- added here since
+  // this is what every Darwin Breakdown bucket (instructors/mentors/ops/
+  // excluded/payroll-edge-case/uncategorized) serializes through.
+  date_of_joining: row.dateOfJoining,
 });
 
 router.get("/reports/teachos-breakdown", requireAuth, requireRole("admin"), async (_req, res) => {
@@ -371,18 +375,36 @@ router.get("/reports/teachos-breakdown", requireAuth, requireRole("admin"), asyn
   // out of the Darwin-match check on both sides so that human decision
   // wins regardless of the underlying inDarwin/inDarwinFullRoster flags.
   const isManualOtherDepartment = (r: InstructorRow) => r.classification === "other_department_manual";
-  const matchedPrimaryRows = rows.filter((r) => r.inDarwin && !r.inDarwinFullRoster && !isManualOtherDepartment(r));
-  const notMappedRows = rows.filter((r) => !(r.inDarwin && !r.inDarwinFullRoster) || isManualOtherDepartment(r));
+  // IIT Kharagpur (broadened 2026-09-08, per request, see reconcile.ts):
+  // institute_name === "IIT Kharagpur" now sets this classification
+  // regardless of Darwin match, so — same as isManualOtherDepartment right
+  // above — it has to carve someone out of the Darwin-match check on both
+  // sides too, or a Darwin-matched IIT Kharagpur person (e.g. Siddhanth
+  // Mosam, NW0002770: active in Darwin's Instructors – Gen AI department)
+  // would stay stuck in matchedPrimaryRows/"matched_with_darwin" instead of
+  // moving into "Other department" as intended.
+  const isIitKharagpurTeam = (r: InstructorRow) => r.classification === "iit_kharagpur_team";
+  const matchedPrimaryRows = rows.filter((r) => r.inDarwin && !r.inDarwinFullRoster && !isManualOtherDepartment(r) && !isIitKharagpurTeam(r));
+  const notMappedRows = rows.filter((r) => !(r.inDarwin && !r.inDarwinFullRoster) || isManualOtherDepartment(r) || isIitKharagpurTeam(r));
 
-  const otherDepartmentDarwinRows = notMappedRows.filter((r) => r.inDarwin && r.inDarwinFullRoster);
+  // `!isIitKharagpurTeam(r)` guards here too: without it, a full-roster-
+  // fallback Darwin match (inDarwin && inDarwinFullRoster) whose institute is
+  // also IIT Kharagpur would double-count in both otherDepartmentDarwinRows
+  // and iitKharagpurRows below.
+  const otherDepartmentDarwinRows = notMappedRows.filter((r) => r.inDarwin && r.inDarwinFullRoster && !isIitKharagpurTeam(r));
   const manualOtherDepartmentRows = notMappedRows.filter((r) => isManualOtherDepartment(r));
-  const notInDarwinRows = notMappedRows.filter((r) => !r.inDarwin);
-  const excludedRows = notInDarwinRows.filter((r) => r.classification === "excluded_other_department" || r.classification === "excluded_non_department_team");
-  // IIT Kharagpur is folded into "Other department" as of 2026-09-04, per
-  // request — it's still its own distinct classification value internally
-  // (see reconcile.ts), just no longer its own reported bucket here.
-  const iitKharagpurRows = notInDarwinRows.filter((r) => r.classification === "iit_kharagpur_team");
+  // Pulled from notMappedRows directly, NOT from notInDarwinRows below —
+  // an IIT Kharagpur person can now have inDarwin=true, so scoping this to
+  // the not-in-Darwin pool (as it used to be, pre-2026-09-08) would miss
+  // them entirely.
+  const iitKharagpurRows = notMappedRows.filter((r) => isIitKharagpurTeam(r));
   const otherDepartmentRows = [...otherDepartmentDarwinRows, ...iitKharagpurRows, ...manualOtherDepartmentRows];
+  // Excludes anyone already claimed by iitKharagpurRows above (relevant now
+  // that an IIT Kharagpur person isn't necessarily !inDarwin anymore) so
+  // excludedRows/payrollConvertedRows/needsReviewRows below can't double-
+  // count them.
+  const notInDarwinRows = notMappedRows.filter((r) => !r.inDarwin && !isIitKharagpurTeam(r));
+  const excludedRows = notInDarwinRows.filter((r) => r.classification === "excluded_other_department" || r.classification === "excluded_non_department_team");
   // Payroll now includes anyone with a Darwin exit record on file too — see
   // reconcile.ts (2026-09-04): those used to land in their own
   // "exit_candidates" bucket, now folded into this one per request. Their

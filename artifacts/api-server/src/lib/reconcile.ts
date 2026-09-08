@@ -181,6 +181,20 @@ export const recomputeStatuses = async () => {
     //      "other department" as of 2026-09-04 — see reports.ts).
     //   3. Everyone still left in the pool -> payroll_converted.
     const isTeachosOnlyLeftover = !!row.inTeachos && !row.inDarwin;
+    // Broadened 2026-09-08, per request: institute_name === "IIT Kharagpur"
+    // now sets iit_kharagpur_team unconditionally, even for someone who ALSO
+    // has an active Darwin match (previously this only fired inside the
+    // TeachOS-only-leftover cascade above, step 2 — see git history for the
+    // narrower `isTeachosOnlyLeftover && isIitKharagpurCampus` condition this
+    // replaced). A concrete case that motivated this: Siddhanth Mosam
+    // (NW0002770) is an active Darwin instructor (Instructors – Gen AI) whose
+    // TeachOS institute is also "IIT kharagpur" — he's meant to be tracked as
+    // IIT Kharagpur team (folded into "Other department" in the TeachOS
+    // breakdown report), not counted as a normal active instructor, despite
+    // the Darwin match. See routes/reports.ts's teachos-breakdown handler for
+    // the companion change this required there (carving IIT-Kharagpur-
+    // classified rows out of the Darwin-matched bucket the same way a manual
+    // "other department" override already does).
     const isIitKharagpurCampus = (row.institutes ?? []).some((institute) => /kharagpur/i.test(institute));
 
     let classification: string | null = null;
@@ -211,9 +225,11 @@ export const recomputeStatuses = async () => {
       classification = "payroll_converted";
       classificationReason = `No Darwin record anywhere (primary Instructors department or full 3,000+ roster) — payroll-converted, with a Darwin exit record also on file (status: ${exit.status ?? "unknown"}), combined into the Payroll bucket (2026-09-04).`;
       computedStatus = "payroll_converted";
-    } else if (isTeachosOnlyLeftover && isIitKharagpurCampus) {
+    } else if (isIitKharagpurCampus) {
       classification = "iit_kharagpur_team";
-      classificationReason = "TeachOS institute is IIT Kharagpur — tracked as its own team, not counted as a payroll-converted instructor.";
+      classificationReason = isTeachosOnlyLeftover
+        ? "TeachOS institute is IIT Kharagpur — tracked as its own team, not counted as a payroll-converted instructor."
+        : "TeachOS institute is IIT Kharagpur — tracked as its own team, not counted as an instructor, even though this person also has a Darwin match (broadened 2026-09-08, per request).";
       computedStatus = "iit_kharagpur_team";
     } else if (isTeachosOnlyLeftover) {
       classification = "payroll_converted";
