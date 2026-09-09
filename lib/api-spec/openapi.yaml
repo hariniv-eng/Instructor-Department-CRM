@@ -198,6 +198,36 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Instructor" }
         "404": { description: Not found }
+  /instructors/{id}/gender:
+    patch:
+      operationId: updateInstructorGender
+      tags: [instructors]
+      summary: Set or clear an instructor's manual gender fallback (Admin or Manager)
+      description: >-
+        Narrower sibling of PATCH /instructors/{id} above (which is Admin-
+        only) -- this one is reachable by either role, since Manual Gender
+        is meant to be filled in by whoever knows the person, not just an
+        Admin. Only takes effect when Darwin doesn't already supply a
+        gender for this person (see InstructorSummary.gender_source);
+        Darwin's own value is never overridden by this.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: number }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/InstructorGenderUpdate" }
+      responses:
+        "200":
+          description: Updated instructor
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Instructor" }
+        "400": { description: "manual_gender must be \"male\", \"female\", or null" }
+        "404": { description: Not found }
   /dashboard:
     get:
       operationId: getDashboard
@@ -339,6 +369,7 @@ components:
           items: { type: string }
         computed_status: { type: string }
         manual_status: { type: ["string", "null"] }
+        manual_gender: { type: ["string", "null"], description: "Manual fallback for gender, settable via PATCH /instructors/{id}/gender by either Admin or Manager. Only used when Darwin has no gender on file for this person." }
         exit_date: { type: ["string", "null"], format: date }
         converted_university_name: { type: ["string", "null"] }
         notes: { type: ["string", "null"] }
@@ -367,6 +398,14 @@ components:
         exit_date: { type: ["string", "null"], format: date }
         converted_university_name: { type: ["string", "null"] }
         notes: { type: ["string", "null"] }
+    # Body for PATCH /instructors/{id}/gender -- a narrower, both-role
+    # sibling of InstructorUpdate above (which is Admin-only). "male" or
+    # "female" sets it, null clears it back to unknown.
+    InstructorGenderUpdate:
+      type: object
+      required: [manual_gender]
+      properties:
+        manual_gender: { type: ["string", "null"], enum: ["male", "female", null] }
     Dashboard:
       type: object
       required: [kpis, monthly_trend, sub_departments, designations]
@@ -584,6 +623,8 @@ components:
         - capability_manager
         - darwin_manager
         - date_of_joining
+        - gender
+        - gender_source
       properties:
         id: { type: number }
         full_name: { type: string }
@@ -614,3 +655,12 @@ components:
         # (2026-09, per request), mirroring the same field already on every
         # Darwin Breakdown bucket (see Candidate schema).
         date_of_joining: { type: ["string", "null"] }
+        # Effective gender -- Darwin's own "Gender" field (typically "Male"/
+        # "Female") when present, else the manually-set fallback (2026-09-09
+        # follow-up: manualGender) for someone Darwin can't supply it for.
+        # Darwin's value, when present, always wins.
+        gender: { type: ["string", "null"] }
+        # Whether `gender` above came from Darwin (locked -- the Instructors
+        # tab shows plain text) or was set/left blank manually (the
+        # Instructors tab shows the manual-gender dropdown instead).
+        gender_source: { type: ["string", "null"], enum: ["darwin", "manual", null] }

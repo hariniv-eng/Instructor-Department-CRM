@@ -54,6 +54,9 @@ export interface Instructor {
   computed_status: string;
   /** @nullable */
   manual_status?: string | null;
+  /** Manual fallback for `gender`, settable via PATCH /instructors/{id}/gender by either Admin or Manager. Only used when Darwin has no gender on file for this person.
+     * @nullable */
+  manual_gender?: string | null;
   /** @nullable */
   exit_date?: string | null;
   /** @nullable */
@@ -116,6 +119,11 @@ export interface InstructorUpdate {
   converted_university_name?: string | null;
   /** @nullable */
   notes?: string | null;
+}
+
+/** Body for PATCH /instructors/{id}/gender -- a narrower, both-role-editable sibling of InstructorUpdate above (which is Admin-only). "male" or "female" to set it, null to clear it back to unknown. */
+export interface InstructorGenderUpdate {
+  manual_gender: 'male' | 'female' | null;
 }
 
 export type DashboardKpis = {[key: string]: number};
@@ -296,6 +304,10 @@ export interface InstructorSummary {
   darwin_manager: string | null;
   /** @nullable */
   date_of_joining: string | null;
+  /** Effective gender -- Darwin's value when present, else the manually-set fallback. @nullable */
+  gender: string | null;
+  /** Whether `gender` above came from Darwin (locked, not editable here) or was set/left blank manually ("manual" or null). Drives whether the Instructors tab shows a plain value or the manual-gender dropdown for this row. @nullable */
+  gender_source: 'darwin' | 'manual' | null;
 }
 
 export interface InstructorsReport {

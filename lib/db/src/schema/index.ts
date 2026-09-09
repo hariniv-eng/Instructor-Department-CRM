@@ -36,6 +36,16 @@ export const instructorsTable = pgTable("instructors", {
   workLocation: text("work_location"),
   workspace: text("workspace"),
   gender: text("gender"),
+  // Manual fallback for `gender` above (2026-09-09, per request) -- for
+  // someone with no current Darwin record (or a Darwin record that just
+  // doesn't have gender filled in), Darwin can never supply this, so a
+  // human who knows the person can mark it here instead. Never written by
+  // any sync path (reconcileDarwin/reconcileDarwinFullRosterFallback/
+  // recomputeStatuses) -- like manualStatus/notes below, it only changes via
+  // the dedicated PATCH .../gender endpoint, so it survives every sync.
+  // Effective gender shown anywhere in the app = Darwin's value when
+  // present, else this. See reports.ts's toApiInstructorSummary.
+  manualGender: text("manual_gender"),
   currentState: text("current_state"),
   currentCity: text("current_city"),
   darwinEmployeeStatus: text("darwin_employee_status"),

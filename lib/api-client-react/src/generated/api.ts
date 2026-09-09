@@ -25,6 +25,7 @@ import type {
   Dashboard,
   HealthStatus,
   Instructor,
+  InstructorGenderUpdate,
   InstructorInput,
   InstructorUpdate,
   InstructorsReport,
@@ -443,6 +444,69 @@ export const useUpdateInstructor = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getUpdateInstructorMutationOptions(options));
+    }
+
+// Hand-added (2026-09-09, per request) to mirror updateInstructor/
+// useUpdateInstructor above -- NOT run through orval, since this session's
+// codegen tooling is broken (see repo notes). Regenerate this file for real
+// once openapi.yaml's /instructors/{id}/gender path is picked up by a
+// working orval run; until then this hand-matched version is the source of
+// truth for it.
+export const getUpdateInstructorGenderUrl = (id: number,) => {
+
+  return `/api/instructors/${id}/gender`
+}
+
+/**
+ * @summary Set or clear an instructor's manual gender fallback (Admin or Manager)
+ */
+export const updateInstructorGender = async (id: number,
+    instructorGenderUpdate: InstructorGenderUpdate, options?: Parameters<typeof customFetch>[1]): Promise<Instructor> => {
+
+  return customFetch<Instructor>(getUpdateInstructorGenderUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(instructorGenderUpdate)
+  }
+);}
+
+export const getUpdateInstructorGenderMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateInstructorGender>>, TError,{id: number;data: BodyType<InstructorGenderUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateInstructorGender>>, TError,{id: number;data: BodyType<InstructorGenderUpdate>}, TContext> => {
+
+const mutationKey = ['updateInstructorGender'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateInstructorGender>>, {id: number;data: BodyType<InstructorGenderUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateInstructorGender(id,data,requestOptions)
+        }
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateInstructorGenderMutationResult = NonNullable<Awaited<ReturnType<typeof updateInstructorGender>>>
+    export type UpdateInstructorGenderMutationBody = BodyType<InstructorGenderUpdate>
+    export type UpdateInstructorGenderMutationError = ErrorType<void>
+
+    /**
+ * @summary Set or clear an instructor's manual gender fallback (Admin or Manager)
+ */
+export const useUpdateInstructorGender = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateInstructorGender>>, TError,{id: number;data: BodyType<InstructorGenderUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateInstructorGender>>,
+        TError,
+        {id: number;data: BodyType<InstructorGenderUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateInstructorGenderMutationOptions(options));
     }
 
 export const getGetDashboardUrl = () => {

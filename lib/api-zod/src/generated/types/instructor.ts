@@ -52,6 +52,8 @@ export interface Instructor {
   /** @nullable */
   manual_status?: string | null;
   /** @nullable */
+  manual_gender?: string | null;
+  /** @nullable */
   exit_date?: Date | null;
   /** @nullable */
   converted_university_name?: string | null;

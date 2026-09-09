@@ -19,6 +19,7 @@ const toApiInstructor = (row: typeof instructorsTable.$inferSelect) => ({
   work_location: row.workLocation,
   workspace: row.workspace,
   gender: row.gender,
+  manual_gender: row.manualGender,
   current_state: row.currentState,
   current_city: row.currentCity,
   darwin_employee_status: row.darwinEmployeeStatus,
@@ -135,6 +136,28 @@ router.patch("/instructors/:id", requireAuth, requireRole("admin"), async (req, 
     convertedUniversityName: body.converted_university_name,
     notes: body.notes,
   }).where(eq(instructorsTable.id, Number(req.params.id))).returning();
+  if (!row) {
+    res.status(404).json({ error: "Instructor not found" });
+    return;
+  }
+  res.json(toApiInstructor(row));
+});
+
+// Manual Gender is its own narrower endpoint, separate from the general
+// PATCH /instructors/:id above -- that one edits Manual Status, Exit Date,
+// etc. and is deliberately Admin-only. Gender was asked to be editable by
+// EITHER role (Admin or Manager), same population requireAuth alone already
+// covers (see middlewares/auth.ts) -- a dedicated route keeps that wider
+// access scoped to just this one low-stakes field instead of loosening the
+// other, more sensitive manual fields to the Manager role too (2026-09-09,
+// per request).
+router.patch("/instructors/:id/gender", requireAuth, async (req, res): Promise<void> => {
+  const raw = (req.body as { manual_gender?: string | null }).manual_gender;
+  if (raw !== "male" && raw !== "female" && raw !== null) {
+    res.status(400).json({ error: 'manual_gender must be "male", "female", or null' });
+    return;
+  }
+  const [row] = await db.update(instructorsTable).set({ manualGender: raw }).where(eq(instructorsTable.id, Number(req.params.id))).returning();
   if (!row) {
     res.status(404).json({ error: "Instructor not found" });
     return;

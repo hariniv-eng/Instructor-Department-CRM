@@ -49,6 +49,20 @@ const toApiInstructorSummary = (row: InstructorRow) => ({
   // stale date. Per request (2026-09-09): no Darwin access right now ->
   // blank, regardless of what's sitting in the column from before.
   date_of_joining: row.inDarwin ? row.dateOfJoining : null,
+  // Darwin's own Gender field -- added (2026-09-09, per request) to power a
+  // gender filter + male/female count on the Instructors tab. Same gating
+  // as date_of_joining above: a TeachOS-only row (no Darwin record at all,
+  // or a stale value from a past Darwin match) doesn't get Darwin's value.
+  // Falls back to manualGender (2026-09-09, follow-up request) -- a human
+  // can mark gender by hand for exactly the people Darwin can't supply it
+  // for (see the PATCH /instructors/:id/gender route and manualGender's
+  // comment in the schema). Darwin, when it has an answer, always wins --
+  // manualGender is a gap-filler, not a correction path for Darwin data.
+  // gender_source tells the frontend whether the value shown is locked
+  // (from Darwin) or editable (manual/none), so it knows whether to render
+  // plain text or the manual-gender dropdown for a given row.
+  gender: (row.inDarwin ? row.gender : null) ?? row.manualGender ?? null,
+  gender_source: row.inDarwin && row.gender ? "darwin" : row.manualGender ? "manual" : null,
 });
 
 // This is the single reporting surface for the breakdowns requested on top

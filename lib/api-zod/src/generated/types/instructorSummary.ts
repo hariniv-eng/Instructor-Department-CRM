@@ -31,4 +31,8 @@ export interface InstructorSummary {
   darwin_manager: string | null;
   /** @nullable */
   date_of_joining: string | null;
+  /** @nullable */
+  gender: string | null;
+  /** @nullable */
+  gender_source: 'darwin' | 'manual' | null;
 }
