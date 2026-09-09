@@ -1,18 +1,24 @@
 import { useMemo, useState } from 'react';
-import { Briefcase, GraduationCap, Search, UserCheck, UsersRound } from 'lucide-react';
+import { Briefcase, Building2, GraduationCap, Search, UserCheck, UsersRound } from 'lucide-react';
 import { useGetReportsInstructors } from '@workspace/api-client-react';
 import type { AccessSplit, InstructorSummary } from '@workspace/api-client-react';
 import { Link } from 'wouter';
 import { PageIntro, EmptyState, QueryError, SkeletonBlock, DownloadCsvButton, MiniStat, pct } from '@/components/ui-pieces';
 import { downloadCsv, slugify, toCsv } from '@/lib/csv';
 
-type CategoryKey = 'instructors' | 'mentors' | 'ops_team';
+type CategoryKey = 'department' | 'instructors' | 'mentors' | 'ops_team';
 
 // Each tab's people list is the same union of darwin_only + both + teachos_only
 // that backs the matching Overview KPI card's count -- so "165 Instructors" here
 // always agrees with the "Instructors" number on the Overview tab. See
 // artifacts/api-server/src/routes/reports.ts's accessBreakdown for the source.
+// "Instructor Department" (2026-09-09, per request) is the same combined
+// Instructors + Mentors + Operations team rollup as the Overview tab's 4th
+// KPI card of the same name -- access_breakdown.department already existed
+// on the API response for that card, so this tab needed no backend change,
+// just wiring up the same field here.
 const CATEGORY_TABS: { key: CategoryKey; label: string; icon: typeof UsersRound; description: string }[] = [
+  { key: 'department', label: 'Instructor Department', icon: Building2, description: 'Instructors + Mentors + Operations team, combined.' },
   { key: 'instructors', label: 'Instructors', icon: UsersRound, description: 'Everyone counted toward the TeachOS instructor count.' },
   { key: 'mentors', label: 'Mentors', icon: GraduationCap, description: 'Darwin — Mentors department.' },
   { key: 'ops_team', label: 'Operations team', icon: Briefcase, description: 'Darwin — Delivery Support (Ops), filed under Operations rather than Instructor or Mentor.' },
@@ -72,7 +78,7 @@ export default function InstructorsPage() {
           const isActive = category === tab.key;
           return <button key={tab.key} type="button" data-testid={`button-category-${tab.key}`} onClick={() => setCategory(tab.key)} aria-pressed={isActive} className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-bold transition-colors ${isActive ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'}`}>
             <Icon size={14} /> {tab.label}
-            <span className="ml-1 font-mono-ui text-[10px] opacity-70">{formatCount(report?.kpis[tab.key === 'instructors' ? 'total_instructor_count' : tab.key === 'mentors' ? 'mentors_count' : 'ops_team_count'])}</span>
+            <span className="ml-1 font-mono-ui text-[10px] opacity-70">{formatCount(report?.kpis[tab.key === 'department' ? 'department_total_count' : tab.key === 'instructors' ? 'total_instructor_count' : tab.key === 'mentors' ? 'mentors_count' : 'ops_team_count'])}</span>
           </button>;
         })}
       </div>
@@ -113,6 +119,18 @@ export default function InstructorsPage() {
 // things the user singled out for this bucket); Mentors get Subject instead
 // of Payroll; Operations team gets Department in place of a subject, since
 // ops rows aren't teaching one. Campus (the institutes list) is common to all three.
+// Department (Darwin's raw department field, e.g. "Instructors -- Frontend")
+// is now its own explicit column for Instructors and Mentors too (2026-09-09,
+// per request) -- separate from Subject (dept_area, the derived teaching
+// area used for the taxonomy) rather than replacing it. Operations team
+// already showed this same `department` value in what was labeled "Subject"
+// for other categories, so it keeps its single "Department" column as-is
+// rather than gaining a second, redundant one.
+// Designation (Darwin's raw "Designation" field) is its own explicit column
+// for every category (2026-09-09, per request, mirroring the same change on
+// the Overview tab's drill-down table) -- it used to be shown only as a
+// small line under the person's name; that's removed now that it has its
+// own column, to avoid showing the same value twice in one row.
 // Rows are Links (for click-through to the instructor detail page), so this
 // uses a CSS grid rather than a real <table> -- an <a> can't be a direct
 // child of <tbody> -- matching the grid-row pattern this page already used.
@@ -127,24 +145,39 @@ export default function InstructorsPage() {
 // spelled out in full below rather than assembled from interpolated pieces
 // -- a dynamically-built arbitrary-value class silently gets no CSS at all.
 function gridColsClass(category: CategoryKey): string {
-  if (category === 'instructors') return 'grid-cols-[260px_130px_280px_160px_220px_140px_190px_130px]';
-  if (category === 'mentors') return 'grid-cols-[260px_130px_280px_160px_240px_140px_190px]';
+  if (category === 'instructors') return 'grid-cols-[260px_190px_130px_280px_160px_170px_220px_140px_190px_130px]';
+  // "Instructor Department" (the combined list) has the same column set as
+  // Mentors: Subject + Department, Campus, no Payroll (payroll status isn't
+  // a meaningful concept for the Mentors/Ops rows mixed into this list).
+  if (category === 'mentors' || category === 'department') return 'grid-cols-[260px_190px_130px_280px_160px_170px_240px_140px_190px]';
   // Operations team has no Campus column -- ops rows aren't deployed to a
-  // teaching campus the way instructors and mentors are.
-  return 'grid-cols-[260px_130px_280px_280px_140px_190px]';
+  // teaching campus the way instructors and mentors are. It also has only
+  // one Subject/Department-style column (labeled "Department"), not both.
+  return 'grid-cols-[260px_190px_130px_280px_280px_140px_190px]';
+}
+
+// Name column header/label is per-category -- "Instructor Department" mixes
+// all three roles, so it gets a neutral "Person" rather than "Instructor".
+function nameColumnLabel(category: CategoryKey): string {
+  if (category === 'ops_team') return 'Team member';
+  if (category === 'mentors') return 'Mentor';
+  if (category === 'department') return 'Person';
+  return 'Instructor';
 }
 
 // Column set mirrors gridColsClass/CategoryTable below exactly, so the CSV
 // always matches what's on screen for the active category tab.
 function downloadInstructorsCsv(category: CategoryKey, people: InstructorSummary[]) {
-  const headers = [category === 'ops_team' ? 'Team member' : category === 'mentors' ? 'Mentor' : 'Instructor', 'Employee ID', 'TeachOS User ID', category === 'ops_team' ? 'Department' : 'Subject'];
+  const headers = [nameColumnLabel(category), 'Designation', 'Employee ID', 'TeachOS User ID'];
+  if (category === 'ops_team') headers.push('Department'); else headers.push('Subject', 'Department');
   if (category !== 'ops_team') headers.push('Campus');
   headers.push('Date of joining');
   headers.push('Capability Manager');
   if (category === 'instructors') headers.push('Payroll');
 
   const rows = people.map((person) => {
-    const row: string[] = [person.full_name, person.employee_id ?? '', person.teachos_user_id ?? '', category === 'ops_team' ? (person.department ?? '') : (person.dept_area ?? '')];
+    const row: string[] = [person.full_name, person.designation ?? '', person.employee_id ?? '', person.teachos_user_id ?? ''];
+    if (category === 'ops_team') row.push(person.department ?? ''); else row.push(person.dept_area ?? '', person.department ?? '');
     if (category !== 'ops_team') row.push(person.institutes?.join(', ') ?? '');
     row.push(person.date_of_joining ?? '');
     row.push(person.capability_manager ?? '');
@@ -161,10 +194,11 @@ function CategoryTable({ category, people }: { category: CategoryKey; people: In
     <div className="overflow-x-auto">
       <div className="w-max min-w-full">
         <div className={`grid gap-4 border-b border-border bg-[#f4f7f9] px-5 py-3.5 text-left font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground ${columns}`}>
-          <span>{category === 'ops_team' ? 'Team member' : category === 'mentors' ? 'Mentor' : 'Instructor'}</span>
+          <span>{nameColumnLabel(category)}</span>
+          <span>Designation</span>
           <span>Employee ID</span>
           <span>TeachOS User ID</span>
-          <span>{category === 'ops_team' ? 'Department' : 'Subject'}</span>
+          {category === 'ops_team' ? <span>Department</span> : <><span>Subject</span><span>Department</span></>}
           {category !== 'ops_team' && <span>Campus</span>}
           <span>Date of joining</span>
           <span>Capability Manager</span>
@@ -183,12 +217,15 @@ function PersonRow({ category, person, columns }: { category: CategoryKey; perso
       <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#e1eaf1] text-[11px] font-extrabold text-primary">{initials(person.full_name)}</span>
       <span className="min-w-0">
         <span className="block truncate text-[13px] font-bold text-foreground">{person.full_name}</span>
-        {person.designation && <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">{person.designation}</span>}
       </span>
     </div>
+    <div className="truncate text-[12px] text-muted-foreground">{person.designation || '—'}</div>
     <div className="truncate font-mono-ui text-[11px] text-muted-foreground">{person.employee_id || '—'}</div>
     <div className="truncate font-mono-ui text-[11px] text-muted-foreground">{person.teachos_user_id || ''}</div>
-    <div className="truncate text-[12px] text-muted-foreground">{category === 'ops_team' ? (person.department || '—') : (person.dept_area || '—')}</div>
+    {category === 'ops_team' ? <div className="truncate text-[12px] text-muted-foreground">{person.department || '—'}</div> : <>
+      <div className="truncate text-[12px] text-muted-foreground">{person.dept_area || '—'}</div>
+      <div className="truncate text-[12px] text-muted-foreground">{person.department || '—'}</div>
+    </>}
     {category !== 'ops_team' && <div className="truncate text-[12px] text-muted-foreground">{campus}</div>}
     {/* No Darwin access right now -> blank (not "--"), per request: this
         column is specifically Darwin's date of joining, not a general
