@@ -156,10 +156,19 @@ function AccessDrilldown({ label, category, split, tab, onTabChange, onClose }: 
     ? (split?.darwin_only?.count ?? 0) + (split?.both?.count ?? 0) + (split?.teachos_only?.count ?? 0)
     : split?.[key]?.count;
   // Designation (Darwin's "Designation" column, see reports.ts's
-  // toApiInstructorSummary) is only surfaced here for the Operations team
-  // drill-down (2026-09-07, per request) -- Instructors/Mentors/Department
-  // already carry Subject/Campus context the way Ops rows don't.
-  const showDesignation = category === 'ops_team';
+  // toApiInstructorSummary) used to be surfaced only for the Operations
+  // team drill-down (2026-09-07). Now shown for every category (2026-09-09,
+  // per request) -- kept as its own flag rather than inlined everywhere
+  // below since the column is conditionally rendered in several places
+  // (header, row, CSV headers, empty-state colSpan).
+  const showDesignation = true;
+  // Operations team shows "Department" here instead of "Subject" -- ops
+  // roles aren't a teaching "subject" the way instructor/mentor rows are.
+  // Mirrors the same category === 'ops_team' distinction instructors.tsx
+  // already made for its own Subject/Department column (2026-09-09, per
+  // request to bring the Overview tab's drilldown in line with it).
+  const subjectLabel = category === 'ops_team' ? 'Department' : 'Subject';
+  const subjectValue = (p: InstructorSummary) => category === 'ops_team' ? (p.department ?? '—') : (p.dept_area ?? p.department ?? '—');
   // Every card now shows two explicit manager columns instead of one
   // ambiguous "Manager" column that used to silently fall back between
   // the two (2026-09-07, per request; extended to Department, then to
@@ -171,12 +180,12 @@ function AccessDrilldown({ label, category, split, tab, onTabChange, onClose }: 
   // reports.ts -- the old combined `manager` field no longer exists on
   // InstructorSummary at all.
   const handleDownload = () => {
-    const headers = ['Name', ...(showDesignation ? ['Designation'] : []), 'Employee ID', 'Department', 'Campus', 'Capability Manager', 'Manager (Darwin)'];
+    const headers = ['Name', ...(showDesignation ? ['Designation'] : []), 'Employee ID', subjectLabel, 'Campus', 'Capability Manager', 'Manager (Darwin)'];
     const rows = people.map((p) => [
       p.full_name,
       ...(showDesignation ? [p.designation ?? ''] : []),
       p.employee_id ?? '',
-      p.dept_area ?? p.department ?? '',
+      category === 'ops_team' ? (p.department ?? '') : (p.dept_area ?? p.department ?? ''),
       p.institutes?.join(', ') ?? '',
       p.capability_manager ?? '',
       p.darwin_manager ?? '',
@@ -218,7 +227,7 @@ function AccessDrilldown({ label, category, split, tab, onTabChange, onClose }: 
             <th className="px-3 py-2">Name</th>
             {showDesignation && <th className="px-3 py-2">Designation</th>}
             <th className="px-3 py-2">Employee ID</th>
-            <th className="px-3 py-2">Department</th>
+            <th className="px-3 py-2">{subjectLabel}</th>
             <th className="px-3 py-2">Campus</th>
             <th className="px-3 py-2">Capability Manager</th>
             <th className="px-3 py-2">Manager (Darwin)</th>
@@ -229,7 +238,7 @@ function AccessDrilldown({ label, category, split, tab, onTabChange, onClose }: 
             <td className="px-3 py-2 font-semibold">{p.full_name}</td>
             {showDesignation && <td className="px-3 py-2 text-muted-foreground">{p.designation ?? '—'}</td>}
             <td className="px-3 py-2 font-mono-ui text-muted-foreground">{p.employee_id ?? '—'}</td>
-            <td className="px-3 py-2 text-muted-foreground">{p.dept_area ?? p.department ?? '—'}</td>
+            <td className="px-3 py-2 text-muted-foreground">{subjectValue(p)}</td>
             <td className="px-3 py-2 text-muted-foreground">{p.institutes?.join(', ') || '—'}</td>
             <td className="px-3 py-2 text-muted-foreground">{p.capability_manager ?? '—'}</td>
             <td className="px-3 py-2 text-muted-foreground">{p.darwin_manager ?? '—'}</td>
