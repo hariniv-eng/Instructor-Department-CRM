@@ -102,11 +102,11 @@ export default function InstructorsPage() {
 // spelled out in full below rather than assembled from interpolated pieces
 // -- a dynamically-built arbitrary-value class silently gets no CSS at all.
 function gridColsClass(category: CategoryKey): string {
-  if (category === 'instructors') return 'grid-cols-[260px_130px_280px_160px_220px_130px]';
-  if (category === 'mentors') return 'grid-cols-[260px_130px_280px_160px_240px]';
+  if (category === 'instructors') return 'grid-cols-[260px_130px_280px_160px_220px_140px_130px]';
+  if (category === 'mentors') return 'grid-cols-[260px_130px_280px_160px_240px_140px]';
   // Operations team has no Campus column -- ops rows aren't deployed to a
   // teaching campus the way instructors and mentors are.
-  return 'grid-cols-[260px_130px_280px_280px]';
+  return 'grid-cols-[260px_130px_280px_280px_140px]';
 }
 
 // Column set mirrors gridColsClass/CategoryTable below exactly, so the CSV
@@ -114,11 +114,13 @@ function gridColsClass(category: CategoryKey): string {
 function downloadInstructorsCsv(category: CategoryKey, people: InstructorSummary[]) {
   const headers = [category === 'ops_team' ? 'Team member' : category === 'mentors' ? 'Mentor' : 'Instructor', 'Employee ID', 'TeachOS User ID', category === 'ops_team' ? 'Department' : 'Subject'];
   if (category !== 'ops_team') headers.push('Campus');
+  headers.push('Date of joining');
   if (category === 'instructors') headers.push('Payroll');
 
   const rows = people.map((person) => {
     const row: string[] = [person.full_name, person.employee_id ?? '', person.teachos_user_id ?? '', category === 'ops_team' ? (person.department ?? '') : (person.dept_area ?? '')];
     if (category !== 'ops_team') row.push(person.institutes?.join(', ') ?? '');
+    row.push(person.date_of_joining ?? '');
     if (category === 'instructors') row.push(person.is_payroll ? 'Payroll' : 'Nxtwave');
     return row;
   });
@@ -137,6 +139,7 @@ function CategoryTable({ category, people }: { category: CategoryKey; people: In
           <span>TeachOS User ID</span>
           <span>{category === 'ops_team' ? 'Department' : 'Subject'}</span>
           {category !== 'ops_team' && <span>Campus</span>}
+          <span>Date of joining</span>
           {category === 'instructors' && <span>Payroll</span>}
         </div>
         <div>{people.map((person) => <PersonRow key={person.id} category={category} person={person} columns={columns} />)}</div>
@@ -159,7 +162,10 @@ function PersonRow({ category, person, columns }: { category: CategoryKey; perso
     <div className="truncate font-mono-ui text-[11px] text-muted-foreground">{person.teachos_user_id || ''}</div>
     <div className="truncate text-[12px] text-muted-foreground">{category === 'ops_team' ? (person.department || '—') : (person.dept_area || '—')}</div>
     {category !== 'ops_team' && <div className="truncate text-[12px] text-muted-foreground">{campus}</div>}
+    {/* No Darwin access right now -> blank (not "--"), per request: this
+        column is specifically Darwin's date of joining, not a general
+        "unknown" placeholder. See date_of_joining's gating in reports.ts. */}
+    <div className="truncate font-mono-ui text-[11px] text-muted-foreground">{person.date_of_joining || ''}</div>
     {category === 'instructors' && <div>{person.is_payroll ? <span className="inline-flex rounded-full bg-[#e6e9fb] px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] text-[#4a4fb0]">Payroll</span> : <span className="inline-flex rounded-full bg-secondary px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] text-muted-foreground">Nxtwave</span>}</div>}
   </Link>;
 }
-

@@ -39,6 +39,16 @@ const toApiInstructorSummary = (row: InstructorRow) => ({
   // every card shows both explicit columns instead of one ambiguous one.
   capability_manager: row.teachosManager || null,
   darwin_manager: row.directManager || null,
+  // Darwin's Date of joining -- added to the Instructors-tab table (2026-09,
+  // per request), mirroring the same field already on every Darwin
+  // Breakdown bucket (see toApiCandidate below). Gated on inDarwin (not just
+  // "is dateOfJoining set"): reconcileDarwin() resets inDarwin to false for
+  // everyone at the start of every sync but does NOT clear the stored
+  // dateOfJoining column, so someone who had a Darwin match in an earlier
+  // sync and has since dropped out of it would otherwise still show that
+  // stale date. Per request (2026-09-09): no Darwin access right now ->
+  // blank, regardless of what's sitting in the column from before.
+  date_of_joining: row.inDarwin ? row.dateOfJoining : null,
 });
 
 // This is the single reporting surface for the breakdowns requested on top

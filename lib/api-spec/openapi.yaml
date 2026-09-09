@@ -583,6 +583,7 @@ components:
         - institutes
         - capability_manager
         - darwin_manager
+        - date_of_joining
       properties:
         id: { type: number }
         full_name: { type: string }
@@ -609,3 +610,7 @@ components:
         # ("Manager (Darwin)") alongside capability_manager on every card
         # in the Overview drill-down (2026-09-07/08).
         darwin_manager: { type: ["string", "null"] }
+        # Darwin's Date of joining -- shown on the Instructors tab table
+        # (2026-09, per request), mirroring the same field already on every
+        # Darwin Breakdown bucket (see Candidate schema).
+        date_of_joining: { type: ["string", "null"] }

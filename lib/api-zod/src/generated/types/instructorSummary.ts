@@ -29,4 +29,6 @@ export interface InstructorSummary {
   capability_manager: string | null;
   /** @nullable */
   darwin_manager: string | null;
+  /** @nullable */
+  date_of_joining: string | null;
 }
