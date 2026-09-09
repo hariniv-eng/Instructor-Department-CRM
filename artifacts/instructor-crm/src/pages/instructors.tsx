@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
-import { Briefcase, GraduationCap, Search, UsersRound } from 'lucide-react';
+import { Briefcase, GraduationCap, Search, UserCheck, UsersRound } from 'lucide-react';
 import { useGetReportsInstructors } from '@workspace/api-client-react';
 import type { AccessSplit, InstructorSummary } from '@workspace/api-client-react';
 import { Link } from 'wouter';
-import { PageIntro, EmptyState, QueryError, SkeletonBlock, DownloadCsvButton } from '@/components/ui-pieces';
+import { PageIntro, EmptyState, QueryError, SkeletonBlock, DownloadCsvButton, MiniStat, pct } from '@/components/ui-pieces';
 import { downloadCsv, slugify, toCsv } from '@/lib/csv';
 
 type CategoryKey = 'instructors' | 'mentors' | 'ops_team';
@@ -48,6 +48,16 @@ export default function InstructorsPage() {
 
   const activeTab = CATEGORY_TABS.find((tab) => tab.key === category)!;
 
+  // Coverage check for the currently-viewed category (2026-09, per request):
+  // how many of these people have a Capability Manager on file at all, vs.
+  // how many don't -- computed client-side from the same list already
+  // loaded for the table below, so switching category/search updates it
+  // too. This is a visibility/audit aid, not a new backend computation --
+  // capability_manager itself is the same TeachOS-sourced field already
+  // shown in the Overview drill-down (see reports.ts's toApiInstructorSummary).
+  const withCapabilityManager = allPeople.filter((person) => !!person.capability_manager).length;
+  const missingCapabilityManager = allPeople.length - withCapabilityManager;
+
   return <div className="mx-auto max-w-[1500px]">
     <PageIntro
       eyebrow="Workforce register / Darwin + TeachOS"
@@ -68,6 +78,21 @@ export default function InstructorsPage() {
       </div>
       <div className="relative flex-1"><Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" /><input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search name, employee ID, or TeachOS user ID..." data-testid="input-search-instructors" className="h-10 w-full rounded-lg border border-border bg-background pl-9 pr-3 text-[12px] outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-primary focus:ring-2 focus:ring-ring/25" /></div>
     </div>
+
+    {!reportQuery.isLoading && !reportQuery.isError && allPeople.length > 0 && <section className="mb-5 rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6">
+      <div className="mb-4 flex items-center gap-2">
+        <span className="grid h-8 w-8 place-items-center rounded-lg bg-[#dff0eb] text-[#287469]"><UserCheck size={16} /></span>
+        <div>
+          <p className="font-mono-ui text-[10px] uppercase tracking-[0.17em] text-muted-foreground">TeachOS-sourced, {activeTab.label.toLowerCase()} in view</p>
+          <h2 className="text-[15px] font-extrabold tracking-[-0.03em]">Capability Manager coverage</h2>
+        </div>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <MiniStat label="Assigned" value={withCapabilityManager} meta={`${pct(withCapabilityManager, allPeople.length)} of ${activeTab.label.toLowerCase()} have a Capability Manager on file`} tone="green" />
+        <MiniStat label="Missing" value={missingCapabilityManager} meta="No valid Capability Manager name matched among their TeachOS candidates" tone={missingCapabilityManager > 0 ? 'amber' : 'muted'} />
+        <MiniStat label="Total in category" value={allPeople.length} meta={`Every ${activeTab.label.toLowerCase()} counted, search excluded`} tone="muted" />
+      </div>
+    </section>}
 
     <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
       <div className="flex flex-col gap-1">
@@ -102,11 +127,11 @@ export default function InstructorsPage() {
 // spelled out in full below rather than assembled from interpolated pieces
 // -- a dynamically-built arbitrary-value class silently gets no CSS at all.
 function gridColsClass(category: CategoryKey): string {
-  if (category === 'instructors') return 'grid-cols-[260px_130px_280px_160px_220px_140px_130px]';
-  if (category === 'mentors') return 'grid-cols-[260px_130px_280px_160px_240px_140px]';
+  if (category === 'instructors') return 'grid-cols-[260px_130px_280px_160px_220px_140px_190px_130px]';
+  if (category === 'mentors') return 'grid-cols-[260px_130px_280px_160px_240px_140px_190px]';
   // Operations team has no Campus column -- ops rows aren't deployed to a
   // teaching campus the way instructors and mentors are.
-  return 'grid-cols-[260px_130px_280px_280px_140px]';
+  return 'grid-cols-[260px_130px_280px_280px_140px_190px]';
 }
 
 // Column set mirrors gridColsClass/CategoryTable below exactly, so the CSV
@@ -115,12 +140,14 @@ function downloadInstructorsCsv(category: CategoryKey, people: InstructorSummary
   const headers = [category === 'ops_team' ? 'Team member' : category === 'mentors' ? 'Mentor' : 'Instructor', 'Employee ID', 'TeachOS User ID', category === 'ops_team' ? 'Department' : 'Subject'];
   if (category !== 'ops_team') headers.push('Campus');
   headers.push('Date of joining');
+  headers.push('Capability Manager');
   if (category === 'instructors') headers.push('Payroll');
 
   const rows = people.map((person) => {
     const row: string[] = [person.full_name, person.employee_id ?? '', person.teachos_user_id ?? '', category === 'ops_team' ? (person.department ?? '') : (person.dept_area ?? '')];
     if (category !== 'ops_team') row.push(person.institutes?.join(', ') ?? '');
     row.push(person.date_of_joining ?? '');
+    row.push(person.capability_manager ?? '');
     if (category === 'instructors') row.push(person.is_payroll ? 'Payroll' : 'Nxtwave');
     return row;
   });
@@ -140,6 +167,7 @@ function CategoryTable({ category, people }: { category: CategoryKey; people: In
           <span>{category === 'ops_team' ? 'Department' : 'Subject'}</span>
           {category !== 'ops_team' && <span>Campus</span>}
           <span>Date of joining</span>
+          <span>Capability Manager</span>
           {category === 'instructors' && <span>Payroll</span>}
         </div>
         <div>{people.map((person) => <PersonRow key={person.id} category={category} person={person} columns={columns} />)}</div>
@@ -166,6 +194,11 @@ function PersonRow({ category, person, columns }: { category: CategoryKey; perso
         column is specifically Darwin's date of joining, not a general
         "unknown" placeholder. See date_of_joining's gating in reports.ts. */}
     <div className="truncate font-mono-ui text-[11px] text-muted-foreground">{person.date_of_joining || ''}</div>
+    {/* No valid Capability Manager name matched among this person's TeachOS
+        candidates -- flagged distinctly (not just a blank/dash) so a gap in
+        this data is easy to spot at a glance while scanning the table, per
+        the coverage section above. */}
+    <div className="truncate text-[12px]">{person.capability_manager ? <span className="text-foreground">{person.capability_manager}</span> : <span className="inline-flex rounded-full bg-[#fff7db] px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] text-[#8b6207]">Missing</span>}</div>
     {category === 'instructors' && <div>{person.is_payroll ? <span className="inline-flex rounded-full bg-[#e6e9fb] px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] text-[#4a4fb0]">Payroll</span> : <span className="inline-flex rounded-full bg-secondary px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] text-muted-foreground">Nxtwave</span>}</div>}
   </Link>;
 }

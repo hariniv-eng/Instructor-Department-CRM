@@ -317,6 +317,22 @@ export async function reconcileTeachos(rows: SheetRow[]) {
   for (const item of rows) {
     const fullName = cell(item, "instructor_name", "Instructor Name");
     if (!fullName) continue;
+    // "Only ACTIVE TeachOS instructors count" needs to be guaranteed HERE,
+    // not left to whatever query/upload produced `rows` (2026-09-09 fix).
+    // It used to be enforced only inside fetchNiatInstructorDetailsRows()'s
+    // own SQL WHERE clause -- which protected the live BigQuery sync, but
+    // left both the manual "TeachOS" CSV upload (routes/uploads.ts) and the
+    // reconcile:from-csv script wide open: neither of those ever filtered
+    // status before handing rows to this function, so a manually uploaded
+    // export that includes inactive instructors would set inTeachos=true
+    // for them same as anyone active. A status value is treated
+    // permissively when the column is simply missing/blank (some sources,
+    // e.g. bigquery.ts's older table, don't always populate it, and a
+    // manual CSV may not carry this column at all) -- only an EXPLICIT
+    // non-"ACTIVE" value excludes a row, same spirit as the BigQuery query
+    // this mirrors.
+    const status = cell(item, "instructor_status", "Instructor Status");
+    if (status && status.trim().toUpperCase() !== "ACTIVE") continue;
     const teachosUserId = cell(item, "instructor_user_id", "TeachOS User Id");
     // Prefer an employee_id carried directly on the row itself — true as of
     // the niat_instructor_details source (switched from
