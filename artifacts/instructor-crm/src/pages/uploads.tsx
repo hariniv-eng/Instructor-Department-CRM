@@ -1,8 +1,19 @@
 import { useRef, useState } from 'react';
-import { CheckCircle2, Clock3, FileSpreadsheet, Info, RefreshCw, UploadCloud, X } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Clock3, FileSpreadsheet, Info, Loader2, RefreshCw, UploadCloud, X, Zap } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
-import { getGetDashboardQueryKey, getListInstructorsQueryKey, getListUploadsQueryKey, useListUploads, useUploadSource } from '@workspace/api-client-react';
+import { getGetDashboardQueryKey, getGetSyncStatusQueryKey, getListInstructorsQueryKey, getListUploadsQueryKey, useGetSyncStatus, useListUploads, useSyncDarwinbox, useSyncTeachos, useUploadSource, type Upload } from '@workspace/api-client-react';
 import { PageIntro, EmptyState, QueryError, SkeletonBlock } from '@/components/ui-pieces';
+
+// Live-sync tiles (2026-09-10, per request): "Darwin" and "TeachOS" trigger
+// the same backend sync the scheduler already runs on its own interval
+// (routes/sync.ts's runDarwinboxSync/runTeachosSync) — added here so the
+// team can force a fresh sync on demand and see immediately whether it
+// succeeded, instead of only finding out via a Recent-uploads row appearing
+// (or not) after waiting on the auto-sync schedule.
+const LIVE_SYNC_SOURCES = [
+  { key: 'Darwin' as const, label: 'Darwin HRMS', detail: 'Employment master' },
+  { key: 'TeachOS' as const, label: 'TeachOS', detail: 'Deployment access' },
+];
 
 const sources = [
   { key: 'Darwin', label: 'Darwin HRMS', detail: 'Employment master', color: 'bg-[#dce8f2] text-primary' },
@@ -49,6 +60,8 @@ export default function UploadsPage() {
   return <div className="mx-auto max-w-[1250px]">
     <PageIntro eyebrow="Source control / Replace and reconcile" title="Source uploads" description="Replace source snapshots when a new export lands. Every upload is recorded here so the team can trace what the register was built from." action={<button type="button" data-testid="button-refresh-uploads" onClick={() => queryClient.invalidateQueries({ queryKey: getListUploadsQueryKey() })} className="inline-flex items-center gap-2 self-start rounded-lg border border-border bg-card px-3.5 py-2.5 text-[12px] font-bold text-foreground transition-colors hover:bg-secondary lg:self-auto"><RefreshCw size={14} /> Refresh history</button>} />
 
+    <LiveSyncPanel uploads={uploadsQuery.data} />
+
     <div className="grid gap-5 lg:grid-cols-[.88fr_1.12fr]">
       <section className="rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6">
         <div className="flex items-start justify-between"><div><p className="font-mono-ui text-[10px] uppercase tracking-[0.17em] text-muted-foreground">Replace snapshot</p><h2 className="mt-1 text-[18px] font-extrabold tracking-[-0.03em]">Bring in a source file</h2></div><UploadCloud size={19} className="text-primary" /></div>
@@ -85,6 +98,77 @@ function formatBytes(bytes: number) {
 function formatDate(value: string) {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function formatDateTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return `${date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}, ${date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`;
+}
+
+type SyncFeedback = { ok: boolean; message: string } | null;
+
+function LiveSyncPanel({ uploads }: { uploads: Upload[] | undefined }) {
+  const queryClient = useQueryClient();
+  const statusQuery = useGetSyncStatus({ query: { queryKey: getGetSyncStatusQueryKey(), refetchOnWindowFocus: false } });
+  const syncDarwinbox = useSyncDarwinbox();
+  const syncTeachos = useSyncTeachos();
+  const [feedback, setFeedback] = useState<Record<'Darwin' | 'TeachOS', SyncFeedback>>({ Darwin: null, TeachOS: null });
+
+  const mutations = { Darwin: syncDarwinbox, TeachOS: syncTeachos };
+  const intervals = { Darwin: statusQuery.data?.darwinbox.auto_sync_interval_hours, TeachOS: statusQuery.data?.teachos.auto_sync_interval_hours };
+
+  const runSync = (key: 'Darwin' | 'TeachOS') => {
+    setFeedback((prev) => ({ ...prev, [key]: null }));
+    mutations[key].mutate(undefined, {
+      onSuccess: (result) => {
+        setFeedback((prev) => ({
+          ...prev,
+          [key]: result.ok
+            ? { ok: true, message: `Synced just now${typeof result.stored === 'number' ? ` — ${result.stored.toLocaleString('en-IN')} rows stored` : ''}.` }
+            : { ok: false, message: result.error || 'Sync failed — see server logs for details.' },
+        }));
+        queryClient.invalidateQueries({ queryKey: getGetSyncStatusQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getListUploadsQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getListInstructorsQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
+      },
+      onError: () => setFeedback((prev) => ({ ...prev, [key]: { ok: false, message: 'Could not reach the server. Check your connection and try again.' } })),
+    });
+  };
+
+  return <section className="mb-5 rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6">
+    <div className="mb-5 flex items-start justify-between">
+      <div><p className="font-mono-ui text-[10px] uppercase tracking-[0.17em] text-muted-foreground">Live connections</p><h2 className="mt-1 text-[18px] font-extrabold tracking-[-0.03em]">Sync now</h2></div>
+      <Zap size={18} className="text-primary" />
+    </div>
+    <div className="grid gap-4 sm:grid-cols-2">
+      {LIVE_SYNC_SOURCES.map((tile) => {
+        const lastUpload = uploads?.find((upload) => upload.source === tile.key);
+        const isPending = mutations[tile.key].isPending;
+        const interval = intervals[tile.key];
+        const result = feedback[tile.key];
+        return <div key={tile.key} data-testid={`card-live-sync-${tile.key.toLowerCase()}`} className="rounded-lg border border-border p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div><p className="text-[13px] font-bold">{tile.label}</p><p className="mt-0.5 text-[11px] text-muted-foreground">{tile.detail}</p></div>
+            <button type="button" disabled={isPending} data-testid={`button-sync-now-${tile.key.toLowerCase()}`} onClick={() => runSync(tile.key)} className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-[11px] font-bold text-primary-foreground shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0">
+              {isPending ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+              {isPending ? 'Syncing…' : 'Sync now'}
+            </button>
+          </div>
+          <div className="mt-3 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+            <Clock3 size={12} />
+            {lastUpload ? <span data-testid={`text-last-sync-${tile.key.toLowerCase()}`}>Last synced {formatDateTime(lastUpload.uploaded_at)}</span> : <span>No recorded sync yet</span>}
+          </div>
+          {typeof interval === 'number' && <p className="mt-1 text-[10px] text-muted-foreground">{interval > 0 ? `Auto-syncs every ${interval}h` : 'Auto-sync is off for this source — use Sync now to refresh it'}</p>}
+          {result && <p data-testid={`status-sync-${tile.key.toLowerCase()}`} className={`mt-3 flex items-start gap-1.5 rounded-lg px-3 py-2 text-[11px] font-semibold ${result.ok ? 'bg-[#e5f3ed] text-[#287469]' : 'bg-[#fff0ec] text-[#9b4434]'}`}>
+            {result.ok ? <CheckCircle2 size={13} className="mt-0.5 shrink-0" /> : <AlertTriangle size={13} className="mt-0.5 shrink-0" />}
+            <span>{result.message}</span>
+          </p>}
+        </div>;
+      })}
+    </div>
+  </section>;
 }
 
 type ParsedRow = Record<string, string>;
