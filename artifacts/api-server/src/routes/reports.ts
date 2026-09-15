@@ -25,7 +25,18 @@ const toApiInstructorSummary = (row: InstructorRow) => ({
   designation: row.designation,
   department: row.department,
   dept_bucket: row.deptBucket,
-  dept_area: row.deptArea,
+  // Falls back to manualDeptArea (2026-09-15, per request) -- a human can
+  // mark the real Subject/teaching area by hand for exactly the people
+  // classifyDepartment() left unclassified (see the PATCH
+  // /instructors/:id/subject route and manualDeptArea's comment in the
+  // schema). The computed value, when present, always wins --
+  // manualDeptArea is a gap-filler, not a correction path. dept_area_source
+  // mirrors gender_source/capability_manager_source above: tells the
+  // frontend whether to render plain text (computed) or the manual-entry
+  // dropdown (manual/none) -- deliberately not offered at all for
+  // Operations team rows, whose null dept_area is intentional, not a gap.
+  dept_area: row.deptArea || row.manualDeptArea || null,
+  dept_area_source: row.deptArea ? "computed" : row.manualDeptArea ? "manual" : null,
   is_payroll: row.classification === "payroll_converted",
   deployment_status: row.deploymentStatus,
   institutes: row.institutes,
@@ -59,6 +70,11 @@ const toApiInstructorSummary = (row: InstructorRow) => ({
   // stale date. Per request (2026-09-09): no Darwin access right now ->
   // blank, regardless of what's sitting in the column from before.
   date_of_joining: row.inDarwin ? row.dateOfJoining : null,
+  // Darwin's own "Org Email Id" field -- added to the Instructors tab table
+  // (2026-09-15, per request). Same gating as date_of_joining above: a
+  // TeachOS-only row (no current Darwin access, or a stale value left over
+  // from a past Darwin match) shows blank rather than a stale email.
+  org_email: row.inDarwin ? row.orgEmail : null,
   // Darwin's own Gender field -- added (2026-09-09, per request) to power a
   // gender filter + male/female count on the Instructors tab. Same gating
   // as date_of_joining above: a TeachOS-only row (no Darwin record at all,

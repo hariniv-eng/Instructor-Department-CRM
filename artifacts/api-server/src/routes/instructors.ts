@@ -3,6 +3,7 @@ import { and, arrayContains, asc, eq, ilike, or } from "drizzle-orm";
 import { db, instructorsTable } from "@workspace/db";
 import { requireAuth, requireRole } from "../middlewares/auth";
 import { VALID_CAPABILITY_MANAGERS } from "../data/validCapabilityManagers";
+import { SUBJECT_AREAS } from "../lib/departmentTaxonomy";
 
 const router: IRouter = Router();
 const toApiInstructor = (row: typeof instructorsTable.$inferSelect) => ({
@@ -48,6 +49,7 @@ const toApiInstructor = (row: typeof instructorsTable.$inferSelect) => ({
   // artifacts/api-server/src/lib/departmentTaxonomy.ts.
   dept_bucket: row.deptBucket,
   dept_area: row.deptArea,
+  manual_dept_area: row.manualDeptArea,
   deployment_status: row.deploymentStatus,
   in_darwin_full_roster: row.inDarwinFullRoster,
 });
@@ -185,6 +187,28 @@ router.patch("/instructors/:id/capability-manager", requireAuth, requireRole("ad
     return;
   }
   const [row] = await db.update(instructorsTable).set({ manualCapabilityManager: raw }).where(eq(instructorsTable.id, Number(req.params.id))).returning();
+  if (!row) {
+    res.status(404).json({ error: "Instructor not found" });
+    return;
+  }
+  res.json(toApiInstructor(row));
+});
+
+// Manual Subject (2026-09-15, per request): for people classifyDepartment()
+// left unclassified -- no usable Darwin department string, or a
+// TeachOS-only row with no Darwin match at all -- a human who knows the
+// person's real teaching area can mark it here instead, constrained to
+// departmentTaxonomy.ts's own SUBJECT_AREAS rather than free text, so this
+// can't drift into an area name the taxonomy doesn't recognize. Admin-only,
+// same as Capability Manager above -- no explicit ask to widen this one to
+// Manager either.
+router.patch("/instructors/:id/subject", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {
+  const raw = (req.body as { manual_dept_area?: string | null }).manual_dept_area;
+  if (raw !== null && !SUBJECT_AREAS.includes(raw as string)) {
+    res.status(400).json({ error: "manual_dept_area must be one of departmentTaxonomy.ts's recognized area names, or null" });
+    return;
+  }
+  const [row] = await db.update(instructorsTable).set({ manualDeptArea: raw }).where(eq(instructorsTable.id, Number(req.params.id))).returning();
   if (!row) {
     res.status(404).json({ error: "Instructor not found" });
     return;

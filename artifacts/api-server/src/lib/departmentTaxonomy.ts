@@ -66,6 +66,13 @@ const RULES: Rule[] = [
   { match: /mathematical sciences/i, bucket: "non_tech", area: "Math" },
 ];
 
+// Every distinct area name RULES above can produce (2026-09-15, per
+// request) -- the closed set PATCH /instructors/:id/subject validates a
+// manual Subject override against (see routes/instructors.ts), so that
+// list can never drift out of sync with what this taxonomy actually
+// recognizes. Derived rather than hand-duplicated on purpose.
+export const SUBJECT_AREAS: string[] = [...new Set(RULES.map((rule) => rule.area).filter((area): area is string => !!area))];
+
 // Coarse fallback when there's no usable Darwin `department` string at all
 // (e.g. a TeachOS-only instructor who never matched Darwin) — TeachOS's own
 // `category` field (teachosCategory) at least gives Tech vs Non-tech, just

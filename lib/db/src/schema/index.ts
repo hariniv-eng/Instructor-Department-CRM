@@ -120,6 +120,21 @@ export const instructorsTable = pgTable("instructors", {
   // is null, or when only the coarse TeachOS category (not the finer Darwin
   // department string) was available to classify from.
   deptArea: text("dept_area"),
+  // Manual fallback for `deptArea` above (2026-09-15, per request) -- same
+  // pattern as manualGender/manualCapabilityManager: for someone
+  // classifyDepartment() left unclassified (no usable Darwin department
+  // string, or a TeachOS-only row with no Darwin match at all -- see
+  // departmentTaxonomy.ts), a human who knows the person's real teaching
+  // area can mark it here instead, chosen from that same taxonomy's area
+  // names (not free text -- see the dedicated PATCH .../subject endpoint,
+  // which validates against it). Deliberately NOT offered for Operations
+  // team rows -- their deptArea is intentionally null (excluded from the
+  // tech/non_tech taxonomy entirely, not a data gap), so the frontend never
+  // renders this editor there. Never written by any sync path -- it only
+  // changes via that endpoint, so it survives every sync. Effective value
+  // shown anywhere in the app = the computed value when present, else this.
+  // See reports.ts's toApiInstructorSummary.
+  manualDeptArea: text("manual_dept_area"),
   // "deployed" | "in_training" | null — derived from `institutes`: any
   // institute other than the "Training Institute" placeholder counts as a
   // real campus deployment.

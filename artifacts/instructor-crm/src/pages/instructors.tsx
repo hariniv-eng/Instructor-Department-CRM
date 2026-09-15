@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
-import { Briefcase, BookOpen, Building2, GraduationCap, Search, UserCheck, Users, UsersRound, Wallet } from 'lucide-react';
-import { useGetReportsInstructors, useUpdateInstructorCapabilityManager, useUpdateInstructorGender, getGetReportsInstructorsQueryKey } from '@workspace/api-client-react';
+import { Briefcase, BookOpen, Building2, GraduationCap, MapPin, Search, UserCheck, Users, UsersRound, Wallet } from 'lucide-react';
+import { useGetReportsInstructors, useUpdateInstructorCapabilityManager, useUpdateInstructorGender, useUpdateInstructorSubject, getGetReportsInstructorsQueryKey } from '@workspace/api-client-react';
 import type { AccessSplit, InstructorSummary } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link } from 'wouter';
@@ -87,6 +87,22 @@ const PAYROLL_FILTERS: { key: PayrollFilterKey; label: string }[] = [
   { key: 'nxtwave', label: 'Nxtwave' },
 ];
 
+// Campus filter (2026-09-15, per request), same "same as gender" treatment
+// -- computed from the institute names actually present in the active
+// category, same as Subject and Capability Manager above. Unlike those,
+// `institutes` is a LIST per person (someone can be deployed to more than
+// one campus at once, or transitioning between two), so this is a
+// contains-match against that list rather than an equality check against
+// a single value -- see matchesCampus() below. "Not set" (UNSPECIFIED_CAMPUS)
+// covers an empty institutes list, e.g. Operations team rows (no Campus
+// column at all) or an instructor not yet deployed anywhere.
+const UNSPECIFIED_CAMPUS = '__unspecified__';
+function matchesCampus(person: InstructorSummary, campusFilter: string): boolean {
+  const institutes = person.institutes ?? [];
+  if (campusFilter === UNSPECIFIED_CAMPUS) return institutes.length === 0;
+  return institutes.includes(campusFilter);
+}
+
 // Maintained Capability Manager roster (2026-09-15, per request) -- mirrors
 // artifacts/api-server/src/data/validCapabilityManagers.ts exactly, since
 // the manual-entry dropdown below must only ever offer names the backend's
@@ -114,6 +130,24 @@ const VALID_CAPABILITY_MANAGERS: string[] = [
   'Voppangi Sai Prasanna',
 ];
 
+// Maintained Subject/area roster (2026-09-15, per request) -- mirrors
+// departmentTaxonomy.ts's RULES-derived SUBJECT_AREAS exactly, since the
+// manual-entry dropdown below must only ever offer names the backend's
+// PATCH /instructors/:id/subject route will actually accept (it 400s on
+// anything not on that list). Keep these two lists in sync by hand if a
+// new area is ever added to that taxonomy.
+const SUBJECT_AREAS: string[] = [
+  'Frontend',
+  'Backend',
+  'DSA',
+  'GenAI',
+  'Artificial Intelligence & Emerging Technologies',
+  'Interdisciplinary & Applied Sciences',
+  'English',
+  'Aptitude',
+  'Math',
+];
+
 export default function InstructorsPage() {
   const reportQuery = useGetReportsInstructors();
   const report = reportQuery.data;
@@ -123,6 +157,7 @@ export default function InstructorsPage() {
   const [subjectFilter, setSubjectFilter] = useState<string>('all');
   const [capabilityManagerFilter, setCapabilityManagerFilter] = useState<string>('all');
   const [payrollFilter, setPayrollFilter] = useState<PayrollFilterKey>('all');
+  const [campusFilter, setCampusFilter] = useState<string>('all');
 
   const split = report?.access_breakdown?.[category];
   const allPeople = useMemo(() => mergedPeople(split), [split]);
@@ -133,10 +168,11 @@ export default function InstructorsPage() {
       if (subjectFilter !== 'all' && (person.dept_area || UNSPECIFIED_SUBJECT) !== subjectFilter) return false;
       if (capabilityManagerFilter !== 'all' && (person.capability_manager || NO_CAPABILITY_MANAGER) !== capabilityManagerFilter) return false;
       if (payrollFilter !== 'all' && (person.is_payroll ? 'payroll' : 'nxtwave') !== payrollFilter) return false;
+      if (campusFilter !== 'all' && !matchesCampus(person, campusFilter)) return false;
       if (!query) return true;
       return person.full_name.toLowerCase().includes(query) || (person.employee_id ?? '').toLowerCase().includes(query) || (person.teachos_user_id ?? '').toLowerCase().includes(query);
     });
-  }, [allPeople, search, genderFilter, subjectFilter, capabilityManagerFilter, payrollFilter]);
+  }, [allPeople, search, genderFilter, subjectFilter, capabilityManagerFilter, payrollFilter, campusFilter]);
 
   const activeTab = CATEGORY_TABS.find((tab) => tab.key === category)!;
 
@@ -230,7 +266,33 @@ export default function InstructorsPage() {
     });
   }, [report, payrollFilter]);
 
-  const anyFilterActive = genderFilter !== 'all' || subjectFilter !== 'all' || capabilityManagerFilter !== 'all' || payrollFilter !== 'all';
+  // Campus filter options + counts for the currently-viewed category
+  // (2026-09-15, per request), same pattern as Subject/Capability Manager
+  // above -- except a person can count toward more than one option here
+  // (see matchesCampus's comment), so these counts don't sum to allPeople.length.
+  const campusOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    let unspecified = 0;
+    for (const person of allPeople) {
+      const institutes = person.institutes ?? [];
+      if (institutes.length === 0) { unspecified += 1; continue; }
+      for (const institute of institutes) counts.set(institute, (counts.get(institute) ?? 0) + 1);
+    }
+    const campuses = [...counts.keys()].sort((a, b) => a.localeCompare(b));
+    const options = [{ key: 'all', label: 'All', count: allPeople.length }, ...campuses.map((campus) => ({ key: campus, label: campus, count: counts.get(campus)! }))];
+    if (unspecified > 0) options.push({ key: UNSPECIFIED_CAMPUS, label: 'Not set', count: unspecified });
+    return options;
+  }, [allPeople]);
+
+  const campusBreakdown = useMemo(() => {
+    if (campusFilter === 'all' || !report?.access_breakdown) return null;
+    return CATEGORY_TABS.map((tab) => {
+      const tabPeople = mergedPeople(report.access_breakdown?.[tab.key]);
+      return { key: tab.key, label: tab.label, count: tabPeople.filter((person) => matchesCampus(person, campusFilter)).length, total: tabPeople.length };
+    });
+  }, [report, campusFilter]);
+
+  const anyFilterActive = genderFilter !== 'all' || subjectFilter !== 'all' || capabilityManagerFilter !== 'all' || payrollFilter !== 'all' || campusFilter !== 'all';
 
   // Coverage check for the currently-viewed category (2026-09, per request):
   // how many of these people have a Capability Manager on file at all, vs.
@@ -288,6 +350,12 @@ export default function InstructorsPage() {
             {PAYROLL_FILTERS.map((filter) => <option key={filter.key} value={filter.key}>{filter.label} ({formatCount(payrollCounts[filter.key])} in {activeTab.label.toLowerCase()})</option>)}
           </select>
         </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <label htmlFor="select-campus-filter" className="font-mono-ui text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Campus</label>
+          <select id="select-campus-filter" data-testid="select-campus-filter" value={campusFilter} onChange={(event) => setCampusFilter(event.target.value)} className="h-9 max-w-[220px] rounded-lg border border-border bg-background px-2.5 text-[12px] font-bold text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-ring/25">
+            {campusOptions.map((option) => <option key={option.key} value={option.key}>{option.label} ({formatCount(option.count)} in {activeTab.label.toLowerCase()})</option>)}
+          </select>
+        </div>
         {anyFilterActive && <span className="font-mono-ui text-[10px] text-muted-foreground">Table below is filtered to {activeTab.label.toLowerCase()}; see the breakdown card(s) below for every category.</span>}
       </div>
     </div>
@@ -341,6 +409,19 @@ export default function InstructorsPage() {
       </div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {payrollBreakdown.map((row) => <MiniStat key={row.key} label={row.label} value={row.count} meta={`${pct(row.count, row.total)} of ${row.label.toLowerCase()}`} tone="muted" />)}
+      </div>
+    </section>}
+
+    {campusFilter !== 'all' && campusBreakdown && <section className="mb-5 rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6">
+      <div className="mb-4 flex items-center gap-2">
+        <span className="grid h-8 w-8 place-items-center rounded-lg bg-[#fbe9e3] text-[#b0511f]"><MapPin size={16} /></span>
+        <div>
+          <p className="font-mono-ui text-[10px] uppercase tracking-[0.17em] text-muted-foreground">Campus</p>
+          <h2 className="text-[15px] font-extrabold tracking-[-0.03em]">{campusFilter === UNSPECIFIED_CAMPUS ? 'Not set' : campusFilter} headcount, by category</h2>
+        </div>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {campusBreakdown.map((row) => <MiniStat key={row.key} label={row.label} value={row.count} meta={`${pct(row.count, row.total)} of ${row.label.toLowerCase()}`} tone="muted" />)}
       </div>
     </section>}
 
@@ -409,16 +490,21 @@ export default function InstructorsPage() {
 // supply it for (150px, added to every literal template below -- see
 // PersonRow's gender cell; kept as full literal strings, not interpolated,
 // per the Tailwind gotcha explained above).
+// Email (Darwin's Org Email Id -- 2026-09-15, per request) sits right after
+// TeachOS User ID, alongside the other identity/ID columns, in every
+// category's grid template (220px, added to every literal template below --
+// kept as full literal strings, not interpolated, per the Tailwind gotcha
+// explained above).
 function gridColsClass(category: CategoryKey): string {
-  if (category === 'instructors') return 'grid-cols-[260px_190px_130px_280px_160px_170px_220px_140px_190px_130px_150px]';
+  if (category === 'instructors') return 'grid-cols-[260px_190px_130px_280px_220px_160px_170px_220px_140px_190px_130px_150px]';
   // "Instructor Department" (the combined list) has the same column set as
   // Mentors: Subject + Department, Campus, no Payroll (payroll status isn't
   // a meaningful concept for the Mentors/Ops rows mixed into this list).
-  if (category === 'mentors' || category === 'department') return 'grid-cols-[260px_190px_130px_280px_160px_170px_240px_140px_190px_150px]';
+  if (category === 'mentors' || category === 'department') return 'grid-cols-[260px_190px_130px_280px_220px_160px_170px_240px_140px_190px_150px]';
   // Operations team has no Campus column -- ops rows aren't deployed to a
   // teaching campus the way instructors and mentors are. It also has only
   // one Subject/Department-style column (labeled "Department"), not both.
-  return 'grid-cols-[260px_190px_130px_280px_280px_140px_190px_150px]';
+  return 'grid-cols-[260px_190px_130px_280px_220px_280px_140px_190px_150px]';
 }
 
 // Name column header/label is per-category -- "Instructor Department" mixes
@@ -433,7 +519,7 @@ function nameColumnLabel(category: CategoryKey): string {
 // Column set mirrors gridColsClass/CategoryTable below exactly, so the CSV
 // always matches what's on screen for the active category tab.
 function downloadInstructorsCsv(category: CategoryKey, people: InstructorSummary[]) {
-  const headers = [nameColumnLabel(category), 'Designation', 'Employee ID', 'TeachOS User ID'];
+  const headers = [nameColumnLabel(category), 'Designation', 'Employee ID', 'TeachOS User ID', 'Email'];
   if (category === 'ops_team') headers.push('Department'); else headers.push('Subject', 'Department');
   if (category !== 'ops_team') headers.push('Campus');
   headers.push('Date of joining');
@@ -442,7 +528,7 @@ function downloadInstructorsCsv(category: CategoryKey, people: InstructorSummary
   headers.push('Gender');
 
   const rows = people.map((person) => {
-    const row: string[] = [person.full_name, person.designation ?? '', person.employee_id ?? '', person.teachos_user_id ?? ''];
+    const row: string[] = [person.full_name, person.designation ?? '', person.employee_id ?? '', person.teachos_user_id ?? '', person.org_email ?? ''];
     if (category === 'ops_team') row.push(person.department ?? ''); else row.push(person.dept_area ?? '', person.department ?? '');
     if (category !== 'ops_team') row.push(person.institutes?.join(', ') ?? '');
     row.push(person.date_of_joining ?? '');
@@ -465,6 +551,7 @@ function CategoryTable({ category, people }: { category: CategoryKey; people: In
           <span>Designation</span>
           <span>Employee ID</span>
           <span>TeachOS User ID</span>
+          <span>Email</span>
           {category === 'ops_team' ? <span>Department</span> : <><span>Subject</span><span>Department</span></>}
           {category !== 'ops_team' && <span>Campus</span>}
           <span>Date of joining</span>
@@ -490,8 +577,11 @@ function PersonRow({ category, person, columns }: { category: CategoryKey; perso
     <div className="truncate text-[12px] text-muted-foreground">{person.designation || '—'}</div>
     <div className="truncate font-mono-ui text-[11px] text-muted-foreground">{person.employee_id || '—'}</div>
     <div className="truncate font-mono-ui text-[11px] text-muted-foreground">{person.teachos_user_id || ''}</div>
+    {/* No Darwin access right now -> blank, not "--", same gating as
+        date_of_joining below -- see org_email's comment in reports.ts. */}
+    <div className="truncate text-[12px] text-muted-foreground">{person.org_email || ''}</div>
     {category === 'ops_team' ? <div className="truncate text-[12px] text-muted-foreground">{person.department || '—'}</div> : <>
-      <div className="truncate text-[12px] text-muted-foreground">{person.dept_area || '—'}</div>
+      <SubjectCell person={person} />
       <div className="truncate text-[12px] text-muted-foreground">{person.department || '—'}</div>
     </>}
     {category !== 'ops_team' && <div className="truncate text-[12px] text-muted-foreground">{campus}</div>}
@@ -599,6 +689,60 @@ function CapabilityManagerCell({ person }: { person: InstructorSummary }) {
     >
       <option value="">Missing -- pick one</option>
       {VALID_CAPABILITY_MANAGERS.map((name) => <option key={name} value={name}>{name}</option>)}
+    </select>
+  </div>;
+}
+
+// Subject is read-only text when classifyDepartment() resolved one
+// (person.dept_area_source === 'computed') -- the computed value is never
+// overridden here. Otherwise (no usable Darwin department string, or a
+// TeachOS-only row with no Darwin match at all -- see
+// departmentTaxonomy.ts) this shows an editable dropdown, populated from
+// that same taxonomy's recognized areas, so a human who knows the
+// person's real teaching area can mark it (2026-09-15, per request).
+// PersonRow only renders this for non-Operations-team categories -- ops
+// rows never had a Subject column, and their null dept_area is
+// intentional, not a gap this editor should fill.
+//
+// Admin-only, same gating as CapabilityManagerCell above (no separate
+// Manager login anymore, so `user` truthy means signed in as Admin). See
+// the dedicated PATCH /instructors/:id/subject route. Same
+// stopPropagation requirement as the cells above (the whole row is a
+// wouter <Link>).
+function SubjectCell({ person }: { person: InstructorSummary }) {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const updateSubject = useUpdateInstructorSubject({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetReportsInstructorsQueryKey() });
+      },
+    },
+  });
+
+  // No department string classifyDepartment() could resolve, and none has
+  // been set manually either -- flagged distinctly (not just a blank/dash)
+  // so a gap in this data is easy to spot at a glance while scanning the
+  // table.
+  if (person.dept_area_source === 'computed' || !user) {
+    return <div className="truncate text-[12px]">{person.dept_area ? <span className="text-muted-foreground">{person.dept_area}</span> : <span className="inline-flex rounded-full bg-[#fff7db] px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] text-[#8b6207]">Missing</span>}</div>;
+  }
+
+  const value = person.dept_area_source === 'manual' && person.dept_area ? person.dept_area : '';
+  return <div onClick={(event) => event.stopPropagation()} className="text-[12px]">
+    <select
+      value={value}
+      onChange={(event) => {
+        const next = event.target.value;
+        updateSubject.mutate({ id: person.id, data: { manual_dept_area: next === '' ? null : next } });
+      }}
+      disabled={updateSubject.isPending}
+      data-testid={`select-manual-subject-${person.id}`}
+      title="No Subject resolved from Darwin's department -- mark it manually"
+      className={`h-8 w-full rounded-md border bg-background px-1.5 text-[11px] font-semibold outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-ring/25 disabled:opacity-60 ${value ? 'border-border text-foreground' : 'border-[#f0d78c] text-[#8b6207]'}`}
+    >
+      <option value="">Missing -- pick one</option>
+      {SUBJECT_AREAS.map((area) => <option key={area} value={area}>{area}</option>)}
     </select>
   </div>;
 }

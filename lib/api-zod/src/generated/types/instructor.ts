@@ -87,6 +87,8 @@ export interface Instructor {
      * @nullable
      */
   dept_area?: string | null;
+  /** @nullable */
+  manual_dept_area?: string | null;
   /**
      * deployed | in_training | null, derived from TeachOS institutes (institute_name "Training Institute" = in_training).
      * @nullable

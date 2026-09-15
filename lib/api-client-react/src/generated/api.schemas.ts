@@ -92,6 +92,9 @@ export interface Instructor {
      * @nullable
      */
   dept_area?: string | null;
+  /** Manual fallback for Subject/dept_area, settable via PATCH /instructors/{id}/subject (Admin only). Only used when classifyDepartment() left this person unclassified. Must be one of departmentTaxonomy.ts's recognized area names, or null.
+     * @nullable */
+  manual_dept_area?: string | null;
   /**
      * deployed | in_training | null, derived from TeachOS institutes (institute_name "Training Institute" = in_training).
      * @nullable
@@ -132,6 +135,11 @@ export interface InstructorGenderUpdate {
 /** Body for PATCH /instructors/{id}/capability-manager -- Admin-only, unlike InstructorGenderUpdate above. Deliberately not a fixed union here: the valid roster (data/validCapabilityManagers.ts) is human-maintained and changes over time; the route validates against it server-side and 400s on anything else. */
 export interface InstructorCapabilityManagerUpdate {
   manual_capability_manager: string | null;
+}
+
+/** Body for PATCH /instructors/{id}/subject -- Admin-only, same pattern as InstructorCapabilityManagerUpdate above. Not a fixed union: departmentTaxonomy.ts's SUBJECT_AREAS is the source of truth; the route validates against it server-side and 400s on anything else. */
+export interface InstructorSubjectUpdate {
+  manual_dept_area: string | null;
 }
 
 export type DashboardKpis = {[key: string]: number};
@@ -302,6 +310,8 @@ export interface InstructorSummary {
   dept_bucket: string | null;
   /** @nullable */
   dept_area: string | null;
+  /** Whether `dept_area` above came from classifyDepartment() (locked, not editable here) or was set/left blank manually ("manual" or null). Not offered for Operations team rows, whose null dept_area is intentional. @nullable */
+  dept_area_source: 'computed' | 'manual' | null;
   is_payroll: boolean;
   /** @nullable */
   deployment_status: string | null;
@@ -314,6 +324,8 @@ export interface InstructorSummary {
   darwin_manager: string | null;
   /** @nullable */
   date_of_joining: string | null;
+  /** Darwin's own "Org Email Id" field, shown as an Email column on the Instructors tab table. Blank (not a stale value) when there's no current Darwin access for this person. @nullable */
+  org_email: string | null;
   /** Effective gender -- Darwin's value when present, else the manually-set fallback. @nullable */
   gender: string | null;
   /** Whether `gender` above came from Darwin (locked, not editable here) or was set/left blank manually ("manual" or null). Drives whether the Instructors tab shows a plain value or the manual-gender dropdown for this row. @nullable */

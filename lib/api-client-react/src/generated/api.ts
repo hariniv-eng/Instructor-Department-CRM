@@ -27,6 +27,7 @@ import type {
   Instructor,
   InstructorGenderUpdate,
   InstructorCapabilityManagerUpdate,
+  InstructorSubjectUpdate,
   InstructorInput,
   InstructorUpdate,
   InstructorsReport,
@@ -569,6 +570,67 @@ export const useUpdateInstructorCapabilityManager = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getUpdateInstructorCapabilityManagerMutationOptions(options));
+    }
+
+// Hand-matched to mirror updateInstructorCapabilityManager/
+// useUpdateInstructorCapabilityManager above exactly -- this session's
+// orval codegen is broken, so /instructors/{id}/subject's client is
+// hand-written against openapi.yaml's shape instead of generated for real.
+export const getUpdateInstructorSubjectUrl = (id: number,) => {
+
+  return `/api/instructors/${id}/subject`
+}
+
+/**
+ * @summary Set or clear an instructor's manual Subject (dept_area) fallback (Admin only)
+ */
+export const updateInstructorSubject = async (id: number,
+    instructorSubjectUpdate: InstructorSubjectUpdate, options?: Parameters<typeof customFetch>[1]): Promise<Instructor> => {
+
+  return customFetch<Instructor>(getUpdateInstructorSubjectUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(instructorSubjectUpdate)
+  }
+);}
+
+export const getUpdateInstructorSubjectMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateInstructorSubject>>, TError,{id: number;data: BodyType<InstructorSubjectUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateInstructorSubject>>, TError,{id: number;data: BodyType<InstructorSubjectUpdate>}, TContext> => {
+
+const mutationKey = ['updateInstructorSubject'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateInstructorSubject>>, {id: number;data: BodyType<InstructorSubjectUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateInstructorSubject(id,data,requestOptions)
+        }
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateInstructorSubjectMutationResult = NonNullable<Awaited<ReturnType<typeof updateInstructorSubject>>>
+    export type UpdateInstructorSubjectMutationBody = BodyType<InstructorSubjectUpdate>
+    export type UpdateInstructorSubjectMutationError = ErrorType<void>
+
+    /**
+ * @summary Set or clear an instructor's manual Subject (dept_area) fallback (Admin only)
+ */
+export const useUpdateInstructorSubject = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateInstructorSubject>>, TError,{id: number;data: BodyType<InstructorSubjectUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateInstructorSubject>>,
+        TError,
+        {id: number;data: BodyType<InstructorSubjectUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateInstructorSubjectMutationOptions(options));
     }
 
 export const getGetDashboardUrl = () => {

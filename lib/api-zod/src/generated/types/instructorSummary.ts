@@ -21,6 +21,8 @@ export interface InstructorSummary {
   dept_bucket: string | null;
   /** @nullable */
   dept_area: string | null;
+  /** @nullable */
+  dept_area_source: 'computed' | 'manual' | null;
   is_payroll: boolean;
   /** @nullable */
   deployment_status: string | null;
@@ -33,6 +35,8 @@ export interface InstructorSummary {
   darwin_manager: string | null;
   /** @nullable */
   date_of_joining: string | null;
+  /** @nullable */
+  org_email: string | null;
   /** @nullable */
   gender: string | null;
   /** @nullable */

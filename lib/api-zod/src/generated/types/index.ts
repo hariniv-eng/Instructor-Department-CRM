@@ -28,6 +28,7 @@ export * from './instructorsReportKpis';
 export * from './instructorsReportPayroll';
 export * from './instructorCapabilityManagerUpdate';
 export * from './instructorGenderUpdate';
+export * from './instructorSubjectUpdate';
 export * from './instructorSummary';
 export * from './instructorUpdate';
 export * from './listInstructorsParams';

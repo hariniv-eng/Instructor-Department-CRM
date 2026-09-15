@@ -259,6 +259,38 @@ paths:
               schema: { $ref: "#/components/schemas/Instructor" }
         "400": { description: "manual_capability_manager must be one of the maintained Capability Manager names, or null" }
         "404": { description: Not found }
+  /instructors/{id}/subject:
+    patch:
+      operationId: updateInstructorSubject
+      tags: [instructors]
+      summary: Set or clear an instructor's manual Subject (dept_area) fallback (Admin only)
+      description: >-
+        Narrower sibling of PATCH /instructors/{id} above -- Admin-only,
+        same as the capability-manager endpoint. Only takes effect when
+        classifyDepartment() (departmentTaxonomy.ts) left this person
+        unclassified (see InstructorSummary.dept_area_source); the computed
+        value is never overridden by this. The value must be one of
+        departmentTaxonomy.ts's recognized area names (or null to clear
+        it), not free text. Not meaningful for Operations team rows, whose
+        dept_area is intentionally null.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: number }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/InstructorSubjectUpdate" }
+      responses:
+        "200":
+          description: Updated instructor
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Instructor" }
+        "400": { description: "manual_dept_area must be one of departmentTaxonomy.ts's recognized area names, or null" }
+        "404": { description: Not found }
   /dashboard:
     get:
       operationId: getDashboard
@@ -412,6 +444,7 @@ components:
         exit_flag_date: { type: ["string", "null"], format: date }
         dept_bucket: { type: ["string", "null"], description: "tech | non_tech | null. See departmentTaxonomy.ts. Null for excluded/mentor rows (see classification)." }
         dept_area: { type: ["string", "null"], description: "Sub-area within dept_bucket, e.g. Frontend, Backend, DSA, GenAI, English, Aptitude, Math." }
+        manual_dept_area: { type: ["string", "null"], description: "Manual fallback for Subject/dept_area, settable via PATCH /instructors/{id}/subject (Admin only). Only used when classifyDepartment() left this person unclassified. Must be one of departmentTaxonomy.ts's recognized area names, or null." }
         deployment_status: { type: ["string", "null"], description: "deployed | in_training | null, derived from TeachOS institutes (institute_name \"Training Institute\" = in_training)." }
         in_darwin_full_roster: { type: boolean, description: "True when this person's Darwin match came from the full/unfiltered company roster fallback rather than the primary Instructors-department sync — see reconcileDarwinFullRosterFallback()." }
     InstructorInput:
@@ -450,6 +483,16 @@ components:
       required: [manual_capability_manager]
       properties:
         manual_capability_manager: { type: ["string", "null"], description: "Must be one of the names in data/validCapabilityManagers.ts, or null." }
+    # Body for PATCH /instructors/{id}/subject -- Admin-only, same pattern
+    # as InstructorCapabilityManagerUpdate above. Not an enum for the same
+    # reason: departmentTaxonomy.ts's SUBJECT_AREAS is the source of truth,
+    # duplicating it here would be one more place to keep in sync. The
+    # route validates against it server-side and 400s on anything else.
+    InstructorSubjectUpdate:
+      type: object
+      required: [manual_dept_area]
+      properties:
+        manual_dept_area: { type: ["string", "null"], description: "Must be one of departmentTaxonomy.ts's SUBJECT_AREAS, or null." }
     Dashboard:
       type: object
       required: [kpis, monthly_trend, sub_departments, designations]
@@ -661,6 +704,7 @@ components:
         - department
         - dept_bucket
         - dept_area
+        - dept_area_source
         - is_payroll
         - deployment_status
         - institutes
@@ -668,6 +712,7 @@ components:
         - capability_manager_source
         - darwin_manager
         - date_of_joining
+        - org_email
         - gender
         - gender_source
       properties:
@@ -679,6 +724,13 @@ components:
         department: { type: ["string", "null"] }
         dept_bucket: { type: ["string", "null"] }
         dept_area: { type: ["string", "null"] }
+        # Mirrors gender_source/capability_manager_source below (2026-09-15,
+        # per request): tells the frontend whether this value is locked
+        # (computed by classifyDepartment()) or editable (a manual entry,
+        # or nothing on file yet) -- see the PATCH /instructors/{id}/subject
+        # endpoint and manualDeptArea's comment in the schema. Not offered
+        # for Operations team rows, whose null dept_area is intentional.
+        dept_area_source: { type: ["string", "null"], enum: ["computed", "manual", null] }
         is_payroll: { type: boolean }
         deployment_status: { type: ["string", "null"] }
         institutes:
@@ -706,6 +758,11 @@ components:
         # (2026-09, per request), mirroring the same field already on every
         # Darwin Breakdown bucket (see Candidate schema).
         date_of_joining: { type: ["string", "null"] }
+        # Darwin's own "Org Email Id" field, shown as an Email column on the
+        # Instructors tab table (2026-09-15, per request). Same gating as
+        # date_of_joining above -- blank rather than a stale value when
+        # there's no current Darwin access for this person.
+        org_email: { type: ["string", "null"] }
         # Effective gender -- Darwin's own "Gender" field (typically "Male"/
         # "Female") when present, else the manually-set fallback (2026-09-09
         # follow-up: manualGender) for someone Darwin can't supply it for.
