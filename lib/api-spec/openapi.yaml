@@ -713,6 +713,7 @@ components:
         - darwin_manager
         - date_of_joining
         - org_email
+        - work_location
         - gender
         - gender_source
       properties:
@@ -763,6 +764,11 @@ components:
         # date_of_joining above -- blank rather than a stale value when
         # there's no current Darwin access for this person.
         org_email: { type: ["string", "null"] }
+        # Darwin's own "Work Location" field, shown as a Location column on
+        # the Instructors tab table (2026-09-15, per request) -- distinct
+        # from the Campus column (institutes, TeachOS deployment). Same
+        # gating as date_of_joining/org_email above.
+        work_location: { type: ["string", "null"] }
         # Effective gender -- Darwin's own "Gender" field (typically "Male"/
         # "Female") when present, else the manually-set fallback (2026-09-09
         # follow-up: manualGender) for someone Darwin can't supply it for.

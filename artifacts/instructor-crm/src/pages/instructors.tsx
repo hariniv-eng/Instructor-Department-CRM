@@ -494,17 +494,19 @@ export default function InstructorsPage() {
 // TeachOS User ID, alongside the other identity/ID columns, in every
 // category's grid template (220px, added to every literal template below --
 // kept as full literal strings, not interpolated, per the Tailwind gotcha
-// explained above).
+// explained above). Location (Darwin's own Work Location field --
+// 2026-09-15, per request) sits right after Email -- distinct from Campus
+// (institutes, TeachOS deployment), which stays where it was (150px).
 function gridColsClass(category: CategoryKey): string {
-  if (category === 'instructors') return 'grid-cols-[260px_190px_130px_280px_220px_160px_170px_220px_140px_190px_130px_150px]';
+  if (category === 'instructors') return 'grid-cols-[260px_190px_130px_280px_220px_150px_160px_170px_220px_140px_190px_130px_150px]';
   // "Instructor Department" (the combined list) has the same column set as
   // Mentors: Subject + Department, Campus, no Payroll (payroll status isn't
   // a meaningful concept for the Mentors/Ops rows mixed into this list).
-  if (category === 'mentors' || category === 'department') return 'grid-cols-[260px_190px_130px_280px_220px_160px_170px_240px_140px_190px_150px]';
+  if (category === 'mentors' || category === 'department') return 'grid-cols-[260px_190px_130px_280px_220px_150px_160px_170px_240px_140px_190px_150px]';
   // Operations team has no Campus column -- ops rows aren't deployed to a
   // teaching campus the way instructors and mentors are. It also has only
   // one Subject/Department-style column (labeled "Department"), not both.
-  return 'grid-cols-[260px_190px_130px_280px_220px_280px_140px_190px_150px]';
+  return 'grid-cols-[260px_190px_130px_280px_220px_150px_280px_140px_190px_150px]';
 }
 
 // Name column header/label is per-category -- "Instructor Department" mixes
@@ -519,7 +521,7 @@ function nameColumnLabel(category: CategoryKey): string {
 // Column set mirrors gridColsClass/CategoryTable below exactly, so the CSV
 // always matches what's on screen for the active category tab.
 function downloadInstructorsCsv(category: CategoryKey, people: InstructorSummary[]) {
-  const headers = [nameColumnLabel(category), 'Designation', 'Employee ID', 'TeachOS User ID', 'Email'];
+  const headers = [nameColumnLabel(category), 'Designation', 'Employee ID', 'TeachOS User ID', 'Email', 'Location'];
   if (category === 'ops_team') headers.push('Department'); else headers.push('Subject', 'Department');
   if (category !== 'ops_team') headers.push('Campus');
   headers.push('Date of joining');
@@ -528,7 +530,7 @@ function downloadInstructorsCsv(category: CategoryKey, people: InstructorSummary
   headers.push('Gender');
 
   const rows = people.map((person) => {
-    const row: string[] = [person.full_name, person.designation ?? '', person.employee_id ?? '', person.teachos_user_id ?? '', person.org_email ?? ''];
+    const row: string[] = [person.full_name, person.designation ?? '', person.employee_id ?? '', person.teachos_user_id ?? '', person.org_email ?? '', person.work_location ?? ''];
     if (category === 'ops_team') row.push(person.department ?? ''); else row.push(person.dept_area ?? '', person.department ?? '');
     if (category !== 'ops_team') row.push(person.institutes?.join(', ') ?? '');
     row.push(person.date_of_joining ?? '');
@@ -552,6 +554,7 @@ function CategoryTable({ category, people }: { category: CategoryKey; people: In
           <span>Employee ID</span>
           <span>TeachOS User ID</span>
           <span>Email</span>
+          <span>Location</span>
           {category === 'ops_team' ? <span>Department</span> : <><span>Subject</span><span>Department</span></>}
           {category !== 'ops_team' && <span>Campus</span>}
           <span>Date of joining</span>
@@ -580,6 +583,7 @@ function PersonRow({ category, person, columns }: { category: CategoryKey; perso
     {/* No Darwin access right now -> blank, not "--", same gating as
         date_of_joining below -- see org_email's comment in reports.ts. */}
     <div className="truncate text-[12px] text-muted-foreground">{person.org_email || ''}</div>
+    <div className="truncate text-[12px] text-muted-foreground">{person.work_location || ''}</div>
     {category === 'ops_team' ? <div className="truncate text-[12px] text-muted-foreground">{person.department || '—'}</div> : <>
       <SubjectCell person={person} />
       <div className="truncate text-[12px] text-muted-foreground">{person.department || '—'}</div>

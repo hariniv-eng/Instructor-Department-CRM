@@ -326,6 +326,8 @@ export interface InstructorSummary {
   date_of_joining: string | null;
   /** Darwin's own "Org Email Id" field, shown as an Email column on the Instructors tab table. Blank (not a stale value) when there's no current Darwin access for this person. @nullable */
   org_email: string | null;
+  /** Darwin's own "Work Location" field, shown as a Location column on the Instructors tab table. Distinct from the Campus column (institutes, TeachOS deployment). @nullable */
+  work_location: string | null;
   /** Effective gender -- Darwin's value when present, else the manually-set fallback. @nullable */
   gender: string | null;
   /** Whether `gender` above came from Darwin (locked, not editable here) or was set/left blank manually ("manual" or null). Drives whether the Instructors tab shows a plain value or the manual-gender dropdown for this row. @nullable */

@@ -38,6 +38,8 @@ export interface InstructorSummary {
   /** @nullable */
   org_email: string | null;
   /** @nullable */
+  work_location: string | null;
+  /** @nullable */
   gender: string | null;
   /** @nullable */
   gender_source: 'darwin' | 'manual' | null;
