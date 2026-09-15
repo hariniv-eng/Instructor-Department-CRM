@@ -54,6 +54,19 @@ export const instructorsTable = pgTable("instructors", {
   teachosRole: text("teachos_role"),
   teachosCategory: text("teachos_category"),
   teachosManager: text("teachos_manager"),
+  // Manual fallback for `teachosManager` above (2026-09-15, per request) --
+  // same pattern as manualGender above: for someone TeachOS's own
+  // Capability Manager candidates don't resolve to any name on the
+  // maintained VALID_CAPABILITY_MANAGERS roster (see
+  // ../../../artifacts/api-server/src/data/validCapabilityManagers.ts),
+  // a human can mark their real Capability Manager here instead, chosen
+  // from that same roster (not free text -- see the dedicated PATCH
+  // .../capability-manager endpoint, which validates against it). Never
+  // written by any sync path -- it only changes via that endpoint, so it
+  // survives every sync. Effective value shown anywhere in the app =
+  // TeachOS's value when present, else this. See reports.ts's
+  // toApiInstructorSummary.
+  manualCapabilityManager: text("manual_capability_manager"),
   institutes: text("institutes").array().notNull().default([]),
   // active | pending_deployment | needs_review | excluded — see
   // recomputeStatuses() in lib/reconcile.ts. "excluded" means this row

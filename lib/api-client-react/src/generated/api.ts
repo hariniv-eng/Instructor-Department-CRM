@@ -26,6 +26,7 @@ import type {
   HealthStatus,
   Instructor,
   InstructorGenderUpdate,
+  InstructorCapabilityManagerUpdate,
   InstructorInput,
   InstructorUpdate,
   InstructorsReport,
@@ -507,6 +508,67 @@ export const useUpdateInstructorGender = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getUpdateInstructorGenderMutationOptions(options));
+    }
+
+// Hand-matched to mirror updateInstructorGender/useUpdateInstructorGender
+// above exactly -- this session's orval codegen is broken, so
+// /instructors/{id}/capability-manager's client is hand-written against
+// openapi.yaml's shape instead of generated for real.
+export const getUpdateInstructorCapabilityManagerUrl = (id: number,) => {
+
+  return `/api/instructors/${id}/capability-manager`
+}
+
+/**
+ * @summary Set or clear an instructor's manual Capability Manager fallback (Admin only)
+ */
+export const updateInstructorCapabilityManager = async (id: number,
+    instructorCapabilityManagerUpdate: InstructorCapabilityManagerUpdate, options?: Parameters<typeof customFetch>[1]): Promise<Instructor> => {
+
+  return customFetch<Instructor>(getUpdateInstructorCapabilityManagerUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(instructorCapabilityManagerUpdate)
+  }
+);}
+
+export const getUpdateInstructorCapabilityManagerMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateInstructorCapabilityManager>>, TError,{id: number;data: BodyType<InstructorCapabilityManagerUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateInstructorCapabilityManager>>, TError,{id: number;data: BodyType<InstructorCapabilityManagerUpdate>}, TContext> => {
+
+const mutationKey = ['updateInstructorCapabilityManager'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateInstructorCapabilityManager>>, {id: number;data: BodyType<InstructorCapabilityManagerUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateInstructorCapabilityManager(id,data,requestOptions)
+        }
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateInstructorCapabilityManagerMutationResult = NonNullable<Awaited<ReturnType<typeof updateInstructorCapabilityManager>>>
+    export type UpdateInstructorCapabilityManagerMutationBody = BodyType<InstructorCapabilityManagerUpdate>
+    export type UpdateInstructorCapabilityManagerMutationError = ErrorType<void>
+
+    /**
+ * @summary Set or clear an instructor's manual Capability Manager fallback (Admin only)
+ */
+export const useUpdateInstructorCapabilityManager = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateInstructorCapabilityManager>>, TError,{id: number;data: BodyType<InstructorCapabilityManagerUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateInstructorCapabilityManager>>,
+        TError,
+        {id: number;data: BodyType<InstructorCapabilityManagerUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateInstructorCapabilityManagerMutationOptions(options));
     }
 
 export const getGetDashboardUrl = () => {

@@ -228,6 +228,37 @@ paths:
               schema: { $ref: "#/components/schemas/Instructor" }
         "400": { description: "manual_gender must be \"male\", \"female\", or null" }
         "404": { description: Not found }
+  /instructors/{id}/capability-manager:
+    patch:
+      operationId: updateInstructorCapabilityManager
+      tags: [instructors]
+      summary: Set or clear an instructor's manual Capability Manager fallback (Admin only)
+      description: >-
+        Narrower sibling of PATCH /instructors/{id} above -- both are
+        Admin-only, unlike the gender endpoint. Only takes effect when
+        TeachOS's own candidate rows didn't resolve to anyone on the
+        maintained Capability Manager roster (see
+        InstructorSummary.capability_manager_source); TeachOS's own value is
+        never overridden by this. The value must be one of the maintained
+        roster names (or null to clear it), not free text.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: number }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/InstructorCapabilityManagerUpdate" }
+      responses:
+        "200":
+          description: Updated instructor
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Instructor" }
+        "400": { description: "manual_capability_manager must be one of the maintained Capability Manager names, or null" }
+        "404": { description: Not found }
   /dashboard:
     get:
       operationId: getDashboard
@@ -364,6 +395,7 @@ components:
         teachos_role: { type: ["string", "null"] }
         teachos_category: { type: ["string", "null"] }
         teachos_manager: { type: ["string", "null"] }
+        manual_capability_manager: { type: ["string", "null"], description: "Manual fallback for the Capability Manager, settable via PATCH /instructors/{id}/capability-manager (Admin only). Only used when TeachOS's own candidate rows didn't resolve to anyone on the maintained roster for this person. Must be one of that maintained roster's names, or null." }
         institutes:
           type: array
           items: { type: string }
@@ -406,6 +438,18 @@ components:
       required: [manual_gender]
       properties:
         manual_gender: { type: ["string", "null"], enum: ["male", "female", null] }
+    # Body for PATCH /instructors/{id}/capability-manager -- Admin-only,
+    # unlike InstructorGenderUpdate above. Deliberately NOT an enum here:
+    # the valid roster (see data/validCapabilityManagers.ts) is a
+    # human-maintained list that changes over time, and duplicating its
+    # exact membership into this spec would be one more place to keep in
+    # sync. The route validates against that roster server-side and 400s
+    # on anything else.
+    InstructorCapabilityManagerUpdate:
+      type: object
+      required: [manual_capability_manager]
+      properties:
+        manual_capability_manager: { type: ["string", "null"], description: "Must be one of the names in data/validCapabilityManagers.ts, or null." }
     Dashboard:
       type: object
       required: [kpis, monthly_trend, sub_departments, designations]
@@ -621,6 +665,7 @@ components:
         - deployment_status
         - institutes
         - capability_manager
+        - capability_manager_source
         - darwin_manager
         - date_of_joining
         - gender
@@ -647,6 +692,12 @@ components:
         # || directManager fallback) was removed entirely (2026-09-08, per
         # request) now that every card shows both explicit columns.
         capability_manager: { type: ["string", "null"] }
+        # Mirrors gender_source below (2026-09-15, per request): tells the
+        # frontend whether this value is locked (from TeachOS) or editable
+        # (a manual entry, or nothing on file yet) -- see the PATCH
+        # /instructors/{id}/capability-manager endpoint and
+        # manualCapabilityManager's comment in the schema.
+        capability_manager_source: { type: ["string", "null"], enum: ["teachos", "manual", null] }
         # Darwin's own "Direct Manager" field, shown as its own column
         # ("Manager (Darwin)") alongside capability_manager on every card
         # in the Overview drill-down (2026-09-07/08).

@@ -37,7 +37,17 @@ const toApiInstructorSummary = (row: InstructorRow) => ({
   // request). The old combined `manager` field (teachosManager || directManager
   // fallback) has been removed entirely (2026-09-08, per request) now that
   // every card shows both explicit columns instead of one ambiguous one.
-  capability_manager: row.teachosManager || null,
+  // Falls back to manualCapabilityManager (2026-09-15, per request) -- a
+  // human can mark the real Capability Manager by hand for exactly the
+  // people TeachOS's own candidate rows didn't resolve to anyone on the
+  // maintained roster (see the PATCH /instructors/:id/capability-manager
+  // route and manualCapabilityManager's comment in the schema). TeachOS,
+  // when it has an answer, always wins -- manualCapabilityManager is a
+  // gap-filler, not a correction path for TeachOS data. capability_manager_source
+  // mirrors gender_source below: tells the frontend whether to render plain
+  // text (teachos) or the manual-entry dropdown (manual/none).
+  capability_manager: row.teachosManager || row.manualCapabilityManager || null,
+  capability_manager_source: row.teachosManager ? "teachos" : row.manualCapabilityManager ? "manual" : null,
   darwin_manager: row.directManager || null,
   // Darwin's Date of joining -- added to the Instructors-tab table (2026-09,
   // per request), mirroring the same field already on every Darwin

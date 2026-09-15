@@ -47,6 +47,8 @@ export interface Instructor {
   teachos_category?: string | null;
   /** @nullable */
   teachos_manager?: string | null;
+  /** @nullable */
+  manual_capability_manager?: string | null;
   institutes: string[];
   computed_status: string;
   /** @nullable */

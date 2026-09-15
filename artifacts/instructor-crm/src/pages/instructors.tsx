@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react';
-import { Briefcase, Building2, GraduationCap, Search, UserCheck, Users, UsersRound } from 'lucide-react';
-import { useGetReportsInstructors, useUpdateInstructorGender, getGetReportsInstructorsQueryKey } from '@workspace/api-client-react';
+import { Briefcase, BookOpen, Building2, GraduationCap, Search, UserCheck, Users, UsersRound, Wallet } from 'lucide-react';
+import { useGetReportsInstructors, useUpdateInstructorCapabilityManager, useUpdateInstructorGender, getGetReportsInstructorsQueryKey } from '@workspace/api-client-react';
 import type { AccessSplit, InstructorSummary } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link } from 'wouter';
 import { PageIntro, EmptyState, QueryError, SkeletonBlock, DownloadCsvButton, MiniStat, pct } from '@/components/ui-pieces';
 import { downloadCsv, slugify, toCsv } from '@/lib/csv';
+import { useAuth } from '@/hooks/use-auth';
 
 type CategoryKey = 'department' | 'instructors' | 'mentors' | 'ops_team';
 
@@ -59,12 +60,69 @@ function normalizeGender(raw: string | null | undefined): 'male' | 'female' | 'u
   return 'unknown';
 }
 
+// Subject filter (2026-09-15, per request) -- Darwin's derived teaching-area
+// field (dept_area, see departmentTaxonomy.ts) that already backs the
+// "Subject" column on this page. Options are computed from whatever values
+// are actually present in the active category (see subjectOptions below)
+// rather than a hardcoded list -- departmentTaxonomy.ts's areas can grow
+// over time and this filter should never silently miss a new one.
+// "Not set" (UNSPECIFIED_SUBJECT) covers a null dept_area -- most commonly
+// an Operations team row (excluded from the tech/non_tech taxonomy
+// entirely) or a TeachOS-only row with no Darwin department match at all.
+const UNSPECIFIED_SUBJECT = '__unspecified__';
+
+// Capability Manager filter (2026-09-15, per request), same "same as
+// gender" treatment: computed from the manager names actually present in
+// the active category rather than a hardcoded list, since
+// VALID_CAPABILITY_MANAGERS (see the roster mirrored below for the manual
+// editor) can change without this page being touched.
+const NO_CAPABILITY_MANAGER = '__none__';
+
+// Payroll filter (2026-09-15, per request) -- mirrors the Payroll/Nxtwave
+// badge already shown in the table for the Instructors category.
+type PayrollFilterKey = 'all' | 'payroll' | 'nxtwave';
+const PAYROLL_FILTERS: { key: PayrollFilterKey; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'payroll', label: 'Payroll' },
+  { key: 'nxtwave', label: 'Nxtwave' },
+];
+
+// Maintained Capability Manager roster (2026-09-15, per request) -- mirrors
+// artifacts/api-server/src/data/validCapabilityManagers.ts exactly, since
+// the manual-entry dropdown below must only ever offer names the backend's
+// PATCH /instructors/:id/capability-manager route will actually accept
+// (it 400s on anything not on that list). Keep these two lists in sync by
+// hand when a Capability Manager is added or removed -- same convention as
+// that file's own header comment.
+const VALID_CAPABILITY_MANAGERS: string[] = [
+  'Akhilendar Reddy',
+  'Boddikurapati Yaswanth',
+  'Dharavath Jayanth',
+  'Garlapati Prudhvi Raj',
+  'Hari Krishna Daggubati',
+  'Karthik Katuri',
+  'Katuri Karthik',
+  'Meka Sri Satya Prudhvi Charan',
+  'Nunna Naga Venkata Dasaradhi',
+  'Penumarthi Satya Syamala',
+  'Pradeep Jat',
+  'Preethi Vangaveti',
+  'Riya Rai',
+  'Shaik Mohammed Pasha',
+  'Sigatapu Sai Sankar',
+  'solasa vinay',
+  'Voppangi Sai Prasanna',
+];
+
 export default function InstructorsPage() {
   const reportQuery = useGetReportsInstructors();
   const report = reportQuery.data;
   const [category, setCategory] = useState<CategoryKey>('instructors');
   const [search, setSearch] = useState('');
   const [genderFilter, setGenderFilter] = useState<GenderFilterKey>('all');
+  const [subjectFilter, setSubjectFilter] = useState<string>('all');
+  const [capabilityManagerFilter, setCapabilityManagerFilter] = useState<string>('all');
+  const [payrollFilter, setPayrollFilter] = useState<PayrollFilterKey>('all');
 
   const split = report?.access_breakdown?.[category];
   const allPeople = useMemo(() => mergedPeople(split), [split]);
@@ -72,10 +130,13 @@ export default function InstructorsPage() {
     const query = search.trim().toLowerCase();
     return allPeople.filter((person) => {
       if (genderFilter !== 'all' && normalizeGender(person.gender) !== genderFilter) return false;
+      if (subjectFilter !== 'all' && (person.dept_area || UNSPECIFIED_SUBJECT) !== subjectFilter) return false;
+      if (capabilityManagerFilter !== 'all' && (person.capability_manager || NO_CAPABILITY_MANAGER) !== capabilityManagerFilter) return false;
+      if (payrollFilter !== 'all' && (person.is_payroll ? 'payroll' : 'nxtwave') !== payrollFilter) return false;
       if (!query) return true;
       return person.full_name.toLowerCase().includes(query) || (person.employee_id ?? '').toLowerCase().includes(query) || (person.teachos_user_id ?? '').toLowerCase().includes(query);
     });
-  }, [allPeople, search, genderFilter]);
+  }, [allPeople, search, genderFilter, subjectFilter, capabilityManagerFilter, payrollFilter]);
 
   const activeTab = CATEGORY_TABS.find((tab) => tab.key === category)!;
 
@@ -106,6 +167,70 @@ export default function InstructorsPage() {
       return { key: tab.key, label: tab.label, count: tabPeople.filter((person) => normalizeGender(person.gender) === genderFilter).length, total: tabPeople.length };
     });
   }, [report, genderFilter]);
+
+  // Subject filter options + counts for the currently-viewed category
+  // (2026-09-15, per request) -- same "same as gender" treatment as above,
+  // but the option set itself is data-driven (see UNSPECIFIED_SUBJECT's
+  // comment) rather than a fixed list.
+  const subjectOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const person of allPeople) {
+      const key = person.dept_area || UNSPECIFIED_SUBJECT;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    const areas = [...counts.keys()].filter((key) => key !== UNSPECIFIED_SUBJECT).sort((a, b) => a.localeCompare(b));
+    const options = [{ key: 'all', label: 'All', count: allPeople.length }, ...areas.map((area) => ({ key: area, label: area, count: counts.get(area)! }))];
+    if (counts.has(UNSPECIFIED_SUBJECT)) options.push({ key: UNSPECIFIED_SUBJECT, label: 'Not set', count: counts.get(UNSPECIFIED_SUBJECT)! });
+    return options;
+  }, [allPeople]);
+
+  const subjectBreakdown = useMemo(() => {
+    if (subjectFilter === 'all' || !report?.access_breakdown) return null;
+    return CATEGORY_TABS.map((tab) => {
+      const tabPeople = mergedPeople(report.access_breakdown?.[tab.key]);
+      return { key: tab.key, label: tab.label, count: tabPeople.filter((person) => (person.dept_area || UNSPECIFIED_SUBJECT) === subjectFilter).length, total: tabPeople.length };
+    });
+  }, [report, subjectFilter]);
+
+  // Capability Manager filter options + counts, same pattern as Subject
+  // above (2026-09-15, per request).
+  const capabilityManagerOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const person of allPeople) {
+      const key = person.capability_manager || NO_CAPABILITY_MANAGER;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    const managers = [...counts.keys()].filter((key) => key !== NO_CAPABILITY_MANAGER).sort((a, b) => a.localeCompare(b));
+    const options = [{ key: 'all', label: 'All', count: allPeople.length }, ...managers.map((manager) => ({ key: manager, label: manager, count: counts.get(manager)! }))];
+    if (counts.has(NO_CAPABILITY_MANAGER)) options.push({ key: NO_CAPABILITY_MANAGER, label: 'Not on file', count: counts.get(NO_CAPABILITY_MANAGER)! });
+    return options;
+  }, [allPeople]);
+
+  const capabilityManagerBreakdown = useMemo(() => {
+    if (capabilityManagerFilter === 'all' || !report?.access_breakdown) return null;
+    return CATEGORY_TABS.map((tab) => {
+      const tabPeople = mergedPeople(report.access_breakdown?.[tab.key]);
+      return { key: tab.key, label: tab.label, count: tabPeople.filter((person) => (person.capability_manager || NO_CAPABILITY_MANAGER) === capabilityManagerFilter).length, total: tabPeople.length };
+    });
+  }, [report, capabilityManagerFilter]);
+
+  // Payroll filter counts + breakdown, same pattern as Gender above
+  // (2026-09-15, per request).
+  const payrollCounts = useMemo(() => {
+    const counts: Record<PayrollFilterKey, number> = { all: allPeople.length, payroll: 0, nxtwave: 0 };
+    for (const person of allPeople) counts[person.is_payroll ? 'payroll' : 'nxtwave'] += 1;
+    return counts;
+  }, [allPeople]);
+
+  const payrollBreakdown = useMemo(() => {
+    if (payrollFilter === 'all' || !report?.access_breakdown) return null;
+    return CATEGORY_TABS.map((tab) => {
+      const tabPeople = mergedPeople(report.access_breakdown?.[tab.key]);
+      return { key: tab.key, label: tab.label, count: tabPeople.filter((person) => (person.is_payroll ? 'payroll' : 'nxtwave') === payrollFilter).length, total: tabPeople.length };
+    });
+  }, [report, payrollFilter]);
+
+  const anyFilterActive = genderFilter !== 'all' || subjectFilter !== 'all' || capabilityManagerFilter !== 'all' || payrollFilter !== 'all';
 
   // Coverage check for the currently-viewed category (2026-09, per request):
   // how many of these people have a Capability Manager on file at all, vs.
@@ -138,12 +263,32 @@ export default function InstructorsPage() {
         </div>
         <div className="relative flex-1"><Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" /><input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search name, employee ID, or TeachOS user ID..." data-testid="input-search-instructors" className="h-10 w-full rounded-lg border border-border bg-background pl-9 pr-3 text-[12px] outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-primary focus:ring-2 focus:ring-ring/25" /></div>
       </div>
-      <div className="flex flex-wrap items-center gap-2 border-t border-border/70 pt-3">
-        <label htmlFor="select-gender-filter" className="font-mono-ui text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Gender</label>
-        <select id="select-gender-filter" data-testid="select-gender-filter" value={genderFilter} onChange={(event) => setGenderFilter(event.target.value as GenderFilterKey)} className="h-9 rounded-lg border border-border bg-background px-2.5 text-[12px] font-bold text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-ring/25">
-          {GENDER_FILTERS.map((filter) => <option key={filter.key} value={filter.key}>{filter.label} ({formatCount(genderCounts[filter.key])} in {activeTab.label.toLowerCase()})</option>)}
-        </select>
-        {genderFilter !== 'all' && <span className="font-mono-ui text-[10px] text-muted-foreground">Table below is filtered to {activeTab.label.toLowerCase()}; see the breakdown card for every category.</span>}
+      <div className="flex flex-wrap items-center gap-4 border-t border-border/70 pt-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <label htmlFor="select-gender-filter" className="font-mono-ui text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Gender</label>
+          <select id="select-gender-filter" data-testid="select-gender-filter" value={genderFilter} onChange={(event) => setGenderFilter(event.target.value as GenderFilterKey)} className="h-9 rounded-lg border border-border bg-background px-2.5 text-[12px] font-bold text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-ring/25">
+            {GENDER_FILTERS.map((filter) => <option key={filter.key} value={filter.key}>{filter.label} ({formatCount(genderCounts[filter.key])} in {activeTab.label.toLowerCase()})</option>)}
+          </select>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <label htmlFor="select-subject-filter" className="font-mono-ui text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Subject</label>
+          <select id="select-subject-filter" data-testid="select-subject-filter" value={subjectFilter} onChange={(event) => setSubjectFilter(event.target.value)} className="h-9 max-w-[220px] rounded-lg border border-border bg-background px-2.5 text-[12px] font-bold text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-ring/25">
+            {subjectOptions.map((option) => <option key={option.key} value={option.key}>{option.label} ({formatCount(option.count)} in {activeTab.label.toLowerCase()})</option>)}
+          </select>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <label htmlFor="select-capability-manager-filter" className="font-mono-ui text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Capability Manager</label>
+          <select id="select-capability-manager-filter" data-testid="select-capability-manager-filter" value={capabilityManagerFilter} onChange={(event) => setCapabilityManagerFilter(event.target.value)} className="h-9 max-w-[220px] rounded-lg border border-border bg-background px-2.5 text-[12px] font-bold text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-ring/25">
+            {capabilityManagerOptions.map((option) => <option key={option.key} value={option.key}>{option.label} ({formatCount(option.count)} in {activeTab.label.toLowerCase()})</option>)}
+          </select>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <label htmlFor="select-payroll-filter" className="font-mono-ui text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Payroll</label>
+          <select id="select-payroll-filter" data-testid="select-payroll-filter" value={payrollFilter} onChange={(event) => setPayrollFilter(event.target.value as PayrollFilterKey)} className="h-9 rounded-lg border border-border bg-background px-2.5 text-[12px] font-bold text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-ring/25">
+            {PAYROLL_FILTERS.map((filter) => <option key={filter.key} value={filter.key}>{filter.label} ({formatCount(payrollCounts[filter.key])} in {activeTab.label.toLowerCase()})</option>)}
+          </select>
+        </div>
+        {anyFilterActive && <span className="font-mono-ui text-[10px] text-muted-foreground">Table below is filtered to {activeTab.label.toLowerCase()}; see the breakdown card(s) below for every category.</span>}
       </div>
     </div>
 
@@ -157,6 +302,45 @@ export default function InstructorsPage() {
       </div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {genderBreakdown.map((row) => <MiniStat key={row.key} label={row.label} value={row.count} meta={`${pct(row.count, row.total)} of ${row.label.toLowerCase()}`} tone="muted" />)}
+      </div>
+    </section>}
+
+    {subjectFilter !== 'all' && subjectBreakdown && <section className="mb-5 rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6">
+      <div className="mb-4 flex items-center gap-2">
+        <span className="grid h-8 w-8 place-items-center rounded-lg bg-[#e3f0fb] text-[#1d6fa5]"><BookOpen size={16} /></span>
+        <div>
+          <p className="font-mono-ui text-[10px] uppercase tracking-[0.17em] text-muted-foreground">Darwin — derived teaching area</p>
+          <h2 className="text-[15px] font-extrabold tracking-[-0.03em]">{subjectFilter === UNSPECIFIED_SUBJECT ? 'Not set' : subjectFilter} headcount, by category</h2>
+        </div>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {subjectBreakdown.map((row) => <MiniStat key={row.key} label={row.label} value={row.count} meta={`${pct(row.count, row.total)} of ${row.label.toLowerCase()}`} tone="muted" />)}
+      </div>
+    </section>}
+
+    {capabilityManagerFilter !== 'all' && capabilityManagerBreakdown && <section className="mb-5 rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6">
+      <div className="mb-4 flex items-center gap-2">
+        <span className="grid h-8 w-8 place-items-center rounded-lg bg-[#dff0eb] text-[#287469]"><UserCheck size={16} /></span>
+        <div>
+          <p className="font-mono-ui text-[10px] uppercase tracking-[0.17em] text-muted-foreground">TeachOS — Capability Manager</p>
+          <h2 className="text-[15px] font-extrabold tracking-[-0.03em]">{capabilityManagerFilter === NO_CAPABILITY_MANAGER ? 'Not on file' : capabilityManagerFilter} headcount, by category</h2>
+        </div>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {capabilityManagerBreakdown.map((row) => <MiniStat key={row.key} label={row.label} value={row.count} meta={`${pct(row.count, row.total)} of ${row.label.toLowerCase()}`} tone="muted" />)}
+      </div>
+    </section>}
+
+    {payrollFilter !== 'all' && payrollBreakdown && <section className="mb-5 rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6">
+      <div className="mb-4 flex items-center gap-2">
+        <span className="grid h-8 w-8 place-items-center rounded-lg bg-[#e6e9fb] text-[#4a4fb0]"><Wallet size={16} /></span>
+        <div>
+          <p className="font-mono-ui text-[10px] uppercase tracking-[0.17em] text-muted-foreground">Payroll status</p>
+          <h2 className="text-[15px] font-extrabold tracking-[-0.03em]">{PAYROLL_FILTERS.find((filter) => filter.key === payrollFilter)?.label} headcount, by category</h2>
+        </div>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {payrollBreakdown.map((row) => <MiniStat key={row.key} label={row.label} value={row.count} meta={`${pct(row.count, row.total)} of ${row.label.toLowerCase()}`} tone="muted" />)}
       </div>
     </section>}
 
@@ -315,11 +499,7 @@ function PersonRow({ category, person, columns }: { category: CategoryKey; perso
         column is specifically Darwin's date of joining, not a general
         "unknown" placeholder. See date_of_joining's gating in reports.ts. */}
     <div className="truncate font-mono-ui text-[11px] text-muted-foreground">{person.date_of_joining || ''}</div>
-    {/* No valid Capability Manager name matched among this person's TeachOS
-        candidates -- flagged distinctly (not just a blank/dash) so a gap in
-        this data is easy to spot at a glance while scanning the table, per
-        the coverage section above. */}
-    <div className="truncate text-[12px]">{person.capability_manager ? <span className="text-foreground">{person.capability_manager}</span> : <span className="inline-flex rounded-full bg-[#fff7db] px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] text-[#8b6207]">Missing</span>}</div>
+    <CapabilityManagerCell person={person} />
     {category === 'instructors' && <div>{person.is_payroll ? <span className="inline-flex rounded-full bg-[#e6e9fb] px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] text-[#4a4fb0]">Payroll</span> : <span className="inline-flex rounded-full bg-secondary px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] text-muted-foreground">Nxtwave</span>}</div>}
     <GenderCell person={person} />
   </Link>;
@@ -365,6 +545,60 @@ function GenderCell({ person }: { person: InstructorSummary }) {
       <option value="">Not on file</option>
       <option value="male">Male</option>
       <option value="female">Female</option>
+    </select>
+  </div>;
+}
+
+// Capability Manager is read-only text when TeachOS supplied it
+// (person.capability_manager_source === 'teachos') -- TeachOS's own value
+// is never overridden here. Otherwise (none of this person's TeachOS
+// candidate rows matched the maintained roster -- see
+// validCapabilityManagers.ts) this shows an editable dropdown, populated
+// from that same maintained roster, so a human who knows the person's real
+// Capability Manager can mark it (2026-09-15, per request).
+//
+// Unlike GenderCell above, this stays Admin-only -- matching the other
+// Admin-only manual fields (Manual Status/Exit Date/Notes on the detail
+// page), gated the same way those are there: an editable control only when
+// `user` is set (there's no separate Manager login anymore -- see
+// routes/index.ts -- so `user` truthy means signed in as Admin), plain
+// text/badge otherwise. See the dedicated PATCH
+// /instructors/:id/capability-manager route. Same stopPropagation
+// requirement as GenderCell (the whole row is a wouter <Link>).
+function CapabilityManagerCell({ person }: { person: InstructorSummary }) {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const updateCapabilityManager = useUpdateInstructorCapabilityManager({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetReportsInstructorsQueryKey() });
+      },
+    },
+  });
+
+  // No valid Capability Manager name matched among this person's TeachOS
+  // candidates and none has been set manually either -- flagged distinctly
+  // (not just a blank/dash) so a gap in this data is easy to spot at a
+  // glance while scanning the table, per the coverage section above.
+  if (person.capability_manager_source === 'teachos' || !user) {
+    return <div className="truncate text-[12px]">{person.capability_manager ? <span className="text-foreground">{person.capability_manager}</span> : <span className="inline-flex rounded-full bg-[#fff7db] px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] text-[#8b6207]">Missing</span>}</div>;
+  }
+
+  const value = person.capability_manager_source === 'manual' && person.capability_manager ? person.capability_manager : '';
+  return <div onClick={(event) => event.stopPropagation()} className="text-[12px]">
+    <select
+      value={value}
+      onChange={(event) => {
+        const next = event.target.value;
+        updateCapabilityManager.mutate({ id: person.id, data: { manual_capability_manager: next === '' ? null : next } });
+      }}
+      disabled={updateCapabilityManager.isPending}
+      data-testid={`select-manual-capability-manager-${person.id}`}
+      title="No Capability Manager matched from TeachOS -- mark it manually"
+      className={`h-8 w-full rounded-md border bg-background px-1.5 text-[11px] font-semibold outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-ring/25 disabled:opacity-60 ${value ? 'border-border text-foreground' : 'border-[#f0d78c] text-[#8b6207]'}`}
+    >
+      <option value="">Missing -- pick one</option>
+      {VALID_CAPABILITY_MANAGERS.map((name) => <option key={name} value={name}>{name}</option>)}
     </select>
   </div>;
 }

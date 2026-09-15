@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { and, arrayContains, asc, eq, ilike, or } from "drizzle-orm";
 import { db, instructorsTable } from "@workspace/db";
 import { requireAuth, requireRole } from "../middlewares/auth";
+import { VALID_CAPABILITY_MANAGERS } from "../data/validCapabilityManagers";
 
 const router: IRouter = Router();
 const toApiInstructor = (row: typeof instructorsTable.$inferSelect) => ({
@@ -28,6 +29,7 @@ const toApiInstructor = (row: typeof instructorsTable.$inferSelect) => ({
   teachos_role: row.teachosRole,
   teachos_category: row.teachosCategory,
   teachos_manager: row.teachosManager,
+  manual_capability_manager: row.manualCapabilityManager,
   institutes: row.institutes,
   computed_status: row.computedStatus,
   manual_status: row.manualStatus,
@@ -158,6 +160,31 @@ router.patch("/instructors/:id/gender", requireAuth, async (req, res): Promise<v
     return;
   }
   const [row] = await db.update(instructorsTable).set({ manualGender: raw }).where(eq(instructorsTable.id, Number(req.params.id))).returning();
+  if (!row) {
+    res.status(404).json({ error: "Instructor not found" });
+    return;
+  }
+  res.json(toApiInstructor(row));
+});
+
+// Manual Capability Manager (2026-09-15, per request): for people TeachOS's
+// own Capability Manager candidates don't resolve to anyone on the
+// maintained VALID_CAPABILITY_MANAGERS roster (see
+// reconcileCapabilityManager() in lib/reconcile.ts and that roster file's
+// own comment for why so many candidate rows get discarded), a human who
+// knows the person can mark their real Capability Manager here instead --
+// constrained to that same roster, not free text, so this can't drift into
+// a name that isn't actually a Capability Manager. Unlike Gender, this
+// stays Admin-only (requireRole("admin")), matching the general manual-edit
+// PATCH above -- there was no explicit ask to widen this one to Manager
+// the way Gender was.
+router.patch("/instructors/:id/capability-manager", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {
+  const raw = (req.body as { manual_capability_manager?: string | null }).manual_capability_manager;
+  if (raw !== null && !VALID_CAPABILITY_MANAGERS.includes(raw as string)) {
+    res.status(400).json({ error: "manual_capability_manager must be one of the maintained Capability Manager names, or null" });
+    return;
+  }
+  const [row] = await db.update(instructorsTable).set({ manualCapabilityManager: raw }).where(eq(instructorsTable.id, Number(req.params.id))).returning();
   if (!row) {
     res.status(404).json({ error: "Instructor not found" });
     return;

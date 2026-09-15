@@ -28,6 +28,8 @@ export interface InstructorSummary {
   /** @nullable */
   capability_manager: string | null;
   /** @nullable */
+  capability_manager_source: 'teachos' | 'manual' | null;
+  /** @nullable */
   darwin_manager: string | null;
   /** @nullable */
   date_of_joining: string | null;

@@ -50,6 +50,9 @@ export interface Instructor {
   teachos_category?: string | null;
   /** @nullable */
   teachos_manager?: string | null;
+  /** Manual fallback for the Capability Manager, settable via PATCH /instructors/{id}/capability-manager (Admin only). Only used when TeachOS's own candidate rows didn't resolve to anyone on the maintained roster for this person. Must be one of that maintained roster's names, or null.
+     * @nullable */
+  manual_capability_manager?: string | null;
   institutes: string[];
   computed_status: string;
   /** @nullable */
@@ -124,6 +127,11 @@ export interface InstructorUpdate {
 /** Body for PATCH /instructors/{id}/gender -- a narrower, both-role-editable sibling of InstructorUpdate above (which is Admin-only). "male" or "female" to set it, null to clear it back to unknown. */
 export interface InstructorGenderUpdate {
   manual_gender: 'male' | 'female' | null;
+}
+
+/** Body for PATCH /instructors/{id}/capability-manager -- Admin-only, unlike InstructorGenderUpdate above. Deliberately not a fixed union here: the valid roster (data/validCapabilityManagers.ts) is human-maintained and changes over time; the route validates against it server-side and 400s on anything else. */
+export interface InstructorCapabilityManagerUpdate {
+  manual_capability_manager: string | null;
 }
 
 export type DashboardKpis = {[key: string]: number};
@@ -300,6 +308,8 @@ export interface InstructorSummary {
   institutes: string[];
   /** @nullable */
   capability_manager: string | null;
+  /** Whether `capability_manager` above came from TeachOS (locked, not editable here) or was set/left blank manually ("manual" or null). Drives whether the Instructors tab shows a plain value or the manual-entry dropdown for this row. @nullable */
+  capability_manager_source: 'teachos' | 'manual' | null;
   /** @nullable */
   darwin_manager: string | null;
   /** @nullable */
