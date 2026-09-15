@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { Briefcase, BookOpen, Building2, GraduationCap, MapPin, Search, UserCheck, Users, UsersRound, Wallet } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Briefcase, BookOpen, Building2, ChevronDown, GraduationCap, MapPin, Search, UserCheck, Users, UsersRound, Wallet, X } from 'lucide-react';
 import { useGetReportsInstructors, useUpdateInstructorCapabilityManager, useUpdateInstructorGender, useUpdateInstructorSubject, getGetReportsInstructorsQueryKey } from '@workspace/api-client-react';
 import type { AccessSplit, InstructorSummary } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -46,9 +46,15 @@ function initials(name: string) {
 // no gender on file (most commonly a TeachOS-only row with no Darwin record
 // at all -- see the inDarwin gating on that field) falls into "Not on file"
 // instead of silently being dropped from any bucket's count.
-type GenderFilterKey = 'all' | 'male' | 'female' | 'unknown';
+// Multi-select (2026-09-15, per request): every filter on this page now
+// holds an ARRAY of selected keys rather than one -- an empty array means
+// "no filter, show everyone" (this used to be the literal key 'all', now
+// dropped from every filter's key type/option list since it's no longer a
+// selectable checkbox, just the implicit "nothing checked" state). Picking
+// more than one value within a single filter is OR'd (e.g. Male OR
+// Female); different filters still combine with AND, same as before.
+type GenderFilterKey = 'male' | 'female' | 'unknown';
 const GENDER_FILTERS: { key: GenderFilterKey; label: string }[] = [
-  { key: 'all', label: 'All' },
   { key: 'male', label: 'Male' },
   { key: 'female', label: 'Female' },
   { key: 'unknown', label: 'Not on file' },
@@ -80,9 +86,8 @@ const NO_CAPABILITY_MANAGER = '__none__';
 
 // Payroll filter (2026-09-15, per request) -- mirrors the Payroll/Nxtwave
 // badge already shown in the table for the Instructors category.
-type PayrollFilterKey = 'all' | 'payroll' | 'nxtwave';
+type PayrollFilterKey = 'payroll' | 'nxtwave';
 const PAYROLL_FILTERS: { key: PayrollFilterKey; label: string }[] = [
-  { key: 'all', label: 'All' },
   { key: 'payroll', label: 'Payroll' },
   { key: 'nxtwave', label: 'Nxtwave' },
 ];
@@ -97,10 +102,21 @@ const PAYROLL_FILTERS: { key: PayrollFilterKey; label: string }[] = [
 // covers an empty institutes list, e.g. Operations team rows (no Campus
 // column at all) or an instructor not yet deployed anywhere.
 const UNSPECIFIED_CAMPUS = '__unspecified__';
-function matchesCampus(person: InstructorSummary, campusFilter: string): boolean {
+// Multi-select OR match: a person counts if they're deployed to ANY of the
+// selected campuses (or, if "Not set" is among the selected values, if
+// they have no institutes at all).
+function matchesCampus(person: InstructorSummary, campusFilters: string[]): boolean {
   const institutes = person.institutes ?? [];
-  if (campusFilter === UNSPECIFIED_CAMPUS) return institutes.length === 0;
-  return institutes.includes(campusFilter);
+  return campusFilters.some((filter) => (filter === UNSPECIFIED_CAMPUS ? institutes.length === 0 : institutes.includes(filter)));
+}
+
+// Formats a multi-select filter's current selection for its breakdown card
+// title and its trigger button -- one label when a single value is picked,
+// a comma-joined list for two or three, else "N selected" so the header
+// never runs unbounded.
+function selectionSummary(selected: string[], labelFor: (key: string) => string): string {
+  if (selected.length <= 3) return selected.map(labelFor).join(', ');
+  return `${selected.length} selected`;
 }
 
 // Maintained Capability Manager roster (2026-09-15, per request) -- mirrors
@@ -153,22 +169,34 @@ export default function InstructorsPage() {
   const report = reportQuery.data;
   const [category, setCategory] = useState<CategoryKey>('instructors');
   const [search, setSearch] = useState('');
-  const [genderFilter, setGenderFilter] = useState<GenderFilterKey>('all');
-  const [subjectFilter, setSubjectFilter] = useState<string>('all');
-  const [capabilityManagerFilter, setCapabilityManagerFilter] = useState<string>('all');
-  const [payrollFilter, setPayrollFilter] = useState<PayrollFilterKey>('all');
-  const [campusFilter, setCampusFilter] = useState<string>('all');
+  const [genderFilter, setGenderFilter] = useState<GenderFilterKey[]>([]);
+  const [subjectFilter, setSubjectFilter] = useState<string[]>([]);
+  const [capabilityManagerFilter, setCapabilityManagerFilter] = useState<string[]>([]);
+  const [payrollFilter, setPayrollFilter] = useState<PayrollFilterKey[]>([]);
+  const [campusFilter, setCampusFilter] = useState<string[]>([]);
+
+  // Resets every filter back to "nothing selected" (= all) in one click
+  // (2026-09-15, per request) -- deliberately leaves `search` and
+  // `category` alone, since those aren't filters in the same sense (the
+  // tab you're on, and a free-text lookup), just the 5 filters above.
+  function clearFilters() {
+    setGenderFilter([]);
+    setSubjectFilter([]);
+    setCapabilityManagerFilter([]);
+    setPayrollFilter([]);
+    setCampusFilter([]);
+  }
 
   const split = report?.access_breakdown?.[category];
   const allPeople = useMemo(() => mergedPeople(split), [split]);
   const people = useMemo(() => {
     const query = search.trim().toLowerCase();
     return allPeople.filter((person) => {
-      if (genderFilter !== 'all' && normalizeGender(person.gender) !== genderFilter) return false;
-      if (subjectFilter !== 'all' && (person.dept_area || UNSPECIFIED_SUBJECT) !== subjectFilter) return false;
-      if (capabilityManagerFilter !== 'all' && (person.capability_manager || NO_CAPABILITY_MANAGER) !== capabilityManagerFilter) return false;
-      if (payrollFilter !== 'all' && (person.is_payroll ? 'payroll' : 'nxtwave') !== payrollFilter) return false;
-      if (campusFilter !== 'all' && !matchesCampus(person, campusFilter)) return false;
+      if (genderFilter.length > 0 && !genderFilter.includes(normalizeGender(person.gender))) return false;
+      if (subjectFilter.length > 0 && !subjectFilter.includes(person.dept_area || UNSPECIFIED_SUBJECT)) return false;
+      if (capabilityManagerFilter.length > 0 && !capabilityManagerFilter.includes(person.capability_manager || NO_CAPABILITY_MANAGER)) return false;
+      if (payrollFilter.length > 0 && !payrollFilter.includes(person.is_payroll ? 'payroll' : 'nxtwave')) return false;
+      if (campusFilter.length > 0 && !matchesCampus(person, campusFilter)) return false;
       if (!query) return true;
       return person.full_name.toLowerCase().includes(query) || (person.employee_id ?? '').toLowerCase().includes(query) || (person.teachos_user_id ?? '').toLowerCase().includes(query);
     });
@@ -183,7 +211,7 @@ export default function InstructorsPage() {
   // but the search box doesn't -- this is meant to answer "how many of this
   // category are Male/Female", not "how many of my search results are".
   const genderCounts = useMemo(() => {
-    const counts: Record<GenderFilterKey, number> = { all: allPeople.length, male: 0, female: 0, unknown: 0 };
+    const counts: Record<GenderFilterKey, number> = { male: 0, female: 0, unknown: 0 };
     for (const person of allPeople) counts[normalizeGender(person.gender)] += 1;
     return counts;
   }, [allPeople]);
@@ -197,10 +225,10 @@ export default function InstructorsPage() {
   // pulled and merged independently here (not derived from `allPeople`,
   // which only ever holds the ACTIVE tab's people).
   const genderBreakdown = useMemo(() => {
-    if (genderFilter === 'all' || !report?.access_breakdown) return null;
+    if (genderFilter.length === 0 || !report?.access_breakdown) return null;
     return CATEGORY_TABS.map((tab) => {
       const tabPeople = mergedPeople(report.access_breakdown?.[tab.key]);
-      return { key: tab.key, label: tab.label, count: tabPeople.filter((person) => normalizeGender(person.gender) === genderFilter).length, total: tabPeople.length };
+      return { key: tab.key, label: tab.label, count: tabPeople.filter((person) => genderFilter.includes(normalizeGender(person.gender))).length, total: tabPeople.length };
     });
   }, [report, genderFilter]);
 
@@ -215,16 +243,16 @@ export default function InstructorsPage() {
       counts.set(key, (counts.get(key) ?? 0) + 1);
     }
     const areas = [...counts.keys()].filter((key) => key !== UNSPECIFIED_SUBJECT).sort((a, b) => a.localeCompare(b));
-    const options = [{ key: 'all', label: 'All', count: allPeople.length }, ...areas.map((area) => ({ key: area, label: area, count: counts.get(area)! }))];
+    const options = areas.map((area) => ({ key: area, label: area, count: counts.get(area)! }));
     if (counts.has(UNSPECIFIED_SUBJECT)) options.push({ key: UNSPECIFIED_SUBJECT, label: 'Not set', count: counts.get(UNSPECIFIED_SUBJECT)! });
     return options;
   }, [allPeople]);
 
   const subjectBreakdown = useMemo(() => {
-    if (subjectFilter === 'all' || !report?.access_breakdown) return null;
+    if (subjectFilter.length === 0 || !report?.access_breakdown) return null;
     return CATEGORY_TABS.map((tab) => {
       const tabPeople = mergedPeople(report.access_breakdown?.[tab.key]);
-      return { key: tab.key, label: tab.label, count: tabPeople.filter((person) => (person.dept_area || UNSPECIFIED_SUBJECT) === subjectFilter).length, total: tabPeople.length };
+      return { key: tab.key, label: tab.label, count: tabPeople.filter((person) => subjectFilter.includes(person.dept_area || UNSPECIFIED_SUBJECT)).length, total: tabPeople.length };
     });
   }, [report, subjectFilter]);
 
@@ -237,32 +265,32 @@ export default function InstructorsPage() {
       counts.set(key, (counts.get(key) ?? 0) + 1);
     }
     const managers = [...counts.keys()].filter((key) => key !== NO_CAPABILITY_MANAGER).sort((a, b) => a.localeCompare(b));
-    const options = [{ key: 'all', label: 'All', count: allPeople.length }, ...managers.map((manager) => ({ key: manager, label: manager, count: counts.get(manager)! }))];
+    const options = managers.map((manager) => ({ key: manager, label: manager, count: counts.get(manager)! }));
     if (counts.has(NO_CAPABILITY_MANAGER)) options.push({ key: NO_CAPABILITY_MANAGER, label: 'Not on file', count: counts.get(NO_CAPABILITY_MANAGER)! });
     return options;
   }, [allPeople]);
 
   const capabilityManagerBreakdown = useMemo(() => {
-    if (capabilityManagerFilter === 'all' || !report?.access_breakdown) return null;
+    if (capabilityManagerFilter.length === 0 || !report?.access_breakdown) return null;
     return CATEGORY_TABS.map((tab) => {
       const tabPeople = mergedPeople(report.access_breakdown?.[tab.key]);
-      return { key: tab.key, label: tab.label, count: tabPeople.filter((person) => (person.capability_manager || NO_CAPABILITY_MANAGER) === capabilityManagerFilter).length, total: tabPeople.length };
+      return { key: tab.key, label: tab.label, count: tabPeople.filter((person) => capabilityManagerFilter.includes(person.capability_manager || NO_CAPABILITY_MANAGER)).length, total: tabPeople.length };
     });
   }, [report, capabilityManagerFilter]);
 
   // Payroll filter counts + breakdown, same pattern as Gender above
   // (2026-09-15, per request).
   const payrollCounts = useMemo(() => {
-    const counts: Record<PayrollFilterKey, number> = { all: allPeople.length, payroll: 0, nxtwave: 0 };
+    const counts: Record<PayrollFilterKey, number> = { payroll: 0, nxtwave: 0 };
     for (const person of allPeople) counts[person.is_payroll ? 'payroll' : 'nxtwave'] += 1;
     return counts;
   }, [allPeople]);
 
   const payrollBreakdown = useMemo(() => {
-    if (payrollFilter === 'all' || !report?.access_breakdown) return null;
+    if (payrollFilter.length === 0 || !report?.access_breakdown) return null;
     return CATEGORY_TABS.map((tab) => {
       const tabPeople = mergedPeople(report.access_breakdown?.[tab.key]);
-      return { key: tab.key, label: tab.label, count: tabPeople.filter((person) => (person.is_payroll ? 'payroll' : 'nxtwave') === payrollFilter).length, total: tabPeople.length };
+      return { key: tab.key, label: tab.label, count: tabPeople.filter((person) => payrollFilter.includes(person.is_payroll ? 'payroll' : 'nxtwave')).length, total: tabPeople.length };
     });
   }, [report, payrollFilter]);
 
@@ -279,20 +307,20 @@ export default function InstructorsPage() {
       for (const institute of institutes) counts.set(institute, (counts.get(institute) ?? 0) + 1);
     }
     const campuses = [...counts.keys()].sort((a, b) => a.localeCompare(b));
-    const options = [{ key: 'all', label: 'All', count: allPeople.length }, ...campuses.map((campus) => ({ key: campus, label: campus, count: counts.get(campus)! }))];
+    const options = campuses.map((campus) => ({ key: campus, label: campus, count: counts.get(campus)! }));
     if (unspecified > 0) options.push({ key: UNSPECIFIED_CAMPUS, label: 'Not set', count: unspecified });
     return options;
   }, [allPeople]);
 
   const campusBreakdown = useMemo(() => {
-    if (campusFilter === 'all' || !report?.access_breakdown) return null;
+    if (campusFilter.length === 0 || !report?.access_breakdown) return null;
     return CATEGORY_TABS.map((tab) => {
       const tabPeople = mergedPeople(report.access_breakdown?.[tab.key]);
       return { key: tab.key, label: tab.label, count: tabPeople.filter((person) => matchesCampus(person, campusFilter)).length, total: tabPeople.length };
     });
   }, [report, campusFilter]);
 
-  const anyFilterActive = genderFilter !== 'all' || subjectFilter !== 'all' || capabilityManagerFilter !== 'all' || payrollFilter !== 'all' || campusFilter !== 'all';
+  const anyFilterActive = genderFilter.length > 0 || subjectFilter.length > 0 || capabilityManagerFilter.length > 0 || payrollFilter.length > 0 || campusFilter.length > 0;
 
   // Coverage check for the currently-viewed category (2026-09, per request):
   // how many of these people have a Capability Manager on file at all, vs.
@@ -326,46 +354,38 @@ export default function InstructorsPage() {
         <div className="relative flex-1"><Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" /><input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search name, employee ID, or TeachOS user ID..." data-testid="input-search-instructors" className="h-10 w-full rounded-lg border border-border bg-background pl-9 pr-3 text-[12px] outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-primary focus:ring-2 focus:ring-ring/25" /></div>
       </div>
       <div className="flex flex-wrap items-center gap-4 border-t border-border/70 pt-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <label htmlFor="select-gender-filter" className="font-mono-ui text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Gender</label>
-          <select id="select-gender-filter" data-testid="select-gender-filter" value={genderFilter} onChange={(event) => setGenderFilter(event.target.value as GenderFilterKey)} className="h-9 rounded-lg border border-border bg-background px-2.5 text-[12px] font-bold text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-ring/25">
-            {GENDER_FILTERS.map((filter) => <option key={filter.key} value={filter.key}>{filter.label} ({formatCount(genderCounts[filter.key])} in {activeTab.label.toLowerCase()})</option>)}
-          </select>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <label htmlFor="select-subject-filter" className="font-mono-ui text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Subject</label>
-          <select id="select-subject-filter" data-testid="select-subject-filter" value={subjectFilter} onChange={(event) => setSubjectFilter(event.target.value)} className="h-9 max-w-[220px] rounded-lg border border-border bg-background px-2.5 text-[12px] font-bold text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-ring/25">
-            {subjectOptions.map((option) => <option key={option.key} value={option.key}>{option.label} ({formatCount(option.count)} in {activeTab.label.toLowerCase()})</option>)}
-          </select>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <label htmlFor="select-capability-manager-filter" className="font-mono-ui text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Capability Manager</label>
-          <select id="select-capability-manager-filter" data-testid="select-capability-manager-filter" value={capabilityManagerFilter} onChange={(event) => setCapabilityManagerFilter(event.target.value)} className="h-9 max-w-[220px] rounded-lg border border-border bg-background px-2.5 text-[12px] font-bold text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-ring/25">
-            {capabilityManagerOptions.map((option) => <option key={option.key} value={option.key}>{option.label} ({formatCount(option.count)} in {activeTab.label.toLowerCase()})</option>)}
-          </select>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <label htmlFor="select-payroll-filter" className="font-mono-ui text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Payroll</label>
-          <select id="select-payroll-filter" data-testid="select-payroll-filter" value={payrollFilter} onChange={(event) => setPayrollFilter(event.target.value as PayrollFilterKey)} className="h-9 rounded-lg border border-border bg-background px-2.5 text-[12px] font-bold text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-ring/25">
-            {PAYROLL_FILTERS.map((filter) => <option key={filter.key} value={filter.key}>{filter.label} ({formatCount(payrollCounts[filter.key])} in {activeTab.label.toLowerCase()})</option>)}
-          </select>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <label htmlFor="select-campus-filter" className="font-mono-ui text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Campus</label>
-          <select id="select-campus-filter" data-testid="select-campus-filter" value={campusFilter} onChange={(event) => setCampusFilter(event.target.value)} className="h-9 max-w-[220px] rounded-lg border border-border bg-background px-2.5 text-[12px] font-bold text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-ring/25">
-            {campusOptions.map((option) => <option key={option.key} value={option.key}>{option.label} ({formatCount(option.count)} in {activeTab.label.toLowerCase()})</option>)}
-          </select>
-        </div>
+        <MultiSelectFilter
+          label="Gender"
+          options={GENDER_FILTERS.map((filter) => ({ key: filter.key, label: filter.label, count: genderCounts[filter.key] }))}
+          selected={genderFilter}
+          onChange={(next) => setGenderFilter(next as GenderFilterKey[])}
+          testId="select-gender-filter"
+          widthClass="w-[170px]"
+        />
+        <MultiSelectFilter label="Subject" options={subjectOptions} selected={subjectFilter} onChange={setSubjectFilter} testId="select-subject-filter" />
+        <MultiSelectFilter label="Capability Manager" options={capabilityManagerOptions} selected={capabilityManagerFilter} onChange={setCapabilityManagerFilter} testId="select-capability-manager-filter" />
+        <MultiSelectFilter
+          label="Payroll"
+          options={PAYROLL_FILTERS.map((filter) => ({ key: filter.key, label: filter.label, count: payrollCounts[filter.key] }))}
+          selected={payrollFilter}
+          onChange={(next) => setPayrollFilter(next as PayrollFilterKey[])}
+          testId="select-payroll-filter"
+          widthClass="w-[170px]"
+        />
+        <MultiSelectFilter label="Campus" options={campusOptions} selected={campusFilter} onChange={setCampusFilter} testId="select-campus-filter" />
+        {anyFilterActive && <button type="button" data-testid="button-clear-filters" onClick={clearFilters} className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-[11px] font-bold text-foreground transition-colors hover:bg-secondary">
+          <X size={13} /> Clear filters
+        </button>}
         {anyFilterActive && <span className="font-mono-ui text-[10px] text-muted-foreground">Table below is filtered to {activeTab.label.toLowerCase()}; see the breakdown card(s) below for every category.</span>}
       </div>
     </div>
 
-    {genderFilter !== 'all' && genderBreakdown && <section className="mb-5 rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6">
+    {genderFilter.length > 0 && genderBreakdown && <section className="mb-5 rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6">
       <div className="mb-4 flex items-center gap-2">
         <span className="grid h-8 w-8 place-items-center rounded-lg bg-[#f3e8fb] text-[#7c3aa8]"><Users size={16} /></span>
         <div>
           <p className="font-mono-ui text-[10px] uppercase tracking-[0.17em] text-muted-foreground">Darwin — Gender field</p>
-          <h2 className="text-[15px] font-extrabold tracking-[-0.03em]">{GENDER_FILTERS.find((filter) => filter.key === genderFilter)?.label} headcount, by category</h2>
+          <h2 className="text-[15px] font-extrabold tracking-[-0.03em]">{selectionSummary(genderFilter, (key) => GENDER_FILTERS.find((filter) => filter.key === key)?.label ?? key)} headcount, by category</h2>
         </div>
       </div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -373,12 +393,12 @@ export default function InstructorsPage() {
       </div>
     </section>}
 
-    {subjectFilter !== 'all' && subjectBreakdown && <section className="mb-5 rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6">
+    {subjectFilter.length > 0 && subjectBreakdown && <section className="mb-5 rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6">
       <div className="mb-4 flex items-center gap-2">
         <span className="grid h-8 w-8 place-items-center rounded-lg bg-[#e3f0fb] text-[#1d6fa5]"><BookOpen size={16} /></span>
         <div>
           <p className="font-mono-ui text-[10px] uppercase tracking-[0.17em] text-muted-foreground">Darwin — derived teaching area</p>
-          <h2 className="text-[15px] font-extrabold tracking-[-0.03em]">{subjectFilter === UNSPECIFIED_SUBJECT ? 'Not set' : subjectFilter} headcount, by category</h2>
+          <h2 className="text-[15px] font-extrabold tracking-[-0.03em]">{selectionSummary(subjectFilter, (key) => (key === UNSPECIFIED_SUBJECT ? 'Not set' : key))} headcount, by category</h2>
         </div>
       </div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -386,12 +406,12 @@ export default function InstructorsPage() {
       </div>
     </section>}
 
-    {capabilityManagerFilter !== 'all' && capabilityManagerBreakdown && <section className="mb-5 rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6">
+    {capabilityManagerFilter.length > 0 && capabilityManagerBreakdown && <section className="mb-5 rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6">
       <div className="mb-4 flex items-center gap-2">
         <span className="grid h-8 w-8 place-items-center rounded-lg bg-[#dff0eb] text-[#287469]"><UserCheck size={16} /></span>
         <div>
           <p className="font-mono-ui text-[10px] uppercase tracking-[0.17em] text-muted-foreground">TeachOS — Capability Manager</p>
-          <h2 className="text-[15px] font-extrabold tracking-[-0.03em]">{capabilityManagerFilter === NO_CAPABILITY_MANAGER ? 'Not on file' : capabilityManagerFilter} headcount, by category</h2>
+          <h2 className="text-[15px] font-extrabold tracking-[-0.03em]">{selectionSummary(capabilityManagerFilter, (key) => (key === NO_CAPABILITY_MANAGER ? 'Not on file' : key))} headcount, by category</h2>
         </div>
       </div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -399,12 +419,12 @@ export default function InstructorsPage() {
       </div>
     </section>}
 
-    {payrollFilter !== 'all' && payrollBreakdown && <section className="mb-5 rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6">
+    {payrollFilter.length > 0 && payrollBreakdown && <section className="mb-5 rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6">
       <div className="mb-4 flex items-center gap-2">
         <span className="grid h-8 w-8 place-items-center rounded-lg bg-[#e6e9fb] text-[#4a4fb0]"><Wallet size={16} /></span>
         <div>
           <p className="font-mono-ui text-[10px] uppercase tracking-[0.17em] text-muted-foreground">Payroll status</p>
-          <h2 className="text-[15px] font-extrabold tracking-[-0.03em]">{PAYROLL_FILTERS.find((filter) => filter.key === payrollFilter)?.label} headcount, by category</h2>
+          <h2 className="text-[15px] font-extrabold tracking-[-0.03em]">{selectionSummary(payrollFilter, (key) => PAYROLL_FILTERS.find((filter) => filter.key === key)?.label ?? key)} headcount, by category</h2>
         </div>
       </div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -412,12 +432,12 @@ export default function InstructorsPage() {
       </div>
     </section>}
 
-    {campusFilter !== 'all' && campusBreakdown && <section className="mb-5 rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6">
+    {campusFilter.length > 0 && campusBreakdown && <section className="mb-5 rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6">
       <div className="mb-4 flex items-center gap-2">
         <span className="grid h-8 w-8 place-items-center rounded-lg bg-[#fbe9e3] text-[#b0511f]"><MapPin size={16} /></span>
         <div>
           <p className="font-mono-ui text-[10px] uppercase tracking-[0.17em] text-muted-foreground">Campus</p>
-          <h2 className="text-[15px] font-extrabold tracking-[-0.03em]">{campusFilter === UNSPECIFIED_CAMPUS ? 'Not set' : campusFilter} headcount, by category</h2>
+          <h2 className="text-[15px] font-extrabold tracking-[-0.03em]">{selectionSummary(campusFilter, (key) => (key === UNSPECIFIED_CAMPUS ? 'Not set' : key))} headcount, by category</h2>
         </div>
       </div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -452,6 +472,72 @@ export default function InstructorsPage() {
     {reportQuery.isError && <QueryError message="The instructor register could not be loaded." />}
     {!reportQuery.isLoading && !reportQuery.isError && people.length === 0 && <EmptyState title={`No ${activeTab.label.toLowerCase()} match this search`} description="Try a broader search or clear the search box." />}
     {!reportQuery.isLoading && !reportQuery.isError && people.length > 0 && <CategoryTable category={category} people={people} />}
+  </div>;
+}
+
+// Checkbox-list dropdown backing every filter on this page (2026-09-15, per
+// request -- "add multiple filter options"). A native <select multiple>
+// needs ctrl/cmd-click to pick more than one value, which is not
+// discoverable and doesn't work on touch at all -- this is the standard
+// checkbox-popover pattern instead: click the trigger to open, check any
+// number of options, click outside (or the trigger again) to close.
+// `selected`/`onChange` are plain string arrays so gender/payroll's typed
+// keys and subject/capability-manager/campus's dynamic string keys can all
+// share one component -- callers narrow the type back with `as` where
+// needed (see the two typed filters' onChange props in the JSX below).
+function MultiSelectFilter({ label, options, selected, onChange, testId, widthClass = 'max-w-[220px]' }: {
+  label: string;
+  options: { key: string; label: string; count: number }[];
+  selected: string[];
+  onChange: (next: string[]) => void;
+  testId: string;
+  widthClass?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClickOutside(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [open]);
+
+  function toggle(key: string) {
+    onChange(selected.includes(key) ? selected.filter((existing) => existing !== key) : [...selected, key]);
+  }
+
+  const summary = selected.length === 0
+    ? 'All'
+    : selected.length === 1
+      ? (options.find((option) => option.key === selected[0])?.label ?? selected[0])
+      : `${selected.length} selected`;
+
+  return <div className="flex flex-wrap items-center gap-2">
+    <label className="font-mono-ui text-[10px] uppercase tracking-[0.14em] text-muted-foreground">{label}</label>
+    <div ref={containerRef} className="relative">
+      <button
+        type="button"
+        data-testid={testId}
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        className={`flex h-9 items-center justify-between gap-2 rounded-lg border bg-background px-2.5 text-[12px] font-bold outline-none transition-colors focus:ring-2 focus:ring-ring/25 ${widthClass} ${selected.length > 0 ? 'border-primary text-primary' : 'border-border text-foreground'}`}
+      >
+        <span className="truncate">{summary}</span>
+        <ChevronDown size={14} className={`shrink-0 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && <div role="listbox" className="absolute left-0 top-full z-20 mt-1 max-h-[280px] w-max min-w-[220px] overflow-y-auto rounded-lg border border-border bg-card p-1 shadow-lg">
+        {options.length === 0 && <p className="px-2 py-1.5 text-[11px] text-muted-foreground">No options for this category</p>}
+        {options.map((option) => <label key={option.key} data-testid={`${testId}-option-${option.key}`} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-[12px] transition-colors hover:bg-secondary">
+          <input type="checkbox" checked={selected.includes(option.key)} onChange={() => toggle(option.key)} className="h-3.5 w-3.5 shrink-0 accent-primary" />
+          <span className="min-w-0 flex-1 truncate font-semibold text-foreground">{option.label}</span>
+          <span className="shrink-0 font-mono-ui text-[10px] text-muted-foreground">{formatCount(option.count)}</span>
+        </label>)}
+      </div>}
+    </div>
   </div>;
 }
 
@@ -521,7 +607,7 @@ function nameColumnLabel(category: CategoryKey): string {
 // Column set mirrors gridColsClass/CategoryTable below exactly, so the CSV
 // always matches what's on screen for the active category tab.
 function downloadInstructorsCsv(category: CategoryKey, people: InstructorSummary[]) {
-  const headers = [nameColumnLabel(category), 'Designation', 'Employee ID', 'TeachOS User ID', 'Email', 'Location'];
+  const headers = [nameColumnLabel(category), 'Designation', 'Employee ID', 'TeachOS User ID', 'Email', 'Location (Darwin)'];
   if (category === 'ops_team') headers.push('Department'); else headers.push('Subject', 'Department');
   if (category !== 'ops_team') headers.push('Campus');
   headers.push('Date of joining');
@@ -554,7 +640,7 @@ function CategoryTable({ category, people }: { category: CategoryKey; people: In
           <span>Employee ID</span>
           <span>TeachOS User ID</span>
           <span>Email</span>
-          <span>Location</span>
+          <span>Location (Darwin)</span>
           {category === 'ops_team' ? <span>Department</span> : <><span>Subject</span><span>Department</span></>}
           {category !== 'ops_team' && <span>Campus</span>}
           <span>Date of joining</span>
