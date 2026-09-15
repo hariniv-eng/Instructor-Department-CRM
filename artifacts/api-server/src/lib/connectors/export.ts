@@ -67,10 +67,54 @@ function toCsv(rows: SheetRow[]): string {
   return lines.join("\r\n");
 }
 
+// "teachos" deliberately does NOT use bigquery.ts's fetchTeachosRows()
+// anymore (2026-09-15 fix) -- that connector queries
+// niat_instructor_managers_and_instructors_details, which the live sync
+// stopped using back on 2026-09-XX in favor of the two-connector split
+// sync.ts itself runs (see its comment there): identity/institute/role/
+// category from niatInstructorDetails.ts's niat_instructor_details, plus a
+// supplementary Capability Manager pass from capabilityManager.ts's
+// niat_instructor_managers_and_instructors_details, keyed on
+// instructor_user_id. bigquery.ts's EXPECTED_COLUMNS still expects
+// instructor_manager/instructor_manager_mail/instructormanager_id columns
+// that niat_instructor_details never had -- calling it here (as this used
+// to) just throws "missing expected columns". This mirrors sync.ts's real
+// pipeline instead, so the export actually reflects what a live sync does.
+async function loadTeachosRows(): Promise<SheetRow[]> {
+  const [{ fetchNiatInstructorDetailsRows }, { fetchCapabilityManagerRows }] = await Promise.all([
+    import("./niatInstructorDetails"),
+    import("./capabilityManager"),
+  ]);
+  const [detailRows, managerRows] = await Promise.all([
+    fetchNiatInstructorDetailsRows(),
+    // Non-fatal, same as sync.ts's own capability-manager pass -- an export
+    // shouldn't fail outright just because this supplementary table is
+    // unreachable; it just comes back with no manager data attached.
+    fetchCapabilityManagerRows().catch(() => [] as SheetRow[]),
+  ]);
+  const managersByTeachosId = new Map<string, string[]>();
+  for (const row of managerRows) {
+    const teachosUserId = row["instructor_user_id"] as string | null;
+    const manager = row["instructor_manager"] as string | null;
+    if (!teachosUserId || !manager) continue;
+    const list = managersByTeachosId.get(teachosUserId) ?? [];
+    if (!list.includes(manager)) list.push(manager);
+    managersByTeachosId.set(teachosUserId, list);
+  }
+  return detailRows.map((row) => {
+    const teachosUserId = row["instructor_user_id"] as string | null;
+    const managers = teachosUserId ? managersByTeachosId.get(teachosUserId) : undefined;
+    // Raw, un-reconciled candidate list (joined, when more than one) -- NOT
+    // run through reconcileCapabilityManager()'s valid-roster/low-priority
+    // filtering, since this is a straight data dump, not a sync.
+    return { ...row, "Capability Manager (raw)": managers?.join("; ") ?? "" };
+  });
+}
+
 const loaders = {
   darwinbox: () => import("./darwinbox").then((m) => m.fetchDarwinRows()),
   "darwinbox-exits": () => import("./darwinboxExits").then((m) => m.fetchExitRows()),
-  teachos: () => import("./bigquery").then((m) => m.fetchTeachosRows()),
+  teachos: loadTeachosRows,
 } as const;
 
 const target = process.argv[2];
