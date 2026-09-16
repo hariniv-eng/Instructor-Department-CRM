@@ -18,6 +18,7 @@
     "check:teachos-column": "tsx src/lib/connectors/checkColumnValues.ts",
     "check:darwinbox-ids": "tsx src/lib/connectors/checkDarwinboxIds.ts",
     "reconcile:from-csv": "tsx src/scripts/reconcileFromCsv.ts",
+    "check:capability-managers": "tsx src/scripts/checkCapabilityManagerCandidates.ts",
     "seed:app-users": "tsx src/scripts/seedAdmin.ts"
   },
   "dependencies": {
