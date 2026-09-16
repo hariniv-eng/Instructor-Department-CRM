@@ -664,9 +664,17 @@ function PersonRow({ category, person, columns }: { category: CategoryKey; perso
 // (2026-09-09, per request). Reachable by either Admin or Manager -- see
 // the dedicated PATCH /instructors/:id/gender route (requireAuth only, no
 // requireRole, unlike the other manual-edit fields on the detail page).
-// stopPropagation on the wrapping div is required: PersonRow's whole row is
-// a wouter <Link>, so without it, opening/using the dropdown would also
-// trigger the row's click-through navigation to the instructor detail page.
+// preventDefault + stopPropagation on the wrapping div are BOTH required:
+// PersonRow's whole row is a wouter <Link>, rendered as a real <a href=...>.
+// stopPropagation alone (2026-09-15's original fix) isn't enough -- it stops
+// wouter's own onClick (attached to that <a>) from firing, but wouter's
+// onClick is also what calls preventDefault() to stop the browser's native
+// anchor navigation. Block that handler from ever running and the native
+// "follow this link" behavior fires unopposed instead of being suppressed --
+// clicking the dropdown was redirecting straight to the instructor detail
+// page (2026-09-16, per report), the opposite of the intended fix. Calling
+// preventDefault() here too suppresses the browser's default action for the
+// whole dispatch regardless of which element's listener calls it.
 function GenderCell({ person }: { person: InstructorSummary }) {
   const queryClient = useQueryClient();
   const updateGender = useUpdateInstructorGender({
@@ -682,7 +690,7 @@ function GenderCell({ person }: { person: InstructorSummary }) {
   }
 
   const value = person.gender === 'male' || person.gender === 'female' ? person.gender : '';
-  return <div onClick={(event) => event.stopPropagation()} className="text-[12px]">
+  return <div onClick={(event) => { event.preventDefault(); event.stopPropagation(); }} className="text-[12px]">
     <select
       value={value}
       onChange={(event) => {
@@ -737,8 +745,9 @@ function CapabilityManagerCell({ person }: { person: InstructorSummary }) {
 // Admin-only, same gating as CapabilityManagerCell above (no separate
 // Manager login anymore, so `user` truthy means signed in as Admin). See
 // the dedicated PATCH /instructors/:id/subject route. Same
-// stopPropagation requirement as the cells above (the whole row is a
-// wouter <Link>).
+// preventDefault + stopPropagation requirement as GenderCell above (the
+// whole row is a wouter <Link>, rendered as a real <a href=...> -- see
+// GenderCell's comment for why stopPropagation alone isn't enough).
 function SubjectCell({ person }: { person: InstructorSummary }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -759,7 +768,7 @@ function SubjectCell({ person }: { person: InstructorSummary }) {
   }
 
   const value = person.dept_area_source === 'manual' && person.dept_area ? person.dept_area : '';
-  return <div onClick={(event) => event.stopPropagation()} className="text-[12px]">
+  return <div onClick={(event) => { event.preventDefault(); event.stopPropagation(); }} className="text-[12px]">
     <select
       value={value}
       onChange={(event) => {
