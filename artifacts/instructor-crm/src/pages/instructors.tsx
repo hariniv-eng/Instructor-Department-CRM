@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Briefcase, BookOpen, Building2, ChevronDown, GraduationCap, MapPin, Search, UserCheck, Users, UsersRound, Wallet, X } from 'lucide-react';
-import { useGetReportsInstructors, useUpdateInstructorCapabilityManager, useUpdateInstructorGender, useUpdateInstructorSubject, getGetReportsInstructorsQueryKey } from '@workspace/api-client-react';
+import { useGetReportsInstructors, useUpdateInstructorGender, useUpdateInstructorSubject, getGetReportsInstructorsQueryKey } from '@workspace/api-client-react';
 import type { AccessSplit, InstructorSummary } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link } from 'wouter';
@@ -79,9 +79,8 @@ const UNSPECIFIED_SUBJECT = '__unspecified__';
 
 // Capability Manager filter (2026-09-15, per request), same "same as
 // gender" treatment: computed from the manager names actually present in
-// the active category rather than a hardcoded list, since
-// VALID_CAPABILITY_MANAGERS (see the roster mirrored below for the manual
-// editor) can change without this page being touched.
+// the active category rather than a hardcoded list, so this doesn't need
+// touching as TeachOS's own roster of managers changes over time.
 const NO_CAPABILITY_MANAGER = '__none__';
 
 // Payroll filter (2026-09-15, per request) -- mirrors the Payroll/Nxtwave
@@ -118,33 +117,6 @@ function selectionSummary(selected: string[], labelFor: (key: string) => string)
   if (selected.length <= 3) return selected.map(labelFor).join(', ');
   return `${selected.length} selected`;
 }
-
-// Maintained Capability Manager roster (2026-09-15, per request) -- mirrors
-// artifacts/api-server/src/data/validCapabilityManagers.ts exactly, since
-// the manual-entry dropdown below must only ever offer names the backend's
-// PATCH /instructors/:id/capability-manager route will actually accept
-// (it 400s on anything not on that list). Keep these two lists in sync by
-// hand when a Capability Manager is added or removed -- same convention as
-// that file's own header comment.
-const VALID_CAPABILITY_MANAGERS: string[] = [
-  'Akhilendar Reddy',
-  'Boddikurapati Yaswanth',
-  'Dharavath Jayanth',
-  'Garlapati Prudhvi Raj',
-  'Hari Krishna Daggubati',
-  'Karthik Katuri',
-  'Katuri Karthik',
-  'Meka Sri Satya Prudhvi Charan',
-  'Nunna Naga Venkata Dasaradhi',
-  'Penumarthi Satya Syamala',
-  'Pradeep Jat',
-  'Preethi Vangaveti',
-  'Riya Rai',
-  'Shaik Mohammed Pasha',
-  'Sigatapu Sai Sankar',
-  'solasa vinay',
-  'Voppangi Sai Prasanna',
-];
 
 // Maintained Subject/area roster (2026-09-15, per request) -- mirrors
 // departmentTaxonomy.ts's RULES-derived SUBJECT_AREAS exactly, since the
@@ -729,58 +701,26 @@ function GenderCell({ person }: { person: InstructorSummary }) {
   </div>;
 }
 
-// Capability Manager is read-only text when TeachOS supplied it
-// (person.capability_manager_source === 'teachos') -- TeachOS's own value
-// is never overridden here. Otherwise (none of this person's TeachOS
-// candidate rows matched the maintained roster -- see
-// validCapabilityManagers.ts) this shows an editable dropdown, populated
-// from that same maintained roster, so a human who knows the person's real
-// Capability Manager can mark it (2026-09-15, per request).
+// Capability Manager is always read-only text here -- the manual-entry
+// dropdown this cell used to show for people with no TeachOS-matched
+// Capability Manager was removed (2026-09-16, per request): a missing
+// Capability Manager here means the person isn't in TeachOS at all yet, not
+// a data gap someone should paper over by hand -- once they're added to
+// TeachOS, their real Capability Manager comes through the normal sync
+// like everyone else's. The dedicated PATCH /instructors/:id/capability-
+// manager route (and manual_capability_manager column) are left in place
+// server-side in case a manual override is wanted again later; nothing in
+// this page calls it anymore.
 //
-// Unlike GenderCell above, this stays Admin-only -- matching the other
-// Admin-only manual fields (Manual Status/Exit Date/Notes on the detail
-// page), gated the same way those are there: an editable control only when
-// `user` is set (there's no separate Manager login anymore -- see
-// routes/index.ts -- so `user` truthy means signed in as Admin), plain
-// text/badge otherwise. See the dedicated PATCH
-// /instructors/:id/capability-manager route. Same stopPropagation
-// requirement as GenderCell (the whole row is a wouter <Link>).
+// A manually-set value from before this change (capability_manager_source
+// === 'manual') still displays normally here -- this only removes the
+// ability to set new ones, not existing data.
 function CapabilityManagerCell({ person }: { person: InstructorSummary }) {
-  const { user } = useAuth();
-  const queryClient = useQueryClient();
-  const updateCapabilityManager = useUpdateInstructorCapabilityManager({
-    mutation: {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getGetReportsInstructorsQueryKey() });
-      },
-    },
-  });
-
   // No valid Capability Manager name matched among this person's TeachOS
   // candidates and none has been set manually either -- flagged distinctly
   // (not just a blank/dash) so a gap in this data is easy to spot at a
   // glance while scanning the table, per the coverage section above.
-  if (person.capability_manager_source === 'teachos' || !user) {
-    return <div className="truncate text-[12px]">{person.capability_manager ? <span className="text-foreground">{person.capability_manager}</span> : <span className="inline-flex rounded-full bg-[#fff7db] px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] text-[#8b6207]">Missing</span>}</div>;
-  }
-
-  const value = person.capability_manager_source === 'manual' && person.capability_manager ? person.capability_manager : '';
-  return <div onClick={(event) => event.stopPropagation()} className="text-[12px]">
-    <select
-      value={value}
-      onChange={(event) => {
-        const next = event.target.value;
-        updateCapabilityManager.mutate({ id: person.id, data: { manual_capability_manager: next === '' ? null : next } });
-      }}
-      disabled={updateCapabilityManager.isPending}
-      data-testid={`select-manual-capability-manager-${person.id}`}
-      title="No Capability Manager matched from TeachOS -- mark it manually"
-      className={`h-8 w-full rounded-md border bg-background px-1.5 text-[11px] font-semibold outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-ring/25 disabled:opacity-60 ${value ? 'border-border text-foreground' : 'border-[#f0d78c] text-[#8b6207]'}`}
-    >
-      <option value="">Missing -- pick one</option>
-      {VALID_CAPABILITY_MANAGERS.map((name) => <option key={name} value={name}>{name}</option>)}
-    </select>
-  </div>;
+  return <div className="truncate text-[12px]">{person.capability_manager ? <span className="text-foreground">{person.capability_manager}</span> : <span className="inline-flex rounded-full bg-[#fff7db] px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] text-[#8b6207]">Missing</span>}</div>;
 }
 
 // Subject is read-only text when classifyDepartment() resolved one
