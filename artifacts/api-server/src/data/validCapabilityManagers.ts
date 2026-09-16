@@ -53,3 +53,28 @@ export const VALID_CAPABILITY_MANAGERS: string[] = [
   "solasa vinay",
   "Voppangi Sai Prasanna",
 ];
+
+// Aliases for how a valid Capability Manager's name is actually recorded as
+// an "instructor_manager" candidate in the raw source data, when that
+// differs from their full name above -- confirmed via
+// check:capability-managers (2026-09-16, per request): "Riya" (51 candidate
+// rows) and "Pradeep" (29 candidate rows) were being silently dropped as
+// unmatched/invalid, even though they're really Riya Rai and Pradeep Jat --
+// the source only ever records their first name for these two, never the
+// full name reconcileCapabilityManager() was matching against.
+//
+// Note: "Naga Venkata Dasaradhi Nunna" (132 candidate rows, same four words
+// as "Nunna Naga Venkata Dasaradhi" reversed) was also considered for this
+// list but deliberately left out, per request (2026-09-16) -- don't add it
+// back without checking first.
+//
+// Key = the raw candidate value as recorded in BigQuery, looked up via the
+// same normalize() (case/accent/spacing-insensitive) reconcileCapabilityManager()
+// already uses for everything else. Value = the canonical full name from
+// VALID_CAPABILITY_MANAGERS above, which is what actually gets written to
+// teachos_manager -- so the app always shows one consistent full name for
+// these two, regardless of which raw variant the source happened to record.
+export const CAPABILITY_MANAGER_ALIASES: Record<string, string> = {
+  Riya: "Riya Rai",
+  Pradeep: "Pradeep Jat",
+};
