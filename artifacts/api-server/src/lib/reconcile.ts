@@ -7,7 +7,7 @@
 import { and, eq } from "drizzle-orm";
 import { db, instructorsTable, darwinboxExitsTable, teachosIdReferenceTable } from "@workspace/db";
 import { EXCLUDED_EMPLOYEES, type ExcludedOverride, OTHER_DEPARTMENT_EMPLOYEES, type OtherDepartmentOverride } from "../data/classificationOverrides";
-import { VALID_CAPABILITY_MANAGERS } from "../data/validCapabilityManagers";
+import { VALID_CAPABILITY_MANAGERS, CAPABILITY_MANAGER_ALIASES } from "../data/validCapabilityManagers";
 import { classifyDepartment, classifyDeployment } from "./departmentTaxonomy";
 
 export type SheetRow = Record<string, unknown>;
@@ -594,7 +594,16 @@ export async function reconcileTeachosEmployeeIdReference(rows: SheetRow[]) {
 // ends up as either a real, confirmed Capability Manager or left unset --
 // never an arbitrary/wrong name (e.g. "Ranjith", "Rajat" -- both observed
 // candidates for real instructors, neither an actual Capability Manager).
-const VALID_CAPABILITY_MANAGER_SET = new Set(VALID_CAPABILITY_MANAGERS.map((name) => normalize(name)));
+//
+// Maps a candidate's normalized form to the canonical full name that should
+// actually get written -- both the roster names themselves (self-mapped)
+// and CAPABILITY_MANAGER_ALIASES's raw-variant spellings (e.g. "Riya" ->
+// "Riya Rai"), so a candidate accepted via an alias still writes the same
+// canonical name a directly-matching candidate would, not the raw variant.
+const CANONICAL_CAPABILITY_MANAGER_BY_NORMALIZED = new Map<string, string>([
+  ...VALID_CAPABILITY_MANAGERS.map((name) => [normalize(name), name] as const),
+  ...Object.entries(CAPABILITY_MANAGER_ALIASES).map(([alias, canonical]) => [normalize(alias), canonical] as const),
+]);
 
 // "Garlapati Prudhvi Raj" is a real Capability Manager, but he also shows up
 // as a candidate row for far more instructors than the others -- evidently
@@ -628,12 +637,13 @@ export async function reconcileCapabilityManager(rows: SheetRow[]) {
     const teachosUserId = cell(item, "instructor_user_id", "Instructor User Id");
     const manager = cell(item, "instructor_manager", "Instructor Manager");
     if (!teachosUserId || !manager) continue;
-    if (!VALID_CAPABILITY_MANAGER_SET.has(normalize(manager))) {
+    const canonicalManager = CANONICAL_CAPABILITY_MANAGER_BY_NORMALIZED.get(normalize(manager));
+    if (!canonicalManager) {
       invalidCount += 1;
       continue;
     }
     const list = validCandidatesByTeachosId.get(teachosUserId) ?? [];
-    if (!list.some((existing) => normalize(existing) === normalize(manager))) list.push(manager);
+    if (!list.includes(canonicalManager)) list.push(canonicalManager);
     validCandidatesByTeachosId.set(teachosUserId, list);
   }
 
