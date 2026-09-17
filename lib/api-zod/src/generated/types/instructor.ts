@@ -78,6 +78,11 @@ export interface Instructor {
   /** @nullable */
   exit_flag_date?: Date | null;
   /**
+     * Capability Manager's manual read on an exit-flagged record -- exited | serving_notice_period | payroll_converted | null. Tracking label only; never affects computed_status/manual_status.
+     * @nullable
+     */
+  exit_verification?: string | null;
+  /**
      * tech | non_tech | null. See departmentTaxonomy.ts. Null for excluded/mentor rows (see classification).
      * @nullable
      */

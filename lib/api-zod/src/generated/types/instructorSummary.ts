@@ -43,4 +43,8 @@ export interface InstructorSummary {
   gender: string | null;
   /** @nullable */
   gender_source: 'darwin' | 'manual' | null;
+  /** True when a live Darwinbox exit/resignation record was found for this person -- powers the Exit column's dropdown vs. dash. */
+  exit_flag: boolean;
+  /** @nullable */
+  exit_verification: 'exited' | 'serving_notice_period' | 'payroll_converted' | null;
 }

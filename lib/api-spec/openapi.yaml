@@ -291,6 +291,41 @@ paths:
               schema: { $ref: "#/components/schemas/Instructor" }
         "400": { description: "manual_dept_area must be one of departmentTaxonomy.ts's recognized area names, or null" }
         "404": { description: Not found }
+  /instructors/{id}/exit-verification:
+    patch:
+      operationId: updateInstructorExitVerification
+      tags: [instructors]
+      summary: Set or clear a Capability Manager's exit-verification label for an exit-flagged instructor (Admin or Manager)
+      description: >-
+        Both-role sibling of PATCH /instructors/{id} above, like the gender
+        endpoint -- reachable by either Admin or Manager, since a Capability
+        Manager may be logged in as either. Lets a Capability Manager record
+        their read on someone with a live Darwinbox exit record on file
+        (InstructorSummary.exit_flag) as one of "exited",
+        "serving_notice_period", or "payroll_converted" (or null to clear
+        it back to unreviewed). This is a TRACKING LABEL ONLY -- it never
+        changes computed_status or manual_status, and never affects the
+        standing instructor headcount. Actually excluding someone from the
+        count stays the separate, deliberate Manual Status control on
+        PATCH /instructors/{id} (Admin-only).
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: number }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/InstructorExitVerificationUpdate" }
+      responses:
+        "200":
+          description: Updated instructor
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Instructor" }
+        "400": { description: "exit_verification must be \"exited\", \"serving_notice_period\", \"payroll_converted\", or null" }
+        "404": { description: Not found }
   /dashboard:
     get:
       operationId: getDashboard
@@ -442,6 +477,7 @@ components:
         exit_flag: { type: boolean, description: "True when a live Darwinbox exit/resignation record was found for this person. Flagged only — NOT subtracted from the standing instructor count." }
         exit_flag_status: { type: ["string", "null"], description: "Darwinbox resignation status as of the most recent exit sync, e.g. Approved, Pending With Approver, Rejected, Revoked." }
         exit_flag_date: { type: ["string", "null"], format: date }
+        exit_verification: { type: ["string", "null"], enum: ["exited", "serving_notice_period", "payroll_converted", null], description: "Capability Manager's manual read on an exit-flagged record, settable via PATCH /instructors/{id}/exit-verification by either Admin or Manager. Tracking label only — never affects computed_status/manual_status or the headcount." }
         dept_bucket: { type: ["string", "null"], description: "tech | non_tech | null. See departmentTaxonomy.ts. Null for excluded/mentor rows (see classification)." }
         dept_area: { type: ["string", "null"], description: "Sub-area within dept_bucket, e.g. Frontend, Backend, DSA, GenAI, English, Aptitude, Math." }
         manual_dept_area: { type: ["string", "null"], description: "Manual fallback for Subject/dept_area, settable via PATCH /instructors/{id}/subject (Admin only). Only used when classifyDepartment() left this person unclassified. Must be one of departmentTaxonomy.ts's recognized area names, or null." }
@@ -493,6 +529,15 @@ components:
       required: [manual_dept_area]
       properties:
         manual_dept_area: { type: ["string", "null"], description: "Must be one of departmentTaxonomy.ts's SUBJECT_AREAS, or null." }
+    # Body for PATCH /instructors/{id}/exit-verification -- both-role
+    # sibling like InstructorGenderUpdate above (a Capability Manager may be
+    # logged in as either Admin or Manager). Tracking label only: setting
+    # this never touches manual_status/computed_status or the headcount.
+    InstructorExitVerificationUpdate:
+      type: object
+      required: [exit_verification]
+      properties:
+        exit_verification: { type: ["string", "null"], enum: ["exited", "serving_notice_period", "payroll_converted", null] }
     Dashboard:
       type: object
       required: [kpis, monthly_trend, sub_departments, designations]
@@ -716,6 +761,8 @@ components:
         - work_location
         - gender
         - gender_source
+        - exit_flag
+        - exit_verification
       properties:
         id: { type: number }
         full_name: { type: string }
@@ -764,10 +811,13 @@ components:
         # date_of_joining above -- blank rather than a stale value when
         # there's no current Darwin access for this person.
         org_email: { type: ["string", "null"] }
-        # Darwin's own "Work Location" field, shown as a Location column on
-        # the Instructors tab table (2026-09-15, per request) -- distinct
-        # from the Campus column (institutes, TeachOS deployment). Same
-        # gating as date_of_joining/org_email above.
+        # Shown as the "Location (Darwin)" column on the Instructors tab
+        # table (2026-09-15, per request) -- distinct from the Campus column
+        # (institutes, TeachOS deployment). Same gating as date_of_joining/
+        # org_email above. Originally sourced from Darwin's "Work Location"
+        # field; switched to Darwin's "Workspace" field instead (2026-09-17,
+        # per request) -- same API field name and frontend column, just a
+        # different Darwin source column feeding it.
         work_location: { type: ["string", "null"] }
         # Effective gender -- Darwin's own "Gender" field (typically "Male"/
         # "Female") when present, else the manually-set fallback (2026-09-09
@@ -778,3 +828,16 @@ components:
         # tab shows plain text) or was set/left blank manually (the
         # Instructors tab shows the manual-gender dropdown instead).
         gender_source: { type: ["string", "null"], enum: ["darwin", "manual", null] }
+        # True when a live Darwinbox exit/resignation record was found for
+        # this person (2026-09-17, per request) -- powers the Instructors
+        # tab's Exit column: true shows the manual-verification dropdown,
+        # false shows a plain dash. Flagged only, same "flag, don't
+        # subtract" philosophy as elsewhere -- never subtracted from the
+        # standing instructor count by itself.
+        exit_flag: { type: boolean }
+        # Capability Manager's manual read on an exit-flagged record,
+        # settable via PATCH /instructors/{id}/exit-verification by either
+        # Admin or Manager -- see that endpoint's description for why this
+        # is a tracking label only and never touches computed_status/
+        # manual_status or the headcount.
+        exit_verification: { type: ["string", "null"], enum: ["exited", "serving_notice_period", "payroll_converted", null] }

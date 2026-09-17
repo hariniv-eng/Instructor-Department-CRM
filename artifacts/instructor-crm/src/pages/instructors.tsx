@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Briefcase, BookOpen, Building2, ChevronDown, GraduationCap, MapPin, Search, UserCheck, Users, UsersRound, Wallet, X } from 'lucide-react';
-import { useGetReportsInstructors, useUpdateInstructorGender, useUpdateInstructorSubject, getGetReportsInstructorsQueryKey } from '@workspace/api-client-react';
+import { useGetReportsInstructors, useUpdateInstructorGender, useUpdateInstructorSubject, useUpdateInstructorExitVerification, getGetReportsInstructorsQueryKey } from '@workspace/api-client-react';
 import type { AccessSplit, InstructorSummary } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link } from 'wouter';
@@ -555,16 +555,19 @@ function MultiSelectFilter({ label, options, selected, onChange, testId, widthCl
 // explained above). Location (Darwin's own Work Location field --
 // 2026-09-15, per request) sits right after Email -- distinct from Campus
 // (institutes, TeachOS deployment), which stays where it was (150px).
+// Trailing 190px on every variant below is the new Exit column (2026-09-17,
+// per request) -- wide enough for the "Serving Notice Period" dropdown
+// option text (the longest of the three) without clipping.
 function gridColsClass(category: CategoryKey): string {
-  if (category === 'instructors') return 'grid-cols-[260px_190px_130px_280px_220px_150px_160px_170px_220px_140px_190px_130px_150px]';
+  if (category === 'instructors') return 'grid-cols-[260px_190px_130px_280px_220px_150px_160px_170px_220px_140px_190px_130px_150px_190px]';
   // "Instructor Department" (the combined list) has the same column set as
   // Mentors: Subject + Department, Campus, no Payroll (payroll status isn't
   // a meaningful concept for the Mentors/Ops rows mixed into this list).
-  if (category === 'mentors' || category === 'department') return 'grid-cols-[260px_190px_130px_280px_220px_150px_160px_170px_240px_140px_190px_150px]';
+  if (category === 'mentors' || category === 'department') return 'grid-cols-[260px_190px_130px_280px_220px_150px_160px_170px_240px_140px_190px_150px_190px]';
   // Operations team has no Campus column -- ops rows aren't deployed to a
   // teaching campus the way instructors and mentors are. It also has only
   // one Subject/Department-style column (labeled "Department"), not both.
-  return 'grid-cols-[260px_190px_130px_280px_220px_150px_280px_140px_190px_150px]';
+  return 'grid-cols-[260px_190px_130px_280px_220px_150px_280px_140px_190px_150px_190px]';
 }
 
 // Name column header/label is per-category -- "Instructor Department" mixes
@@ -586,6 +589,7 @@ function downloadInstructorsCsv(category: CategoryKey, people: InstructorSummary
   headers.push('Capability Manager');
   if (category === 'instructors') headers.push('Payroll');
   headers.push('Gender');
+  headers.push('Exit');
 
   const rows = people.map((person) => {
     const row: string[] = [person.full_name, person.designation ?? '', person.employee_id ?? '', person.teachos_user_id ?? '', person.org_email ?? '', person.work_location ?? ''];
@@ -595,6 +599,10 @@ function downloadInstructorsCsv(category: CategoryKey, people: InstructorSummary
     row.push(person.capability_manager ?? '');
     if (category === 'instructors') row.push(person.is_payroll ? 'Payroll' : 'Nxtwave');
     row.push(person.gender ?? '');
+    // Blank when there's no exit record at all; "Not reviewed" when one
+    // exists but no Capability Manager has verified it yet; otherwise the
+    // reviewed label -- mirrors ExitCell's dash-vs-dropdown split below.
+    row.push(person.exit_flag ? EXIT_VERIFICATION_LABELS[person.exit_verification ?? ''] ?? 'Not reviewed' : '');
     return row;
   });
 
@@ -619,6 +627,7 @@ function CategoryTable({ category, people }: { category: CategoryKey; people: In
           <span>Capability Manager</span>
           {category === 'instructors' && <span>Payroll</span>}
           <span>Gender</span>
+          <span>Exit</span>
         </div>
         <div>{people.map((person) => <PersonRow key={person.id} category={category} person={person} columns={columns} />)}</div>
       </div>
@@ -654,6 +663,7 @@ function PersonRow({ category, person, columns }: { category: CategoryKey; perso
     <CapabilityManagerCell person={person} />
     {category === 'instructors' && <div>{person.is_payroll ? <span className="inline-flex rounded-full bg-[#e6e9fb] px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] text-[#4a4fb0]">Payroll</span> : <span className="inline-flex rounded-full bg-secondary px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] text-muted-foreground">Nxtwave</span>}</div>}
     <GenderCell person={person} />
+    <ExitCell person={person} />
   </Link>;
 }
 
@@ -705,6 +715,60 @@ function GenderCell({ person }: { person: InstructorSummary }) {
       <option value="">Not on file</option>
       <option value="male">Male</option>
       <option value="female">Female</option>
+    </select>
+  </div>;
+}
+
+const EXIT_VERIFICATION_LABELS: Record<string, string> = {
+  exited: 'Exited',
+  serving_notice_period: 'Serving Notice Period',
+  payroll_converted: 'Payroll Converted',
+};
+
+// Exit column (2026-09-17, per request): for anyone with a live Darwinbox
+// exit record on file (person.exit_flag), shows an editable dropdown so a
+// Capability Manager can record their read on the situation -- Exited,
+// Serving Notice Period, or Payroll Converted. This is a TRACKING LABEL
+// ONLY (see exitVerification's comment in the schema): picking a value here
+// never changes computed/manual status or the standing instructor headcount
+// -- that stays the separate Manual Status control on the instructor detail
+// page. Everyone else (no exit record) just gets a dash, same as e.g.
+// designation's fallback above. Reachable by either Admin or Manager, same
+// population as Gender above -- see the dedicated PATCH
+// /instructors/:id/exit-verification route (requireAuth only, no
+// requireRole). preventDefault + stopPropagation on the wrapping div are
+// BOTH required here too -- see GenderCell's comment above for why.
+function ExitCell({ person }: { person: InstructorSummary }) {
+  const queryClient = useQueryClient();
+  const updateExitVerification = useUpdateInstructorExitVerification({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetReportsInstructorsQueryKey() });
+      },
+    },
+  });
+
+  if (!person.exit_flag) {
+    return <div className="truncate text-[12px] text-muted-foreground">—</div>;
+  }
+
+  const value = person.exit_verification ?? '';
+  return <div onClick={(event) => { event.preventDefault(); event.stopPropagation(); }} className="text-[12px]">
+    <select
+      value={value}
+      onChange={(event) => {
+        const next = event.target.value;
+        updateExitVerification.mutate({ id: person.id, data: { exit_verification: next === '' ? null : (next as 'exited' | 'serving_notice_period' | 'payroll_converted') } });
+      }}
+      disabled={updateExitVerification.isPending}
+      data-testid={`select-exit-verification-${person.id}`}
+      title="Exit record on file -- verify what's actually going on with this person"
+      className="h-8 w-full rounded-md border border-border bg-background px-1.5 text-[11px] font-semibold text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-ring/25 disabled:opacity-60"
+    >
+      <option value="">Not reviewed</option>
+      <option value="exited">{EXIT_VERIFICATION_LABELS.exited}</option>
+      <option value="serving_notice_period">{EXIT_VERIFICATION_LABELS.serving_notice_period}</option>
+      <option value="payroll_converted">{EXIT_VERIFICATION_LABELS.payroll_converted}</option>
     </select>
   </div>;
 }

@@ -75,12 +75,14 @@ const toApiInstructorSummary = (row: InstructorRow) => ({
   // TeachOS-only row (no current Darwin access, or a stale value left over
   // from a past Darwin match) shows blank rather than a stale email.
   org_email: row.inDarwin ? row.orgEmail : null,
-  // Darwin's own "Work Location" field -- added to the Instructors tab
-  // table (2026-09-15, per request) as a Location column. Distinct from
-  // the existing Campus column (institutes, TeachOS deployment) -- this is
-  // Darwin's own office/work-location field. Same gating as
-  // date_of_joining/org_email above.
-  work_location: row.inDarwin ? row.workLocation : null,
+  // Darwin's own "Workspace" field -- powers the Instructors tab table's
+  // "Location (Darwin)" column. Originally sourced from Darwin's "Work
+  // Location" field (2026-09-15); switched to "Workspace" instead
+  // (2026-09-17, per request) -- same API field name (work_location) and
+  // frontend column, just a different Darwin source column feeding it.
+  // Distinct from the existing Campus column (institutes, TeachOS
+  // deployment). Same gating as date_of_joining/org_email above.
+  work_location: row.inDarwin ? row.workspace : null,
   // Darwin's own Gender field -- added (2026-09-09, per request) to power a
   // gender filter + male/female count on the Instructors tab. Same gating
   // as date_of_joining above: a TeachOS-only row (no Darwin record at all,
@@ -95,6 +97,18 @@ const toApiInstructorSummary = (row: InstructorRow) => ({
   // plain text or the manual-gender dropdown for a given row.
   gender: (row.inDarwin ? row.gender : null) ?? row.manualGender ?? null,
   gender_source: row.inDarwin && row.gender ? "darwin" : row.manualGender ? "manual" : null,
+  // Whether this person has a live Darwinbox exit record on file (2026-09-17,
+  // per request) -- not gated on inDarwin like the fields above, since
+  // exitFlag is computed straight from darwinboxExitsTable and stays
+  // meaningful whether or not this person currently has Darwin access. Used
+  // by the Instructors tab table to decide whether to render the Exit
+  // column's manual-verification dropdown (exit_flag true) or a plain dash.
+  exit_flag: row.exitFlag,
+  // Capability Manager's manual read on an exit-flagged record -- "exited" |
+  // "serving_notice_period" | "payroll_converted" | null. Purely a tracking
+  // label; see exitVerification's comment in the schema for why it never
+  // touches computed/manual status or the headcount.
+  exit_verification: row.exitVerification,
 });
 
 // This is the single reporting surface for the breakdowns requested on top
