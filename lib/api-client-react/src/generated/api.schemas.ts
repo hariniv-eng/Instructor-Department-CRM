@@ -82,6 +82,9 @@ export interface Instructor {
   exit_flag_status?: string | null;
   /** @nullable */
   exit_flag_date?: string | null;
+  /** Capability Manager's manual read on an exit-flagged record -- exited | serving_notice_period | payroll_converted | null. Tracking label only; never affects computed_status/manual_status.
+     * @nullable */
+  exit_verification?: 'exited' | 'serving_notice_period' | 'payroll_converted' | null;
   /**
      * tech | non_tech | null. See departmentTaxonomy.ts. Null for excluded/mentor rows (see classification).
      * @nullable
@@ -140,6 +143,11 @@ export interface InstructorCapabilityManagerUpdate {
 /** Body for PATCH /instructors/{id}/subject -- Admin-only, same pattern as InstructorCapabilityManagerUpdate above. Not a fixed union: departmentTaxonomy.ts's SUBJECT_AREAS is the source of truth; the route validates against it server-side and 400s on anything else. */
 export interface InstructorSubjectUpdate {
   manual_dept_area: string | null;
+}
+
+/** Body for PATCH /instructors/{id}/exit-verification -- both-role-editable like InstructorGenderUpdate above (Capability Managers may be logged in as either Admin or Manager). Tracking label only -- never touches manual_status/computed_status. */
+export interface InstructorExitVerificationUpdate {
+  exit_verification: 'exited' | 'serving_notice_period' | 'payroll_converted' | null;
 }
 
 export type DashboardKpis = {[key: string]: number};
@@ -332,6 +340,10 @@ export interface InstructorSummary {
   gender: string | null;
   /** Whether `gender` above came from Darwin (locked, not editable here) or was set/left blank manually ("manual" or null). Drives whether the Instructors tab shows a plain value or the manual-gender dropdown for this row. @nullable */
   gender_source: 'darwin' | 'manual' | null;
+  /** True when a live Darwinbox exit/resignation record was found for this person. Drives whether the Instructors tab's Exit column shows the manual-verification dropdown (true) or a plain dash (false). */
+  exit_flag: boolean;
+  /** Capability Manager's manual read on an exit-flagged record, settable via PATCH /instructors/{id}/exit-verification by either Admin or Manager. Tracking label only -- never affects computed_status/manual_status or headcount. @nullable */
+  exit_verification: 'exited' | 'serving_notice_period' | 'payroll_converted' | null;
 }
 
 export interface InstructorsReport {

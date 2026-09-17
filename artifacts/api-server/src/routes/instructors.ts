@@ -45,6 +45,7 @@ const toApiInstructor = (row: typeof instructorsTable.$inferSelect) => ({
   exit_flag: row.exitFlag,
   exit_flag_status: row.exitFlagStatus,
   exit_flag_date: row.exitFlagDate,
+  exit_verification: row.exitVerification,
   // Department taxonomy + deployment status — see
   // artifacts/api-server/src/lib/departmentTaxonomy.ts.
   dept_bucket: row.deptBucket,
@@ -209,6 +210,37 @@ router.patch("/instructors/:id/subject", requireAuth, requireRole("admin"), asyn
     return;
   }
   const [row] = await db.update(instructorsTable).set({ manualDeptArea: raw }).where(eq(instructorsTable.id, Number(req.params.id))).returning();
+  if (!row) {
+    res.status(404).json({ error: "Instructor not found" });
+    return;
+  }
+  res.json(toApiInstructor(row));
+});
+
+const EXIT_VERIFICATION_VALUES = ["exited", "serving_notice_period", "payroll_converted"] as const;
+
+// Exit verification (2026-09-17, per request): lets a Capability Manager
+// record their read on an exit-flagged record -- exited / serving notice
+// period / payroll converted -- directly from the new Exit column on the
+// Instructors tab table. Reachable by either Admin or Manager (requireAuth
+// only, no requireRole), same population as Gender above -- there was an
+// explicit ask for Capability Managers themselves to be able to set this,
+// and Manager is the role without an Admin login. Deliberately does NOT
+// touch manualStatus/computedStatus: this is a tracking label only, same
+// "flag, don't subtract" philosophy as exitFlag itself (see
+// recomputeStatuses() and its comment in the schema) -- actually excluding
+// someone from the headcount stays the separate Manual Status control on
+// the instructor detail page (Admin-only). Only meaningful for exit-flagged
+// rows, but not enforced server-side -- the frontend only shows the
+// dropdown when exit_flag is true; setting this for a non-flagged row is
+// harmless (it just won't be visible anywhere) rather than blocked outright.
+router.patch("/instructors/:id/exit-verification", requireAuth, async (req, res): Promise<void> => {
+  const raw = (req.body as { exit_verification?: string | null }).exit_verification;
+  if (raw !== null && !EXIT_VERIFICATION_VALUES.includes(raw as (typeof EXIT_VERIFICATION_VALUES)[number])) {
+    res.status(400).json({ error: 'exit_verification must be "exited", "serving_notice_period", "payroll_converted", or null' });
+    return;
+  }
+  const [row] = await db.update(instructorsTable).set({ exitVerification: raw }).where(eq(instructorsTable.id, Number(req.params.id))).returning();
   if (!row) {
     res.status(404).json({ error: "Instructor not found" });
     return;

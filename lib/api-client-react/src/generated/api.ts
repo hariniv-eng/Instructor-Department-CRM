@@ -28,6 +28,7 @@ import type {
   InstructorGenderUpdate,
   InstructorCapabilityManagerUpdate,
   InstructorSubjectUpdate,
+  InstructorExitVerificationUpdate,
   InstructorInput,
   InstructorUpdate,
   InstructorsReport,
@@ -631,6 +632,68 @@ export const useUpdateInstructorSubject = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getUpdateInstructorSubjectMutationOptions(options));
+    }
+
+// Hand-matched to mirror updateInstructorGender/useUpdateInstructorGender
+// above exactly (both-role editable, not Admin-only like Capability Manager/
+// Subject above) -- this session's orval codegen is broken, so
+// /instructors/{id}/exit-verification's client is hand-written against
+// openapi.yaml's shape instead of generated for real.
+export const getUpdateInstructorExitVerificationUrl = (id: number,) => {
+
+  return `/api/instructors/${id}/exit-verification`
+}
+
+/**
+ * @summary Set or clear a Capability Manager's exit-verification label for an exit-flagged instructor (Admin or Manager)
+ */
+export const updateInstructorExitVerification = async (id: number,
+    instructorExitVerificationUpdate: InstructorExitVerificationUpdate, options?: Parameters<typeof customFetch>[1]): Promise<Instructor> => {
+
+  return customFetch<Instructor>(getUpdateInstructorExitVerificationUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(instructorExitVerificationUpdate)
+  }
+);}
+
+export const getUpdateInstructorExitVerificationMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateInstructorExitVerification>>, TError,{id: number;data: BodyType<InstructorExitVerificationUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateInstructorExitVerification>>, TError,{id: number;data: BodyType<InstructorExitVerificationUpdate>}, TContext> => {
+
+const mutationKey = ['updateInstructorExitVerification'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateInstructorExitVerification>>, {id: number;data: BodyType<InstructorExitVerificationUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateInstructorExitVerification(id,data,requestOptions)
+        }
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateInstructorExitVerificationMutationResult = NonNullable<Awaited<ReturnType<typeof updateInstructorExitVerification>>>
+    export type UpdateInstructorExitVerificationMutationBody = BodyType<InstructorExitVerificationUpdate>
+    export type UpdateInstructorExitVerificationMutationError = ErrorType<void>
+
+    /**
+ * @summary Set or clear a Capability Manager's exit-verification label for an exit-flagged instructor (Admin or Manager)
+ */
+export const useUpdateInstructorExitVerification = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateInstructorExitVerification>>, TError,{id: number;data: BodyType<InstructorExitVerificationUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateInstructorExitVerification>>,
+        TError,
+        {id: number;data: BodyType<InstructorExitVerificationUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateInstructorExitVerificationMutationOptions(options));
     }
 
 export const getGetDashboardUrl = () => {

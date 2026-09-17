@@ -99,6 +99,23 @@ export const instructorsTable = pgTable("instructors", {
   // sync, e.g. "Approved", "Pending With Approver", "Rejected", "Revoked".
   exitFlagStatus: text("exit_flag_status"),
   exitFlagDate: date("exit_flag_date"),
+  // Manual exit-review label (2026-09-17, per request): for anyone with an
+  // exit record on file (exitFlag true), a Capability Manager can record
+  // their read on the situation directly from the Instructors tab table --
+  // one of "exited" | "serving_notice_period" | "payroll_converted", or
+  // null (not yet reviewed). Deliberately a TRACKING LABEL ONLY: setting it
+  // does not touch computedStatus/manualStatus or the headcount in any way
+  // -- actually excluding someone from the standing instructor count stays
+  // the separate, deliberate Manual Status control on the instructor detail
+  // page (per the same "flag, don't subtract" philosophy as exitFlag
+  // itself -- see recomputeStatuses() and sync.ts's comment on the
+  // Darwinbox exits sync). Reachable by either Admin or Manager, same
+  // population as manualGender -- see the dedicated PATCH
+  // .../exit-verification route. Never written by any sync path, so it
+  // survives every sync; the frontend only shows the dropdown for rows
+  // where exitFlag is true (see toApiInstructorSummary in reports.ts) --
+  // not enforced server-side.
+  exitVerification: text("exit_verification"),
   // True when this person was NOT found in the Instructors-department-
   // filtered Darwin data (darwinbox_active) but WAS found via the fallback
   // match against Darwin's full/unfiltered company roster
