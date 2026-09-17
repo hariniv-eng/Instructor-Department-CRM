@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Bell, Building2, ChevronRight, Database, Eye, GitBranch, LayoutDashboard, LogIn, LogOut, Menu, UploadCloud, UsersRound, X } from 'lucide-react';
+import { Bell, Building2, ChevronRight, Database, Eye, GitBranch, LayoutDashboard, LogIn, LogOut, Menu, UploadCloud, UserX, UsersRound, X } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { useAuth, ROLE_LABELS } from '@/hooks/use-auth';
 import type { AppUser } from '@workspace/api-client-react';
@@ -10,11 +10,13 @@ const ALL_NAV_ITEMS = [
   { href: '/darwin-breakdown', label: 'Darwin Breakdown', icon: Building2 },
   { href: '/teachos-breakdown', label: 'TeachOS Breakdown', icon: GitBranch },
   { href: '/uploads', label: 'Source uploads', icon: UploadCloud },
+  { href: '/exits', label: 'Exits', icon: UserX },
 ];
 
 // "manager" only sees the Overview + Instructors headcount view — Darwin/
-// TeachOS breakdown detail and source uploads are admin-only (mirrors
-// ADMIN_ONLY_PATHS in App.tsx and requireRole("admin") on the backend).
+// TeachOS breakdown detail, source uploads, and exits are admin-only
+// (mirrors ADMIN_ONLY_PATHS in App.tsx and requireRole("admin") on the
+// backend).
 function navItemsForRole(role: AppUser['role'] | undefined) {
   if (role === 'admin') return ALL_NAV_ITEMS;
   return ALL_NAV_ITEMS.filter((item) => item.href === '/' || item.href === '/instructors');

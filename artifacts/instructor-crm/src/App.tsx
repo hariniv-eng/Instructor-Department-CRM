@@ -11,6 +11,7 @@ import InstructorsPage from '@/pages/instructors';
 import UploadsPage from '@/pages/uploads';
 import TeachosBreakdownPage from '@/pages/teachos-breakdown';
 import DarwinBreakdownPage from '@/pages/darwin-breakdown';
+import ExitsPage from '@/pages/exits';
 import LoginPage from '@/pages/login';
 import AccessChoicePage from '@/pages/access-choice';
 import { AuthProvider, useAuth } from '@/hooks/use-auth';
@@ -34,7 +35,7 @@ const queryClient = new QueryClient();
 // by /access — see hooks/use-view-mode.ts). Any actual session user is
 // necessarily Admin now, since the backend's /auth/login rejects any other
 // role (see api-server/src/routes/auth.ts).
-const ADMIN_ONLY_PATHS = ['/darwin-breakdown', '/teachos-breakdown', '/uploads'];
+const ADMIN_ONLY_PATHS = ['/darwin-breakdown', '/teachos-breakdown', '/uploads', '/exits'];
 
 function FullscreenLoader() {
   return (
@@ -87,6 +88,7 @@ function Router() {
                 <Route path="/teachos-breakdown" component={TeachosBreakdownPage} />
                 <Route path="/darwin-breakdown" component={DarwinBreakdownPage} />
                 <Route path="/uploads" component={UploadsPage} />
+                <Route path="/exits" component={ExitsPage} />
                 <Route component={NotFound} />
               </Switch>
             </AppShell>
