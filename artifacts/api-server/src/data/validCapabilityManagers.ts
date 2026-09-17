@@ -57,11 +57,16 @@ export const VALID_CAPABILITY_MANAGERS: string[] = [
 // Aliases for how a valid Capability Manager's name is actually recorded as
 // an "instructor_manager" candidate in the raw source data, when that
 // differs from their full name above -- confirmed via
-// check:capability-managers (2026-09-16, per request): "Riya" (51 candidate
-// rows) and "Pradeep" (29 candidate rows) were being silently dropped as
-// unmatched/invalid, even though they're really Riya Rai and Pradeep Jat --
-// the source only ever records their first name for these two, never the
-// full name reconcileCapabilityManager() was matching against.
+// check:capability-managers (2026-09-16, per request):
+//   - "Riya" (51 candidate rows) and "Pradeep" (29 candidate rows) were
+//     being silently dropped as unmatched/invalid, even though they're
+//     really Riya Rai and Pradeep Jat -- the source only ever records
+//     their first name, never the full name reconcileCapabilityManager()
+//     was matching against.
+//   - "Akhil" (19 candidate rows) is Akhilendar Reddy -- confirmed against
+//     Darwin's own record for NW0001087 ("Akhilendar Reddy Karri",
+//     designation "Capability Manager"), same first-name-only truncation
+//     as the other two.
 //
 // Note: "Naga Venkata Dasaradhi Nunna" (132 candidate rows, same four words
 // as "Nunna Naga Venkata Dasaradhi" reversed) was also considered for this
@@ -73,8 +78,9 @@ export const VALID_CAPABILITY_MANAGERS: string[] = [
 // already uses for everything else. Value = the canonical full name from
 // VALID_CAPABILITY_MANAGERS above, which is what actually gets written to
 // teachos_manager -- so the app always shows one consistent full name for
-// these two, regardless of which raw variant the source happened to record.
+// these, regardless of which raw variant the source happened to record.
 export const CAPABILITY_MANAGER_ALIASES: Record<string, string> = {
   Riya: "Riya Rai",
   Pradeep: "Pradeep Jat",
+  Akhil: "Akhilendar Reddy",
 };
