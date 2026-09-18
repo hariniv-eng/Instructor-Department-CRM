@@ -143,7 +143,14 @@ router.get("/reports/instructors", async (_req, res) => {
   // for what's supposed to be the same headline count — the gap was mentors
   // Darwin has on file who don't have a TeachOS record yet at all. Taking
   // the Darwin count as the source of truth resolves that discrepancy.
-  const mentors = allRows.filter((r) => r.inDarwin && !r.inDarwinFullRoster && r.classification === "mentor");
+  // "&& r.exitVerification !== 'exited'" (2026-09-18, per request): once a
+  // Capability Manager confirms a Mentor's exit record as an actual
+  // completed exit (not Serving Notice Period or Payroll Converted, and not
+  // left unreviewed), they come out of the Mentors count -- see the matching
+  // guards on opsTeamRows/darwinInstructorsForCount/teachosOnlyForPayrollCount
+  // below, and exceptionRows' comment further down for the review-queue
+  // logic this powers.
+  const mentors = allRows.filter((r) => r.inDarwin && !r.inDarwinFullRoster && r.classification === "mentor" && r.exitVerification !== "exited");
   // "Counted as instructors" excludes: individual excluded overrides,
   // Delivery Support (Ops and Central Managers), and Mentors — none of
   // these are instructor roles. Mentors get their own reported section
@@ -160,7 +167,9 @@ router.get("/reports/instructors", async (_req, res) => {
   // not just TeachOS-active ones — so a Darwin Ops person who was never
   // onboarded into TeachOS still counts here, same reasoning as the
   // Mentors 85-vs-90 fix.
-  const opsTeamRows = allRows.filter((r) => r.classification === "excluded_ops_managers");
+  // See the exitVerification guard on `mentors` above -- same rule, same
+  // 2026-09-18 request, applied to Operations team.
+  const opsTeamRows = allRows.filter((r) => r.classification === "excluded_ops_managers" && r.exitVerification !== "exited");
   // The IIT Kharagpur team is set aside the same way mentors/excluded
   // people are — a real category, not silently dropped, but not counted as
   // an instructor either (see reconcile.ts's payroll cascade, 2026-09-03).
@@ -229,8 +238,12 @@ router.get("/reports/instructors", async (_req, res) => {
   // countedInstructorRows is now built from, so every breakdown below
   // (department, campus, manager, deployment, payroll split, the
   // click-to-expand instructor list, and the CSV download) reflects it too.
-  const darwinInstructorsForCount = allRows.filter((r) => r.inDarwin && !r.inDarwinFullRoster && !r.classification && (r.deptBucket === "tech" || r.deptBucket === "non_tech"));
-  const teachosOnlyForPayrollCount = allRows.filter((r) => r.inTeachos && !r.inDarwin);
+  // See the exitVerification guard on `mentors` above -- same rule, same
+  // 2026-09-18 request, applied to the Instructors count's two source
+  // populations (Darwin-matched instructors and the TeachOS-only/Payroll
+  // pool below).
+  const darwinInstructorsForCount = allRows.filter((r) => r.inDarwin && !r.inDarwinFullRoster && !r.classification && (r.deptBucket === "tech" || r.deptBucket === "non_tech") && r.exitVerification !== "exited");
+  const teachosOnlyForPayrollCount = allRows.filter((r) => r.inTeachos && !r.inDarwin && r.exitVerification !== "exited");
   const payrollConvertedForCount = teachosOnlyForPayrollCount.filter((r) => r.classification === "payroll_converted");
   const needsReviewForCount = teachosOnlyForPayrollCount.filter((r) =>
     r.classification !== "excluded_other_department"
@@ -328,11 +341,31 @@ router.get("/reports/instructors", async (_req, res) => {
   // "excluded_ops_managers" (and inDarwin) -- a row can only ever match one
   // of those three shapes.
   const departmentRows: InstructorRow[] = [...countedInstructorRows, ...mentors, ...opsTeamRows];
+
+  // "Exception" bifurcation (2026-09-18, per request): a review queue, not a
+  // fifth headcount bucket -- every Instructor/Mentor/Ops person (the same
+  // departmentRows population above) with a live exit record that a
+  // Capability Manager hasn't reviewed yet (exitFlag true, exitVerification
+  // still null). They're still counted in their normal category's total
+  // above right up until someone actually resolves them:
+  //   - marks them "Exited" -> the exitVerification !== "exited" guards on
+  //     mentors/opsTeamRows/darwinInstructorsForCount/teachosOnlyForPayrollCount
+  //     above already dropped them from both departmentRows AND this queue,
+  //     so nothing further to do here -- they simply won't appear in either
+  //     by the time this filter runs. (They're still tracked for HR purposes
+  //     via GET /reports/exits, which reads exitFlag directly off allRows.)
+  //   - marks them "Serving Notice Period" or "Payroll Converted" -> stays
+  //     counted in their category (no guard excludes either value), and
+  //     exitVerification is no longer null, so they drop out of this queue
+  //     too, without ever leaving the headcount.
+  const exceptionRows = departmentRows.filter((r) => r.exitFlag && !r.exitVerification);
+
   const accessBreakdown = {
     department: buildAccessSplit(departmentRows),
     instructors: buildAccessSplit(countedInstructorRows),
     mentors: buildAccessSplit(mentors),
     ops_team: buildAccessSplit(opsTeamRows),
+    exception: buildAccessSplit(exceptionRows),
   };
 
   res.json({
@@ -346,6 +379,12 @@ router.get("/reports/instructors", async (_req, res) => {
       mentors_count: mentors.length,
       excluded_count: excludedRows.length,
       ops_team_count: opsTeamRows.length,
+      // Unreviewed-exit review queue (2026-09-18, per request) -- see
+      // exceptionRows' comment above. Not additive with the counts above:
+      // everyone here is already included in exactly one of
+      // total_instructor_count/mentors_count/ops_team_count/
+      // department_total_count.
+      exception_count: exceptionRows.length,
       iit_kharagpur_count: iitKharagpurRows.length,
       // New employee-ID-mapping pipeline breakdown (see comment above
       // countedInstructorRows): who's actually feeding the headline total,

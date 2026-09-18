@@ -12,4 +12,5 @@ export type InstructorsReportAccessBreakdown = {
   instructors?: AccessSplit;
   mentors?: AccessSplit;
   ops_team?: AccessSplit;
+  exception?: AccessSplit;
 };

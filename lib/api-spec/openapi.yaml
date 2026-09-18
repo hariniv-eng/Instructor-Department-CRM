@@ -690,12 +690,13 @@ components:
           items: { $ref: "#/components/schemas/InstructorSummary" }
         access_breakdown:
           type: object
-          description: Darwin-only / TeachOS-only / both-access split for the Instructor Department, Instructors, Mentors, and Operations team KPI cards (2026-09-04; department card added 2026-09-07). "department" is the union of instructors + mentors + ops_team (mutually exclusive populations, safe to sum).
+          description: Darwin-only / TeachOS-only / both-access split for the Instructor Department, Instructors, Mentors, Operations team, and Exception KPI cards (2026-09-04; department card added 2026-09-07; exception added 2026-09-18). "department" is the union of instructors + mentors + ops_team (mutually exclusive populations, safe to sum). "exception" is a review-queue overlay on top of those three, not a fourth population to add in -- see reports.ts's exceptionRows comment.
           properties:
             department: { $ref: "#/components/schemas/AccessSplit" }
             instructors: { $ref: "#/components/schemas/AccessSplit" }
             mentors: { $ref: "#/components/schemas/AccessSplit" }
             ops_team: { $ref: "#/components/schemas/AccessSplit" }
+            exception: { $ref: "#/components/schemas/AccessSplit" }
     AccessBucket:
       type: object
       description: One darwin_only/both/teachos_only bucket -- a count plus the actual people in it, for the click-to-drill-down view.
