@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Briefcase, BookOpen, Building2, ChevronDown, GraduationCap, MapPin, Search, UserCheck, Users, UsersRound, Wallet, X } from 'lucide-react';
+import { AlertTriangle, Briefcase, BookOpen, Building2, ChevronDown, GraduationCap, MapPin, Search, UserCheck, Users, UsersRound, Wallet, X } from 'lucide-react';
 import { useGetReportsInstructors, useUpdateInstructorGender, useUpdateInstructorSubject, useUpdateInstructorExitVerification, getGetReportsInstructorsQueryKey } from '@workspace/api-client-react';
 import type { AccessSplit, InstructorSummary } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -8,7 +8,7 @@ import { PageIntro, EmptyState, QueryError, SkeletonBlock, DownloadCsvButton, Mi
 import { downloadCsv, slugify, toCsv } from '@/lib/csv';
 import { useAuth } from '@/hooks/use-auth';
 
-type CategoryKey = 'department' | 'instructors' | 'mentors' | 'ops_team';
+type CategoryKey = 'department' | 'instructors' | 'mentors' | 'ops_team' | 'exception';
 
 // Each tab's people list is the same union of darwin_only + both + teachos_only
 // that backs the matching Overview KPI card's count -- so "165 Instructors" here
@@ -19,11 +19,22 @@ type CategoryKey = 'department' | 'instructors' | 'mentors' | 'ops_team';
 // KPI card of the same name -- access_breakdown.department already existed
 // on the API response for that card, so this tab needed no backend change,
 // just wiring up the same field here.
+// "Exception" (2026-09-18, per request) is a review queue, not a fourth
+// population alongside Instructors/Mentors/Ops -- anyone shown here is
+// already counted in exactly one of those three (and in Department). It
+// lists everyone with an exit record a Capability Manager hasn't reviewed
+// yet (the Exit column's dropdown is still "Not reviewed"); resolving that
+// dropdown to Exited removes the person from their category's count
+// everywhere (this tab and the Overview dashboard), while Serving Notice
+// Period or Payroll Converted leaves the count untouched -- either way they
+// drop off this queue once reviewed. See reports.ts's exceptionRows comment
+// for the full rule.
 const CATEGORY_TABS: { key: CategoryKey; label: string; icon: typeof UsersRound; description: string }[] = [
   { key: 'department', label: 'Instructor Department', icon: Building2, description: 'Instructors + Mentors + Operations team, combined.' },
   { key: 'instructors', label: 'Instructors', icon: UsersRound, description: 'Everyone counted toward the TeachOS instructor count.' },
   { key: 'mentors', label: 'Mentors', icon: GraduationCap, description: 'Darwin — Mentors department.' },
   { key: 'ops_team', label: 'Operations team', icon: Briefcase, description: 'Darwin — Delivery Support (Ops), filed under Operations rather than Instructor or Mentor.' },
+  { key: 'exception', label: 'Exception', icon: AlertTriangle, description: 'Instructors, Mentors, and Ops team members with an exit record still awaiting review -- resolve via the Exit column below.' },
 ];
 
 function formatCount(value: number | undefined) {
@@ -294,16 +305,6 @@ export default function InstructorsPage() {
 
   const anyFilterActive = genderFilter.length > 0 || subjectFilter.length > 0 || capabilityManagerFilter.length > 0 || payrollFilter.length > 0 || campusFilter.length > 0;
 
-  // Coverage check for the currently-viewed category (2026-09, per request):
-  // how many of these people have a Capability Manager on file at all, vs.
-  // how many don't -- computed client-side from the same list already
-  // loaded for the table below, so switching category/search updates it
-  // too. This is a visibility/audit aid, not a new backend computation --
-  // capability_manager itself is the same TeachOS-sourced field already
-  // shown in the Overview drill-down (see reports.ts's toApiInstructorSummary).
-  const withCapabilityManager = allPeople.filter((person) => !!person.capability_manager).length;
-  const missingCapabilityManager = allPeople.length - withCapabilityManager;
-
   return <div className="mx-auto max-w-[1500px]">
     <PageIntro
       eyebrow="Workforce register / Darwin + TeachOS"
@@ -319,7 +320,7 @@ export default function InstructorsPage() {
             const isActive = category === tab.key;
             return <button key={tab.key} type="button" data-testid={`button-category-${tab.key}`} onClick={() => setCategory(tab.key)} aria-pressed={isActive} className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-bold transition-colors ${isActive ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'}`}>
               <Icon size={14} /> {tab.label}
-              <span className="ml-1 font-mono-ui text-[10px] opacity-70">{formatCount(report?.kpis[tab.key === 'department' ? 'department_total_count' : tab.key === 'instructors' ? 'total_instructor_count' : tab.key === 'mentors' ? 'mentors_count' : 'ops_team_count'])}</span>
+              <span className="ml-1 font-mono-ui text-[10px] opacity-70">{formatCount(report?.kpis[tab.key === 'department' ? 'department_total_count' : tab.key === 'instructors' ? 'total_instructor_count' : tab.key === 'mentors' ? 'mentors_count' : tab.key === 'ops_team' ? 'ops_team_count' : 'exception_count'])}</span>
             </button>;
           })}
         </div>
@@ -414,21 +415,6 @@ export default function InstructorsPage() {
       </div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {campusBreakdown.map((row) => <MiniStat key={row.key} label={row.label} value={row.count} meta={`${pct(row.count, row.total)} of ${row.label.toLowerCase()}`} tone="muted" />)}
-      </div>
-    </section>}
-
-    {!reportQuery.isLoading && !reportQuery.isError && allPeople.length > 0 && <section className="mb-5 rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6">
-      <div className="mb-4 flex items-center gap-2">
-        <span className="grid h-8 w-8 place-items-center rounded-lg bg-[#dff0eb] text-[#287469]"><UserCheck size={16} /></span>
-        <div>
-          <p className="font-mono-ui text-[10px] uppercase tracking-[0.17em] text-muted-foreground">TeachOS-sourced, {activeTab.label.toLowerCase()} in view</p>
-          <h2 className="text-[15px] font-extrabold tracking-[-0.03em]">Capability Manager coverage</h2>
-        </div>
-      </div>
-      <div className="grid gap-3 sm:grid-cols-3">
-        <MiniStat label="Assigned" value={withCapabilityManager} meta={`${pct(withCapabilityManager, allPeople.length)} of ${activeTab.label.toLowerCase()} have a Capability Manager on file`} tone="green" />
-        <MiniStat label="Missing" value={missingCapabilityManager} meta="No valid Capability Manager name matched among their TeachOS candidates" tone={missingCapabilityManager > 0 ? 'amber' : 'muted'} />
-        <MiniStat label="Total in category" value={allPeople.length} meta={`Every ${activeTab.label.toLowerCase()} counted, search excluded`} tone="muted" />
       </div>
     </section>}
 
@@ -563,7 +549,9 @@ function gridColsClass(category: CategoryKey): string {
   // "Instructor Department" (the combined list) has the same column set as
   // Mentors: Subject + Department, Campus, no Payroll (payroll status isn't
   // a meaningful concept for the Mentors/Ops rows mixed into this list).
-  if (category === 'mentors' || category === 'department') return 'grid-cols-[260px_190px_130px_280px_220px_150px_160px_170px_240px_140px_190px_150px_190px]';
+  // "Exception" (2026-09-18) mixes Instructors/Mentors/Ops the same way
+  // Department does, so it gets the identical column set.
+  if (category === 'mentors' || category === 'department' || category === 'exception') return 'grid-cols-[260px_190px_130px_280px_220px_150px_160px_170px_240px_140px_190px_150px_190px]';
   // Operations team has no Campus column -- ops rows aren't deployed to a
   // teaching campus the way instructors and mentors are. It also has only
   // one Subject/Department-style column (labeled "Department"), not both.
@@ -575,7 +563,7 @@ function gridColsClass(category: CategoryKey): string {
 function nameColumnLabel(category: CategoryKey): string {
   if (category === 'ops_team') return 'Team member';
   if (category === 'mentors') return 'Mentor';
-  if (category === 'department') return 'Person';
+  if (category === 'department' || category === 'exception') return 'Person';
   return 'Instructor';
 }
 

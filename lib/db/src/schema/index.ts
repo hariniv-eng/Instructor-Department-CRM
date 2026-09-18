@@ -99,18 +99,23 @@ export const instructorsTable = pgTable("instructors", {
   // sync, e.g. "Approved", "Pending With Approver", "Rejected", "Revoked".
   exitFlagStatus: text("exit_flag_status"),
   exitFlagDate: date("exit_flag_date"),
-  // Manual exit-review label (2026-09-17, per request): for anyone with an
-  // exit record on file (exitFlag true), a Capability Manager can record
-  // their read on the situation directly from the Instructors tab table --
-  // one of "exited" | "serving_notice_period" | "payroll_converted", or
-  // null (not yet reviewed). Deliberately a TRACKING LABEL ONLY: setting it
-  // does not touch computedStatus/manualStatus or the headcount in any way
-  // -- actually excluding someone from the standing instructor count stays
-  // the separate, deliberate Manual Status control on the instructor detail
-  // page (per the same "flag, don't subtract" philosophy as exitFlag
-  // itself -- see recomputeStatuses() and sync.ts's comment on the
-  // Darwinbox exits sync). Reachable by either Admin or Manager, same
-  // population as manualGender -- see the dedicated PATCH
+  // Manual exit-review label (2026-09-17, per request; headcount behavior
+  // revised 2026-09-18, per request): for anyone with an exit record on file
+  // (exitFlag true), a Capability Manager can record their read on the
+  // situation directly from the Instructors tab table -- one of "exited" |
+  // "serving_notice_period" | "payroll_converted", or null (not yet
+  // reviewed). This does NOT touch computedStatus/manualStatus -- excluding
+  // someone from those stays the separate Manual Status control on the
+  // instructor detail page. It DOES now affect the Instructors-tab/Overview
+  // headcount, per an explicit 2026-09-18 request that reverses the original
+  // "tracking label only" design for exactly one value: "exited" removes the
+  // person from their category's count (Instructors/Mentors/Operations
+  // team/Department total, everywhere those figures are shown -- see
+  // GET /reports/instructors in reports.ts). "serving_notice_period" and
+  // "payroll_converted" leave the count untouched, same as null. See
+  // reports.ts's exceptionRows/exitVerification comments for the full
+  // Exception-tab review-queue logic this powers. Reachable by either Admin
+  // or Manager, same population as manualGender -- see the dedicated PATCH
   // .../exit-verification route. Never written by any sync path, so it
   // survives every sync; the frontend only shows the dropdown for rows
   // where exitFlag is true (see toApiInstructorSummary in reports.ts) --
