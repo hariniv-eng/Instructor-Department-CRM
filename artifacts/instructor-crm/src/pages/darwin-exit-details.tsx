@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { RefreshCw, Users, Building2 } from 'lucide-react';
-import { PageIntro, EmptyState, QueryError, SkeletonBlock, TopStat, formatKpi } from '@/components/ui-pieces';
+import { PageIntro, EmptyState, QueryError, SkeletonBlock, TopStat, TablePager, usePagedRows, formatKpi } from '@/components/ui-pieces';
 
 // Full joined exit-record dump (2026-09-19, per request: "the darwin data
 // report id that we are using is limited to few details of data only ...
@@ -52,6 +52,12 @@ export default function DarwinExitDetailsPage() {
   const query = useDarwinExitDetails();
   const data = query.data;
   const refresh = () => queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+  // Client-side pagination (2026-09-19, per request: "can we apply the pager
+  // logic for the darwin full rooster and also the darwin exit tabs tables")
+  // -- see usePagedRows/TablePager in ui-pieces.tsx. Only paginates the main
+  // exit-records table below; the small department_breakdown list above is
+  // short enough to show in full.
+  const pager = usePagedRows(data?.rows ?? [], 50);
 
   return <div className="mx-auto max-w-[1500px]">
     <PageIntro
@@ -92,19 +98,31 @@ export default function DarwinExitDetailsPage() {
 
     {data && (data.count === 0
       ? <EmptyState title="No exit records yet" description="Run the Exits sync (Source uploads) to pull the base exit report and its enrichment reports." />
-      : <div className="overflow-x-auto">
-        <table className="w-max min-w-full border-collapse text-left">
-          <thead>
-            <tr className="border-b border-border bg-[#f4f7f9]">
-              {data.columns.map((column) => <th key={column} className="whitespace-nowrap px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">{column}</th>)}
-            </tr>
-          </thead>
-          <tbody>
-            {data.rows.map((row, index) => <tr key={index} className="border-b border-border/70 last:border-0 hover:bg-[#f8fafb]">
-              {data.columns.map((column) => <td key={column} className="whitespace-nowrap px-4 py-3 text-[12px] text-foreground">{cellText(row[column]) || <span className="text-muted-foreground">—</span>}</td>)}
-            </tr>)}
-          </tbody>
-        </table>
+      : <div className="rounded-lg border border-border">
+        <div className="overflow-x-auto">
+          <table className="w-max min-w-full border-collapse text-left">
+            <thead>
+              <tr className="border-b border-border bg-[#f4f7f9]">
+                {data.columns.map((column) => <th key={column} className="whitespace-nowrap px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">{column}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {pager.pageRows.map((row, index) => <tr key={index} className="border-b border-border/70 last:border-0 hover:bg-[#f8fafb]">
+                {data.columns.map((column) => <td key={column} className="whitespace-nowrap px-4 py-3 text-[12px] text-foreground">{cellText(row[column]) || <span className="text-muted-foreground">—</span>}</td>)}
+              </tr>)}
+            </tbody>
+          </table>
+        </div>
+        <TablePager
+          page={pager.page}
+          pageCount={pager.pageCount}
+          pageSize={pager.pageSize}
+          start={pager.start}
+          end={pager.end}
+          total={pager.total}
+          onPageChange={pager.setPage}
+          onPageSizeChange={pager.setPageSize}
+        />
       </div>
     )}
   </div>;

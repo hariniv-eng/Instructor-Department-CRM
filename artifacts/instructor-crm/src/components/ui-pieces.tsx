@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { AlertTriangle, Check, ChevronDown, ChevronUp, CircleCheck, Download, LoaderCircle } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { AlertTriangle, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, CircleCheck, Download, LoaderCircle } from 'lucide-react';
 import { downloadCsv, slugify, toCsv } from '@/lib/csv';
 
 export function PageIntro({ eyebrow, title, description, action }: { eyebrow: string; title: string; description?: string; action?: React.ReactNode }) {
@@ -216,4 +216,83 @@ export function BucketPanel({ title, subtitle, icon, bucket, emptyLabel, columns
         </div>}
     </div>}
   </section>;
+}
+
+// Client-side pagination for the big raw-dump tables (Darwin Full Roster,
+// Darwin Exit Details) -- 2026-09-19, per request: "can we apply the pager
+// logic for the darwin full rooster and also the darwin exit tabs tables".
+// Both pages already fetch every row in one API response (there's no
+// server-side page/pageSize param -- see reports.ts), so this just slices
+// the already-fetched array for display; it doesn't reduce payload size,
+// only how many rows render into the DOM and how much the user scrolls
+// through at once. `usePagedRows` clamps its own page number, so a refresh
+// that shrinks the row count (or a page-size change) can never leave the
+// view stranded past the last page.
+export const PAGE_SIZE_OPTIONS = [25, 50, 100, 200] as const;
+
+export function usePagedRows<T>(rows: T[], defaultPageSize: number = 50) {
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(defaultPageSize);
+  const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
+  const page_ = Math.min(Math.max(page, 1), pageCount);
+  const start = rows.length === 0 ? 0 : (page_ - 1) * pageSize;
+  const end = Math.min(start + pageSize, rows.length);
+  const pageRows = useMemo(() => rows.slice(start, start + pageSize), [rows, start, pageSize]);
+  return {
+    page: page_,
+    setPage,
+    pageSize,
+    setPageSize: (size: number) => { setPageSize(size); setPage(1); },
+    pageCount,
+    start,
+    end,
+    total: rows.length,
+    pageRows,
+  };
+}
+
+export function TablePager({ page, pageCount, pageSize, start, end, total, onPageChange, onPageSizeChange }: {
+  page: number;
+  pageCount: number;
+  pageSize: number;
+  start: number;
+  end: number;
+  total: number;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (size: number) => void;
+}) {
+  return <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-[#f8fafb] px-4 py-2.5">
+    <span className="text-[11px] text-muted-foreground">
+      {total === 0 ? 'No rows' : <>Showing <strong className="font-semibold text-foreground">{start + 1}</strong>–<strong className="font-semibold text-foreground">{end}</strong> of <strong className="font-semibold text-foreground">{formatKpi(total)}</strong></>}
+    </span>
+    <div className="flex items-center gap-2">
+      <select
+        data-testid="select-page-size"
+        value={pageSize}
+        onChange={(e) => onPageSizeChange(Number(e.target.value))}
+        className="rounded-md border border-border bg-card px-2 py-1.5 text-[11px] font-semibold text-foreground"
+      >
+        {PAGE_SIZE_OPTIONS.map((size) => <option key={size} value={size}>{size} / page</option>)}
+      </select>
+      <button
+        type="button"
+        data-testid="button-page-prev"
+        disabled={page <= 1}
+        onClick={() => onPageChange(page - 1)}
+        className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-2.5 py-1.5 text-[11px] font-semibold text-foreground transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        <ChevronLeft size={13} /> Prev
+      </button>
+      <span className="min-w-[80px] text-center font-mono-ui text-[11px] tabular-nums text-muted-foreground">Page {page} / {pageCount}</span>
+      <button
+        type="button"
+        data-testid="button-page-next"
+        disabled={page >= pageCount}
+        onClick={() => onPageChange(page + 1)}
+        className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-2.5 py-1.5 text-[11px] font-semibold text-foreground transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        Next <ChevronRight size={13} />
+      </button>
+    </div>
+  </div>;
 }
