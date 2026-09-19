@@ -49,7 +49,7 @@ export default function DarwinExitDetailsPage() {
     <PageIntro
       eyebrow="Darwinbox / exit report + enrichment reports, joined"
       title="Darwin Exit Details"
-      description="Every field on file for each exited employee -- the base exit report's Employee Id / Full Name / Exit Date / Reason / Status, plus whatever the enrichment reports (DBX_CHECK_ENRICH_REPORT_IDS) add on top, joined by Employee Id. Refresh via the Exits sync (Source uploads) to pull the latest."
+      description="Every field on file for each exited Instructors Department employee -- the base exit report's Employee Id / Full Name / Exit Date / Reason / Status, plus whatever the enrichment reports (DBX_CHECK_ENRICH_REPORT_IDS) add on top, joined by Employee Id. Scoped to Top Department = Instructors Department (NWD_ID); other departments' exits aren't shown here. Refresh via the Exits sync (Source uploads) to pull the latest."
       action={<button type="button" data-testid="button-refresh-darwin-exit-details" onClick={refresh} className="inline-flex items-center gap-2 self-start rounded-lg border border-border bg-card px-3.5 py-2.5 text-[12px] font-bold text-foreground transition-colors hover:bg-secondary lg:self-auto"><RefreshCw size={14} /> Refresh</button>}
     />
 
@@ -58,7 +58,7 @@ export default function DarwinExitDetailsPage() {
 
     {data && <div className="mb-6 grid max-w-xs grid-cols-1">
       <TopStat
-        label="Exit records on file"
+        label="Instructors Dept. exit records"
         value={formatKpi(data.count)}
         meta={data.synced_at ? `As of last sync -- ${new Date(data.synced_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' })}` : 'Sync time unavailable'}
         icon={<Users size={16} />}
