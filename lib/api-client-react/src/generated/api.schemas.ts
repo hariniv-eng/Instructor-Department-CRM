@@ -145,9 +145,9 @@ export interface InstructorSubjectUpdate {
   manual_dept_area: string | null;
 }
 
-/** Body for PATCH /instructors/{id}/exit-verification -- both-role-editable like InstructorGenderUpdate above (Capability Managers may be logged in as either Admin or Manager). Tracking label only -- never touches manual_status/computed_status. */
+/** Body for PATCH /instructors/{id}/exit-verification -- both-role-editable like InstructorGenderUpdate above (Capability Managers may be logged in as either Admin or Manager). Tracking label only -- never touches manual_status/computed_status. "revoked" removed as a settable value (2026-09-19, per request) -- reports.ts now auto-excludes Darwinbox-reported "Revoked" exits from the Exception queue on its own. */
 export interface InstructorExitVerificationUpdate {
-  exit_verification: 'exited' | 'serving_notice_period' | 'payroll_converted' | 'absconded' | 'revoked' | null;
+  exit_verification: 'exited' | 'serving_notice_period' | 'payroll_converted' | 'absconded' | null;
 }
 
 export type DashboardKpis = {[key: string]: number};

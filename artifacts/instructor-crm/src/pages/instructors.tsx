@@ -718,23 +718,27 @@ const EXIT_VERIFICATION_LABELS: Record<string, string> = {
   revoked: 'Revoked',
 };
 
-// Exit column (2026-09-17, per request; Absconded/Revoked added 2026-09-19):
-// for anyone with a live Darwinbox exit record on file (person.exit_flag),
+// Exit column (2026-09-17, per request; Absconded/Revoked added 2026-09-19;
+// Revoked removed again from this dropdown the same day -- see below): for
+// anyone with a live Darwinbox exit record on file (person.exit_flag),
 // shows an editable dropdown so a Capability Manager can record their read
-// on the situation -- Exited, Serving Notice Period, Payroll Converted,
-// Absconded, or Revoked. This is a TRACKING LABEL ONLY (see
-// exitVerification's comment in the schema): picking a value here never
-// changes computed/manual status or the standing instructor headcount --
-// that stays the separate Manual Status control on the instructor detail
-// page. It does drive the Instructors tab's Exception queue though -- see
-// reports.ts's exceptionRows: everything except Payroll Converted and
-// Revoked (the two "resolved" outcomes) keeps showing there. Everyone else
-// (no exit record) just gets a dash, same as e.g. designation's fallback
-// above. Reachable by either Admin or Manager, same population as Gender
-// above -- see the dedicated PATCH /instructors/:id/exit-verification route
-// (requireAuth only, no requireRole). preventDefault + stopPropagation on
-// the wrapping div are BOTH required here too -- see GenderCell's comment
-// above for why.
+// on the situation -- Exited, Serving Notice Period, Payroll Converted, or
+// Absconded. This is a TRACKING LABEL ONLY (see exitVerification's comment
+// in the schema): picking a value here never changes computed/manual status
+// or the standing instructor headcount -- that stays the separate Manual
+// Status control on the instructor detail page. It does drive the
+// Instructors tab's Exception queue though -- see reports.ts's
+// exceptionRows: everything except Payroll Converted (and anyone Darwinbox
+// itself reports as "Revoked" via the live exit sync -- reports.ts's
+// hasRevokedExitStatus) keeps showing there. Everyone else (no exit record)
+// just gets a dash, same as e.g. designation's fallback above. "Revoked" was
+// dropped as a selectable option here (per request) since that automatic
+// Darwinbox-status check already excludes revoked exits from the queue --
+// a manual "Revoked" label was redundant with it. Reachable by either Admin
+// or Manager, same population as Gender above -- see the dedicated PATCH
+// /instructors/:id/exit-verification route (requireAuth only, no
+// requireRole). preventDefault + stopPropagation on the wrapping div are
+// BOTH required here too -- see GenderCell's comment above for why.
 function ExitCell({ person }: { person: InstructorSummary }) {
   const queryClient = useQueryClient();
   const updateExitVerification = useUpdateInstructorExitVerification({
@@ -755,7 +759,7 @@ function ExitCell({ person }: { person: InstructorSummary }) {
       value={value}
       onChange={(event) => {
         const next = event.target.value;
-        updateExitVerification.mutate({ id: person.id, data: { exit_verification: next === '' ? null : (next as 'exited' | 'serving_notice_period' | 'payroll_converted' | 'absconded' | 'revoked') } });
+        updateExitVerification.mutate({ id: person.id, data: { exit_verification: next === '' ? null : (next as 'exited' | 'serving_notice_period' | 'payroll_converted' | 'absconded') } });
       }}
       disabled={updateExitVerification.isPending}
       data-testid={`select-exit-verification-${person.id}`}
@@ -767,7 +771,6 @@ function ExitCell({ person }: { person: InstructorSummary }) {
       <option value="serving_notice_period">{EXIT_VERIFICATION_LABELS.serving_notice_period}</option>
       <option value="payroll_converted">{EXIT_VERIFICATION_LABELS.payroll_converted}</option>
       <option value="absconded">{EXIT_VERIFICATION_LABELS.absconded}</option>
-      <option value="revoked">{EXIT_VERIFICATION_LABELS.revoked}</option>
     </select>
   </div>;
 }
