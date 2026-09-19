@@ -25,8 +25,22 @@ const REQUIRED = ["DBX_CHECK_ENDPOINT", "DBX_CHECK_USERNAME", "DBX_CHECK_PASSWOR
 // pending resignation request) that it needs to survive into rawData rather
 // than being silently dropped, since storeDarwinboxExits() in storeRaw.ts
 // persists exactly this mapped row object, not the original raw record.
+// "Employee Id" carries extra aliases beyond what the base report needs
+// (2026-09-19, per request -- enrichment reports weren't joining, and the
+// suspicion is a report using a employee-id column name of its own that
+// wasn't recognized here, silently producing zero matches for that whole
+// report). These are common Darwinbox Report Builder column-name variants
+// for the same concept, not the base report's own confirmed field --
+// inspectDarwinboxExits() below reports exactly which ones (if any) each
+// enrichment report actually matched against, add more here if a real
+// report turns up something not on this list.
 const ALIASES: Record<string, string[]> = {
-  "Employee Id": ["Employee Id", "employee_id", "emp_id", "employeeId", "employee_code", "id"],
+  "Employee Id": [
+    "Employee Id", "employee_id", "emp_id", "employeeId", "employee_code", "id",
+    "Emp ID", "Emp Id", "EmpId", "EmpID", "Emp Code", "Employee Code", "Employee No",
+    "Employee Number", "Employee No.", "EmployeeNo", "Emp No", "Emp No.", "EmpNo",
+    "Personnel Number", "Personnel No", "Staff ID", "Staff Id", "StaffId",
+  ],
   "Full Name": ["Employee Name", "full_name", "employee_name", "name", "fullName"],
   "Exit Date": ["Date Of Resignation", "Separation Requested On", "exit_date", "date_of_exit", "last_working_day", "lwd", "relieving_date", "separation_date", "exitDate"],
   "Reason": ["Separation Type", "reason", "exit_reason", "separation_reason", "reason_for_leaving"],
@@ -159,27 +173,56 @@ async function fetchEnrichmentRecords(reportId: string): Promise<Record<string, 
 // the base row (or an earlier, higher-priority enrichment report) already
 // filled in -- "first non-blank value wins", same rule the report-priority
 // order documented in config.ts describes.
-function mergeEnrichmentFields(rows: SheetRow[], enrichmentRecords: Record<string, unknown>[]): void {
-  if (!enrichmentRecords.length) return;
-  const byEmployeeId = new Map<string, Record<string, unknown>>();
+//
+// A report can carry MORE THAN ONE row for the same Employee Id (2026-09-19
+// fix, per request: "still we didn't get the complete exit data, we have
+// multiple more rows" -- someone had several rows in one of these reports,
+// e.g. one line per training/offboarding-step/job-history entry, each with
+// only some columns filled in, and comparing directly against Darwinbox's
+// own report showed fields the app was missing). Grouping by Employee Id
+// (rather than keeping only the first row found for that id, which is what
+// this used to do) and merging every one of that employee's rows in turn
+// means a field left blank on their first row can still get filled from
+// their second, third, etc. -- still first-non-blank-wins, just across ALL
+// of that employee's rows in this report, not only the earliest one.
+type MergeStats = {
+  totalRecords: number;
+  recordsWithNoEmployeeId: number;
+  rowsMatched: number;
+};
+
+function mergeEnrichmentFields(rows: SheetRow[], enrichmentRecords: Record<string, unknown>[]): MergeStats {
+  const stats: MergeStats = { totalRecords: enrichmentRecords.length, recordsWithNoEmployeeId: 0, rowsMatched: 0 };
+  if (!enrichmentRecords.length) return stats;
+  const recordsByEmployeeId = new Map<string, Record<string, unknown>[]>();
   for (const record of enrichmentRecords) {
     const key = employeeIdKey(record);
-    if (key && !byEmployeeId.has(key)) byEmployeeId.set(key, record);
+    if (!key) {
+      stats.recordsWithNoEmployeeId += 1;
+      continue;
+    }
+    const bucket = recordsByEmployeeId.get(key);
+    if (bucket) bucket.push(record);
+    else recordsByEmployeeId.set(key, [record]);
   }
   const employeeIdAliasSet = new Set(ALIASES["Employee Id"].map((a) => a.toLowerCase()));
   for (const row of rows) {
     const rowKey = row["Employee Id"] === null || row["Employee Id"] === undefined ? null : String(row["Employee Id"]).trim().toLowerCase();
     if (!rowKey) continue;
-    const enrichmentRecord = byEmployeeId.get(rowKey);
-    if (!enrichmentRecord) continue;
-    for (const [field, value] of Object.entries(enrichmentRecord)) {
-      if (employeeIdAliasSet.has(field.trim().toLowerCase())) continue;
-      const existing = row[field];
-      const isBlank = existing === null || existing === undefined || existing === "";
-      const hasValue = value !== null && value !== undefined && value !== "";
-      if (isBlank && hasValue) row[field] = value;
+    const matchingRecords = recordsByEmployeeId.get(rowKey);
+    if (!matchingRecords) continue;
+    stats.rowsMatched += 1;
+    for (const enrichmentRecord of matchingRecords) {
+      for (const [field, value] of Object.entries(enrichmentRecord)) {
+        if (employeeIdAliasSet.has(field.trim().toLowerCase())) continue;
+        const existing = row[field];
+        const isBlank = existing === null || existing === undefined || existing === "";
+        const hasValue = value !== null && value !== undefined && value !== "";
+        if (isBlank && hasValue) row[field] = value;
+      }
     }
   }
+  return stats;
 }
 
 /**
@@ -190,9 +233,24 @@ function mergeEnrichmentFields(rows: SheetRow[], enrichmentRecords: Record<strin
  */
 export async function fetchExitRows(): Promise<SheetRow[]> {
   const records = await fetchExitRecords();
+  // All alias strings across ALIASES, lowercased -- a raw field matching one
+  // of these is already captured under its canonical name below, so it's
+  // skipped when copying the record's remaining fields over.
+  const claimedAliases = new Set(Object.values(ALIASES).flat().map((a) => a.toLowerCase()));
   const rows = records.map((rec) => {
     const row: SheetRow = {};
     for (const [canonical, aliases] of Object.entries(ALIASES)) row[canonical] = firstPresent(rec, aliases);
+    // The base report was originally confirmed to return only the 5
+    // canonical fields above (2026-08-26 note atop this file), but if it
+    // ever carries more columns than that -- e.g. this report gets extra
+    // columns added on the Darwinbox side later -- they used to be silently
+    // dropped here instead of surfacing anywhere. Copy anything else the
+    // record has straight through, same "don't hardcode the shape" approach
+    // the enrichment merge below and darwin-full-roster.tsx already use.
+    for (const [field, value] of Object.entries(rec)) {
+      if (claimedAliases.has(field.trim().toLowerCase())) continue;
+      if (row[field] === undefined) row[field] = value;
+    }
     return row;
   });
   if (rows.length && rows.every((r) => r["Employee Id"] == null) && rows.every((r) => r["Full Name"] == null)) {
@@ -210,7 +268,16 @@ export async function fetchExitRows(): Promise<SheetRow[]> {
   for (const reportId of parseEnrichReportIds()) {
     try {
       const enrichmentRecords = await fetchEnrichmentRecords(reportId);
-      mergeEnrichmentFields(rows, enrichmentRecords);
+      const stats = mergeEnrichmentFields(rows, enrichmentRecords);
+      if (stats.totalRecords > 0 && stats.rowsMatched === 0) {
+        // Fetched fine but joined onto nothing -- almost always means this
+        // report's employee-id column isn't one of ALIASES["Employee Id"]'s
+        // aliases. Loud on purpose: this fails silently otherwise (the sync
+        // "succeeds" with rows just missing that report's fields).
+        console.warn(`[darwinboxExits] Enrichment report ${reportId} returned ${stats.totalRecords} record(s) but matched 0 exit rows by Employee Id -- its employee-id column probably isn't recognized. Run 'pnpm --filter @workspace/api-server run inspect:darwinbox-exits' to see its actual field names and add the right one to ALIASES in darwinboxExits.ts.`);
+      } else if (stats.totalRecords > 0) {
+        console.log(`[darwinboxExits] Enrichment report ${reportId}: ${stats.totalRecords} record(s), matched ${stats.rowsMatched} exit row(s)${stats.recordsWithNoEmployeeId ? `, ${stats.recordsWithNoEmployeeId} record(s) had no recognizable Employee Id` : ""}.`);
+      }
     } catch (e) {
       console.warn(`[darwinboxExits] Enrichment report ${reportId} failed, skipping it: ${(e as Error).message}`);
     }
@@ -231,11 +298,20 @@ export async function inspectDarwinboxExits() {
     try {
       const enrichmentRecords = await fetchEnrichmentRecords(reportId);
       console.log(`Enrichment report ${reportId}: found ${enrichmentRecords.length} records.`);
-      if (enrichmentRecords[0]) console.log(`  First record's keys:`, Object.keys(enrichmentRecords[0]));
+      if (enrichmentRecords[0]) {
+        console.log(`  First record's keys:`, Object.keys(enrichmentRecords[0]));
+        const key = employeeIdKey(enrichmentRecords[0]);
+        console.log(key
+          ? `  Recognized Employee Id on first record: "${key}" -- this report should join correctly.`
+          : `  Could NOT find a recognizable Employee Id field on the first record among the keys above. This report will join onto NOTHING until one of its columns is added to ALIASES["Employee Id"] in darwinboxExits.ts.`);
+        const matchedCount = enrichmentRecords.filter((r) => employeeIdKey(r) !== null).length;
+        console.log(`  ${matchedCount} of ${enrichmentRecords.length} records have a recognizable Employee Id.`);
+      }
     } catch (e) {
       console.log(`Enrichment report ${reportId} failed: ${(e as Error).message}`);
     }
   }
   const rows = await fetchExitRows();
   console.log("Mapped + enriched first row:", rows[0]);
+  console.log("Mapped + enriched first row's field count:", Object.keys(rows[0] ?? {}).length);
 }
