@@ -19,22 +19,25 @@ type CategoryKey = 'department' | 'instructors' | 'mentors' | 'ops_team' | 'exce
 // KPI card of the same name -- access_breakdown.department already existed
 // on the API response for that card, so this tab needed no backend change,
 // just wiring up the same field here.
-// "Exception" (2026-09-18, per request) is a review queue, not a fourth
-// population alongside Instructors/Mentors/Ops -- anyone shown here is
-// already counted in exactly one of those three (and in Department). It
-// lists everyone with an exit record a Capability Manager hasn't reviewed
-// yet (the Exit column's dropdown is still "Not reviewed"); resolving that
-// dropdown to Exited removes the person from their category's count
-// everywhere (this tab and the Overview dashboard), while Serving Notice
-// Period or Payroll Converted leaves the count untouched -- either way they
-// drop off this queue once reviewed. See reports.ts's exceptionRows comment
-// for the full rule.
+// "Exception" (2026-09-18, per request; scope revised 2026-09-19, per
+// request) is a review queue, not a fourth population alongside
+// Instructors/Mentors/Ops -- anyone shown here is already counted in
+// exactly one of those three (and in Department), and STAYS counted there
+// regardless of what's picked in the Exit column: picking any value,
+// including Exited, never changes the headcount -- actually removing
+// someone from the active list is a deliberate separate step (the Manual
+// Status control on the instructor detail page). This tab lists everyone
+// with an exit record that isn't yet resolved: not reviewed, Serving Notice
+// Period (shown for visibility), Exited, or Absconded (the real action
+// items -- waiting on that separate removal). Payroll Converted or Revoked
+// mean it's resolved, so those drop off. See reports.ts's exceptionRows
+// comment for the full rule.
 const CATEGORY_TABS: { key: CategoryKey; label: string; icon: typeof UsersRound; description: string }[] = [
   { key: 'department', label: 'Instructor Department', icon: Building2, description: 'Instructors + Mentors + Operations team, combined.' },
   { key: 'instructors', label: 'Instructors', icon: UsersRound, description: 'Everyone counted toward the TeachOS instructor count.' },
   { key: 'mentors', label: 'Mentors', icon: GraduationCap, description: 'Darwin — Mentors department.' },
   { key: 'ops_team', label: 'Operations team', icon: Briefcase, description: 'Darwin — Delivery Support (Ops), filed under Operations rather than Instructor or Mentor.' },
-  { key: 'exception', label: 'Exception', icon: AlertTriangle, description: 'Instructors, Mentors, and Ops team members with an exit record still awaiting review -- resolve via the Exit column below.' },
+  { key: 'exception', label: 'Exception', icon: AlertTriangle, description: 'Instructors, Mentors, and Ops team members with an unresolved exit record -- not yet Payroll Converted or Revoked. Everyone here still counts normally; use the Exit column to record what actually happened.' },
 ];
 
 function formatCount(value: number | undefined) {
@@ -711,21 +714,27 @@ const EXIT_VERIFICATION_LABELS: Record<string, string> = {
   exited: 'Exited',
   serving_notice_period: 'Serving Notice Period',
   payroll_converted: 'Payroll Converted',
+  absconded: 'Absconded',
+  revoked: 'Revoked',
 };
 
-// Exit column (2026-09-17, per request): for anyone with a live Darwinbox
-// exit record on file (person.exit_flag), shows an editable dropdown so a
-// Capability Manager can record their read on the situation -- Exited,
-// Serving Notice Period, or Payroll Converted. This is a TRACKING LABEL
-// ONLY (see exitVerification's comment in the schema): picking a value here
-// never changes computed/manual status or the standing instructor headcount
-// -- that stays the separate Manual Status control on the instructor detail
-// page. Everyone else (no exit record) just gets a dash, same as e.g.
-// designation's fallback above. Reachable by either Admin or Manager, same
-// population as Gender above -- see the dedicated PATCH
-// /instructors/:id/exit-verification route (requireAuth only, no
-// requireRole). preventDefault + stopPropagation on the wrapping div are
-// BOTH required here too -- see GenderCell's comment above for why.
+// Exit column (2026-09-17, per request; Absconded/Revoked added 2026-09-19):
+// for anyone with a live Darwinbox exit record on file (person.exit_flag),
+// shows an editable dropdown so a Capability Manager can record their read
+// on the situation -- Exited, Serving Notice Period, Payroll Converted,
+// Absconded, or Revoked. This is a TRACKING LABEL ONLY (see
+// exitVerification's comment in the schema): picking a value here never
+// changes computed/manual status or the standing instructor headcount --
+// that stays the separate Manual Status control on the instructor detail
+// page. It does drive the Instructors tab's Exception queue though -- see
+// reports.ts's exceptionRows: everything except Payroll Converted and
+// Revoked (the two "resolved" outcomes) keeps showing there. Everyone else
+// (no exit record) just gets a dash, same as e.g. designation's fallback
+// above. Reachable by either Admin or Manager, same population as Gender
+// above -- see the dedicated PATCH /instructors/:id/exit-verification route
+// (requireAuth only, no requireRole). preventDefault + stopPropagation on
+// the wrapping div are BOTH required here too -- see GenderCell's comment
+// above for why.
 function ExitCell({ person }: { person: InstructorSummary }) {
   const queryClient = useQueryClient();
   const updateExitVerification = useUpdateInstructorExitVerification({
@@ -746,7 +755,7 @@ function ExitCell({ person }: { person: InstructorSummary }) {
       value={value}
       onChange={(event) => {
         const next = event.target.value;
-        updateExitVerification.mutate({ id: person.id, data: { exit_verification: next === '' ? null : (next as 'exited' | 'serving_notice_period' | 'payroll_converted') } });
+        updateExitVerification.mutate({ id: person.id, data: { exit_verification: next === '' ? null : (next as 'exited' | 'serving_notice_period' | 'payroll_converted' | 'absconded' | 'revoked') } });
       }}
       disabled={updateExitVerification.isPending}
       data-testid={`select-exit-verification-${person.id}`}
@@ -757,6 +766,8 @@ function ExitCell({ person }: { person: InstructorSummary }) {
       <option value="exited">{EXIT_VERIFICATION_LABELS.exited}</option>
       <option value="serving_notice_period">{EXIT_VERIFICATION_LABELS.serving_notice_period}</option>
       <option value="payroll_converted">{EXIT_VERIFICATION_LABELS.payroll_converted}</option>
+      <option value="absconded">{EXIT_VERIFICATION_LABELS.absconded}</option>
+      <option value="revoked">{EXIT_VERIFICATION_LABELS.revoked}</option>
     </select>
   </div>;
 }

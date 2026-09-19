@@ -82,9 +82,9 @@ export interface Instructor {
   exit_flag_status?: string | null;
   /** @nullable */
   exit_flag_date?: string | null;
-  /** Capability Manager's manual read on an exit-flagged record -- exited | serving_notice_period | payroll_converted | null. Tracking label only; never affects computed_status/manual_status.
+  /** Capability Manager's manual read on an exit-flagged record -- exited | serving_notice_period | payroll_converted | absconded | revoked | null. Tracking label only; never affects computed_status/manual_status.
      * @nullable */
-  exit_verification?: 'exited' | 'serving_notice_period' | 'payroll_converted' | null;
+  exit_verification?: 'exited' | 'serving_notice_period' | 'payroll_converted' | 'absconded' | 'revoked' | null;
   /**
      * tech | non_tech | null. See departmentTaxonomy.ts. Null for excluded/mentor rows (see classification).
      * @nullable
@@ -147,7 +147,7 @@ export interface InstructorSubjectUpdate {
 
 /** Body for PATCH /instructors/{id}/exit-verification -- both-role-editable like InstructorGenderUpdate above (Capability Managers may be logged in as either Admin or Manager). Tracking label only -- never touches manual_status/computed_status. */
 export interface InstructorExitVerificationUpdate {
-  exit_verification: 'exited' | 'serving_notice_period' | 'payroll_converted' | null;
+  exit_verification: 'exited' | 'serving_notice_period' | 'payroll_converted' | 'absconded' | 'revoked' | null;
 }
 
 export type DashboardKpis = {[key: string]: number};
@@ -344,7 +344,7 @@ export interface InstructorSummary {
   /** True when a live Darwinbox exit/resignation record was found for this person. Drives whether the Instructors tab's Exit column shows the manual-verification dropdown (true) or a plain dash (false). */
   exit_flag: boolean;
   /** Capability Manager's manual read on an exit-flagged record, settable via PATCH /instructors/{id}/exit-verification by either Admin or Manager. Tracking label only -- never affects computed_status/manual_status or headcount. @nullable */
-  exit_verification: 'exited' | 'serving_notice_period' | 'payroll_converted' | null;
+  exit_verification: 'exited' | 'serving_notice_period' | 'payroll_converted' | 'absconded' | 'revoked' | null;
 }
 
 export interface InstructorsReport {

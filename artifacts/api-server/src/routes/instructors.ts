@@ -217,11 +217,12 @@ router.patch("/instructors/:id/subject", requireAuth, requireRole("admin"), asyn
   res.json(toApiInstructor(row));
 });
 
-const EXIT_VERIFICATION_VALUES = ["exited", "serving_notice_period", "payroll_converted"] as const;
+const EXIT_VERIFICATION_VALUES = ["exited", "serving_notice_period", "payroll_converted", "absconded", "revoked"] as const;
 
-// Exit verification (2026-09-17, per request): lets a Capability Manager
-// record their read on an exit-flagged record -- exited / serving notice
-// period / payroll converted -- directly from the new Exit column on the
+// Exit verification (2026-09-17, per request; Absconded/Revoked added
+// 2026-09-19): lets a Capability Manager record their read on an
+// exit-flagged record -- exited / serving notice period / payroll converted
+// / absconded / revoked -- directly from the Exit column on the
 // Instructors tab table. Reachable by either Admin or Manager (requireAuth
 // only, no requireRole), same population as Gender above -- there was an
 // explicit ask for Capability Managers themselves to be able to set this,
@@ -237,7 +238,7 @@ const EXIT_VERIFICATION_VALUES = ["exited", "serving_notice_period", "payroll_co
 router.patch("/instructors/:id/exit-verification", requireAuth, async (req, res): Promise<void> => {
   const raw = (req.body as { exit_verification?: string | null }).exit_verification;
   if (raw !== null && !EXIT_VERIFICATION_VALUES.includes(raw as (typeof EXIT_VERIFICATION_VALUES)[number])) {
-    res.status(400).json({ error: 'exit_verification must be "exited", "serving_notice_period", "payroll_converted", or null' });
+    res.status(400).json({ error: 'exit_verification must be "exited", "serving_notice_period", "payroll_converted", "absconded", "revoked", or null' });
     return;
   }
   const [row] = await db.update(instructorsTable).set({ exitVerification: raw }).where(eq(instructorsTable.id, Number(req.params.id))).returning();

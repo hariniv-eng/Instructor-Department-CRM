@@ -143,14 +143,7 @@ router.get("/reports/instructors", async (_req, res) => {
   // for what's supposed to be the same headline count — the gap was mentors
   // Darwin has on file who don't have a TeachOS record yet at all. Taking
   // the Darwin count as the source of truth resolves that discrepancy.
-  // "&& r.exitVerification !== 'exited'" (2026-09-18, per request): once a
-  // Capability Manager confirms a Mentor's exit record as an actual
-  // completed exit (not Serving Notice Period or Payroll Converted, and not
-  // left unreviewed), they come out of the Mentors count -- see the matching
-  // guards on opsTeamRows/darwinInstructorsForCount/teachosOnlyForPayrollCount
-  // below, and exceptionRows' comment further down for the review-queue
-  // logic this powers.
-  const mentors = allRows.filter((r) => r.inDarwin && !r.inDarwinFullRoster && r.classification === "mentor" && r.exitVerification !== "exited");
+  const mentors = allRows.filter((r) => r.inDarwin && !r.inDarwinFullRoster && r.classification === "mentor");
   // "Counted as instructors" excludes: individual excluded overrides,
   // Delivery Support (Ops and Central Managers), and Mentors — none of
   // these are instructor roles. Mentors get their own reported section
@@ -167,9 +160,7 @@ router.get("/reports/instructors", async (_req, res) => {
   // not just TeachOS-active ones — so a Darwin Ops person who was never
   // onboarded into TeachOS still counts here, same reasoning as the
   // Mentors 85-vs-90 fix.
-  // See the exitVerification guard on `mentors` above -- same rule, same
-  // 2026-09-18 request, applied to Operations team.
-  const opsTeamRows = allRows.filter((r) => r.classification === "excluded_ops_managers" && r.exitVerification !== "exited");
+  const opsTeamRows = allRows.filter((r) => r.classification === "excluded_ops_managers");
   // The IIT Kharagpur team is set aside the same way mentors/excluded
   // people are — a real category, not silently dropped, but not counted as
   // an instructor either (see reconcile.ts's payroll cascade, 2026-09-03).
@@ -238,12 +229,8 @@ router.get("/reports/instructors", async (_req, res) => {
   // countedInstructorRows is now built from, so every breakdown below
   // (department, campus, manager, deployment, payroll split, the
   // click-to-expand instructor list, and the CSV download) reflects it too.
-  // See the exitVerification guard on `mentors` above -- same rule, same
-  // 2026-09-18 request, applied to the Instructors count's two source
-  // populations (Darwin-matched instructors and the TeachOS-only/Payroll
-  // pool below).
-  const darwinInstructorsForCount = allRows.filter((r) => r.inDarwin && !r.inDarwinFullRoster && !r.classification && (r.deptBucket === "tech" || r.deptBucket === "non_tech") && r.exitVerification !== "exited");
-  const teachosOnlyForPayrollCount = allRows.filter((r) => r.inTeachos && !r.inDarwin && r.exitVerification !== "exited");
+  const darwinInstructorsForCount = allRows.filter((r) => r.inDarwin && !r.inDarwinFullRoster && !r.classification && (r.deptBucket === "tech" || r.deptBucket === "non_tech"));
+  const teachosOnlyForPayrollCount = allRows.filter((r) => r.inTeachos && !r.inDarwin);
   const payrollConvertedForCount = teachosOnlyForPayrollCount.filter((r) => r.classification === "payroll_converted");
   const needsReviewForCount = teachosOnlyForPayrollCount.filter((r) =>
     r.classification !== "excluded_other_department"
@@ -342,23 +329,34 @@ router.get("/reports/instructors", async (_req, res) => {
   // of those three shapes.
   const departmentRows: InstructorRow[] = [...countedInstructorRows, ...mentors, ...opsTeamRows];
 
-  // "Exception" bifurcation (2026-09-18, per request): a review queue, not a
-  // fifth headcount bucket -- every Instructor/Mentor/Ops person (the same
-  // departmentRows population above) with a live exit record that a
-  // Capability Manager hasn't reviewed yet (exitFlag true, exitVerification
-  // still null). They're still counted in their normal category's total
-  // above right up until someone actually resolves them:
-  //   - marks them "Exited" -> the exitVerification !== "exited" guards on
-  //     mentors/opsTeamRows/darwinInstructorsForCount/teachosOnlyForPayrollCount
-  //     above already dropped them from both departmentRows AND this queue,
-  //     so nothing further to do here -- they simply won't appear in either
-  //     by the time this filter runs. (They're still tracked for HR purposes
-  //     via GET /reports/exits, which reads exitFlag directly off allRows.)
-  //   - marks them "Serving Notice Period" or "Payroll Converted" -> stays
-  //     counted in their category (no guard excludes either value), and
-  //     exitVerification is no longer null, so they drop out of this queue
-  //     too, without ever leaving the headcount.
-  const exceptionRows = departmentRows.filter((r) => r.exitFlag && !r.exitVerification);
+  // "Exception" bifurcation (2026-09-18, per request; scope revised
+  // 2026-09-19, per request) -- a review queue, not a headcount bucket:
+  // everyone here is already counted in their normal category above, and
+  // stays counted there no matter what this queue shows. A 2026-09-18
+  // version made "exited" auto-remove someone from their category's count;
+  // that was explicitly reverted the next day because actually removing
+  // someone from the active list needs to be a deliberate separate action
+  // (the Manual Status control on the instructor detail page), not a side
+  // effect of this dropdown -- see exitVerification's comment in the schema.
+  // So this queue exists purely to surface who still needs a look: everyone
+  // exit-flagged EXCEPT the "resolved" outcomes -- "payroll_converted" or
+  // "revoked" on the manual exit_verification dropdown, OR Darwinbox's own
+  // live exit record already reporting status "Revoked" (exitFlagStatus,
+  // set straight from the synced Darwinbox exit report's Status field by
+  // recomputeStatuses() in reconcile.ts -- see darwinboxExits.ts's comment:
+  // "Revoked" there means the resignation request itself was cancelled, not
+  // a completed exit). That second check (2026-09-19, per request) means a
+  // resignation Darwinbox itself already shows as cancelled never needs a
+  // Capability Manager to touch the dropdown at all -- it's excluded from
+  // this queue automatically. Manual exit-CSV uploads (reconcileExits() in
+  // reconcile.ts) never set exitFlagStatus, only the manual dropdown, which
+  // is why both checks exist side by side. That leaves null (not yet
+  // reviewed), "serving_notice_period" (shown here purely for visibility,
+  // per request), and "exited"/"absconded" (the real action items --
+  // waiting on someone to actually do the Manual Status removal) visible in
+  // this queue until resolved.
+  const hasRevokedExitStatus = (r: InstructorRow) => (r.exitFlagStatus ?? "").trim().toLowerCase() === "revoked";
+  const exceptionRows = departmentRows.filter((r) => r.exitFlag && !hasRevokedExitStatus(r) && r.exitVerification !== "payroll_converted" && r.exitVerification !== "revoked");
 
   const accessBreakdown = {
     department: buildAccessSplit(departmentRows),
