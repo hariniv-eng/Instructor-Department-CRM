@@ -31,6 +31,17 @@ export const config = {
   DBX_CHECK_API_KEY: env("DBX_CHECK_API_KEY"),
   DBX_CHECK_REPORT_ID: env("DBX_CHECK_REPORT_ID"),
   DARWINBOX_EXITS_SYNC_INTERVAL_HOURS: num("DARWINBOX_EXITS_SYNC_INTERVAL_HOURS"),
+  // Additional Report Builder reports (2026-09-19, per request) joined onto
+  // each exit row by Employee Id, since DBX_CHECK_REPORT_ID's own report
+  // only carries Employee Id/Full Name/Exit Date/Reason/Status. Same
+  // endpoint + credentials as DBX_CHECK_* above, just different report ids
+  // requested one at a time (see darwinboxExits.ts's fetchEnrichmentRecords).
+  // Comma-separated, in priority order — when the same field name shows up
+  // in more than one of these reports, the first non-blank value wins (see
+  // mergeEnrichmentFields). Defaults to the four detail reports on file for
+  // this org (EIF Main, TA Employee Master, Offboarding tracking, L&D
+  // Details) — override in .env/Replit Secrets to add, remove, or reorder.
+  DBX_CHECK_ENRICH_REPORT_IDS: env("DBX_CHECK_ENRICH_REPORT_IDS") ?? "70c916bd0ed8bb,1d513a4ccdf2e8,9feb118d44726a,853905cf311922",
 
   // TeachOS via BigQuery
   BIGQUERY_PROJECT_ID: env("BIGQUERY_PROJECT_ID"),
