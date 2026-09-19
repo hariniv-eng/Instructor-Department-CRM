@@ -6,5 +6,5 @@
  */
 
 export interface InstructorExitVerificationUpdate {
-  exit_verification: 'exited' | 'serving_notice_period' | 'payroll_converted' | null;
+  exit_verification: 'exited' | 'serving_notice_period' | 'payroll_converted' | 'absconded' | 'revoked' | null;
 }

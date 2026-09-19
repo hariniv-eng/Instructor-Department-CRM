@@ -99,27 +99,35 @@ export const instructorsTable = pgTable("instructors", {
   // sync, e.g. "Approved", "Pending With Approver", "Rejected", "Revoked".
   exitFlagStatus: text("exit_flag_status"),
   exitFlagDate: date("exit_flag_date"),
-  // Manual exit-review label (2026-09-17, per request; headcount behavior
-  // revised 2026-09-18, per request): for anyone with an exit record on file
-  // (exitFlag true), a Capability Manager can record their read on the
-  // situation directly from the Instructors tab table -- one of "exited" |
-  // "serving_notice_period" | "payroll_converted", or null (not yet
-  // reviewed). This does NOT touch computedStatus/manualStatus -- excluding
-  // someone from those stays the separate Manual Status control on the
-  // instructor detail page. It DOES now affect the Instructors-tab/Overview
-  // headcount, per an explicit 2026-09-18 request that reverses the original
-  // "tracking label only" design for exactly one value: "exited" removes the
-  // person from their category's count (Instructors/Mentors/Operations
-  // team/Department total, everywhere those figures are shown -- see
-  // GET /reports/instructors in reports.ts). "serving_notice_period" and
-  // "payroll_converted" leave the count untouched, same as null. See
-  // reports.ts's exceptionRows/exitVerification comments for the full
-  // Exception-tab review-queue logic this powers. Reachable by either Admin
-  // or Manager, same population as manualGender -- see the dedicated PATCH
-  // .../exit-verification route. Never written by any sync path, so it
-  // survives every sync; the frontend only shows the dropdown for rows
-  // where exitFlag is true (see toApiInstructorSummary in reports.ts) --
-  // not enforced server-side.
+  // Manual exit-review label (2026-09-17, per request). One of "exited" |
+  // "serving_notice_period" | "payroll_converted" | "absconded" | "revoked"
+  // (the last two added 2026-09-19, per request), or null (not yet
+  // reviewed). A brief 2026-09-18 change made "exited" auto-remove the
+  // person from their category's headcount; that was REVERTED the next day
+  // (2026-09-19, per explicit request) because removing someone from the
+  // active list needs to stay a deliberate action, not a side effect of
+  // picking a dropdown value -- so this is back to being a TRACKING LABEL
+  // ONLY again, for every value including "exited"/"absconded": it does not
+  // touch computedStatus/manualStatus, and does not change
+  // total_instructor_count/mentors_count/ops_team_count/
+  // department_total_count in reports.ts. Actually removing someone from the
+  // active list/headcount stays a separate, deliberate action (the Manual
+  // Status control on the instructor detail page) -- this field's job is
+  // just to drive the Instructors tab's Exception queue (see
+  // GET /reports/instructors's exceptionRows in reports.ts): anyone
+  // exit-flagged and not yet "payroll_converted" or "revoked" (i.e. null,
+  // "serving_notice_period", "exited", or "absconded") shows there as
+  // something needing a look -- "serving_notice_period" surfaces there
+  // purely for visibility, while "exited"/"absconded" are the actual action
+  // items (waiting on that separate Manual Status removal). "payroll_converted"
+  // and "revoked" mean the situation is resolved -- Darwinbox's own record
+  // shows the exit was either converted to payroll or the resignation
+  // request was cancelled -- so those drop off the queue. Reachable by
+  // either Admin or Manager, same population as manualGender -- see the
+  // dedicated PATCH .../exit-verification route. Never written by any sync
+  // path, so it survives every sync; the frontend only shows the dropdown
+  // for rows where exitFlag is true (see toApiInstructorSummary in
+  // reports.ts) -- not enforced server-side.
   exitVerification: text("exit_verification"),
   // True when this person was NOT found in the Instructors-department-
   // filtered Darwin data (darwinbox_active) but WAS found via the fallback

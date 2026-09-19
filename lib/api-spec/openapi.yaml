@@ -302,12 +302,15 @@ paths:
         Manager may be logged in as either. Lets a Capability Manager record
         their read on someone with a live Darwinbox exit record on file
         (InstructorSummary.exit_flag) as one of "exited",
-        "serving_notice_period", or "payroll_converted" (or null to clear
-        it back to unreviewed). This is a TRACKING LABEL ONLY -- it never
-        changes computed_status or manual_status, and never affects the
-        standing instructor headcount. Actually excluding someone from the
-        count stays the separate, deliberate Manual Status control on
-        PATCH /instructors/{id} (Admin-only).
+        "serving_notice_period", "payroll_converted", "absconded", or
+        "revoked" (or null to clear it back to unreviewed). This is a
+        TRACKING LABEL ONLY -- it never changes computed_status or
+        manual_status, and never affects the standing instructor headcount.
+        Actually excluding someone from the count stays the separate,
+        deliberate Manual Status control on PATCH /instructors/{id}
+        (Admin-only). It does drive the Instructors tab's Exception queue:
+        everything except "payroll_converted" and "revoked" (the two
+        resolved outcomes) keeps showing there.
       parameters:
         - in: path
           name: id
@@ -324,7 +327,7 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Instructor" }
-        "400": { description: "exit_verification must be \"exited\", \"serving_notice_period\", \"payroll_converted\", or null" }
+        "400": { description: "exit_verification must be \"exited\", \"serving_notice_period\", \"payroll_converted\", \"absconded\", \"revoked\", or null" }
         "404": { description: Not found }
   /dashboard:
     get:
@@ -477,7 +480,7 @@ components:
         exit_flag: { type: boolean, description: "True when a live Darwinbox exit/resignation record was found for this person. Flagged only — NOT subtracted from the standing instructor count." }
         exit_flag_status: { type: ["string", "null"], description: "Darwinbox resignation status as of the most recent exit sync, e.g. Approved, Pending With Approver, Rejected, Revoked." }
         exit_flag_date: { type: ["string", "null"], format: date }
-        exit_verification: { type: ["string", "null"], enum: ["exited", "serving_notice_period", "payroll_converted", null], description: "Capability Manager's manual read on an exit-flagged record, settable via PATCH /instructors/{id}/exit-verification by either Admin or Manager. Tracking label only — never affects computed_status/manual_status or the headcount." }
+        exit_verification: { type: ["string", "null"], enum: ["exited", "serving_notice_period", "payroll_converted", "absconded", "revoked", null], description: "Capability Manager's manual read on an exit-flagged record, settable via PATCH /instructors/{id}/exit-verification by either Admin or Manager. Tracking label only — never affects computed_status/manual_status or the headcount." }
         dept_bucket: { type: ["string", "null"], description: "tech | non_tech | null. See departmentTaxonomy.ts. Null for excluded/mentor rows (see classification)." }
         dept_area: { type: ["string", "null"], description: "Sub-area within dept_bucket, e.g. Frontend, Backend, DSA, GenAI, English, Aptitude, Math." }
         manual_dept_area: { type: ["string", "null"], description: "Manual fallback for Subject/dept_area, settable via PATCH /instructors/{id}/subject (Admin only). Only used when classifyDepartment() left this person unclassified. Must be one of departmentTaxonomy.ts's recognized area names, or null." }
@@ -537,7 +540,7 @@ components:
       type: object
       required: [exit_verification]
       properties:
-        exit_verification: { type: ["string", "null"], enum: ["exited", "serving_notice_period", "payroll_converted", null] }
+        exit_verification: { type: ["string", "null"], enum: ["exited", "serving_notice_period", "payroll_converted", "absconded", "revoked", null] }
     Dashboard:
       type: object
       required: [kpis, monthly_trend, sub_departments, designations]
@@ -841,4 +844,4 @@ components:
         # Admin or Manager -- see that endpoint's description for why this
         # is a tracking label only and never touches computed_status/
         # manual_status or the headcount.
-        exit_verification: { type: ["string", "null"], enum: ["exited", "serving_notice_period", "payroll_converted", null] }
+        exit_verification: { type: ["string", "null"], enum: ["exited", "serving_notice_period", "payroll_converted", "absconded", "revoked", null] }
