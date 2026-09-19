@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { RefreshCw, Users } from 'lucide-react';
+import { RefreshCw, Users, Building2 } from 'lucide-react';
 import { PageIntro, EmptyState, QueryError, SkeletonBlock, TopStat, formatKpi } from '@/components/ui-pieces';
 
 // Full joined exit-record dump (2026-09-19, per request: "the darwin data
@@ -20,6 +20,14 @@ type DarwinExitDetails = {
   columns: string[];
   rows: Record<string, unknown>[];
   synced_at: string | null;
+  // Added 2026-09-19, per follow-up "i just need the list of all the
+  // departements from darwin exit data" -- every department Top Department
+  // has ever taken across the exit records, with a count for each (see
+  // department_breakdown in reports.ts). "No Top Department on file" is its
+  // own entry for rows whose Employee Id never matched an enrichment report.
+  // Kept as extra context even after the page went back to showing every
+  // department's rows (see below) -- still useful on its own.
+  department_breakdown: { department: string; count: number }[];
 };
 
 const QUERY_KEY = ['reports', 'darwin-exit-details'];
@@ -49,7 +57,7 @@ export default function DarwinExitDetailsPage() {
     <PageIntro
       eyebrow="Darwinbox / exit report + enrichment reports, joined"
       title="Darwin Exit Details"
-      description="Every field on file for each exited Instructors Department employee -- the base exit report's Employee Id / Full Name / Exit Date / Reason / Status, plus whatever the enrichment reports (DBX_CHECK_ENRICH_REPORT_IDS) add on top, joined by Employee Id. Scoped to Top Department = Instructors Department (NWD_ID); other departments' exits aren't shown here. Refresh via the Exits sync (Source uploads) to pull the latest."
+      description="Every field on file for every exited employee, all departments -- the base exit report's Employee Id / Full Name / Exit Date / Reason / Status, plus whatever the enrichment reports (DBX_CHECK_ENRICH_REPORT_IDS) add on top, joined by Employee Id. Refresh via the Exits sync (Source uploads) to pull the latest."
       action={<button type="button" data-testid="button-refresh-darwin-exit-details" onClick={refresh} className="inline-flex items-center gap-2 self-start rounded-lg border border-border bg-card px-3.5 py-2.5 text-[12px] font-bold text-foreground transition-colors hover:bg-secondary lg:self-auto"><RefreshCw size={14} /> Refresh</button>}
     />
 
@@ -58,12 +66,28 @@ export default function DarwinExitDetailsPage() {
 
     {data && <div className="mb-6 grid max-w-xs grid-cols-1">
       <TopStat
-        label="Instructors Dept. exit records"
+        label="Exit records on file"
         value={formatKpi(data.count)}
         meta={data.synced_at ? `As of last sync -- ${new Date(data.synced_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' })}` : 'Sync time unavailable'}
         icon={<Users size={16} />}
         tone="navy"
       />
+    </div>}
+
+    {data && data.department_breakdown.length > 0 && <div className="mb-8 max-w-md">
+      <div className="mb-2 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.1em] text-muted-foreground">
+        <Building2 size={13} /> All departments in Darwin exit data
+      </div>
+      <div className="overflow-hidden rounded-lg border border-border">
+        <table className="w-full border-collapse text-left">
+          <tbody>
+            {data.department_breakdown.map(({ department, count }) => <tr key={department} className="border-b border-border/70 last:border-0">
+              <td className="px-4 py-2.5 text-[12px] text-foreground">{department}</td>
+              <td className="px-4 py-2.5 text-right font-mono-ui text-[12px] tabular-nums text-muted-foreground">{formatKpi(count)}</td>
+            </tr>)}
+          </tbody>
+        </table>
+      </div>
     </div>}
 
     {data && (data.count === 0

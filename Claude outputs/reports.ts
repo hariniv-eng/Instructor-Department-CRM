@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, instructorsTable, darwinboxFullRosterTable, darwinboxExitsTable } from "@workspace/db";
+import { db, instructorsTable, darwinboxFullRosterTable } from "@workspace/db";
 import { requireAuth, requireRole } from "../middlewares/auth";
 
 const router: IRouter = Router();
@@ -143,7 +143,14 @@ router.get("/reports/instructors", async (_req, res) => {
   // for what's supposed to be the same headline count — the gap was mentors
   // Darwin has on file who don't have a TeachOS record yet at all. Taking
   // the Darwin count as the source of truth resolves that discrepancy.
-  const mentors = allRows.filter((r) => r.inDarwin && !r.inDarwinFullRoster && r.classification === "mentor");
+  // "&& r.exitVerification !== 'exited'" (2026-09-18, per request): once a
+  // Capability Manager confirms a Mentor's exit record as an actual
+  // completed exit (not Serving Notice Period or Payroll Converted, and not
+  // left unreviewed), they come out of the Mentors count -- see the matching
+  // guards on opsTeamRows/darwinInstructorsForCount/teachosOnlyForPayrollCount
+  // below, and exceptionRows' comment further down for the review-queue
+  // logic this powers.
+  const mentors = allRows.filter((r) => r.inDarwin && !r.inDarwinFullRoster && r.classification === "mentor" && r.exitVerification !== "exited");
   // "Counted as instructors" excludes: individual excluded overrides,
   // Delivery Support (Ops and Central Managers), and Mentors — none of
   // these are instructor roles. Mentors get their own reported section
@@ -160,7 +167,9 @@ router.get("/reports/instructors", async (_req, res) => {
   // not just TeachOS-active ones — so a Darwin Ops person who was never
   // onboarded into TeachOS still counts here, same reasoning as the
   // Mentors 85-vs-90 fix.
-  const opsTeamRows = allRows.filter((r) => r.classification === "excluded_ops_managers");
+  // See the exitVerification guard on `mentors` above -- same rule, same
+  // 2026-09-18 request, applied to Operations team.
+  const opsTeamRows = allRows.filter((r) => r.classification === "excluded_ops_managers" && r.exitVerification !== "exited");
   // The IIT Kharagpur team is set aside the same way mentors/excluded
   // people are — a real category, not silently dropped, but not counted as
   // an instructor either (see reconcile.ts's payroll cascade, 2026-09-03).
@@ -229,8 +238,12 @@ router.get("/reports/instructors", async (_req, res) => {
   // countedInstructorRows is now built from, so every breakdown below
   // (department, campus, manager, deployment, payroll split, the
   // click-to-expand instructor list, and the CSV download) reflects it too.
-  const darwinInstructorsForCount = allRows.filter((r) => r.inDarwin && !r.inDarwinFullRoster && !r.classification && (r.deptBucket === "tech" || r.deptBucket === "non_tech"));
-  const teachosOnlyForPayrollCount = allRows.filter((r) => r.inTeachos && !r.inDarwin);
+  // See the exitVerification guard on `mentors` above -- same rule, same
+  // 2026-09-18 request, applied to the Instructors count's two source
+  // populations (Darwin-matched instructors and the TeachOS-only/Payroll
+  // pool below).
+  const darwinInstructorsForCount = allRows.filter((r) => r.inDarwin && !r.inDarwinFullRoster && !r.classification && (r.deptBucket === "tech" || r.deptBucket === "non_tech") && r.exitVerification !== "exited");
+  const teachosOnlyForPayrollCount = allRows.filter((r) => r.inTeachos && !r.inDarwin && r.exitVerification !== "exited");
   const payrollConvertedForCount = teachosOnlyForPayrollCount.filter((r) => r.classification === "payroll_converted");
   const needsReviewForCount = teachosOnlyForPayrollCount.filter((r) =>
     r.classification !== "excluded_other_department"
@@ -329,34 +342,23 @@ router.get("/reports/instructors", async (_req, res) => {
   // of those three shapes.
   const departmentRows: InstructorRow[] = [...countedInstructorRows, ...mentors, ...opsTeamRows];
 
-  // "Exception" bifurcation (2026-09-18, per request; scope revised
-  // 2026-09-19, per request) -- a review queue, not a headcount bucket:
-  // everyone here is already counted in their normal category above, and
-  // stays counted there no matter what this queue shows. A 2026-09-18
-  // version made "exited" auto-remove someone from their category's count;
-  // that was explicitly reverted the next day because actually removing
-  // someone from the active list needs to be a deliberate separate action
-  // (the Manual Status control on the instructor detail page), not a side
-  // effect of this dropdown -- see exitVerification's comment in the schema.
-  // So this queue exists purely to surface who still needs a look: everyone
-  // exit-flagged EXCEPT the "resolved" outcomes -- "payroll_converted" or
-  // "revoked" on the manual exit_verification dropdown, OR Darwinbox's own
-  // live exit record already reporting status "Revoked" (exitFlagStatus,
-  // set straight from the synced Darwinbox exit report's Status field by
-  // recomputeStatuses() in reconcile.ts -- see darwinboxExits.ts's comment:
-  // "Revoked" there means the resignation request itself was cancelled, not
-  // a completed exit). That second check (2026-09-19, per request) means a
-  // resignation Darwinbox itself already shows as cancelled never needs a
-  // Capability Manager to touch the dropdown at all -- it's excluded from
-  // this queue automatically. Manual exit-CSV uploads (reconcileExits() in
-  // reconcile.ts) never set exitFlagStatus, only the manual dropdown, which
-  // is why both checks exist side by side. That leaves null (not yet
-  // reviewed), "serving_notice_period" (shown here purely for visibility,
-  // per request), and "exited"/"absconded" (the real action items --
-  // waiting on someone to actually do the Manual Status removal) visible in
-  // this queue until resolved.
-  const hasRevokedExitStatus = (r: InstructorRow) => (r.exitFlagStatus ?? "").trim().toLowerCase() === "revoked";
-  const exceptionRows = departmentRows.filter((r) => r.exitFlag && !hasRevokedExitStatus(r) && r.exitVerification !== "payroll_converted" && r.exitVerification !== "revoked");
+  // "Exception" bifurcation (2026-09-18, per request): a review queue, not a
+  // fifth headcount bucket -- every Instructor/Mentor/Ops person (the same
+  // departmentRows population above) with a live exit record that a
+  // Capability Manager hasn't reviewed yet (exitFlag true, exitVerification
+  // still null). They're still counted in their normal category's total
+  // above right up until someone actually resolves them:
+  //   - marks them "Exited" -> the exitVerification !== "exited" guards on
+  //     mentors/opsTeamRows/darwinInstructorsForCount/teachosOnlyForPayrollCount
+  //     above already dropped them from both departmentRows AND this queue,
+  //     so nothing further to do here -- they simply won't appear in either
+  //     by the time this filter runs. (They're still tracked for HR purposes
+  //     via GET /reports/exits, which reads exitFlag directly off allRows.)
+  //   - marks them "Serving Notice Period" or "Payroll Converted" -> stays
+  //     counted in their category (no guard excludes either value), and
+  //     exitVerification is no longer null, so they drop out of this queue
+  //     too, without ever leaving the headcount.
+  const exceptionRows = departmentRows.filter((r) => r.exitFlag && !r.exitVerification);
 
   const accessBreakdown = {
     department: buildAccessSplit(departmentRows),
@@ -471,11 +473,52 @@ const toApiCandidate = (row: InstructorRow) => ({
   date_of_joining: row.dateOfJoining,
 });
 
-// The old "Exits" tab (added 2026-09-15) lived here -- GET /reports/exits +
-// toApiExit(), everyone currently flagged as exited joined with their
-// instructor record. Removed (2026-09-19, per request) now that "Darwin
-// Exit Details" gives the fuller, joined-with-enrichment-reports picture of
-// exited employees instead -- see GET /reports/darwin-exit-details above.
+// Exits report (2026-09-15, per request): everyone currently flagged as
+// exited, from either source that can set that flag --
+//   (a) the live Darwinbox resignation report, reconciled automatically
+//       during every Darwin sync (exitFlag/exitFlagStatus/exitFlagDate --
+//       see reconcileDarwin()/checkActiveWithExitDate.ts in reconcile.ts),
+//   (b) a manually-uploaded exits CSV or a by-hand edit on the instructor
+//       detail page (manualStatus === "exited", exitDate, notes -- see
+//       reconcileExits() in reconcile.ts), for whoever Darwin hasn't
+//       reported yet.
+// Scoped across every row in the table, not just counted
+// instructors/TeachOS-active people -- someone can leave regardless of
+// which bucket they were classified into (mentor, ops, payroll-converted,
+// etc.). Admin-only, matching Darwin Breakdown/TeachOS Breakdown/Source
+// uploads -- this is detailed, sensitive HR data, not the headcount
+// summary Manager view gets.
+const toApiExit = (row: InstructorRow) => ({
+  id: row.id,
+  full_name: row.fullName,
+  employee_id: row.employeeId,
+  teachos_user_id: row.teachosUserId,
+  designation: row.designation,
+  department: row.department,
+  dept_bucket: row.deptBucket,
+  dept_area: row.deptArea,
+  institutes: row.institutes,
+  capability_manager: row.teachosManager || row.manualCapabilityManager || null,
+  org_email: row.orgEmail,
+  date_of_joining: row.dateOfJoining,
+  exit_flag: row.exitFlag,
+  exit_flag_status: row.exitFlagStatus,
+  exit_flag_date: row.exitFlagDate,
+  manual_status: row.manualStatus,
+  exit_date: row.exitDate,
+  notes: row.notes,
+});
+
+router.get("/reports/exits", requireAuth, requireRole("admin"), async (_req, res) => {
+  const allRows = await db.select().from(instructorsTable);
+  const exitedRows = allRows.filter((r) => r.exitFlag || r.manualStatus === "exited");
+  res.json({
+    count: exitedRows.length,
+    darwin_flagged_count: exitedRows.filter((r) => r.exitFlag).length,
+    manual_count: exitedRows.filter((r) => !r.exitFlag && r.manualStatus === "exited").length,
+    people: exitedRows.map(toApiExit),
+  });
+});
 
 router.get("/reports/teachos-breakdown", requireAuth, requireRole("admin"), async (_req, res) => {
   const rows = (await db.select().from(instructorsTable)).filter((r) => r.inTeachos);
@@ -631,36 +674,6 @@ router.get("/reports/darwin-breakdown", requireAuth, requireRole("admin"), async
   });
 });
 
-// Shared by the two dynamic-column raw tables below (Darwin Full Roster,
-// Darwin Exit Details). collectDynamicColumns() walks every stored row's
-// rawData in first-seen order, same as before; pinIdentityColumnsFirst()
-// then guarantees Employee Id is always column 1 and Full Name column 2
-// (2026-09-19, per request: "make sure that 1st column is employee_id and
-// 2nd column is name") regardless of whatever order a given row's own
-// fields happened to come in as -- both connectors already build their rows
-// with Employee Id/Full Name first (see darwinbox.ts's and
-// darwinboxExits.ts's ALIASES), so this is normally a no-op, but pinning it
-// explicitly here means a legacy row, a manually-uploaded full-roster CSV
-// with its own column order, or a future connector change can never quietly
-// knock these two out of place.
-function collectDynamicColumns(stored: { rawData: unknown }[]): string[] {
-  const columns: string[] = [];
-  const seen = new Set<string>();
-  for (const r of stored) {
-    for (const key of Object.keys((r.rawData as Record<string, unknown>) ?? {})) {
-      if (!seen.has(key)) { seen.add(key); columns.push(key); }
-    }
-  }
-  return columns;
-}
-
-function pinIdentityColumnsFirst(columns: string[]): string[] {
-  const priority = ["Employee Id", "Full Name"];
-  const present = priority.filter((name) => columns.includes(name));
-  const rest = columns.filter((name) => !priority.includes(name));
-  return [...present, ...rest];
-}
-
 // Raw browse of Darwin's FULL, unfiltered company roster (2026-09-18, per
 // follow-up request -- replaces an earlier classified-breakdown version of
 // this same tab: "I don't need any breakdown there, I just want to see the
@@ -684,55 +697,13 @@ function pinIdentityColumnsFirst(columns: string[]): string[] {
 router.get("/reports/darwin-full-roster", requireAuth, requireRole("admin"), async (_req, res) => {
   const stored = await db.select().from(darwinboxFullRosterTable).orderBy(darwinboxFullRosterTable.id);
 
-  const columns: string[] = pinIdentityColumnsFirst(collectDynamicColumns(stored));
-  const rows = stored.map((r) => {
-    const data = r.rawData as Record<string, unknown>;
-    const row: Record<string, unknown> = {};
-    for (const key of columns) row[key] = data[key] ?? null;
-    return row;
-  });
-
-  res.json({
-    count: rows.length,
-    columns,
-    rows,
-    synced_at: stored[0]?.syncedAt ?? null,
-  });
-});
-
-// Darwin Exit Details (2026-09-19, per request: "the darwin data report id
-// that we are using is limited to few details of data only ... for each
-// employee_id ... pull other data from other new report Id"). The Exits
-// tab above only ever shows Employee Id/Full Name/Exit Date/Reason/Status,
-// because that's all DBX_CHECK_REPORT_ID's own report returns. This route
-// surfaces the FULL joined record instead -- every field darwinboxExits.ts
-// merged in from DBX_CHECK_ENRICH_REPORT_IDS (config.ts) on top of the base
-// 5, straight from darwinboxExitsTable.rawData, columns derived dynamically
-// same as darwin-full-roster above rather than hardcoded, since which
-// fields those enrichment reports actually carry isn't fixed ahead of time.
-//
-// Was briefly scoped to Instructors Department only, then reverted (2026-
-// 09-19, per request: "can we go back displaying all exit data in the
-// darwin exit tab") -- `rows`/`count` are back to every exit record on file,
-// every department, unfiltered. department_breakdown below (added per the
-// department-list follow-up in between) is kept as extra context on the
-// same page rather than removed, since it's independently useful and reads
-// straight off the same query.
-router.get("/reports/darwin-exit-details", requireAuth, requireRole("admin"), async (_req, res) => {
-  const stored = await db.select().from(darwinboxExitsTable).orderBy(darwinboxExitsTable.id);
-
-  const NO_TOP_DEPARTMENT_LABEL = "No Top Department on file";
-  const departmentCounts = new Map<string, number>();
+  const columns: string[] = [];
+  const seen = new Set<string>();
   for (const r of stored) {
-    const topDepartment = (r.rawData as Record<string, unknown> | null)?.["Top Department"];
-    const label = typeof topDepartment === "string" && topDepartment.trim() ? topDepartment.trim() : NO_TOP_DEPARTMENT_LABEL;
-    departmentCounts.set(label, (departmentCounts.get(label) ?? 0) + 1);
+    for (const key of Object.keys(r.rawData ?? {})) {
+      if (!seen.has(key)) { seen.add(key); columns.push(key); }
+    }
   }
-  const departmentBreakdown = Array.from(departmentCounts.entries())
-    .map(([department, count]) => ({ department, count }))
-    .sort((a, b) => b.count - a.count);
-
-  const columns: string[] = pinIdentityColumnsFirst(collectDynamicColumns(stored));
   const rows = stored.map((r) => {
     const data = r.rawData as Record<string, unknown>;
     const row: Record<string, unknown> = {};
@@ -745,11 +716,6 @@ router.get("/reports/darwin-exit-details", requireAuth, requireRole("admin"), as
     columns,
     rows,
     synced_at: stored[0]?.syncedAt ?? null,
-    // The full list of departments present in Darwin's exit data, with how
-    // many exit records fell under each (2026-09-19, per follow-up "i just
-    // need the list of all the departements from darwin exit data").
-    // Sorted by count, descending.
-    department_breakdown: departmentBreakdown,
   });
 });
 
