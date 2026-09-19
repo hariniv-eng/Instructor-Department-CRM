@@ -217,17 +217,18 @@ router.patch("/instructors/:id/subject", requireAuth, requireRole("admin"), asyn
   res.json(toApiInstructor(row));
 });
 
-const EXIT_VERIFICATION_VALUES = ["exited", "serving_notice_period", "payroll_converted", "absconded", "revoked"] as const;
+const EXIT_VERIFICATION_VALUES = ["exited", "serving_notice_period", "payroll_converted", "absconded"] as const;
 
 // Exit verification (2026-09-17, per request; Absconded/Revoked added
-// 2026-09-19): lets a Capability Manager record their read on an
+// 2026-09-19; Revoked removed again as a settable value 2026-09-19 --
+// see below): lets a Capability Manager record their read on an
 // exit-flagged record -- exited / serving notice period / payroll converted
-// / absconded / revoked -- directly from the Exit column on the
-// Instructors tab table. Reachable by either Admin or Manager (requireAuth
-// only, no requireRole), same population as Gender above -- there was an
-// explicit ask for Capability Managers themselves to be able to set this,
-// and Manager is the role without an Admin login. Deliberately does NOT
-// touch manualStatus/computedStatus: this is a tracking label only, same
+// / absconded -- directly from the Exit column on the Instructors tab
+// table. Reachable by either Admin or Manager (requireAuth only, no
+// requireRole), same population as Gender above -- there was an explicit
+// ask for Capability Managers themselves to be able to set this, and
+// Manager is the role without an Admin login. Deliberately does NOT touch
+// manualStatus/computedStatus: this is a tracking label only, same
 // "flag, don't subtract" philosophy as exitFlag itself (see
 // recomputeStatuses() and its comment in the schema) -- actually excluding
 // someone from the headcount stays the separate Manual Status control on
@@ -235,10 +236,18 @@ const EXIT_VERIFICATION_VALUES = ["exited", "serving_notice_period", "payroll_co
 // rows, but not enforced server-side -- the frontend only shows the
 // dropdown when exit_flag is true; setting this for a non-flagged row is
 // harmless (it just won't be visible anywhere) rather than blocked outright.
+// "revoked" was dropped from this list (per request, 2026-09-19) now that
+// reports.ts's exceptionRows already auto-excludes anyone Darwinbox's own
+// live exit sync reports as "Revoked" (see hasRevokedExitStatus/
+// exitFlagStatus there) -- a manual "Revoked" label was redundant with that
+// automatic check. Any instructor row still carrying a historic manual
+// exit_verification of "revoked" from before this change keeps being
+// excluded from the Exception queue (reports.ts still checks for it), it
+// just can no longer be newly set through this dropdown/endpoint.
 router.patch("/instructors/:id/exit-verification", requireAuth, async (req, res): Promise<void> => {
   const raw = (req.body as { exit_verification?: string | null }).exit_verification;
   if (raw !== null && !EXIT_VERIFICATION_VALUES.includes(raw as (typeof EXIT_VERIFICATION_VALUES)[number])) {
-    res.status(400).json({ error: 'exit_verification must be "exited", "serving_notice_period", "payroll_converted", "absconded", "revoked", or null' });
+    res.status(400).json({ error: 'exit_verification must be "exited", "serving_notice_period", "payroll_converted", "absconded", or null' });
     return;
   }
   const [row] = await db.update(instructorsTable).set({ exitVerification: raw }).where(eq(instructorsTable.id, Number(req.params.id))).returning();
