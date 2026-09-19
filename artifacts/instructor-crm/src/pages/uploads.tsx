@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { AlertTriangle, CheckCircle2, Clock3, FileSpreadsheet, Info, Loader2, RefreshCw, UploadCloud, X, Zap } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
-import { getGetDashboardQueryKey, getGetSyncStatusQueryKey, getListInstructorsQueryKey, getListUploadsQueryKey, useGetSyncStatus, useListUploads, useSyncDarwinbox, useSyncTeachos, useUploadSource, type Upload } from '@workspace/api-client-react';
+import { getGetDashboardQueryKey, getGetSyncStatusQueryKey, getListInstructorsQueryKey, getListUploadsQueryKey, useGetSyncStatus, useListUploads, useSyncDarwinbox, useSyncDarwinboxExits, useSyncTeachos, useUploadSource, type Upload } from '@workspace/api-client-react';
 import { PageIntro, EmptyState, QueryError, SkeletonBlock } from '@/components/ui-pieces';
 
 // Live-sync tiles (2026-09-10, per request): "Darwin" and "TeachOS" trigger
@@ -10,9 +10,24 @@ import { PageIntro, EmptyState, QueryError, SkeletonBlock } from '@/components/u
 // team can force a fresh sync on demand and see immediately whether it
 // succeeded, instead of only finding out via a Recent-uploads row appearing
 // (or not) after waiting on the auto-sync schedule.
+//
+// "Exit List" added 2026-09-19 (per request, tracked down while debugging
+// "still only 5 columns" on Darwin Exit Details): the backend route
+// (POST /api/sync/darwinbox-exits, routes/sync.ts's runDarwinboxExitsSync)
+// and its typed hook (useSyncDarwinboxExits) already existed, but nothing
+// on this page ever called them, and DARWINBOX_EXITS_SYNC_INTERVAL_HOURS
+// defaults to 0 (auto-sync off) -- so there was actually no way, anywhere
+// in the app, to trigger the exits sync (base report + the 4 enrichment
+// reports) after it was first set up. Every darwinboxExits.ts fix landed
+// correctly (confirmed via inspect:darwinbox-exits pulling real, fully
+// joined data) but never had a way to reach darwinboxExitsTable, which is
+// what GET /reports/darwin-exit-details actually reads from -- so the
+// stored data just stayed stuck at whatever it was from before enrichment
+// existed. This tile is what was missing.
 const LIVE_SYNC_SOURCES = [
   { key: 'Darwin' as const, label: 'Darwin HRMS', detail: 'Employment master' },
   { key: 'TeachOS' as const, label: 'TeachOS', detail: 'Deployment access' },
+  { key: 'Exit List' as const, label: 'Darwin Exits', detail: 'Resignation report + enrichment reports' },
 ];
 
 const sources = [
@@ -113,12 +128,13 @@ function LiveSyncPanel({ uploads }: { uploads: Upload[] | undefined }) {
   const statusQuery = useGetSyncStatus({ query: { queryKey: getGetSyncStatusQueryKey(), refetchOnWindowFocus: false } });
   const syncDarwinbox = useSyncDarwinbox();
   const syncTeachos = useSyncTeachos();
-  const [feedback, setFeedback] = useState<Record<'Darwin' | 'TeachOS', SyncFeedback>>({ Darwin: null, TeachOS: null });
+  const syncDarwinboxExits = useSyncDarwinboxExits();
+  const [feedback, setFeedback] = useState<Record<'Darwin' | 'TeachOS' | 'Exit List', SyncFeedback>>({ Darwin: null, TeachOS: null, 'Exit List': null });
 
-  const mutations = { Darwin: syncDarwinbox, TeachOS: syncTeachos };
-  const intervals = { Darwin: statusQuery.data?.darwinbox.auto_sync_interval_hours, TeachOS: statusQuery.data?.teachos.auto_sync_interval_hours };
+  const mutations = { Darwin: syncDarwinbox, TeachOS: syncTeachos, 'Exit List': syncDarwinboxExits };
+  const intervals = { Darwin: statusQuery.data?.darwinbox.auto_sync_interval_hours, TeachOS: statusQuery.data?.teachos.auto_sync_interval_hours, 'Exit List': statusQuery.data?.darwinbox_exits.auto_sync_interval_hours };
 
-  const runSync = (key: 'Darwin' | 'TeachOS') => {
+  const runSync = (key: 'Darwin' | 'TeachOS' | 'Exit List') => {
     setFeedback((prev) => ({ ...prev, [key]: null }));
     mutations[key].mutate(undefined, {
       onSuccess: (result) => {
@@ -142,26 +158,27 @@ function LiveSyncPanel({ uploads }: { uploads: Upload[] | undefined }) {
       <div><p className="font-mono-ui text-[10px] uppercase tracking-[0.17em] text-muted-foreground">Live connections</p><h2 className="mt-1 text-[18px] font-extrabold tracking-[-0.03em]">Sync now</h2></div>
       <Zap size={18} className="text-primary" />
     </div>
-    <div className="grid gap-4 sm:grid-cols-2">
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {LIVE_SYNC_SOURCES.map((tile) => {
+        const testKey = tile.key.toLowerCase().replaceAll(' ', '-');
         const lastUpload = uploads?.find((upload) => upload.source === tile.key);
         const isPending = mutations[tile.key].isPending;
         const interval = intervals[tile.key];
         const result = feedback[tile.key];
-        return <div key={tile.key} data-testid={`card-live-sync-${tile.key.toLowerCase()}`} className="rounded-lg border border-border p-4">
+        return <div key={tile.key} data-testid={`card-live-sync-${testKey}`} className="rounded-lg border border-border p-4">
           <div className="flex items-start justify-between gap-3">
             <div><p className="text-[13px] font-bold">{tile.label}</p><p className="mt-0.5 text-[11px] text-muted-foreground">{tile.detail}</p></div>
-            <button type="button" disabled={isPending} data-testid={`button-sync-now-${tile.key.toLowerCase()}`} onClick={() => runSync(tile.key)} className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-[11px] font-bold text-primary-foreground shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0">
+            <button type="button" disabled={isPending} data-testid={`button-sync-now-${testKey}`} onClick={() => runSync(tile.key)} className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-[11px] font-bold text-primary-foreground shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0">
               {isPending ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
               {isPending ? 'Syncing…' : 'Sync now'}
             </button>
           </div>
           <div className="mt-3 flex items-center gap-1.5 text-[11px] text-muted-foreground">
             <Clock3 size={12} />
-            {lastUpload ? <span data-testid={`text-last-sync-${tile.key.toLowerCase()}`}>Last synced {formatDateTime(lastUpload.uploaded_at)}</span> : <span>No recorded sync yet</span>}
+            {lastUpload ? <span data-testid={`text-last-sync-${testKey}`}>Last synced {formatDateTime(lastUpload.uploaded_at)}</span> : <span>No recorded sync yet</span>}
           </div>
           {typeof interval === 'number' && <p className="mt-1 text-[10px] text-muted-foreground">{interval > 0 ? `Auto-syncs every ${interval}h` : 'Auto-sync is off for this source — use Sync now to refresh it'}</p>}
-          {result && <p data-testid={`status-sync-${tile.key.toLowerCase()}`} className={`mt-3 flex items-start gap-1.5 rounded-lg px-3 py-2 text-[11px] font-semibold ${result.ok ? 'bg-[#e5f3ed] text-[#287469]' : 'bg-[#fff0ec] text-[#9b4434]'}`}>
+          {result && <p data-testid={`status-sync-${testKey}`} className={`mt-3 flex items-start gap-1.5 rounded-lg px-3 py-2 text-[11px] font-semibold ${result.ok ? 'bg-[#e5f3ed] text-[#287469]' : 'bg-[#fff0ec] text-[#9b4434]'}`}>
             {result.ok ? <CheckCircle2 size={13} className="mt-0.5 shrink-0" /> : <AlertTriangle size={13} className="mt-0.5 shrink-0" />}
             <span>{result.message}</span>
           </p>}
