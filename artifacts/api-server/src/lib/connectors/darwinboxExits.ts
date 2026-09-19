@@ -162,9 +162,23 @@ function employeeIdKey(record: Record<string, unknown>): string | null {
   return normalized || null;
 }
 
+// Unlike fetchExitRecords() (the base report), this used to swallow an
+// unrecognized response shape into a plain empty array instead of throwing
+// -- meaning a permission error, an "invalid report id" message, or any
+// other error-shaped response Darwinbox sent back for one of these ids
+// looked EXACTLY like "this report has zero exit records", with nothing
+// logged anywhere (2026-09-19 fix, per request: enrichment was still
+// producing 0 extra columns with no warning at all in the logs -- this is
+// why). Now it throws with the raw response included, same as the base
+// report, so the catch in fetchExitRows()/inspectDarwinboxExits() actually
+// surfaces what Darwinbox said.
 async function fetchEnrichmentRecords(reportId: string): Promise<Record<string, unknown>[]> {
   const raw = await fetchRaw(reportId);
-  return findRecordsArray(raw) ?? [];
+  const found = findRecordsArray(raw);
+  if (found) return found;
+  throw new DarwinboxExitsError(
+    `Unrecognized response shape for enrichment report ${reportId} — could not find a records array. Raw response (truncated to 1500 chars): ${JSON.stringify(raw).slice(0, 1500)}`
+  );
 }
 
 // Merges one enrichment report's fields onto each base row that shares its
@@ -269,13 +283,18 @@ export async function fetchExitRows(): Promise<SheetRow[]> {
     try {
       const enrichmentRecords = await fetchEnrichmentRecords(reportId);
       const stats = mergeEnrichmentFields(rows, enrichmentRecords);
-      if (stats.totalRecords > 0 && stats.rowsMatched === 0) {
+      if (stats.totalRecords === 0) {
+        // Fetched fine (didn't throw) but the report itself has zero rows
+        // right now -- logged unconditionally so this never looks identical
+        // to the "failed" or "fetched but didn't join" cases below.
+        console.warn(`[darwinboxExits] Enrichment report ${reportId} returned 0 records -- nothing to merge from it this sync.`);
+      } else if (stats.rowsMatched === 0) {
         // Fetched fine but joined onto nothing -- almost always means this
         // report's employee-id column isn't one of ALIASES["Employee Id"]'s
         // aliases. Loud on purpose: this fails silently otherwise (the sync
         // "succeeds" with rows just missing that report's fields).
         console.warn(`[darwinboxExits] Enrichment report ${reportId} returned ${stats.totalRecords} record(s) but matched 0 exit rows by Employee Id -- its employee-id column probably isn't recognized. Run 'pnpm --filter @workspace/api-server run inspect:darwinbox-exits' to see its actual field names and add the right one to ALIASES in darwinboxExits.ts.`);
-      } else if (stats.totalRecords > 0) {
+      } else {
         console.log(`[darwinboxExits] Enrichment report ${reportId}: ${stats.totalRecords} record(s), matched ${stats.rowsMatched} exit row(s)${stats.recordsWithNoEmployeeId ? `, ${stats.recordsWithNoEmployeeId} record(s) had no recognizable Employee Id` : ""}.`);
       }
     } catch (e) {
