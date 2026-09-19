@@ -8,7 +8,7 @@ const ALL_NAV_ITEMS = [
   { href: '/', label: 'Overview', icon: LayoutDashboard },
   { href: '/instructors', label: 'Instructors', icon: UsersRound },
   { href: '/darwin-breakdown', label: 'Darwin Breakdown', icon: Building2 },
-  { href: '/darwin-full-roster-breakdown', label: 'Darwin Full Roster Breakdown', icon: Layers },
+  { href: '/darwin-full-roster', label: 'Darwin Full Roster', icon: Layers },
   { href: '/teachos-breakdown', label: 'TeachOS Breakdown', icon: GitBranch },
   { href: '/uploads', label: 'Source uploads', icon: UploadCloud },
   { href: '/exits', label: 'Exits', icon: UserX },
@@ -110,7 +110,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Menu size={18} />
             </button>
             <div className="hidden items-center gap-2 text-[12px] text-muted-foreground sm:flex">
-              <span>Instructor Department</span><ChevronRight size={13} /><span className="font-semibold text-foreground">{location === '/' ? 'Overview' : location.startsWith('/uploads') ? 'Source uploads' : location.startsWith('/teachos-breakdown') ? 'TeachOS Breakdown' : location.startsWith('/darwin-full-roster-breakdown') ? 'Darwin Full Roster Breakdown' : location.startsWith('/darwin-breakdown') ? 'Darwin Breakdown' : 'Instructors'}</span>
+              <span>Instructor Department</span><ChevronRight size={13} /><span className="font-semibold text-foreground">{location === '/' ? 'Overview' : location.startsWith('/uploads') ? 'Source uploads' : location.startsWith('/teachos-breakdown') ? 'TeachOS Breakdown' : location.startsWith('/darwin-full-roster') ? 'Darwin Full Roster' : location.startsWith('/darwin-breakdown') ? 'Darwin Breakdown' : 'Instructors'}</span>
             </div>
             <span className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-muted-foreground sm:hidden">ID / OPS</span>
           </div>

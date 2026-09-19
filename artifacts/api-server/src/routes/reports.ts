@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, instructorsTable } from "@workspace/db";
+import { db, instructorsTable, darwinboxFullRosterTable } from "@workspace/db";
 import { requireAuth, requireRole } from "../middlewares/auth";
 
 const router: IRouter = Router();
@@ -674,68 +674,48 @@ router.get("/reports/darwin-breakdown", requireAuth, requireRole("admin"), async
   });
 });
 
-// A dedicated breakdown of Darwin's FULL-ROSTER fallback matches (2026-09-18,
-// per request) -- the audit trail for reconcileDarwinFullRosterFallback() in
-// reconcile.ts. Darwin Breakdown above is scoped to inDarwin &&
-// !inDarwinFullRoster (the primary pass: Darwinbox's own Instructors-
-// department-filtered data). This tab is the complement: inDarwin &&
-// inDarwinFullRoster -- everyone whose Darwinbox record was only found by
-// re-checking Darwin's FULL, unfiltered company roster, because their
-// department field isn't literally "Instructors – ..." (Mentors is the
-// confirmed real case; there may be others). Bucketed identically to
-// /reports/darwin-breakdown (same shapes/names) so it's a drop-in second
-// tab, just over the fallback-matched population instead of the primary
-// one. No new data pipeline needed for this -- fetchDarwinRowsBoth() (see
-// lib/connectors/darwinbox.ts) already pulls this full roster alongside the
-// primary Instructors-department pull on every Darwin sync (scheduled or
-// manual "Sync now") and every manual full-roster CSV upload (see
-// routes/uploads.ts), storing it in the darwinbox_full_roster table and
-// setting inDarwinFullRoster via reconcileDarwinFullRosterFallback() -- this
-// route just surfaces what's already being kept current.
-router.get("/reports/darwin-full-roster-breakdown", requireAuth, requireRole("admin"), async (_req, res) => {
-  const rows = (await db.select().from(instructorsTable)).filter(
-    (r) => r.inDarwin && r.inDarwinFullRoster,
-  );
+// Raw browse of Darwin's FULL, unfiltered company roster (2026-09-18, per
+// follow-up request -- replaces an earlier classified-breakdown version of
+// this same tab: "I don't need any breakdown there, I just want to see the
+// whole darwin data, 3K+ data should be visible there"). No reconciliation,
+// no bucketing, no scoping to whoever happens to also be a current TeachOS
+// instructor -- literally every row Darwinbox's Master API returned on the
+// last sync (~3,300+, per the darwinbox.ts header comment), straight out of
+// the darwinbox_full_roster table. Column set is derived from whichever
+// keys are actually present across the stored rows (first-seen order)
+// rather than a hardcoded list, so this never silently drops a field if
+// darwinbox.ts's ALIASES list changes later -- in practice this is exactly
+// the 15 canonical columns mapRecordToRow() maps every record through (see
+// connectors/darwinbox.ts): Employee Id, Full Name, Org Email Id, Primary
+// Mobile Number, Date Of Joining, Department, Designation, Direct Manager,
+// Work Location, Workspace, Gender, Employee Status, Date Of Exit, Current
+// State, Current City. No new data pipeline needed -- fetchDarwinRowsBoth()
+// already fetches this full roster alongside the primary Instructors-
+// department pull on every Darwin sync (scheduled or manual "Sync now") and
+// every manual full-roster CSV upload (see routes/uploads.ts); this route
+// just surfaces what's already being kept current.
+router.get("/reports/darwin-full-roster", requireAuth, requireRole("admin"), async (_req, res) => {
+  const stored = await db.select().from(darwinboxFullRosterTable).orderBy(darwinboxFullRosterTable.id);
 
-  const instructorRows = rows.filter(
-    (r) => !r.classification && (r.deptBucket === "tech" || r.deptBucket === "non_tech"),
-  );
-  const mentorRows = rows.filter((r) => r.classification === "mentor");
-  const opsRows = rows.filter(
-    (r) => r.classification === "excluded_ops_managers" || r.classification === "instructor_ops",
-  );
-  const excludedRows = rows.filter(
-    (r) => r.classification === "excluded_other_department" || r.classification === "excluded_non_department_team",
-  );
-  const payrollEdgeCaseRows = rows.filter((r) => r.classification === "payroll_converted");
-  const classifiedIds = new Set(
-    [...instructorRows, ...mentorRows, ...opsRows, ...excludedRows, ...payrollEdgeCaseRows].map((r) => r.id),
-  );
-  const otherRows = rows.filter((r) => !classifiedIds.has(r.id));
-
-  const byArea: Record<string, number> = {};
-  for (const r of instructorRows) {
-    const key = r.deptArea ?? "(unspecified)";
-    byArea[key] = (byArea[key] ?? 0) + 1;
+  const columns: string[] = [];
+  const seen = new Set<string>();
+  for (const r of stored) {
+    for (const key of Object.keys(r.rawData ?? {})) {
+      if (!seen.has(key)) { seen.add(key); columns.push(key); }
+    }
   }
-
-  const othersTotal = opsRows.length + excludedRows.length + payrollEdgeCaseRows.length + otherRows.length;
+  const rows = stored.map((r) => {
+    const data = r.rawData as Record<string, unknown>;
+    const row: Record<string, unknown> = {};
+    for (const key of columns) row[key] = data[key] ?? null;
+    return row;
+  });
 
   res.json({
-    total_full_roster_matched: rows.length,
-    instructors: {
-      count: instructorRows.length,
-      by_area: byArea,
-      people: instructorRows.map(toApiCandidate),
-    },
-    mentors: { count: mentorRows.length, people: mentorRows.map(toApiCandidate) },
-    others: {
-      total: othersTotal,
-      ops_delivery_support: { count: opsRows.length, people: opsRows.map(toApiCandidate) },
-      excluded: { count: excludedRows.length, people: excludedRows.map(toApiCandidate) },
-      payroll_edge_case: { count: payrollEdgeCaseRows.length, people: payrollEdgeCaseRows.map(toApiCandidate) },
-      uncategorized: { count: otherRows.length, people: otherRows.map(toApiCandidate) },
-    },
+    count: rows.length,
+    columns,
+    rows,
+    synced_at: stored[0]?.syncedAt ?? null,
   });
 });
 
