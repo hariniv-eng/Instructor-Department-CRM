@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Bell, Building2, ChevronRight, Database, Eye, FileSearch, GitBranch, LayoutDashboard, Layers, LogIn, LogOut, Menu, UploadCloud, UserX, UsersRound, X } from 'lucide-react';
+import { Bell, Building2, ChevronRight, Database, Eye, FileSearch, GitBranch, LayoutDashboard, Layers, LogIn, LogOut, Menu, UploadCloud, UsersRound, X } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { useAuth, ROLE_LABELS } from '@/hooks/use-auth';
 import type { AppUser } from '@workspace/api-client-react';
@@ -11,14 +11,13 @@ const ALL_NAV_ITEMS = [
   { href: '/darwin-full-roster', label: 'Darwin Full Roster', icon: Layers },
   { href: '/teachos-breakdown', label: 'TeachOS Breakdown', icon: GitBranch },
   { href: '/uploads', label: 'Source uploads', icon: UploadCloud },
-  { href: '/exits', label: 'Exits', icon: UserX },
   { href: '/darwin-exit-details', label: 'Darwin Exit Details', icon: FileSearch },
 ];
 
 // "manager" only sees the Overview + Instructors headcount view — Darwin/
-// TeachOS breakdown detail, source uploads, and exits are admin-only
-// (mirrors ADMIN_ONLY_PATHS in App.tsx and requireRole("admin") on the
-// backend).
+// TeachOS breakdown detail, source uploads, and Darwin Exit Details are
+// admin-only (mirrors ADMIN_ONLY_PATHS in App.tsx and requireRole("admin")
+// on the backend).
 function navItemsForRole(role: AppUser['role'] | undefined) {
   if (role === 'admin') return ALL_NAV_ITEMS;
   return ALL_NAV_ITEMS.filter((item) => item.href === '/' || item.href === '/instructors');
@@ -111,7 +110,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Menu size={18} />
             </button>
             <div className="hidden items-center gap-2 text-[12px] text-muted-foreground sm:flex">
-              <span>Instructor Department</span><ChevronRight size={13} /><span className="font-semibold text-foreground">{location === '/' ? 'Overview' : location.startsWith('/uploads') ? 'Source uploads' : location.startsWith('/teachos-breakdown') ? 'TeachOS Breakdown' : location.startsWith('/darwin-exit-details') ? 'Darwin Exit Details' : location.startsWith('/darwin-full-roster') ? 'Darwin Full Roster' : location.startsWith('/darwin-breakdown') ? 'Darwin Breakdown' : location.startsWith('/exits') ? 'Exits' : 'Instructors'}</span>
+              <span>Instructor Department</span><ChevronRight size={13} /><span className="font-semibold text-foreground">{location === '/' ? 'Overview' : location.startsWith('/uploads') ? 'Source uploads' : location.startsWith('/teachos-breakdown') ? 'TeachOS Breakdown' : location.startsWith('/darwin-exit-details') ? 'Darwin Exit Details' : location.startsWith('/darwin-full-roster') ? 'Darwin Full Roster' : location.startsWith('/darwin-breakdown') ? 'Darwin Breakdown' : 'Instructors'}</span>
             </div>
             <span className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-muted-foreground sm:hidden">ID / OPS</span>
           </div>

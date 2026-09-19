@@ -471,52 +471,11 @@ const toApiCandidate = (row: InstructorRow) => ({
   date_of_joining: row.dateOfJoining,
 });
 
-// Exits report (2026-09-15, per request): everyone currently flagged as
-// exited, from either source that can set that flag --
-//   (a) the live Darwinbox resignation report, reconciled automatically
-//       during every Darwin sync (exitFlag/exitFlagStatus/exitFlagDate --
-//       see reconcileDarwin()/checkActiveWithExitDate.ts in reconcile.ts),
-//   (b) a manually-uploaded exits CSV or a by-hand edit on the instructor
-//       detail page (manualStatus === "exited", exitDate, notes -- see
-//       reconcileExits() in reconcile.ts), for whoever Darwin hasn't
-//       reported yet.
-// Scoped across every row in the table, not just counted
-// instructors/TeachOS-active people -- someone can leave regardless of
-// which bucket they were classified into (mentor, ops, payroll-converted,
-// etc.). Admin-only, matching Darwin Breakdown/TeachOS Breakdown/Source
-// uploads -- this is detailed, sensitive HR data, not the headcount
-// summary Manager view gets.
-const toApiExit = (row: InstructorRow) => ({
-  id: row.id,
-  full_name: row.fullName,
-  employee_id: row.employeeId,
-  teachos_user_id: row.teachosUserId,
-  designation: row.designation,
-  department: row.department,
-  dept_bucket: row.deptBucket,
-  dept_area: row.deptArea,
-  institutes: row.institutes,
-  capability_manager: row.teachosManager || row.manualCapabilityManager || null,
-  org_email: row.orgEmail,
-  date_of_joining: row.dateOfJoining,
-  exit_flag: row.exitFlag,
-  exit_flag_status: row.exitFlagStatus,
-  exit_flag_date: row.exitFlagDate,
-  manual_status: row.manualStatus,
-  exit_date: row.exitDate,
-  notes: row.notes,
-});
-
-router.get("/reports/exits", requireAuth, requireRole("admin"), async (_req, res) => {
-  const allRows = await db.select().from(instructorsTable);
-  const exitedRows = allRows.filter((r) => r.exitFlag || r.manualStatus === "exited");
-  res.json({
-    count: exitedRows.length,
-    darwin_flagged_count: exitedRows.filter((r) => r.exitFlag).length,
-    manual_count: exitedRows.filter((r) => !r.exitFlag && r.manualStatus === "exited").length,
-    people: exitedRows.map(toApiExit),
-  });
-});
+// The old "Exits" tab (added 2026-09-15) lived here -- GET /reports/exits +
+// toApiExit(), everyone currently flagged as exited joined with their
+// instructor record. Removed (2026-09-19, per request) now that "Darwin
+// Exit Details" gives the fuller, joined-with-enrichment-reports picture of
+// exited employees instead -- see GET /reports/darwin-exit-details above.
 
 router.get("/reports/teachos-breakdown", requireAuth, requireRole("admin"), async (_req, res) => {
   const rows = (await db.select().from(instructorsTable)).filter((r) => r.inTeachos);
