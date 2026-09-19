@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { RefreshCw } from 'lucide-react';
-import { PageIntro, EmptyState, QueryError, SkeletonBlock } from '@/components/ui-pieces';
+import { RefreshCw, Users } from 'lucide-react';
+import { PageIntro, EmptyState, QueryError, SkeletonBlock, TopStat, formatKpi } from '@/components/ui-pieces';
 
 // A flat, unreconciled dump of Darwin's full company roster (2026-09-18, per
 // request: "I don't need any breakdown there, I just want to see the whole
@@ -53,6 +53,16 @@ export default function DarwinFullRosterPage() {
 
     {query.isLoading && <SkeletonBlock className="h-[520px]" />}
     {query.isError && <QueryError message="Darwin Full Roster is unavailable right now." />}
+
+    {data && <div className="mb-6 grid max-w-xs grid-cols-1">
+      <TopStat
+        label="Total employees (Darwin)"
+        value={formatKpi(data.count)}
+        meta={data.synced_at ? `As of last sync -- ${new Date(data.synced_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' })}` : 'Sync time unavailable'}
+        icon={<Users size={16} />}
+        tone="navy"
+      />
+    </div>}
 
     {data && (data.count === 0
       ? <EmptyState title="No full-roster data yet" description="Sync Darwinbox (or upload a full-roster CSV) to see every record here." />
