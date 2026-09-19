@@ -47,16 +47,19 @@ function basicAuthHeader(username: string, password: string): string {
   return `Basic ${Buffer.from(`${username}:${password}`).toString("base64")}`;
 }
 
-async function fetchRaw(timeoutMs = 30000): Promise<unknown> {
+// Same Report Builder endpoint/credentials as the base exit report, just a
+// different report id — reused for both the base report and each
+// enrichment report below (fetchEnrichmentRecords).
+async function fetchRaw(reportId: string, timeoutMs = 30000): Promise<unknown> {
   const missingKeys = missing(REQUIRED);
   if (missingKeys.length) {
     throw new DarwinboxExitsError(`Darwinbox exits-report credentials are not fully configured — missing: ${missingKeys.join(", ")} (check .env).`);
   }
   const body = {
     api_key: config.DBX_CHECK_API_KEY,
-    report_id: config.DBX_CHECK_REPORT_ID,
-    reportId: config.DBX_CHECK_REPORT_ID,
-    id: config.DBX_CHECK_REPORT_ID,
+    report_id: reportId,
+    reportId: reportId,
+    id: reportId,
   };
 
   try {
@@ -108,7 +111,7 @@ function findRecordsArray(value: unknown, depth = 0): Record<string, unknown>[] 
 }
 
 export async function fetchExitRecords(): Promise<Record<string, unknown>[]> {
-  const raw = await fetchRaw();
+  const raw = await fetchRaw(config.DBX_CHECK_REPORT_ID!);
   const found = findRecordsArray(raw);
   if (found) return found;
   throw new DarwinboxExitsError(
@@ -116,7 +119,75 @@ export async function fetchExitRecords(): Promise<Record<string, unknown>[]> {
   );
 }
 
-/** Fetches + maps to the "Full Name" / "Employee Id" / "Exit Date" / "Reason" shape reconcileExits() expects. */
+// --- Enrichment reports (2026-09-19, per request) --------------------------
+//
+// The base report above only ever returns 5 fields. To get "full exit
+// details" for each employee_id, we separately call the same Report Builder
+// endpoint once per id in DBX_CHECK_ENRICH_REPORT_IDS (config.ts) and join
+// each report's rows onto the matching base exit row by Employee Id. These
+// extra reports' shapes are NOT known ahead of time the way the base
+// report's are (no confirmed field list yet — see the 2026-08-26 note atop
+// this file for how that was pinned down), so unlike the base report we do
+// NOT force every field through the fixed ALIASES map: whatever field names
+// a given report actually returns are merged onto the row as-is, and the
+// full-details page (see reports.ts's GET /reports/darwin-exit-details)
+// renders whatever columns show up, the same "don't hardcode the shape"
+// approach darwin-full-roster.tsx already uses for the full company roster.
+
+function parseEnrichReportIds(): string[] {
+  return (config.DBX_CHECK_ENRICH_REPORT_IDS ?? "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
+}
+
+function employeeIdKey(record: Record<string, unknown>): string | null {
+  const value = firstPresent(record, ALIASES["Employee Id"]);
+  if (value === null || value === undefined) return null;
+  const normalized = String(value).trim().toLowerCase();
+  return normalized || null;
+}
+
+async function fetchEnrichmentRecords(reportId: string): Promise<Record<string, unknown>[]> {
+  const raw = await fetchRaw(reportId);
+  return findRecordsArray(raw) ?? [];
+}
+
+// Merges one enrichment report's fields onto each base row that shares its
+// Employee Id, skipping the report's own employee-id column (the base row
+// already has the canonical "Employee Id") and never overwriting a field
+// the base row (or an earlier, higher-priority enrichment report) already
+// filled in -- "first non-blank value wins", same rule the report-priority
+// order documented in config.ts describes.
+function mergeEnrichmentFields(rows: SheetRow[], enrichmentRecords: Record<string, unknown>[]): void {
+  if (!enrichmentRecords.length) return;
+  const byEmployeeId = new Map<string, Record<string, unknown>>();
+  for (const record of enrichmentRecords) {
+    const key = employeeIdKey(record);
+    if (key && !byEmployeeId.has(key)) byEmployeeId.set(key, record);
+  }
+  const employeeIdAliasSet = new Set(ALIASES["Employee Id"].map((a) => a.toLowerCase()));
+  for (const row of rows) {
+    const rowKey = row["Employee Id"] === null || row["Employee Id"] === undefined ? null : String(row["Employee Id"]).trim().toLowerCase();
+    if (!rowKey) continue;
+    const enrichmentRecord = byEmployeeId.get(rowKey);
+    if (!enrichmentRecord) continue;
+    for (const [field, value] of Object.entries(enrichmentRecord)) {
+      if (employeeIdAliasSet.has(field.trim().toLowerCase())) continue;
+      const existing = row[field];
+      const isBlank = existing === null || existing === undefined || existing === "";
+      const hasValue = value !== null && value !== undefined && value !== "";
+      if (isBlank && hasValue) row[field] = value;
+    }
+  }
+}
+
+/**
+ * Fetches + maps to the "Full Name" / "Employee Id" / "Exit Date" / "Reason"
+ * shape reconcileExits() expects, then joins in every DBX_CHECK_ENRICH_REPORT_IDS
+ * report by Employee Id so each row carries whatever additional detail
+ * those reports have on file, not just the base report's 5 fields.
+ */
 export async function fetchExitRows(): Promise<SheetRow[]> {
   const records = await fetchExitRecords();
   const rows = records.map((rec) => {
@@ -131,6 +202,20 @@ export async function fetchExitRows(): Promise<SheetRow[]> {
       `Could not map Employee Id or Full Name from any record. Raw fields available: ${[...seen].sort().join(", ")}. Update ALIASES in darwinboxExits.ts.`
     );
   }
+
+  // Enrichment is best-effort: one bad/renamed/inaccessible report id
+  // shouldn't take down the whole exits sync (the base report above is what
+  // actually drives exitFlag/exitFlagStatus). Log and move on to the next
+  // report rather than throwing.
+  for (const reportId of parseEnrichReportIds()) {
+    try {
+      const enrichmentRecords = await fetchEnrichmentRecords(reportId);
+      mergeEnrichmentFields(rows, enrichmentRecords);
+    } catch (e) {
+      console.warn(`[darwinboxExits] Enrichment report ${reportId} failed, skipping it: ${(e as Error).message}`);
+    }
+  }
+
   return rows;
 }
 
@@ -142,6 +227,15 @@ export async function inspectDarwinboxExits() {
     console.log("First record's keys:", Object.keys(records[0]));
     console.log(JSON.stringify(records[0], null, 2).slice(0, 2000));
   }
+  for (const reportId of parseEnrichReportIds()) {
+    try {
+      const enrichmentRecords = await fetchEnrichmentRecords(reportId);
+      console.log(`Enrichment report ${reportId}: found ${enrichmentRecords.length} records.`);
+      if (enrichmentRecords[0]) console.log(`  First record's keys:`, Object.keys(enrichmentRecords[0]));
+    } catch (e) {
+      console.log(`Enrichment report ${reportId} failed: ${(e as Error).message}`);
+    }
+  }
   const rows = await fetchExitRows();
-  console.log("Mapped first row:", rows[0]);
+  console.log("Mapped + enriched first row:", rows[0]);
 }

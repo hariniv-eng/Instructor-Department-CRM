@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, instructorsTable, darwinboxFullRosterTable } from "@workspace/db";
+import { db, instructorsTable, darwinboxFullRosterTable, darwinboxExitsTable } from "@workspace/db";
 import { requireAuth, requireRole } from "../middlewares/auth";
 
 const router: IRouter = Router();
@@ -694,6 +694,41 @@ router.get("/reports/darwin-breakdown", requireAuth, requireRole("admin"), async
 // just surfaces what's already being kept current.
 router.get("/reports/darwin-full-roster", requireAuth, requireRole("admin"), async (_req, res) => {
   const stored = await db.select().from(darwinboxFullRosterTable).orderBy(darwinboxFullRosterTable.id);
+
+  const columns: string[] = [];
+  const seen = new Set<string>();
+  for (const r of stored) {
+    for (const key of Object.keys(r.rawData ?? {})) {
+      if (!seen.has(key)) { seen.add(key); columns.push(key); }
+    }
+  }
+  const rows = stored.map((r) => {
+    const data = r.rawData as Record<string, unknown>;
+    const row: Record<string, unknown> = {};
+    for (const key of columns) row[key] = data[key] ?? null;
+    return row;
+  });
+
+  res.json({
+    count: rows.length,
+    columns,
+    rows,
+    synced_at: stored[0]?.syncedAt ?? null,
+  });
+});
+
+// Darwin Exit Details (2026-09-19, per request: "the darwin data report id
+// that we are using is limited to few details of data only ... for each
+// employee_id ... pull other data from other new report Id"). The Exits
+// tab above only ever shows Employee Id/Full Name/Exit Date/Reason/Status,
+// because that's all DBX_CHECK_REPORT_ID's own report returns. This route
+// surfaces the FULL joined record instead -- every field darwinboxExits.ts
+// merged in from DBX_CHECK_ENRICH_REPORT_IDS (config.ts) on top of the base
+// 5, straight from darwinboxExitsTable.rawData, columns derived dynamically
+// same as darwin-full-roster above rather than hardcoded, since which
+// fields those enrichment reports actually carry isn't fixed ahead of time.
+router.get("/reports/darwin-exit-details", requireAuth, requireRole("admin"), async (_req, res) => {
+  const stored = await db.select().from(darwinboxExitsTable).orderBy(darwinboxExitsTable.id);
 
   const columns: string[] = [];
   const seen = new Set<string>();
