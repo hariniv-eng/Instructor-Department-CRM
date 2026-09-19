@@ -631,6 +631,36 @@ router.get("/reports/darwin-breakdown", requireAuth, requireRole("admin"), async
   });
 });
 
+// Shared by the two dynamic-column raw tables below (Darwin Full Roster,
+// Darwin Exit Details). collectDynamicColumns() walks every stored row's
+// rawData in first-seen order, same as before; pinIdentityColumnsFirst()
+// then guarantees Employee Id is always column 1 and Full Name column 2
+// (2026-09-19, per request: "make sure that 1st column is employee_id and
+// 2nd column is name") regardless of whatever order a given row's own
+// fields happened to come in as -- both connectors already build their rows
+// with Employee Id/Full Name first (see darwinbox.ts's and
+// darwinboxExits.ts's ALIASES), so this is normally a no-op, but pinning it
+// explicitly here means a legacy row, a manually-uploaded full-roster CSV
+// with its own column order, or a future connector change can never quietly
+// knock these two out of place.
+function collectDynamicColumns(stored: { rawData: unknown }[]): string[] {
+  const columns: string[] = [];
+  const seen = new Set<string>();
+  for (const r of stored) {
+    for (const key of Object.keys((r.rawData as Record<string, unknown>) ?? {})) {
+      if (!seen.has(key)) { seen.add(key); columns.push(key); }
+    }
+  }
+  return columns;
+}
+
+function pinIdentityColumnsFirst(columns: string[]): string[] {
+  const priority = ["Employee Id", "Full Name"];
+  const present = priority.filter((name) => columns.includes(name));
+  const rest = columns.filter((name) => !priority.includes(name));
+  return [...present, ...rest];
+}
+
 // Raw browse of Darwin's FULL, unfiltered company roster (2026-09-18, per
 // follow-up request -- replaces an earlier classified-breakdown version of
 // this same tab: "I don't need any breakdown there, I just want to see the
@@ -654,13 +684,7 @@ router.get("/reports/darwin-breakdown", requireAuth, requireRole("admin"), async
 router.get("/reports/darwin-full-roster", requireAuth, requireRole("admin"), async (_req, res) => {
   const stored = await db.select().from(darwinboxFullRosterTable).orderBy(darwinboxFullRosterTable.id);
 
-  const columns: string[] = [];
-  const seen = new Set<string>();
-  for (const r of stored) {
-    for (const key of Object.keys(r.rawData ?? {})) {
-      if (!seen.has(key)) { seen.add(key); columns.push(key); }
-    }
-  }
+  const columns: string[] = pinIdentityColumnsFirst(collectDynamicColumns(stored));
   const rows = stored.map((r) => {
     const data = r.rawData as Record<string, unknown>;
     const row: Record<string, unknown> = {};
@@ -676,6 +700,25 @@ router.get("/reports/darwin-full-roster", requireAuth, requireRole("admin"), asy
   });
 });
 
+// "Top Department" is one of the fields the enrichment reports join in
+// (see darwinboxExits.ts) -- values look like "Instructors Department
+// (NWD_ID)" or "HR - Human Resources (NWD_HR)", name plus department code
+// in parentheses (2026-09-19, per request: scope Darwin Exit Details down
+// to Instructors Department only). Matching on the "(NWD_ID)" code rather
+// than the full string is deliberately more forgiving of minor spacing/
+// capitalization differences across the different enrichment reports (they
+// don't all format this field identically), while still being precise --
+// the code is what's actually stable. A row with no "Top Department" at all
+// (e.g. its Employee Id never matched any enrichment report) is excluded,
+// since there's nothing here confirming it belongs to Instructors.
+const INSTRUCTORS_DEPARTMENT_CODE = "nwd_id";
+function isInstructorsDepartmentRow(topDepartment: unknown): boolean {
+  if (typeof topDepartment !== "string") return false;
+  const normalized = topDepartment.trim().toLowerCase();
+  if (!normalized) return false;
+  return normalized.includes(`(${INSTRUCTORS_DEPARTMENT_CODE})`) || normalized.startsWith("instructors department");
+}
+
 // Darwin Exit Details (2026-09-19, per request: "the darwin data report id
 // that we are using is limited to few details of data only ... for each
 // employee_id ... pull other data from other new report Id"). The Exits
@@ -686,16 +729,16 @@ router.get("/reports/darwin-full-roster", requireAuth, requireRole("admin"), asy
 // 5, straight from darwinboxExitsTable.rawData, columns derived dynamically
 // same as darwin-full-roster above rather than hardcoded, since which
 // fields those enrichment reports actually carry isn't fixed ahead of time.
+// Scoped to Instructors Department only (2026-09-19, per request) via
+// isInstructorsDepartmentRow() above -- someone who exited from a different
+// department shouldn't show up here even though their base exit record is
+// still in darwinboxExitsTable (that table isn't itself scoped to any one
+// department; only this view is).
 router.get("/reports/darwin-exit-details", requireAuth, requireRole("admin"), async (_req, res) => {
-  const stored = await db.select().from(darwinboxExitsTable).orderBy(darwinboxExitsTable.id);
+  const allStored = await db.select().from(darwinboxExitsTable).orderBy(darwinboxExitsTable.id);
+  const stored = allStored.filter((r) => isInstructorsDepartmentRow((r.rawData as Record<string, unknown> | null)?.["Top Department"]));
 
-  const columns: string[] = [];
-  const seen = new Set<string>();
-  for (const r of stored) {
-    for (const key of Object.keys(r.rawData ?? {})) {
-      if (!seen.has(key)) { seen.add(key); columns.push(key); }
-    }
-  }
+  const columns: string[] = pinIdentityColumnsFirst(collectDynamicColumns(stored));
   const rows = stored.map((r) => {
     const data = r.rawData as Record<string, unknown>;
     const row: Record<string, unknown> = {};
