@@ -42,7 +42,7 @@ export interface InstructorSummary {
   /** @nullable */
   gender: string | null;
   /** @nullable */
-  gender_source: 'darwin' | 'manual' | null;
+  gender_source: 'darwin' | 'exit' | 'manual' | null;
   /** True when a live Darwinbox exit/resignation record was found for this person -- powers the Exit column's dropdown vs. dash. */
   exit_flag: boolean;
   /** @nullable */

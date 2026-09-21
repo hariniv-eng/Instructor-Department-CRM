@@ -23,11 +23,17 @@ type DarwinExitDetails = {
   // Added 2026-09-21, per request: "now need to put filter for only
   // instructor team only ... get data of all the exit people who have
   // current department as 'instructor-...'". `rows`/`count` are scoped to
-  // the Instructor team (isInstructorTeamDepartment() in reports.ts,
-  // startsWith("instructor") on the Department field); this reports the
-  // company-wide split behind that filter, learned from the earlier "why
-  // did i only get 41" gap -- so if the filter is ever excluding someone it
-  // shouldn't, that's visible here instead of a silent count.
+  // the Instructor team -- isInstructorTeamDepartment() in reports.ts,
+  // an exact allowlist of the six real department values confirmed off
+  // this page (NIAT_Instructors, NIAT_Instructors_DSA, NIAT_Instructors_
+  // Aptitude & English, NIAT_Maths Instructors and Mentors, NIAT_
+  // Instructors & Mentors, Instructors Department) -- a generic
+  // startsWith("instructor") match was tried first and missed every
+  // "NIAT_..." value, since none of them start with the word "Instructor".
+  // This reports the company-wide split behind that filter, learned from
+  // the earlier "why did i only get 41" gap -- so if the filter is ever
+  // excluding someone it shouldn't, that's visible here instead of a
+  // silent count.
   diagnostics: {
     total_exit_records: number;
     instructor_team: number;
@@ -73,7 +79,7 @@ export default function DarwinExitDetailsPage() {
     <PageIntro
       eyebrow="Darwinbox / exit report + enrichment reports, joined"
       title="Darwin Exit Details"
-      description="Every field on file for each exited Instructor-team employee -- the base exit report's Employee Id / Full Name / Exit Date / Reason / Status, plus whatever the enrichment reports (DBX_CHECK_ENRICH_REPORT_IDS) add on top, joined by Employee Id. Scoped to every Instructors sub-department (Frontend, Backend, DSA, GenAI, English, and so on) -- other departments' exits aren't shown here. Refresh via the Exits sync (Source uploads) to pull the latest."
+      description="Every field on file for each exited Instructor-team employee -- the base exit report's Employee Id / Full Name / Exit Date / Reason / Status, plus whatever the enrichment reports (DBX_CHECK_ENRICH_REPORT_IDS) add on top, joined by Employee Id. Scoped to the Instructor-team departments (NIAT_Instructors, NIAT_Instructors_DSA, NIAT_Instructors_Aptitude & English, NIAT_Maths Instructors and Mentors, NIAT_Instructors & Mentors, Instructors Department) -- other departments' exits aren't shown here. Refresh via the Exits sync (Source uploads) to pull the latest."
       action={<button type="button" data-testid="button-refresh-darwin-exit-details" onClick={refresh} className="inline-flex items-center gap-2 self-start rounded-lg border border-border bg-card px-3.5 py-2.5 text-[12px] font-bold text-foreground transition-colors hover:bg-secondary lg:self-auto"><RefreshCw size={14} /> Refresh</button>}
     />
 

@@ -22,8 +22,20 @@ const toApiInstructorSummary = (row: InstructorRow) => ({
   full_name: row.fullName,
   employee_id: row.employeeId,
   teachos_user_id: row.teachosUserId,
-  designation: row.designation,
-  department: row.department,
+  // Falls back to exitDesignation/exitDepartment (2026-09-21, per request:
+  // "payroll converted instructor dont have data like gender subject and
+  // the department and also role ... get that data from the exit, map the
+  // payroll instructors with there employee_id with the whole exit data").
+  // Both Darwin-sourced columns are always null for a payroll-converted
+  // person (no Darwin record at all) -- recomputeStatuses() (reconcile.ts)
+  // now backfills these two from that population's matched Darwinbox exit
+  // record instead, keyed by employeeId (same findExit() lookup exitFlag
+  // already uses). Darwin's own value always wins when present -- this is
+  // strictly a gap-filler for the population that has nothing else, same
+  // "computed always wins over a lesser source" convention as gender/
+  // dept_area below.
+  designation: row.designation || row.exitDesignation || null,
+  department: row.department || row.exitDepartment || null,
   dept_bucket: row.deptBucket,
   // Falls back to manualDeptArea (2026-09-15, per request) -- a human can
   // mark the real Subject/teaching area by hand for exactly the people
@@ -95,8 +107,20 @@ const toApiInstructorSummary = (row: InstructorRow) => ({
   // gender_source tells the frontend whether the value shown is locked
   // (from Darwin) or editable (manual/none), so it knows whether to render
   // plain text or the manual-gender dropdown for a given row.
-  gender: (row.inDarwin ? row.gender : null) ?? row.manualGender ?? null,
-  gender_source: row.inDarwin && row.gender ? "darwin" : row.manualGender ? "manual" : null,
+  //
+  // Also falls back to exitGender (2026-09-21, per request — see
+  // designation/department's comment above): a payroll-converted person's
+  // matched Darwinbox exit record often carries its own Gender field, one
+  // tier below Darwin's own value and above the human-entered manual
+  // fallback. GenderCell on the frontend only special-cases
+  // gender_source === 'darwin' as locked read-only text -- 'exit' falls
+  // through to the same editable dropdown 'manual'/null already get
+  // (pre-filled with the exit-derived value), which is intentional: unlike
+  // Darwin's own field, an exit record is a secondary source, so leaving it
+  // correctable by whoever reviews the row is safer than presenting it as
+  // locked fact.
+  gender: (row.inDarwin ? row.gender : null) ?? row.exitGender ?? row.manualGender ?? null,
+  gender_source: row.inDarwin && row.gender ? "darwin" : row.exitGender ? "exit" : row.manualGender ? "manual" : null,
   // Whether this person has a live Darwinbox exit record on file (2026-09-17,
   // per request) -- not gated on inDarwin like the fields above, since
   // exitFlag is computed straight from darwinboxExitsTable and stays
@@ -714,15 +738,30 @@ router.get("/reports/darwin-full-roster", requireAuth, requireRole("admin"), asy
 // Scoping history: briefly scoped to "Top Department === Instructors
 // Department (NWD_ID)" only, reverted to showing every department
 // unfiltered (2026-09-19, per request: "can we go back displaying all exit
-// data in the darwin exit tab"), and now scoped again (2026-09-21, per
-// request: "now need to put filter for only instructor team only ... get
-// data of all the exit people who have current department as
-// 'instructor-...'") -- this time via isInstructorTeamDepartment() below,
-// which is deliberately broader than the earlier NWD_ID-only match: it
-// catches every Instructors sub-department (Frontend/Backend/DSA/GenAI/
-// English/Aptitude/Math/Delivery Support/etc.), not one specific top-level
-// code, mirroring darwinbox.ts's isInstructorRecord() used for the primary
-// Darwin roster rather than the narrower rule from the earlier attempt.
+// data in the darwin exit tab"), then scoped again via a startsWith(
+// "instructor") heuristic (2026-09-21, per request: "now need to put
+// filter for only instructor team only ... get data of all the exit
+// people who have current department as 'instructor-...'") -- and finally
+// swapped for this exact allowlist (2026-09-21, same day, per the user
+// pasting the real department values off the page and listing which ones
+// should count). The heuristic was wrong: this table's Department field
+// follows Darwinbox's "NIAT_..." naming (e.g. "NIAT_Instructors_DSA"),
+// not the live roster's "Instructors – Frontend Technologies (NWD_ID_FT)"
+// convention darwinbox.ts's isInstructorRecord() matches -- so
+// startsWith("instructor") silently missed every "NIAT_..." value and
+// only ever caught the one literal "Instructors Department" string. An
+// exact, case-insensitive allowlist of the six real values the user
+// confirmed is safer than guessing at another pattern.
+const INSTRUCTOR_TEAM_DEPARTMENTS = [
+  "NIAT_Instructors & Mentors",
+  "NIAT_Instructors_Aptitude & English",
+  "NIAT_Instructors",
+  "NIAT_Maths Instructors and Mentors",
+  "NIAT_Instructors_DSA",
+  "Instructors Department",
+];
+const INSTRUCTOR_TEAM_DEPARTMENTS_LOWER = new Set(INSTRUCTOR_TEAM_DEPARTMENTS.map((d) => d.toLowerCase()));
+
 const INSTRUCTOR_DEPARTMENT_FIELD_ALIASES = ["Department", "Current Department", "Top Department"];
 
 function findDepartmentValue(rawData: Record<string, unknown> | null): unknown {
@@ -736,15 +775,9 @@ function findDepartmentValue(rawData: Record<string, unknown> | null): unknown {
   return null;
 }
 
-// Matches Darwin's own department-string convention (e.g. "Instructors –
-// Frontend Technologies (NWD_ID_FT)" or "Instructors - English &
-// Communication Studies (NWD_ID_E&CS)") -- tolerates both the em-dash
-// Darwin uses live and the plain hyphen some exported sheets use, same as
-// isInstructorRecord() in connectors/darwinbox.ts, since this is checking
-// for the same family of strings on a different table.
 function isInstructorTeamDepartment(value: unknown): boolean {
   if (typeof value !== "string") return false;
-  return value.trim().toLowerCase().startsWith("instructor");
+  return INSTRUCTOR_TEAM_DEPARTMENTS_LOWER.has(value.trim().toLowerCase());
 }
 
 router.get("/reports/darwin-exit-details", requireAuth, requireRole("admin"), async (_req, res) => {

@@ -782,7 +782,14 @@ components:
         full_name: { type: string }
         employee_id: { type: ["string", "null"] }
         teachos_user_id: { type: ["string", "null"] }
+        # Darwin's own value when present; else falls back to the matched
+        # Darwinbox exit record's Designation field (2026-09-21, per
+        # request) -- a payroll-converted person has no Darwin record at
+        # all, so this is otherwise always blank for that population.
         designation: { type: ["string", "null"] }
+        # Same fallback as designation above (2026-09-21, per request) --
+        # Darwin's own value when present, else the matched exit record's
+        # Department field.
         department: { type: ["string", "null"] }
         dept_bucket: { type: ["string", "null"] }
         dept_area: { type: ["string", "null"] }
@@ -839,9 +846,13 @@ components:
         # Darwin's value, when present, always wins.
         gender: { type: ["string", "null"] }
         # Whether `gender` above came from Darwin (locked -- the Instructors
-        # tab shows plain text) or was set/left blank manually (the
-        # Instructors tab shows the manual-gender dropdown instead).
-        gender_source: { type: ["string", "null"], enum: ["darwin", "manual", null] }
+        # tab shows plain text), a payroll-converted person's matched
+        # Darwinbox exit record ("exit", 2026-09-21 -- editable, same
+        # dropdown as manual, since an exit record is a secondary source and
+        # not locked fact the way Darwin's own field is), or was set/left
+        # blank manually (the Instructors tab shows the manual-gender
+        # dropdown instead).
+        gender_source: { type: ["string", "null"], enum: ["darwin", "exit", "manual", null] }
         # True when a live Darwinbox exit/resignation record was found for
         # this person (2026-09-17, per request) -- powers the Instructors
         # tab's Exit column: true shows the manual-verification dropdown,
