@@ -502,10 +502,13 @@ function MultiSelectFilter({ label, options, selected, onChange, testId, widthCl
   </div>;
 }
 
-// Column set is per-category: Instructors get Subject + Payroll (the two
-// things the user singled out for this bucket); Mentors get Subject instead
-// of Payroll; Operations team gets Department in place of a subject, since
-// ops rows aren't teaching one. Campus (the institutes list) is common to all three.
+// Column set is per-category: Instructors, Mentors, the combined
+// "Instructor Department" list, and Exception all show the identical
+// column set now, Payroll included (2026-09-21, per request -- see
+// gridColsClass below for the full explanation). Operations team is the
+// one deliberate exception: Department in place of Subject, since ops rows
+// aren't teaching one, and no Payroll or Campus either. Campus (the
+// institutes list) is common to the other four.
 // Department (Darwin's raw department field, e.g. "Instructors -- Frontend")
 // is now its own explicit column for Instructors and Mentors too (2026-09-09,
 // per request) -- separate from Subject (dept_area, the derived teaching
@@ -548,16 +551,27 @@ function MultiSelectFilter({ label, options, selected, onChange, testId, widthCl
 // per request) -- wide enough for the "Serving Notice Period" dropdown
 // option text (the longest of the three) without clipping.
 function gridColsClass(category: CategoryKey): string {
-  if (category === 'instructors') return 'grid-cols-[260px_190px_130px_280px_220px_150px_160px_170px_220px_140px_190px_130px_150px_190px]';
-  // "Instructor Department" (the combined list) has the same column set as
-  // Mentors: Subject + Department, Campus, no Payroll (payroll status isn't
-  // a meaningful concept for the Mentors/Ops rows mixed into this list).
-  // "Exception" (2026-09-18) mixes Instructors/Mentors/Ops the same way
-  // Department does, so it gets the identical column set.
-  if (category === 'mentors' || category === 'department' || category === 'exception') return 'grid-cols-[260px_190px_130px_280px_220px_150px_160px_170px_240px_140px_190px_150px_190px]';
-  // Operations team has no Campus column -- ops rows aren't deployed to a
-  // teaching campus the way instructors and mentors are. It also has only
-  // one Subject/Department-style column (labeled "Department"), not both.
+  // Payroll is now shown everywhere Subject/Campus are (2026-09-21, per
+  // request: "make sure we have all the columns we have one ... for
+  // example instructors table we have payroll column but it is not in any
+  // other, make sure it is visible in all the tables properly") --
+  // Instructors, Mentors, the combined "Instructor Department" list, and
+  // Exception all share this identical 14-column set now. is_payroll can
+  // only ever be true for a genuine instructor row -- classifyDepartment()/
+  // recomputeStatuses() never assigns the payroll_converted classification
+  // to a Mentors- or Ops-department row (those are decided by the
+  // department-level rules first, before the TeachOS-only-leftover/payroll
+  // path is ever reached -- see reconcile.ts) -- so a Mentor or Ops row
+  // mixed into Department/Exception just reads "Nxtwave" in this column,
+  // same as any non-payroll instructor. Never wrong, just not usually the
+  // interesting value there.
+  if (category === 'instructors' || category === 'mentors' || category === 'department' || category === 'exception') return 'grid-cols-[260px_190px_130px_280px_220px_150px_160px_170px_220px_140px_190px_130px_150px_190px]';
+  // Operations team keeps its own shape (2026-09-21: not part of the above
+  // request) -- no Campus column (ops rows aren't deployed to a teaching
+  // campus the way instructors and mentors are), a single Department
+  // column instead of Subject+Department, and no Payroll either (same
+  // reason it's never meaningful for Mentors: payroll_converted can't be
+  // assigned to an ops row).
   return 'grid-cols-[260px_190px_130px_280px_220px_150px_280px_140px_190px_150px_190px]';
 }
 
@@ -578,7 +592,7 @@ function downloadInstructorsCsv(category: CategoryKey, people: InstructorSummary
   if (category !== 'ops_team') headers.push('Campus');
   headers.push('Date of joining');
   headers.push('Capability Manager');
-  if (category === 'instructors') headers.push('Payroll');
+  if (category !== 'ops_team') headers.push('Payroll');
   headers.push('Gender');
   headers.push('Exit');
 
@@ -588,7 +602,7 @@ function downloadInstructorsCsv(category: CategoryKey, people: InstructorSummary
     if (category !== 'ops_team') row.push(person.institutes?.join(', ') ?? '');
     row.push(person.date_of_joining ?? '');
     row.push(person.capability_manager ?? '');
-    if (category === 'instructors') row.push(person.is_payroll ? 'Payroll' : 'Nxtwave');
+    if (category !== 'ops_team') row.push(person.is_payroll ? 'Payroll' : 'Nxtwave');
     row.push(person.gender ?? '');
     // Blank when there's no exit record at all; "Not reviewed" when one
     // exists but no Capability Manager has verified it yet; otherwise the
@@ -616,7 +630,7 @@ function CategoryTable({ category, people }: { category: CategoryKey; people: In
           {category !== 'ops_team' && <span>Campus</span>}
           <span>Date of joining</span>
           <span>Capability Manager</span>
-          {category === 'instructors' && <span>Payroll</span>}
+          {category !== 'ops_team' && <span>Payroll</span>}
           <span>Gender</span>
           <span>Exit</span>
         </div>
@@ -652,7 +666,7 @@ function PersonRow({ category, person, columns }: { category: CategoryKey; perso
         "unknown" placeholder. See date_of_joining's gating in reports.ts. */}
     <div className="truncate font-mono-ui text-[11px] text-muted-foreground">{person.date_of_joining || ''}</div>
     <CapabilityManagerCell person={person} />
-    {category === 'instructors' && <div>{person.is_payroll ? <span className="inline-flex rounded-full bg-[#e6e9fb] px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] text-[#4a4fb0]">Payroll</span> : <span className="inline-flex rounded-full bg-secondary px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] text-muted-foreground">Nxtwave</span>}</div>}
+    {category !== 'ops_team' && <div>{person.is_payroll ? <span className="inline-flex rounded-full bg-[#e6e9fb] px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] text-[#4a4fb0]">Payroll</span> : <span className="inline-flex rounded-full bg-secondary px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] text-muted-foreground">Nxtwave</span>}</div>}
     <GenderCell person={person} />
     <ExitCell person={person} />
   </Link>;
