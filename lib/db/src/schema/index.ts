@@ -148,7 +148,14 @@ export const instructorsTable = pgTable("instructors", {
   // "Artificial Intelligence & Emerging Technologies", "Interdisciplinary &
   // Applied Sciences", "English", "Aptitude", "Math". null when deptBucket
   // is null, or when only the coarse TeachOS category (not the finer Darwin
-  // department string) was available to classify from.
+  // department string) was available to classify from. One exception
+  // (2026-09-21, per request to surface Subject for mentors too): a Mentor
+  // embedded within an Instructors sub-department can have a real value
+  // here even though deptBucket itself is still forced null for that row
+  // (reconcile.ts's isDeptExclusion vs. the narrower isAreaExclusion) --
+  // deptBucket only ever means tech/non_tech, so "mentor" was never a value
+  // it could hold, but the sub-area classifyDepartment() resolved for that
+  // person is still real and worth keeping.
   deptArea: text("dept_area"),
   // Manual fallback for `deptArea` above (2026-09-15, per request) -- same
   // pattern as manualGender/manualCapabilityManager: for someone

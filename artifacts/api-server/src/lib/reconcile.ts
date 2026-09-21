@@ -160,6 +160,27 @@ export const recomputeStatuses = async () => {
     const otherDepartmentOverride = findOverride<OtherDepartmentOverride>(row, OTHER_DEPARTMENT_EMPLOYEES);
     const deptInfo = classifyDepartment(row.department, row.teachosCategory, row.designation);
     const isDeptExclusion = deptInfo.bucket === "excluded_ops_managers" || deptInfo.bucket === "mentor" || deptInfo.bucket === "instructor_ops";
+    // Subject/area exclusion is narrower than the bucket exclusion above
+    // (2026-09-21, per request: "apply the logic we have used for the
+    // instructors to get the subjects for mentors also"). classifyDepartment()
+    // already resolves a real sub-area (Frontend/Backend/DSA/GenAI/etc.) for
+    // a mentor embedded within an Instructors sub-department -- Darwin
+    // department string starts with "Instructors", designation says Mentor
+    // (see departmentTaxonomy.ts) -- using the exact same RULES-based
+    // matching an ordinary instructor gets. That computed area used to be
+    // discarded here along with deptBucket, which is why the Subject column
+    // read empty for every mentor even when classifyDepartment had a real
+    // answer. Only "excluded_ops_managers" and "instructor_ops" (roles that
+    // were never a teaching area in the first place) still null the area
+    // out; mentors now keep whatever classifyDepartment resolved -- null for
+    // the flat "Mentors" department (that string has no sub-area to read),
+    // a real area for one filed under an Instructors sub-department. A
+    // mentor left null this way can still be filled in by hand through the
+    // same Manual Subject control instructors already use (routes/
+    // instructors.ts's PATCH /instructors/:id/subject, SubjectCell on the
+    // frontend) -- that path was already open to mentors, it just never had
+    // a computed value to fall back past.
+    const isAreaExclusion = deptInfo.bucket === "excluded_ops_managers" || deptInfo.bucket === "instructor_ops";
     const exit = findExit(row, exits);
     const deploymentStatus = classifyDeployment(row.institutes);
     // Payroll-converted status is now fully computed for the TeachOS-only
@@ -248,7 +269,7 @@ export const recomputeStatuses = async () => {
       exitFlagStatus: exit?.status ?? null,
       exitFlagDate: toISODate(exit?.exitDate ?? null),
       deptBucket: isDeptExclusion ? null : deptInfo.bucket,
-      deptArea: isDeptExclusion ? null : deptInfo.area,
+      deptArea: isAreaExclusion ? null : deptInfo.area,
       deploymentStatus,
     }).where(eq(instructorsTable.id, row.id));
   }));
