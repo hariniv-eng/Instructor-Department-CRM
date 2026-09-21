@@ -172,6 +172,43 @@ export const instructorsTable = pgTable("instructors", {
   // shown anywhere in the app = the computed value when present, else this.
   // See reports.ts's toApiInstructorSummary.
   manualDeptArea: text("manual_dept_area"),
+  // --- Exit-derived gap-fill for payroll-converted instructors (2026-09-21,
+  // per request: "payroll converted instructor dont have data like gender
+  // subject and the department and also role ... get that data from the
+  // exit, map the payroll instructors with there employee_id with the whole
+  // exit data") ---
+  // A payroll-converted person (classification "payroll_converted" —
+  // isTeachosOnlyLeftover in recomputeStatuses: found in TeachOS, never
+  // matched Darwin at all, neither the primary Instructors-department pass
+  // nor the full-roster fallback) has no Darwin record, so `department`,
+  // `designation`, and `gender` above (all Darwin-sourced) are never
+  // populated for them, and deptArea/deptBucket have nothing to classify
+  // from either — every one of those columns reads blank. But many of these
+  // same people DO have a Darwinbox exit/resignation record on file
+  // (darwinboxExitsTable, matched by employeeId — same findExit() lookup
+  // recomputeStatuses() already uses for exitFlag/exitFlagStatus above), and
+  // that exit record carries its own Department/Designation/Gender fields
+  // straight from Darwinbox. These three columns hold exactly that —
+  // written ONLY for the isTeachosOnlyLeftover population, so a normal
+  // Darwin-matched instructor's row (who may separately have an exit record
+  // on file too, per the "flag, don't subtract" rule) never has this
+  // secondary source silently override their real Darwin data. Never
+  // written by any manual-edit path — purely computed by recomputeStatuses()
+  // every reconcile, same as exitFlag/exitFlagStatus/exitFlagDate.
+  //
+  // Effective value shown anywhere in the app, in priority order: Darwin's
+  // own value (when present) > this exit-derived value > the human-entered
+  // manual* fallback above (gap-filler of last resort) — same "computed
+  // always wins over manual" convention every other gap-filled field in
+  // this table follows. See reports.ts's toApiInstructorSummary (department/
+  // designation/gender fields) and recomputeStatuses()'s deptArea line
+  // (exitDesignation + exitDepartment feed classifyDepartment() the same way
+  // a normal Darwin department string would, so Subject gets filled in too —
+  // no separate exit_dept_area column needed, it lands in the same deptArea
+  // column mentors' computed subject already uses).
+  exitDepartment: text("exit_department"),
+  exitDesignation: text("exit_designation"),
+  exitGender: text("exit_gender"),
   // "deployed" | "in_training" | null — derived from `institutes`: any
   // institute other than the "Training Institute" placeholder counts as a
   // real campus deployment.

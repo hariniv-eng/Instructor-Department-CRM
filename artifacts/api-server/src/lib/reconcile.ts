@@ -62,6 +62,19 @@ function findOverride<T extends { teachosUserId?: string; employeeId?: string; f
 interface ExitInfo {
   status: string | null;
   exitDate: string | null;
+  // Department/Designation/Gender straight off the exit record itself
+  // (2026-09-21, per request: "get missing data of payroll converted
+  // instructors ... get that data from the exit, map the payroll instructors
+  // with there employee_id with the whole exit data") — same Darwinbox-
+  // sourced field names reconcileDarwin()/reconcileCapabilityManager() read
+  // elsewhere in this file ("Designation"/"Gender"), plus the "Current
+  // Department"/"Top Department" aliases confirmed real for this specific
+  // table (see reports.ts's darwin-exit-details route). Populated for every
+  // exit record regardless of who matches it; recomputeStatuses() below
+  // decides who actually gets to use it (isTeachosOnlyLeftover only).
+  department: string | null;
+  designation: string | null;
+  gender: string | null;
 }
 
 // Darwinbox exit records don't carry a stable numeric ordering we can trust
@@ -120,7 +133,10 @@ async function loadLatestExitsByPerson(): Promise<{ byEmployeeId: Map<string, Ex
   for (const exit of exits) {
     const status = cell(exit.rawData, "Status", "status");
     const exitDate = cell(exit.rawData, "Exit Date", "exit_date");
-    const info: ExitInfo = { status, exitDate };
+    const department = cell(exit.rawData, "Department", "Current Department", "Top Department", "department");
+    const designation = cell(exit.rawData, "Designation", "Current Designation", "designation");
+    const gender = cell(exit.rawData, "Gender", "gender");
+    const info: ExitInfo = { status, exitDate, department, designation, gender };
     const rank = parseLooseDate(exitDate);
     const candidate = { info, rank, id: exit.id };
     const isNewer = (existing?: { rank: number; id: number }) => !existing || rank > existing.rank || (rank === existing.rank && exit.id > existing.id);
@@ -202,6 +218,22 @@ export const recomputeStatuses = async () => {
     //      "other department" as of 2026-09-04 — see reports.ts).
     //   3. Everyone still left in the pool -> payroll_converted.
     const isTeachosOnlyLeftover = !!row.inTeachos && !row.inDarwin;
+    // Exit-derived gap-fill (2026-09-21, per request — see exitDepartment/
+    // exitDesignation/exitGender's comment in schema/index.ts): scoped to
+    // isTeachosOnlyLeftover only, so a normal Darwin-matched instructor who
+    // separately has an exit record on file (the "flag, don't subtract"
+    // case) never has this secondary source override their real Darwin
+    // department/designation/gender. Fed through classifyDepartment() the
+    // same way an ordinary Darwin department string would be, purely to
+    // resolve a Subject/area for deptArea below (deptInfo above already used
+    // row.department, which is always null for this population, so it never
+    // has one) — deliberately not used to decide deptBucket/classification;
+    // this population's classification stays whatever the cascade below
+    // already decides (payroll_converted / iit_kharagpur_team), regardless
+    // of what department the exit record happens to name.
+    const exitDeptInfo = isTeachosOnlyLeftover && exit && (exit.department || exit.designation)
+      ? classifyDepartment(exit.department, null, exit.designation)
+      : null;
     // Narrowed back 2026-09-16, per request: institute_name === "IIT
     // Kharagpur" only sets iit_kharagpur_team for someone with NO Darwin
     // match at all (isTeachosOnlyLeftover). Anyone who has a Darwin match
@@ -268,8 +300,11 @@ export const recomputeStatuses = async () => {
       exitFlag: !!exit,
       exitFlagStatus: exit?.status ?? null,
       exitFlagDate: toISODate(exit?.exitDate ?? null),
+      exitDepartment: isTeachosOnlyLeftover ? (exit?.department ?? null) : null,
+      exitDesignation: isTeachosOnlyLeftover ? (exit?.designation ?? null) : null,
+      exitGender: isTeachosOnlyLeftover ? (exit?.gender ?? null) : null,
       deptBucket: isDeptExclusion ? null : deptInfo.bucket,
-      deptArea: isAreaExclusion ? null : deptInfo.area,
+      deptArea: isAreaExclusion ? null : (deptInfo.area || exitDeptInfo?.area || null),
       deploymentStatus,
     }).where(eq(instructorsTable.id, row.id));
   }));
