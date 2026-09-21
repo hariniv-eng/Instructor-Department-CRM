@@ -711,26 +711,69 @@ router.get("/reports/darwin-full-roster", requireAuth, requireRole("admin"), asy
 // same as darwin-full-roster above rather than hardcoded, since which
 // fields those enrichment reports actually carry isn't fixed ahead of time.
 //
-// Was briefly scoped to Instructors Department only, then reverted (2026-
-// 09-19, per request: "can we go back displaying all exit data in the
-// darwin exit tab") -- `rows`/`count` are back to every exit record on file,
-// every department, unfiltered. department_breakdown below (added per the
-// department-list follow-up in between) is kept as extra context on the
-// same page rather than removed, since it's independently useful and reads
-// straight off the same query.
-router.get("/reports/darwin-exit-details", requireAuth, requireRole("admin"), async (_req, res) => {
-  const stored = await db.select().from(darwinboxExitsTable).orderBy(darwinboxExitsTable.id);
+// Scoping history: briefly scoped to "Top Department === Instructors
+// Department (NWD_ID)" only, reverted to showing every department
+// unfiltered (2026-09-19, per request: "can we go back displaying all exit
+// data in the darwin exit tab"), and now scoped again (2026-09-21, per
+// request: "now need to put filter for only instructor team only ... get
+// data of all the exit people who have current department as
+// 'instructor-...'") -- this time via isInstructorTeamDepartment() below,
+// which is deliberately broader than the earlier NWD_ID-only match: it
+// catches every Instructors sub-department (Frontend/Backend/DSA/GenAI/
+// English/Aptitude/Math/Delivery Support/etc.), not one specific top-level
+// code, mirroring darwinbox.ts's isInstructorRecord() used for the primary
+// Darwin roster rather than the narrower rule from the earlier attempt.
+const INSTRUCTOR_DEPARTMENT_FIELD_ALIASES = ["Department", "Current Department", "Top Department"];
 
-  const NO_TOP_DEPARTMENT_LABEL = "No Top Department on file";
-  const departmentCounts = new Map<string, number>();
-  for (const r of stored) {
-    const topDepartment = (r.rawData as Record<string, unknown> | null)?.["Top Department"];
-    const label = typeof topDepartment === "string" && topDepartment.trim() ? topDepartment.trim() : NO_TOP_DEPARTMENT_LABEL;
-    departmentCounts.set(label, (departmentCounts.get(label) ?? 0) + 1);
+function findDepartmentValue(rawData: Record<string, unknown> | null): unknown {
+  if (!rawData) return null;
+  const lowerMap = new Map(Object.keys(rawData).map((k) => [k.toLowerCase(), rawData[k]]));
+  for (const alias of INSTRUCTOR_DEPARTMENT_FIELD_ALIASES) {
+    if (alias in rawData && rawData[alias] != null && rawData[alias] !== "") return rawData[alias];
+    const hit = lowerMap.get(alias.toLowerCase());
+    if (hit != null && hit !== "") return hit;
   }
+  return null;
+}
+
+// Matches Darwin's own department-string convention (e.g. "Instructors –
+// Frontend Technologies (NWD_ID_FT)" or "Instructors - English &
+// Communication Studies (NWD_ID_E&CS)") -- tolerates both the em-dash
+// Darwin uses live and the plain hyphen some exported sheets use, same as
+// isInstructorRecord() in connectors/darwinbox.ts, since this is checking
+// for the same family of strings on a different table.
+function isInstructorTeamDepartment(value: unknown): boolean {
+  if (typeof value !== "string") return false;
+  return value.trim().toLowerCase().startsWith("instructor");
+}
+
+router.get("/reports/darwin-exit-details", requireAuth, requireRole("admin"), async (_req, res) => {
+  const allStored = await db.select().from(darwinboxExitsTable).orderBy(darwinboxExitsTable.id);
+
+  // department_breakdown stays unfiltered/company-wide on purpose (same as
+  // before this scoping change) -- it's what let us catch the earlier "why
+  // did i only get 41" gap, so keeping the full picture visible here means
+  // the same question is answerable at a glance if this filter ever looks
+  // like it's excluding people it shouldn't.
+  const NO_DEPARTMENT_LABEL = "No department on file";
+  const departmentCounts = new Map<string, number>();
+  let instructorTeamCount = 0;
+  const stored = allStored.filter((r) => {
+    const rawData = r.rawData as Record<string, unknown> | null;
+    const department = findDepartmentValue(rawData);
+    const label = typeof department === "string" && department.trim() ? department.trim() : NO_DEPARTMENT_LABEL;
+    departmentCounts.set(label, (departmentCounts.get(label) ?? 0) + 1);
+    const isInstructorTeam = isInstructorTeamDepartment(department);
+    if (isInstructorTeam) instructorTeamCount++;
+    return isInstructorTeam;
+  });
   const departmentBreakdown = Array.from(departmentCounts.entries())
     .map(([department, count]) => ({ department, count }))
     .sort((a, b) => b.count - a.count);
+  console.log(
+    `darwin-exit-details: ${allStored.length} total exit records -- ` +
+    `${instructorTeamCount} matched an Instructor-team department, ${allStored.length - instructorTeamCount} did not (see department_breakdown for the full split)`
+  );
 
   const columns: string[] = pinIdentityColumnsFirst(collectDynamicColumns(stored));
   const rows = stored.map((r) => {
@@ -745,10 +788,14 @@ router.get("/reports/darwin-exit-details", requireAuth, requireRole("admin"), as
     columns,
     rows,
     synced_at: stored[0]?.syncedAt ?? null,
-    // The full list of departments present in Darwin's exit data, with how
-    // many exit records fell under each (2026-09-19, per follow-up "i just
-    // need the list of all the departements from darwin exit data").
-    // Sorted by count, descending.
+    diagnostics: {
+      total_exit_records: allStored.length,
+      instructor_team: instructorTeamCount,
+      other_or_unclassified: allStored.length - instructorTeamCount,
+    },
+    // The full list of departments present in Darwin's exit data, company-
+    // wide (not scoped to the Instructor team filter above), with how many
+    // exit records fell under each. Sorted by count, descending.
     department_breakdown: departmentBreakdown,
   });
 });
