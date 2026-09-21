@@ -775,9 +775,23 @@ function findDepartmentValue(rawData: Record<string, unknown> | null): unknown {
   return null;
 }
 
+// Broadened (2026-09-21, per request: "in the exit data also add the
+// instructor-'..' current instructors to the exit data") to ALSO match the
+// OTHER Darwinbox department-naming convention -- the primary Darwin roster
+// style used by darwinbox.ts's isInstructorRecord() ("Instructors – Frontend
+// Technologies (NWD_ID_FT)", em-dash or hyphen), not just the exact NIAT_...
+// values this exit-enrichment data normally carries. The two conventions
+// never collide (none of the six NIAT_/exact values below start with the
+// word "Instructor"), so this is purely additive -- every record the exact
+// allowlist already matched still matches; this just also catches an exit
+// record whose Department field happens to carry the primary-roster spelling
+// instead of the NIAT_ one.
 function isInstructorTeamDepartment(value: unknown): boolean {
   if (typeof value !== "string") return false;
-  return INSTRUCTOR_TEAM_DEPARTMENTS_LOWER.has(value.trim().toLowerCase());
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  if (INSTRUCTOR_TEAM_DEPARTMENTS_LOWER.has(trimmed.toLowerCase())) return true;
+  return /^instructors?\b/i.test(trimmed);
 }
 
 router.get("/reports/darwin-exit-details", requireAuth, requireRole("admin"), async (_req, res) => {
