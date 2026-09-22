@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db, instructorsTable, darwinboxFullRosterTable, darwinboxExitsTable } from "@workspace/db";
 import { requireAuth, requireRole } from "../middlewares/auth";
+import { cell } from "../lib/reconcile";
 
 const router: IRouter = Router();
 
@@ -37,6 +38,17 @@ const toApiInstructorSummary = (row: InstructorRow) => ({
   designation: row.designation || row.exitDesignation || null,
   department: row.department || row.exitDepartment || null,
   dept_bucket: row.deptBucket,
+  // Added (2026-09-22, per request: a "bifurcation" column on the
+  // Instructors tab table showing Instructor / Mentor / Delivery Support).
+  // dept_bucket above isn't enough on its own for this: recomputeStatuses()
+  // (reconcile.ts) deliberately NULLS deptBucket for every Mentor/Ops-team
+  // row (isDeptExclusion), so dept_bucket alone can't tell a Mentor or Ops
+  // row apart from an ordinary instructor once they're mixed together in
+  // the combined "Instructor Department"/"Exception" tab views. classification
+  // is the field that's actually reliable for that ("mentor" /
+  // "excluded_ops_managers" vs. everything else this report ever includes --
+  // see the frontend's bifurcationLabel()).
+  classification: row.classification,
   // Falls back to manualDeptArea (2026-09-15, per request) -- a human can
   // mark the real Subject/teaching area by hand for exactly the people
   // classifyDepartment() left unclassified (see the PATCH
@@ -805,6 +817,7 @@ router.get("/reports/darwin-exit-details", requireAuth, requireRole("admin"), as
   const NO_DEPARTMENT_LABEL = "No department on file";
   const departmentCounts = new Map<string, number>();
   let instructorTeamCount = 0;
+  let revokedCount = 0;
   const stored = allStored.filter((r) => {
     const rawData = r.rawData as Record<string, unknown> | null;
     const department = findDepartmentValue(rawData);
@@ -812,14 +825,21 @@ router.get("/reports/darwin-exit-details", requireAuth, requireRole("admin"), as
     departmentCounts.set(label, (departmentCounts.get(label) ?? 0) + 1);
     const isInstructorTeam = isInstructorTeamDepartment(department);
     if (isInstructorTeam) instructorTeamCount++;
-    return isInstructorTeam;
+    // Revoked means the separation request itself was cancelled/withdrawn --
+    // the person never actually exited, so this row shouldn't show up as an
+    // "exit" at all, regardless of which department it matched.
+    const status = rawData ? cell(rawData, "Status") : null;
+    const isRevoked = status?.toLowerCase() === "revoked";
+    if (isInstructorTeam && isRevoked) revokedCount++;
+    return isInstructorTeam && !isRevoked;
   });
   const departmentBreakdown = Array.from(departmentCounts.entries())
     .map(([department, count]) => ({ department, count }))
     .sort((a, b) => b.count - a.count);
   console.log(
     `darwin-exit-details: ${allStored.length} total exit records -- ` +
-    `${instructorTeamCount} matched an Instructor-team department, ${allStored.length - instructorTeamCount} did not (see department_breakdown for the full split)`
+    `${instructorTeamCount} matched an Instructor-team department (${revokedCount} of those Revoked and excluded), ` +
+    `${allStored.length - instructorTeamCount} did not match an Instructor-team department at all (see department_breakdown for the full split)`
   );
 
   const columns: string[] = pinIdentityColumnsFirst(collectDynamicColumns(stored));
@@ -838,6 +858,7 @@ router.get("/reports/darwin-exit-details", requireAuth, requireRole("admin"), as
     diagnostics: {
       total_exit_records: allStored.length,
       instructor_team: instructorTeamCount,
+      instructor_team_revoked_excluded: revokedCount,
       other_or_unclassified: allStored.length - instructorTeamCount,
     },
     // The full list of departments present in Darwin's exit data, company-

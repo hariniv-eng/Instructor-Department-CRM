@@ -762,6 +762,7 @@ components:
         - designation
         - department
         - dept_bucket
+        - classification
         - dept_area
         - dept_area_source
         - is_payroll
@@ -792,6 +793,15 @@ components:
         # Department field.
         department: { type: ["string", "null"] }
         dept_bucket: { type: ["string", "null"] }
+        # The row's underlying classification (see reconcile.ts's
+        # recomputeStatuses) -- added (2026-09-22) to power the Instructors
+        # tab's bifurcation column (Instructor / Mentor / Delivery Support).
+        # Unlike dept_bucket above, this is NEVER nulled for a Mentor/Ops
+        # row, so it's the reliable field for telling those apart once mixed
+        # into a combined list. Typical values seen on this report: null,
+        # "payroll_converted", or "iit_kharagpur_team" (all ordinary
+        # instructors), "mentor", or "excluded_ops_managers".
+        classification: { type: ["string", "null"] }
         dept_area: { type: ["string", "null"] }
         # Mirrors gender_source/capability_manager_source below (2026-09-15,
         # per request): tells the frontend whether this value is locked

@@ -565,14 +565,45 @@ function gridColsClass(category: CategoryKey): string {
   // mixed into Department/Exception just reads "Nxtwave" in this column,
   // same as any non-payroll instructor. Never wrong, just not usually the
   // interesting value there.
-  if (category === 'instructors' || category === 'mentors' || category === 'department' || category === 'exception') return 'grid-cols-[260px_190px_130px_280px_220px_150px_160px_170px_220px_140px_190px_130px_150px_190px]';
+  if (category === 'instructors' || category === 'mentors' || category === 'department' || category === 'exception') return 'grid-cols-[260px_190px_130px_280px_220px_150px_160px_170px_220px_140px_190px_190px_160px_130px_150px_190px]';
   // Operations team keeps its own shape (2026-09-21: not part of the above
   // request) -- no Campus column (ops rows aren't deployed to a teaching
   // campus the way instructors and mentors are), a single Department
   // column instead of Subject+Department, and no Payroll either (same
   // reason it's never meaningful for Mentors: payroll_converted can't be
   // assigned to an ops row).
-  return 'grid-cols-[260px_190px_130px_280px_220px_150px_280px_140px_190px_150px_190px]';
+  return 'grid-cols-[260px_190px_130px_280px_220px_150px_280px_140px_190px_190px_160px_150px_190px]';
+}
+
+// Manager (Darwin) (2026-09-22, per request: "in the overview table we have
+// darwin(manager) column right i want that to be reflected in the
+// instructor tab table also") -- Darwin's own Direct Manager field
+// (person.darwin_manager), already shown next to Capability Manager on the
+// Overview drill-down (dashboard.tsx) and the instructor detail page; this
+// just adds the same read-only column here, right after Capability Manager,
+// mirroring that existing pairing. 190px, added to both grid templates
+// above and every list below.
+//
+// Bifurcation (2026-09-22, per request: "create a new column where it
+// should show the bifurcation who that employee is such as instructor,
+// mentor or Delivery support") -- derived from person.classification, NOT
+// dept_bucket: dept_bucket is nulled server-side for every Mentor/Ops row
+// (see reports.ts's toApiInstructorSummary comment), so it can't tell those
+// apart once mixed into the combined "Instructor Department"/"Exception"
+// views. classification is never nulled that way, so it's the reliable
+// source -- see bifurcationLabel below. 160px, added to both grid templates
+// above and every list below, right after the new Manager (Darwin) column.
+function bifurcationLabel(classification: string | null): string {
+  if (classification === 'mentor') return 'Mentor';
+  if (classification === 'excluded_ops_managers') return 'Delivery Support';
+  // "instructor_ops" is declared in departmentTaxonomy.ts's DeptBucket type
+  // but classifyDepartment() doesn't currently ever return it -- handled
+  // here anyway so this label stays correct if that ever changes.
+  if (classification === 'instructor_ops') return 'Instructor Team Operations';
+  // Every other classification this report ever includes (null,
+  // "payroll_converted", "iit_kharagpur_team") is an ordinary counted
+  // instructor.
+  return 'Instructor';
 }
 
 // Name column header/label is per-category -- "Instructor Department" mixes
@@ -592,6 +623,8 @@ function downloadInstructorsCsv(category: CategoryKey, people: InstructorSummary
   if (category !== 'ops_team') headers.push('Campus');
   headers.push('Date of joining');
   headers.push('Capability Manager');
+  headers.push('Manager (Darwin)');
+  headers.push('Bifurcation');
   if (category !== 'ops_team') headers.push('Payroll');
   headers.push('Gender');
   headers.push('Exit');
@@ -602,6 +635,8 @@ function downloadInstructorsCsv(category: CategoryKey, people: InstructorSummary
     if (category !== 'ops_team') row.push(person.institutes?.join(', ') ?? '');
     row.push(person.date_of_joining ?? '');
     row.push(person.capability_manager ?? '');
+    row.push(person.darwin_manager ?? '');
+    row.push(bifurcationLabel(person.classification));
     if (category !== 'ops_team') row.push(person.is_payroll ? 'Payroll' : 'Nxtwave');
     row.push(person.gender ?? '');
     // Blank when there's no exit record at all; "Not reviewed" when one
@@ -630,6 +665,8 @@ function CategoryTable({ category, people }: { category: CategoryKey; people: In
           {category !== 'ops_team' && <span>Campus</span>}
           <span>Date of joining</span>
           <span>Capability Manager</span>
+          <span>Manager (Darwin)</span>
+          <span>Bifurcation</span>
           {category !== 'ops_team' && <span>Payroll</span>}
           <span>Gender</span>
           <span>Exit</span>
@@ -666,6 +703,8 @@ function PersonRow({ category, person, columns }: { category: CategoryKey; perso
         "unknown" placeholder. See date_of_joining's gating in reports.ts. */}
     <div className="truncate font-mono-ui text-[11px] text-muted-foreground">{person.date_of_joining || ''}</div>
     <CapabilityManagerCell person={person} />
+    <div className="truncate text-[12px] text-muted-foreground">{person.darwin_manager || '—'}</div>
+    <BifurcationCell person={person} />
     {category !== 'ops_team' && <div>{person.is_payroll ? <span className="inline-flex rounded-full bg-[#e6e9fb] px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] text-[#4a4fb0]">Payroll</span> : <span className="inline-flex rounded-full bg-secondary px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] text-muted-foreground">Nxtwave</span>}</div>}
     <GenderCell person={person} />
     <ExitCell person={person} />
@@ -809,6 +848,24 @@ function CapabilityManagerCell({ person }: { person: InstructorSummary }) {
   // (not just a blank/dash) so a gap in this data is easy to spot at a
   // glance while scanning the table, per the coverage section above.
   return <div className="truncate text-[12px]">{person.capability_manager ? <span className="text-foreground">{person.capability_manager}</span> : <span className="inline-flex rounded-full bg-[#fff7db] px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] text-[#8b6207]">Missing</span>}</div>;
+}
+
+// Bifurcation column (2026-09-22, per request) -- read-only, same badge
+// treatment as the Payroll/Nxtwave cell above so it's easy to scan at a
+// glance, especially on the combined "Instructor Department" and
+// "Exception" tabs where all three roles show up mixed together. See
+// bifurcationLabel's comment above for why this reads person.classification
+// rather than person.dept_bucket.
+function BifurcationCell({ person }: { person: InstructorSummary }) {
+  const label = bifurcationLabel(person.classification);
+  const toneClass = label === 'Mentor'
+    ? 'bg-[#e3f3ea] text-[#1f7a4d]'
+    : label === 'Delivery Support'
+      ? 'bg-[#fdeadd] text-[#a15417]'
+      : label === 'Instructor Team Operations'
+        ? 'bg-[#fdeadd] text-[#a15417]'
+        : 'bg-[#e6e9fb] text-[#4a4fb0]';
+  return <div><span className={`inline-flex rounded-full px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] ${toneClass}`}>{label}</span></div>;
 }
 
 // Subject is read-only text when classifyDepartment() resolved one

@@ -318,6 +318,8 @@ export interface InstructorSummary {
   /** @nullable */
   dept_bucket: string | null;
   /** @nullable */
+  classification: string | null;
+  /** @nullable */
   dept_area: string | null;
   /** Whether `dept_area` above came from classifyDepartment() (locked, not editable here) or was set/left blank manually ("manual" or null). Not offered for Operations team rows, whose null dept_area is intentional. @nullable */
   dept_area_source: 'computed' | 'manual' | null;
