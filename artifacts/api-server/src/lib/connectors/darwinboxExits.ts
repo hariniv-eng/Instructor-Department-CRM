@@ -305,6 +305,101 @@ export async function fetchExitRows(): Promise<SheetRow[]> {
   return rows;
 }
 
+// Targeted check (2026-09-22, per request: "not just 5 fields i also need
+// the data that we have in the other reports also") -- for a specific,
+// named list of employee_ids, checks the base exit report AND every
+// configured enrichment report individually and prints exactly what row (if
+// any) exists for each one in each report. This is the exhaustive version
+// of what mergeEnrichmentFields() already does automatically on every sync
+// (and what darwinbox_exits.raw_data already reflects, since the sync
+// stores the merged row) -- but it prints per-report, per-employee detail
+// instead of just aggregate counts, so there's no ambiguity about whether
+// "no data" means "none of the 4 reports have this person" versus "only
+// checked one report." Run via:
+//   npx tsx src/lib/connectors/inspect.ts darwinbox-exits-for NW0004155,NW0004563,...
+// CSV field quoting -- wraps in double quotes and escapes embedded quotes
+// whenever the value contains a comma, quote, or newline. Plain values are
+// left bare, matching how psql --csv (used throughout this investigation)
+// formats output, so the two are easy to compare side by side.
+function csvField(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  const s = String(value);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+// Tidy/long-format row: one row per field found for an employee in a given
+// report, so the CSV never assumes a fixed schema (every report here has
+// a different, unpredictable set of columns -- see the report field lists
+// printed by inspectDarwinboxExits()). A row with an empty "field"/"value"
+// and value "NOT FOUND" marks an employee that report has no record for.
+function csvRow(employeeId: string, report: string, field: string, value: unknown): string {
+  return [csvField(employeeId), csvField(report), csvField(field), csvField(value)].join(",");
+}
+
+export async function inspectExitDataForEmployees(employeeIds: string[]) {
+  const targets = new Set(employeeIds.map((id) => id.trim().toLowerCase()).filter(Boolean));
+  if (!targets.size) {
+    console.log("No employee_ids given.");
+    return;
+  }
+  console.error(`Checking ${targets.size} employee_id(s) against the base exit report and all configured enrichment reports.`);
+  console.error(`CSV rows are printed to stdout below (between the CSV_START/CSV_END markers) -- everything else here goes to stderr so you can separate them, e.g. redirect stdout to a file.\n`);
+
+  const REPORT_NAMES: Record<string, string> = {
+    "70c916bd0ed8bb": "EIF Main",
+    "1d513a4ccdf2e8": "TA Employee Master",
+    "9feb118d44726a": "Offboarding tracking",
+    "853905cf311922": "L&D Details",
+  };
+
+  console.log("CSV_START");
+  console.log(csvRow("employee_id", "report", "field", "value")); // header
+
+  const baseRecords = await fetchExitRecords();
+  console.error(`--- Base report (${config.DBX_CHECK_REPORT_ID}): ${baseRecords.length} records total ---`);
+  const seenInBase = new Set<string>();
+  for (const record of baseRecords) {
+    const key = employeeIdKey(record);
+    if (key && targets.has(key)) {
+      seenInBase.add(key);
+      for (const [field, value] of Object.entries(record)) {
+        console.log(csvRow(key.toUpperCase(), "Base exit report", field, value));
+      }
+    }
+  }
+  for (const target of targets) {
+    if (!seenInBase.has(target)) console.log(csvRow(target.toUpperCase(), "Base exit report", "", "NOT FOUND"));
+  }
+
+  for (const reportId of parseEnrichReportIds()) {
+    const reportName = REPORT_NAMES[reportId] ?? reportId;
+    console.error(`\n--- Enrichment report ${reportId} (${reportName}) ---`);
+    try {
+      const records = await fetchEnrichmentRecords(reportId);
+      const seenInReport = new Set<string>();
+      for (const record of records) {
+        const key = employeeIdKey(record);
+        if (key && targets.has(key)) {
+          seenInReport.add(key);
+          for (const [field, value] of Object.entries(record)) {
+            console.log(csvRow(key.toUpperCase(), reportName, field, value));
+          }
+        }
+      }
+      console.error(`  ${records.length} records total in this report; ${seenInReport.size} of the ${targets.size} target employee_id(s) found in it.`);
+      for (const target of targets) {
+        if (!seenInReport.has(target)) console.log(csvRow(target.toUpperCase(), reportName, "", "NOT FOUND"));
+      }
+    } catch (e) {
+      console.error(`  Report failed, could not check: ${(e as Error).message}`);
+      for (const target of targets) {
+        console.log(csvRow(target.toUpperCase(), reportName, "", "REPORT FAILED"));
+      }
+    }
+  }
+  console.log("CSV_END");
+}
+
 /** Run for schema inspection: `npx tsx src/lib/connectors/darwinboxExits.ts` (with .env loaded). */
 export async function inspectDarwinboxExits() {
   const records = await fetchExitRecords();
