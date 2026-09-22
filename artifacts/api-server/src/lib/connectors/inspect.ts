@@ -36,22 +36,43 @@ try {
 
 const target = process.argv[2];
 
-const loaders = {
-  darwinbox: () => import("./darwinbox").then((m) => m.inspectDarwinbox),
-  "darwinbox-exits": () => import("./darwinboxExits").then((m) => m.inspectDarwinboxExits),
-  bigquery: () => import("./bigquery").then((m) => m.inspectBigQuery),
-} as const;
-
-const loadRun = loaders[target as keyof typeof loaders];
-
-if (!loadRun) {
-  console.error(`Unknown target "${target}". Use one of: darwinbox, darwinbox-exits, bigquery.`);
-  process.exit(1);
-}
-
-loadRun()
-  .then((run) => run())
-  .catch((e) => {
-    console.error(`${target} inspection failed:`, e instanceof Error ? e.message : e);
+// "darwinbox-exits-for" is its own branch, not a plain no-arg loader like
+// the others below -- it takes a third argv, a comma-separated list of
+// employee_ids, and checks each one against the base report + every
+// configured enrichment report individually (see
+// inspectExitDataForEmployees() in darwinboxExits.ts for why this exists
+// separately from the aggregate inspectDarwinboxExits() below).
+if (target === "darwinbox-exits-for") {
+  const idsArg = process.argv[3];
+  if (!idsArg) {
+    console.error(`Usage: npx tsx src/lib/connectors/inspect.ts darwinbox-exits-for <comma-separated employee_ids>`);
     process.exit(1);
-  });
+  }
+  const employeeIds = idsArg.split(",").map((id) => id.trim()).filter(Boolean);
+  import("./darwinboxExits")
+    .then((m) => m.inspectExitDataForEmployees(employeeIds))
+    .catch((e) => {
+      console.error(`darwinbox-exits-for inspection failed:`, e instanceof Error ? e.message : e);
+      process.exit(1);
+    });
+} else {
+  const loaders = {
+    darwinbox: () => import("./darwinbox").then((m) => m.inspectDarwinbox),
+    "darwinbox-exits": () => import("./darwinboxExits").then((m) => m.inspectDarwinboxExits),
+    bigquery: () => import("./bigquery").then((m) => m.inspectBigQuery),
+  } as const;
+
+  const loadRun = loaders[target as keyof typeof loaders];
+
+  if (!loadRun) {
+    console.error(`Unknown target "${target}". Use one of: darwinbox, darwinbox-exits, darwinbox-exits-for, bigquery.`);
+    process.exit(1);
+  }
+
+  loadRun()
+    .then((run) => run())
+    .catch((e) => {
+      console.error(`${target} inspection failed:`, e instanceof Error ? e.message : e);
+      process.exit(1);
+    });
+}
