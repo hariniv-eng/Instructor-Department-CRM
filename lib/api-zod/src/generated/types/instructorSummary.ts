@@ -20,6 +20,8 @@ export interface InstructorSummary {
   /** @nullable */
   dept_bucket: string | null;
   /** @nullable */
+  classification: string | null;
+  /** @nullable */
   dept_area: string | null;
   /** @nullable */
   dept_area_source: 'computed' | 'manual' | null;
