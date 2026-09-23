@@ -179,12 +179,16 @@ function bqStringLiteral(value: string): string {
  * happens, so only ~1 result row per (instructor, tracked course) actually
  * comes back over the wire.
  *
- * Status per (instructor, course_key): COMPLETED if every matching unit row
- * is completion_status='COMPLETED'; NOT_STARTED if every one is
- * 'YET_TO_START'; IN_PROGRESS otherwise (any mix, including any
- * 'IN_PROGRESS' row). This is a judgment call, not something Ankush
- * explicitly specified -- flagged in the Training Stats page's own notes so
- * it's easy to revisit.
+ * Status per (instructor, course_key): COMPLETED if >=95% of matching unit
+ * rows are completion_status='COMPLETED'; NOT_STARTED if every one is
+ * 'YET_TO_START' (zero progress at all); IN_PROGRESS otherwise. The 95%
+ * threshold (2026-09-23, per request, after reviewing real data via
+ * inspect:training-status-aggregation) replaces an earlier "literally every
+ * unit" rule that was producing near-zero Completed counts across the board
+ * -- e.g. an instructor with 75/76 units done (98.7%) still showed In
+ * Progress under the old rule. A handful of stray optional/locked units
+ * that never get clicked shouldn't keep someone who's functionally done
+ * from ever showing green.
  */
 export async function fetchCourseStatusRows(courseDefs: TrainingCourseDef[]): Promise<CourseStatusRow[]> {
   const resolved = courseDefs.filter((c) => c.courseTitles.length > 0);
@@ -209,7 +213,7 @@ export async function fetchCourseStatusRows(courseDefs: TrainingCourseDef[]): Pr
       ${groupBranches}
       END AS track_group,
       CASE
-        WHEN COUNTIF(completion_status != 'COMPLETED') = 0 THEN 'COMPLETED'
+        WHEN SAFE_DIVIDE(COUNTIF(completion_status = 'COMPLETED'), COUNT(*)) >= 0.95 THEN 'COMPLETED'
         WHEN COUNTIF(completion_status != 'YET_TO_START') = 0 THEN 'NOT_STARTED'
         ELSE 'IN_PROGRESS'
       END AS status,

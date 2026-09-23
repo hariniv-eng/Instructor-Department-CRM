@@ -9,7 +9,7 @@ import { PageIntro, EmptyState, QueryError, SkeletonBlock, TopStat, TablePager, 
 // niat_instructor_unit_wise_completion_and_best_attempt_details, aggregated
 // server-side per (instructor, tracked course) -- see fetchCourseStatusRows
 // in api-server/src/lib/connectors/instructorLearningStatus.ts and GET
-// /reports/training-stats in reports.ts. Matches the 25-column layout of
+// /reports/training-stats in reports.ts. Matches the layout of
 // Ankush's own reference sheet: 5 track groups (Frontend Development,
 // Backend Development, DSA, Gen AI, DSML), each with several named courses.
 //
