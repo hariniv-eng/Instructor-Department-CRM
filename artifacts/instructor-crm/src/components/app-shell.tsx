@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Bell, Building2, ChevronRight, Database, Eye, FileSearch, GitBranch, LayoutDashboard, Layers, LogIn, LogOut, Menu, UploadCloud, UsersRound, X } from 'lucide-react';
+import { Bell, Building2, ChevronRight, Database, Eye, FileSearch, GitBranch, GraduationCap, LayoutDashboard, Layers, LogIn, LogOut, Menu, UploadCloud, UsersRound, X } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { useAuth, ROLE_LABELS } from '@/hooks/use-auth';
 import type { AppUser } from '@workspace/api-client-react';
@@ -10,6 +10,7 @@ const ALL_NAV_ITEMS = [
   { href: '/darwin-breakdown', label: 'Darwin Breakdown', icon: Building2 },
   { href: '/darwin-full-roster', label: 'Darwin Full Roster', icon: Layers },
   { href: '/teachos-breakdown', label: 'TeachOS Breakdown', icon: GitBranch },
+  { href: '/training-stats', label: 'Training Stats', icon: GraduationCap },
   { href: '/uploads', label: 'Source uploads', icon: UploadCloud },
   { href: '/darwin-exit-details', label: 'Darwin Exit Details', icon: FileSearch },
 ];
