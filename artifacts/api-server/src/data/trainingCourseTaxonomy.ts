@@ -1,8 +1,10 @@
-// The fixed 25-column course taxonomy for the "Training Stats" tab (2026-09-
-// 23, per request, matching a reference sheet Ankush shared: Employee ID /
-// Name / Department / Capability Manager / Primary Track / Secondary Track,
-// then 5 track groups -- Frontend Development, Backend Development, DSA,
-// Gen AI, DSML -- each with several named course columns).
+// The course taxonomy for the "Training Stats" tab (2026-09-23, per request,
+// matching a reference sheet Ankush shared: Employee ID / Name / Department /
+// Capability Manager / Primary Track / Secondary Track, then 5 track groups
+// -- Frontend Development, Backend Development, DSA, Gen AI, DSML -- each
+// with several named course columns). Originally 25 columns; "Frontend
+// Projects" and "Backend Projects" were removed on 2026-09-23 per request
+// (both were still unmapped pending columns, never resolved), leaving 23.
 //
 // Each entry's `courseTitles` is the set of REAL course_title values (from
 // niat_instructor_unit_wise_completion_and_best_attempt_details, confirmed
@@ -36,14 +38,12 @@ export const TRAINING_COURSE_TAXONOMY: TrainingCourseDef[] = [
   { key: "javascript_sprint", label: "JavaScript Sprint", trackGroup: "Frontend Development", courseTitles: [] },
   { key: "javascript_essentials", label: "JavaScript Essentials", trackGroup: "Frontend Development", courseTitles: ["JS Essentials", "JavaScript Essentials"] },
   { key: "react_js", label: "React JS", trackGroup: "Frontend Development", courseTitles: ["React JS", "Introduction to React JS"] },
-  { key: "frontend_projects", label: "Frontend Projects", trackGroup: "Frontend Development", courseTitles: [] },
   // --- Backend Development ---
   { key: "python", label: "Python", trackGroup: "Backend Development", courseTitles: ["Python Programming"] },
   { key: "sql", label: "SQL", trackGroup: "Backend Development", courseTitles: ["SQL"] },
   { key: "node_js", label: "Node JS", trackGroup: "Backend Development", courseTitles: ["Node JS"] },
   { key: "mongodb", label: "MongoDB", trackGroup: "Backend Development", courseTitles: ["MongoDB", "Mongo DB"] },
   { key: "developer_foundation", label: "Developer Foundation", trackGroup: "Backend Development", courseTitles: ["Developer Foundations"] },
-  { key: "backend_projects", label: "Backend Projects", trackGroup: "Backend Development", courseTitles: [] },
   // --- DSA ---
   { key: "dsa", label: "DSA", trackGroup: "DSA", courseTitles: [] },
   { key: "dia", label: "DIA", trackGroup: "DSA", courseTitles: [] },
