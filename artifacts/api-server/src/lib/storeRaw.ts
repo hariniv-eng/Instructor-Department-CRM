@@ -16,8 +16,10 @@ import {
   darwinboxExitsTable,
   darwinboxFullRosterTable,
   teachosDeploymentTable,
+  instructorTrainingStatusTable,
 } from "@workspace/db";
 import { cell, type SheetRow } from "./reconcile";
+import type { CourseStatusRow } from "./connectors/instructorLearningStatus";
 
 const CHUNK = 500;
 
@@ -76,6 +78,28 @@ export async function storeTeachosDeployment(rows: SheetRow[]): Promise<number> 
         rawData: row,
       }));
       if (batch.length) await tx.insert(teachosDeploymentTable).values(batch);
+    }
+  });
+  return rows.length;
+}
+
+// Instructor Training Status (2026-09-23) -- already aggregated server-side
+// by fetchCourseStatusRows() (one row per instructor per tracked course, not
+// per raw BigQuery unit row), so this is a much smaller replace than the
+// others above, but same full delete-then-insert-in-one-transaction pattern.
+export async function storeTrainingStatus(rows: CourseStatusRow[]): Promise<number> {
+  await db.transaction(async (tx) => {
+    await tx.delete(instructorTrainingStatusTable);
+    for (let i = 0; i < rows.length; i += CHUNK) {
+      const batch = rows.slice(i, i + CHUNK).map((row) => ({
+        instructorUserId: row.instructor_user_id,
+        courseKey: row.course_key,
+        trackGroup: row.track_group,
+        status: row.status,
+        unitsTotal: row.units_total,
+        unitsCompleted: row.units_completed,
+      }));
+      if (batch.length) await tx.insert(instructorTrainingStatusTable).values(batch);
     }
   });
   return rows.length;

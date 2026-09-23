@@ -13,7 +13,9 @@ import { fetchDarwinRowsBoth, DarwinboxError } from "../lib/connectors/darwinbox
 import { fetchExitRows, DarwinboxExitsError } from "../lib/connectors/darwinboxExits";
 import { fetchNiatInstructorDetailsRows, NiatInstructorDetailsError } from "../lib/connectors/niatInstructorDetails";
 import { fetchCapabilityManagerRows } from "../lib/connectors/capabilityManager";
-import { storeDarwinboxActive, storeDarwinboxExits, storeDarwinboxFullRoster, storeTeachosDeployment } from "../lib/storeRaw";
+import { fetchCourseStatusRows, InstructorLearningStatusError } from "../lib/connectors/instructorLearningStatus";
+import { resolvedCourseDefs } from "../data/trainingCourseTaxonomy";
+import { storeDarwinboxActive, storeDarwinboxExits, storeDarwinboxFullRoster, storeTeachosDeployment, storeTrainingStatus } from "../lib/storeRaw";
 import { reconcileDarwin, reconcileDarwinFullRosterFallback, reconcileTeachos, reconcileTeachosEmployeeIdReference, reconcileCapabilityManager, recomputeStatuses } from "../lib/reconcile";
 import { LAST_SYNC, LAST_CAPABILITY_MANAGER_SYNC, setLastCapabilityManagerSync, type SyncResult } from "../lib/syncState";
 
@@ -134,6 +136,39 @@ async function runNiatInstructorDetailsSync(): Promise<SyncResult> {
   }
 }
 
+// Instructor Training Status (2026-09-23): aggregates
+// niat_instructor_unit_wise_completion_and_best_attempt_details server-side
+// (see fetchCourseStatusRows()) against the fixed course taxonomy in
+// data/trainingCourseTaxonomy.ts, and fully replaces
+// instructorTrainingStatusTable. Deliberately NOT wired into the scheduler
+// or the main TeachOS sync above yet -- this is a brand-new feature built
+// against real data confirmed only via one-off inspect/check CLI runs, not
+// verified end-to-end through an actual sync yet, so it stays manual-only
+// (triggered here) until confirmed working -- same caution as
+// niat-instructor-details above (auto_sync_interval_hours: 0 in
+// /sync/status). No reconcile step is needed: rows are stored keyed by the
+// BigQuery instructor_user_id as-is; GET /reports/training-stats joins them
+// against instructorsTable.teachosUserId at read time (same key
+// reconcileCapabilityManager() already relies on), so there's nothing to
+// match ahead of time the way Darwin/TeachOS name-matching needs.
+async function runTrainingStatusSync(): Promise<SyncResult> {
+  try {
+    const rows = await fetchCourseStatusRows(resolvedCourseDefs());
+    const stored = await storeTrainingStatus(rows);
+    await db.insert(uploadsTable).values({ source: "Instructor Training Status", filename: "BigQuery sync (niat_instructor_unit_wise_completion_and_best_attempt_details, aggregated per course)", rowCount: stored });
+    return { ok: true, source: "training_status_live", stored, synced_at: new Date().toISOString() };
+  } catch (e) {
+    const message = e instanceof InstructorLearningStatusError ? e.message : `Unexpected error: ${(e as Error).message}`;
+    return { ok: false, source: "training_status_live", error: message, synced_at: new Date().toISOString() };
+  }
+}
+
+router.post("/sync/training-status", async (_req, res) => {
+  const result = await runTrainingStatusSync();
+  LAST_SYNC.training_status_live = result;
+  res.json(result);
+});
+
 router.post("/sync/niat-instructor-details", async (_req, res) => {
   const result = await runNiatInstructorDetailsSync();
   LAST_SYNC.niat_instructor_details_live = result;
@@ -174,6 +209,7 @@ router.get("/sync/status", (_req, res) => {
     darwinbox_exits: { auto_sync_interval_hours: config.DARWINBOX_EXITS_SYNC_INTERVAL_HOURS, last_sync: LAST_SYNC.darwinbox_exits_live },
     teachos: { auto_sync_interval_hours: config.BIGQUERY_SYNC_INTERVAL_HOURS, last_sync: LAST_SYNC.teachos_live },
     niat_instructor_details: { auto_sync_interval_hours: 0, last_sync: LAST_SYNC.niat_instructor_details_live },
+    training_status: { auto_sync_interval_hours: 0, last_sync: LAST_SYNC.training_status_live },
     // Capability Manager enrichment (2026-09-08, per request): a separate,
     // non-fatal sub-step of the TeachOS sync above -- teachos.last_sync can
     // say ok:true even when this failed silently, so it's tracked and
@@ -207,5 +243,5 @@ router.get("/sync/darwinbox-full-roster/data", async (_req, res) => {
   res.json({ count: rows.length, rows });
 });
 
-export { runDarwinboxSync, runDarwinboxExitsSync, runTeachosSync };
+export { runDarwinboxSync, runDarwinboxExitsSync, runTeachosSync, runTrainingStatusSync };
 export default router;

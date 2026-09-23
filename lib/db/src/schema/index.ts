@@ -308,6 +308,47 @@ export const teachosIdReferenceTable = pgTable("teachos_id_reference", {
   syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// Aggregated per-instructor, per-course training-completion status, synced
+// from the two "instructor learning status" BigQuery tables (see
+// artifacts/api-server/src/lib/connectors/instructorLearningStatus.ts and
+// artifacts/api-server/src/data/trainingCourseTaxonomy.ts, 2026-09-23, per
+// request: track an instructor's OWN training/upskilling progress, distinct
+// from the session-teaching completion the rest of this app already
+// tracks). One row per (instructorUserId, courseKey) -- courseKey is a
+// fixed slug from trainingCourseTaxonomy.ts (e.g. "react_js", "sql"), NOT a
+// raw BigQuery course_title, since the taxonomy combines several
+// near-duplicate real course_titles (e.g. "MongoDB" + "Mongo DB") into one
+// tracked column. instructorUserId is BigQuery's own hex ID -- join against
+// instructorsTable.teachosUserId to resolve a person (same key
+// reconcileCapabilityManager() already uses), not stored as a foreign key
+// here since a course-status row can arrive for an instructor_user_id this
+// app hasn't matched to an employee_id yet.
+//
+// Full delete-then-insert on every sync (see storeTrainingStatus() in
+// lib/storeRaw.ts) -- same convention as teachosDeploymentTable above, no
+// unique constraint needed since the whole table is always replaced
+// atomically inside one transaction.
+export const instructorTrainingStatusTable = pgTable("instructor_training_status", {
+  id: serial("id").primaryKey(),
+  instructorUserId: text("instructor_user_id").notNull(),
+  courseKey: text("course_key").notNull(),
+  trackGroup: text("track_group").notNull(),
+  // "COMPLETED" | "IN_PROGRESS" | "NOT_STARTED" -- derived per (instructor,
+  // course) from the unit-level completion_status rows: all COMPLETED ->
+  // COMPLETED, all YET_TO_START -> NOT_STARTED, any mix (including any
+  // IN_PROGRESS) -> IN_PROGRESS. There is no ON_HOLD value coming from
+  // BigQuery (confirmed live, 2026-09-23 -- completion_status only ever has
+  // those 3 values) -- see the Training Stats page for how that's surfaced.
+  status: text("status").notNull(),
+  unitsTotal: integer("units_total").notNull().default(0),
+  unitsCompleted: integer("units_completed").notNull().default(0),
+  syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const insertInstructorTrainingStatusSchema = createInsertSchema(instructorTrainingStatusTable);
+export type InstructorTrainingStatus = typeof instructorTrainingStatusTable.$inferSelect;
+export type InsertInstructorTrainingStatus = z.infer<typeof insertInstructorTrainingStatusSchema>;
+
 export const insertInstructorSchema = createInsertSchema(instructorsTable);
 export const insertUploadSchema = createInsertSchema(uploadsTable);
 export const insertDarwinboxActiveSchema = createInsertSchema(darwinboxActiveTable);

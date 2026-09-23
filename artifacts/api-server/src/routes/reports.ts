@@ -1,7 +1,8 @@
 import { Router, type IRouter } from "express";
-import { db, instructorsTable, darwinboxFullRosterTable, darwinboxExitsTable } from "@workspace/db";
+import { db, instructorsTable, darwinboxFullRosterTable, darwinboxExitsTable, instructorTrainingStatusTable } from "@workspace/db";
 import { requireAuth, requireRole } from "../middlewares/auth";
 import { cell } from "../lib/reconcile";
+import { TRAINING_COURSE_TAXONOMY } from "../data/trainingCourseTaxonomy";
 
 const router: IRouter = Router();
 
@@ -865,6 +866,90 @@ router.get("/reports/darwin-exit-details", requireAuth, requireRole("admin"), as
     // wide (not scoped to the Instructor team filter above), with how many
     // exit records fell under each. Sorted by count, descending.
     department_breakdown: departmentBreakdown,
+  });
+});
+
+// Instructor Training Status ("Training Stats" tab, 2026-09-23, per
+// request) -- an instructor's OWN training/upskilling progress, sourced
+// from BigQuery's niat_instructor_unit_wise_completion_and_best_attempt_
+// details (aggregated per course by fetchCourseStatusRows() and synced into
+// instructorTrainingStatusTable via POST /sync/training-status, see
+// routes/sync.ts). Distinct from every other report on this page, which
+// tracks session-teaching activity, not the instructor's own coursework.
+//
+// Population (2026-09-23, per request: "we only going to extract data of
+// the instructors and mentors only, depending on there employee id"):
+// TeachOS-active rows (inTeachos, same base population /reports/instructors
+// uses) whose classification isn't one of the excluded/ops/other-department
+// buckets -- i.e. confirmed instructors, mentors, payroll-converted, and
+// unclassified/normal rows, matching instructorRows + mentorRows combined
+// from /reports/instructors above. Each person is identified by their own
+// employee_id in the response, per that same request.
+const TRAINING_STATS_EXCLUDED_CLASSIFICATIONS = new Set([
+  "excluded_other_department",
+  "excluded_non_department_team",
+  "excluded_ops_managers",
+  "instructor_ops",
+  "iit_kharagpur_team",
+  "other_department_manual",
+]);
+
+router.get("/reports/training-stats", requireAuth, requireRole("admin"), async (_req, res) => {
+  const allRows = await db.select().from(instructorsTable);
+  const people = allRows
+    .filter((r) => r.inTeachos && !TRAINING_STATS_EXCLUDED_CLASSIFICATIONS.has(r.classification ?? ""))
+    .sort((a, b) => a.fullName.localeCompare(b.fullName));
+
+  const statusRows = await db.select().from(instructorTrainingStatusTable);
+  // instructor_user_id (BigQuery's own hex ID) -> courseKey -> that row.
+  // Joined here, at read time, against instructorsTable.teachosUserId --
+  // the same key reconcileCapabilityManager() already uses to match this
+  // exact BigQuery ID to an instructor record (see lib/reconcile.ts) -- no
+  // separate reconcile/matching step was needed for this sync.
+  const byInstructor = new Map<string, Map<string, (typeof statusRows)[number]>>();
+  for (const row of statusRows) {
+    if (!byInstructor.has(row.instructorUserId)) byInstructor.set(row.instructorUserId, new Map());
+    byInstructor.get(row.instructorUserId)!.set(row.courseKey, row);
+  }
+
+  const rows = people.map((p) => {
+    const courseStatuses = p.teachosUserId ? byInstructor.get(p.teachosUserId) : undefined;
+    const hasTrainingData = !!courseStatuses;
+    const courses: Record<string, string> = {};
+    for (const def of TRAINING_COURSE_TAXONOMY) {
+      if (def.courseTitles.length === 0) {
+        // No confident course_title mapping yet -- see
+        // trainingCourseTaxonomy.ts and Instructor_Learning_Status_Course_
+        // Mapping_Review.xlsx. Uniform across every instructor, not
+        // per-person data.
+        courses[def.key] = "PENDING_MAPPING";
+      } else if (!hasTrainingData) {
+        // Distinct from NOT_STARTED: this instructor has no BigQuery
+        // training-status rows at all (never synced, or their
+        // teachos_user_id hasn't matched anything in that table), so there's
+        // no basis to say they haven't started -- vs. genuinely having
+        // course rows that are all YET_TO_START.
+        courses[def.key] = "NO_DATA";
+      } else {
+        courses[def.key] = courseStatuses!.get(def.key)?.status ?? "NOT_STARTED";
+      }
+    }
+    return {
+      employee_id: p.employeeId,
+      full_name: p.fullName,
+      department: p.department,
+      capability_manager: p.teachosManager || p.manualCapabilityManager || null,
+      classification: p.classification,
+      has_training_data: hasTrainingData,
+      courses,
+    };
+  });
+
+  res.json({
+    taxonomy: TRAINING_COURSE_TAXONOMY,
+    count: rows.length,
+    rows,
+    synced_at: statusRows[0]?.syncedAt ?? null,
   });
 });
 
