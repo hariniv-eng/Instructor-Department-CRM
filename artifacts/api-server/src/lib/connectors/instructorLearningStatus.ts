@@ -34,7 +34,7 @@
 import { BigQuery } from "@google-cloud/bigquery";
 import { config, missing } from "./config";
 import { runWithHardTimeout, HardTimeout } from "./timeout";
-import type { TrainingCourseDef } from "../../data/trainingCourseTaxonomy";
+import { TRAINING_COURSE_TAXONOMY, resolvedCourseDefs, pendingCourseKeys, type TrainingCourseDef } from "../../data/trainingCourseTaxonomy";
 
 export class InstructorLearningStatusError extends Error {}
 
@@ -236,6 +236,43 @@ export async function fetchCourseStatusRows(courseDefs: TrainingCourseDef[]): Pr
     if (e instanceof HardTimeout) throw new InstructorLearningStatusError(`Query against ${ref} failed: ${e.message}`);
     throw new InstructorLearningStatusError(`Query against ${ref} failed: ${(e as Error).message}`);
   }
+}
+
+/**
+ * Preview of exactly what fetchCourseStatusRows() (and therefore
+ * POST /sync/training-status) actually produces -- run this to see the
+ * real aggregated data before/without clicking Sync Now on the Training
+ * Stats page itself. Prints one row count + status breakdown per resolved
+ * course, plus a handful of raw sample rows so it's clear what an
+ * (instructor_user_id, course_key) row looks like.
+ */
+export async function inspectTrainingStatusAggregation(): Promise<void> {
+  const defs = resolvedCourseDefs();
+  console.log(`${defs.length} of ${TRAINING_COURSE_TAXONOMY.length} taxonomy columns have a confirmed course_title mapping (see trainingCourseTaxonomy.ts) -- only these are queried:`);
+  defs.forEach((d) => console.log(`  - ${d.label} [${d.key}] (${d.trackGroup}): ${d.courseTitles.join(" | ")}`));
+  const pending = pendingCourseKeys();
+  if (pending.length) console.log(`\n${pending.length} columns still pending a mapping (skipped): ${pending.join(", ")}`);
+
+  console.log("\nRunning the aggregation query against BigQuery...");
+  const rows = await fetchCourseStatusRows(defs);
+  console.log(`\n${rows.length} total (instructor, course) rows came back.`);
+
+  const distinctInstructors = new Set(rows.map((r) => r.instructor_user_id)).size;
+  console.log(`Distinct instructor_user_id values represented: ${distinctInstructors}`);
+
+  const byCourse = new Map<string, { COMPLETED: number; IN_PROGRESS: number; NOT_STARTED: number }>();
+  for (const r of rows) {
+    if (!byCourse.has(r.course_key)) byCourse.set(r.course_key, { COMPLETED: 0, IN_PROGRESS: 0, NOT_STARTED: 0 });
+    byCourse.get(r.course_key)![r.status]++;
+  }
+  console.log("\nPer-course status breakdown (instructor count per status):");
+  for (const def of defs) {
+    const counts = byCourse.get(def.key) ?? { COMPLETED: 0, IN_PROGRESS: 0, NOT_STARTED: 0 };
+    console.log(`  ${def.label}: ✅ ${counts.COMPLETED} completed, 🟡 ${counts.IN_PROGRESS} in progress, ❌ ${counts.NOT_STARTED} not started`);
+  }
+
+  console.log("\nFirst 15 raw rows (instructor_user_id, course_key, track_group, status, units_completed/units_total):");
+  console.log(rows.slice(0, 15));
 }
 
 async function inspectTable(tableName: string): Promise<void> {
