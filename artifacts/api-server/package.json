@@ -13,6 +13,7 @@
     "inspect:bigquery": "tsx src/lib/connectors/inspect.ts bigquery",
     "inspect:instructor-unit-completion": "tsx src/lib/connectors/inspect.ts instructor-unit-completion",
     "inspect:instructor-practice-exam": "tsx src/lib/connectors/inspect.ts instructor-practice-exam",
+    "inspect:training-status-aggregation": "tsx src/lib/connectors/inspect.ts training-status-aggregation",
     "export:darwinbox": "tsx src/lib/connectors/export.ts darwinbox",
     "export:darwinbox-exits": "tsx src/lib/connectors/export.ts darwinbox-exits",
     "export:teachos": "tsx src/lib/connectors/export.ts teachos",
