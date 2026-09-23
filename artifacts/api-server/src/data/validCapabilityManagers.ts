@@ -42,6 +42,7 @@ export const VALID_CAPABILITY_MANAGERS: string[] = [
   "Hari Krishna Daggubati",
   "Karthik Katuri",
   "Katuri Karthik",
+  "Kushal Kumar Terli",
   "Meka Sri Satya Prudhvi Charan",
   "Nunna Naga Venkata Dasaradhi",
   "Penumarthi Satya Syamala",
