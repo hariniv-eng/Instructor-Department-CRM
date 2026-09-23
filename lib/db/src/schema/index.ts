@@ -334,11 +334,14 @@ export const instructorTrainingStatusTable = pgTable("instructor_training_status
   courseKey: text("course_key").notNull(),
   trackGroup: text("track_group").notNull(),
   // "COMPLETED" | "IN_PROGRESS" | "NOT_STARTED" -- derived per (instructor,
-  // course) from the unit-level completion_status rows: all COMPLETED ->
-  // COMPLETED, all YET_TO_START -> NOT_STARTED, any mix (including any
-  // IN_PROGRESS) -> IN_PROGRESS. There is no ON_HOLD value coming from
-  // BigQuery (confirmed live, 2026-09-23 -- completion_status only ever has
-  // those 3 values) -- see the Training Stats page for how that's surfaced.
+  // course) from the unit-level completion_status rows: >=95% COMPLETED ->
+  // COMPLETED (2026-09-23, per request, after real data showed the earlier
+  // "literally every unit" rule producing near-zero completions -- see
+  // fetchCourseStatusRows()'s own comment in instructorLearningStatus.ts),
+  // all YET_TO_START (zero progress) -> NOT_STARTED, else -> IN_PROGRESS.
+  // There is no ON_HOLD value coming from BigQuery (confirmed live,
+  // 2026-09-23 -- completion_status only ever has those 3 values) -- see
+  // the Training Stats page for how that's surfaced.
   status: text("status").notNull(),
   unitsTotal: integer("units_total").notNull().default(0),
   unitsCompleted: integer("units_completed").notNull().default(0),
