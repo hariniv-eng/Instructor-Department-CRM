@@ -45,9 +45,20 @@ export const TRAINING_COURSE_TAXONOMY: TrainingCourseDef[] = [
   { key: "mongodb", label: "MongoDB", trackGroup: "Backend Development", courseTitles: ["MongoDB", "Mongo DB"] },
   { key: "developer_foundation", label: "Developer Foundation", trackGroup: "Backend Development", courseTitles: ["Developer Foundations"] },
   // --- DSA ---
-  { key: "dsa", label: "DSA", trackGroup: "DSA", courseTitles: [] },
-  { key: "dia", label: "DIA", trackGroup: "DSA", courseTitles: [] },
-  { key: "ips", label: "IPS", trackGroup: "DSA", courseTitles: [] },
+  // Redefined 2026-09-24 per request: Ankush's original DSA/DIA/IPS module
+  // breakdown didn't align 1:1 with the real course_title/topic_title
+  // structure in the data -- content was interleaved across phases (e.g.
+  // "Stack & Queue" and "Bit Manipulation" landed in different phases than
+  // his module list implied). Rather than force an approximate combination,
+  // these 4 columns now match the actual curriculum's own phase structure
+  // (confirmed via check:course-topics, 2026-09-24). Row counts for all four
+  // are still small company-wide (135/21/23/112 total rows at mapping time)
+  // -- this looks like an early-stage rollout, not yet broadly assigned, so
+  // expect mostly "No data" until more instructors are on this curriculum.
+  { key: "programming_foundations", label: "Programming Foundations (C++)", trackGroup: "DSA", courseTitles: ["Phase 1: Programming Foundations in C++"] },
+  { key: "algorithmic_foundations", label: "Algorithmic Foundations", trackGroup: "DSA", courseTitles: ["Phase 2: Algorithmic Foundations"] },
+  { key: "data_structures_discrete_math", label: "Data Structures & Discrete Math", trackGroup: "DSA", courseTitles: ["Phase 3: Data Structures & Discrete Math"] },
+  { key: "dp_graph_theory", label: "DP & Graph Theory", trackGroup: "DSA", courseTitles: ["Phase 4: Dynamic Programming & Graph Theory"] },
   // --- Gen AI ---
   { key: "gen_ai", label: "Gen AI", trackGroup: "Gen AI", courseTitles: ["Generative AI", "Intro to Generative AI"] },
   { key: "llm", label: "LLM", trackGroup: "Gen AI", courseTitles: ["Building LLM Applications", "Building LLM Applications Part - 2", "Building  LLM  Applications"] },
