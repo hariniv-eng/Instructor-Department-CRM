@@ -30,6 +30,9 @@ type ContributionRow = {
   department: string | null;
   capability_manager: string | null;
   classification: string | null;
+  // Instructor/Mentor bifurcation (2026-09-24, per request) -- mirrors the
+  // Instructors tab's own bifurcation column/badge styling.
+  role: 'Instructor' | 'Mentor';
   has_contribution_data: boolean;
   lecture_hours: number;
   practice_hours: number;
@@ -59,6 +62,14 @@ function useContribution() {
 
 function formatHours(hours: number): string {
   return hours.toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+}
+
+// Same badge colors as BifurcationCell on the Instructors tab (2026-09-22
+// precedent) -- kept in sync deliberately so "Mentor" reads the same way
+// across both pages.
+function RoleBadge({ role }: { role: ContributionRow['role'] }) {
+  const toneClass = role === 'Mentor' ? 'bg-[#e3f3ea] text-[#1f7a4d]' : 'bg-[#e6e9fb] text-[#4a4fb0]';
+  return <span className={`inline-flex rounded-full px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] ${toneClass}`}>{role}</span>;
 }
 
 export default function ContributionPage() {
@@ -151,6 +162,7 @@ export default function ContributionPage() {
               <tr className="border-b border-border bg-[#f4f7f9]">
                 <th className="sticky left-0 z-10 whitespace-nowrap border-r border-border bg-[#f4f7f9] px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Employee ID</th>
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Name</th>
+                <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Role</th>
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Department</th>
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Capability Manager</th>
                 <th className="whitespace-nowrap border-l border-border px-4 py-3 text-right font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Lecture Hrs</th>
@@ -164,6 +176,7 @@ export default function ContributionPage() {
               {pager.pageRows.map((row) => <tr key={row.employee_id ?? row.full_name} className="border-b border-border/70 last:border-0 hover:bg-[#f8fafb]">
                 <td className="sticky left-0 z-10 whitespace-nowrap border-r border-border bg-card px-4 py-3 font-mono-ui text-[11px] text-foreground">{row.employee_id || '—'}</td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] font-semibold text-foreground">{row.full_name}</td>
+                <td className="whitespace-nowrap border-r border-border px-4 py-3"><RoleBadge role={row.role} /></td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-muted-foreground">{row.department || '—'}</td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-muted-foreground">{row.capability_manager || '—'}</td>
                 {row.has_contribution_data

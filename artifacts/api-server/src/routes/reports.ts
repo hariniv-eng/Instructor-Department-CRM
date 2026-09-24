@@ -1007,6 +1007,14 @@ router.get("/reports/instructor-contribution", requireAuth, requireRole("admin")
       department: p.department,
       capability_manager: p.teachosManager || p.manualCapabilityManager || null,
       classification: p.classification,
+      // Instructor/Mentor bifurcation (2026-09-24, per request) -- same
+      // rule as bifurcationLabel() on the Instructors tab: classification
+      // "mentor" is the only Mentor marker; every other value this
+      // population ever has (null, "payroll_converted") is an ordinary
+      // instructor. Delivery Support/Ops classifications never reach here
+      // since TRAINING_STATS_EXCLUDED_CLASSIFICATIONS already filters them
+      // out above, so this population is strictly Instructor or Mentor.
+      role: p.classification === "mentor" ? "Mentor" : "Instructor",
       // Distinct from 0 hours: this instructor has no BigQuery contribution
       // rows at all (never synced, or their teachos_user_id hasn't matched
       // anything in that table) -- vs. genuinely having zero COMPLETED
