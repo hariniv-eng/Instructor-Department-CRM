@@ -190,6 +190,20 @@ function bqStringLiteral(value: string): string {
  * that never get clicked shouldn't keep someone who's functionally done
  * from ever showing green.
  */
+// A course def matches on course_title alone, unless it also sets
+// topicTitles, in which case a row must additionally have a matching
+// topic_title -- needed for columns like DSA/DIA/IPS where one phase
+// course_title's content actually splits across more than one of our
+// columns (see the header comment on those entries in
+// trainingCourseTaxonomy.ts).
+function matchCondition(c: TrainingCourseDef): string {
+  const courseCond = `course_title IN (${c.courseTitles.map(bqStringLiteral).join(", ")})`;
+  if (c.topicTitles && c.topicTitles.length > 0) {
+    return `(${courseCond} AND topic_title IN (${c.topicTitles.map(bqStringLiteral).join(", ")}))`;
+  }
+  return courseCond;
+}
+
 export async function fetchCourseStatusRows(courseDefs: TrainingCourseDef[]): Promise<CourseStatusRow[]> {
   const resolved = courseDefs.filter((c) => c.courseTitles.length > 0);
   if (resolved.length === 0) return [];
@@ -197,10 +211,10 @@ export async function fetchCourseStatusRows(courseDefs: TrainingCourseDef[]): Pr
   const bq = client();
   const ref = tableRef(UNIT_COMPLETION_TABLE);
   const keyBranches = resolved
-    .map((c) => `WHEN course_title IN (${c.courseTitles.map(bqStringLiteral).join(", ")}) THEN ${bqStringLiteral(c.key)}`)
+    .map((c) => `WHEN ${matchCondition(c)} THEN ${bqStringLiteral(c.key)}`)
     .join("\n      ");
   const groupBranches = resolved
-    .map((c) => `WHEN course_title IN (${c.courseTitles.map(bqStringLiteral).join(", ")}) THEN ${bqStringLiteral(c.trackGroup)}`)
+    .map((c) => `WHEN ${matchCondition(c)} THEN ${bqStringLiteral(c.trackGroup)}`)
     .join("\n      ");
 
   const query = `
