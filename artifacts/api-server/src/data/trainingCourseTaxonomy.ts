@@ -21,7 +21,7 @@
 // why each pending one is unresolved. Per request (2026-09-23): "Build now,
 // mark pending" -- ship with what's confirmed, fill in the rest once
 // answered.
-export type TrainingTrackGroup = "Frontend Development" | "Backend Development" | "DSA" | "Gen AI" | "DSML";
+export type TrainingTrackGroup = "Frontend Development" | "Backend Development" | "DSA" | "Gen AI" | "DSML" | "Aptitude" | "Math";
 
 export type TrainingCourseDef = {
   key: string;
@@ -116,6 +116,31 @@ export const TRAINING_COURSE_TAXONOMY: TrainingCourseDef[] = [
   { key: "ml_projects", label: "ML Projects", trackGroup: "DSML", courseTitles: ["Machine Learning & AI Projects"] },
   { key: "nlp", label: "NLP", trackGroup: "DSML", courseTitles: ["Introduction to Natural Language Processing"] },
   { key: "data_foundation", label: "Data Foundation", trackGroup: "DSML", courseTitles: [] },
+  // --- Aptitude ---
+  // Added 2026-09-24 per request ("we only have tech instructors related
+  // data, now we need to also get the aptitude, math and also english") --
+  // Ankush shared the exact 7-column reference (4 Aptitude + 3 Math), same
+  // population as Tech (Instructors + Mentors, confirmed 2026-09-24 -- no
+  // separate classification/department filter needed). Rendered as its own
+  // "Aptitude" tab on the Training Stats page, not mixed into the Tech
+  // table. Advanced Aptitude combines two spelling variants found in the
+  // data ("Advanced Aptitude" / "Advance Aptitude") -- same near-duplicate
+  // pattern as MongoDB/Mongo DB or JS Essentials/JavaScript Essentials.
+  { key: "quantitative_aptitude", label: "Quantitative Aptitude", trackGroup: "Aptitude", courseTitles: ["Quantitative Aptitude"] },
+  { key: "numerical_ability", label: "Numerical Ability", trackGroup: "Aptitude", courseTitles: ["Numerical Ability"] },
+  { key: "logical_reasoning", label: "Logical Reasoning", trackGroup: "Aptitude", courseTitles: ["Logical Reasoning"] },
+  { key: "advanced_aptitude", label: "Advanced Aptitude", trackGroup: "Aptitude", courseTitles: ["Advanced Aptitude", "Advance Aptitude"] },
+  // --- Math ---
+  // Added 2026-09-24, same request/population as Aptitude above. "Math for
+  // Computer Science" combines 4 near-duplicate course_title variants found
+  // in the data, including one with a "- AU" suffix that may be a
+  // campus/program-specific variant rather than a true duplicate -- flagged
+  // to Ankush, included for now, easy to split out if it turns out wrong.
+  // "Probability and Statistics" similarly combines 3 spelling/punctuation
+  // variants ("(P&S)" suffix, "&" vs "and").
+  { key: "math_for_cs", label: "Mathematics for Computer Science", trackGroup: "Math", courseTitles: ["Math For Computer Science", "Mathematics For Computer Science - AU", "Math for CSE", "Mathematics for Computer Science"] },
+  { key: "probability_statistics", label: "Probability and Statistics", trackGroup: "Math", courseTitles: ["Probability and Statistics(P&S)", "Probability and Statistics", "Probability & Statistics"] },
+  { key: "linear_algebra_calculus", label: "Linear Algebra and Calculus", trackGroup: "Math", courseTitles: ["Linear Algebra and Calculus"] },
 ];
 
 export function resolvedCourseDefs(): TrainingCourseDef[] {
