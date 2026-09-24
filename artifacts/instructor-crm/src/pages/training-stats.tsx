@@ -11,17 +11,28 @@ import { PageIntro, EmptyState, QueryError, SkeletonBlock, TopStat, TablePager, 
 // in api-server/src/lib/connectors/instructorLearningStatus.ts and GET
 // /reports/training-stats in reports.ts.
 //
-// Split into 4 SUB-TABS (2026-09-24, per request -- "tech separate, math
-// and aptitude separate, and also english separate" / "keep ... buttons:
-// tech, aptitude, math, english"): Tech groups the original 5 track groups
-// (Frontend Development, Backend Development, DSA, Gen AI, DSML) matching
-// Ankush's reference sheet; Aptitude and Math are their own track groups
-// added the same day; English has no taxonomy columns yet (still waiting on
-// Ankush's course list) -- its tab renders with an explanatory empty state
-// rather than being hidden, since all 4 buttons should always be visible.
-// All 4 tabs share the SAME instructor population (Instructors + Mentors,
-// confirmed 2026-09-24 -- no separate classification/department filter per
-// tab) -- only the COLUMNS shown differ per tab, not the rows/instructors.
+// Split into 3 SUB-TABS (2026-09-24, per request): Tech groups the original
+// 5 track groups (Frontend Development, Backend Development, DSA, Gen AI,
+// DSML) matching Ankush's reference sheet; Math and Aptitude share ONE
+// tab/button ("I don't want two separate sheets or two separate tabs for
+// math and aptitude. I want it in one only") even though they're still two
+// separate track groups in the taxonomy underneath; English has no taxonomy
+// columns yet (still waiting on Ankush's course list) -- its tab renders
+// with an explanatory empty state rather than being hidden, since all 3
+// buttons should always be visible.
+//
+// EACH TAB SHOWS ONLY ITS OWN SUBJECT'S INSTRUCTORS (2026-09-24, per
+// request -- "we know the bifurcation using the teacher's data... if I'm
+// trying to open only tech, to only see the tech-related instructors...
+// if I'm trying to open English-related learning stats, I need to only see
+// the data of English instructors"). This reverses the earlier "same
+// roster for every tab" build: rows are now filtered client-side by each
+// instructor's `subject_area` (from classifyDepartment() -- see
+// TECH_AREAS/subject_area in api-server/src/lib/departmentTaxonomy.ts and
+// routes/reports.ts), matched against the active tab's subjectAreas below.
+// A row whose subject_area is null (classifyDepartment() couldn't resolve
+// one -- e.g. a flat "Mentors" string with no sub-area) won't appear on ANY
+// tab until a human fills in Manual Subject for them on the Instructors tab.
 //
 // Scoped to Instructors + Mentors only, identified by employee_id (per
 // request) -- Delivery Support / Instructor Team Operations / other-
@@ -43,11 +54,13 @@ type TrainingStatsRow = {
   capability_manager: string | null;
   classification: string | null;
   has_training_data: boolean;
+  subject_area: string | null;
   courses: Record<string, CourseStatus>;
 };
 
 type TrainingStatsResponse = {
   taxonomy: TrainingCourseDef[];
+  tech_areas: string[];
   count: number;
   rows: TrainingStatsRow[];
   synced_at: string | null;
@@ -55,17 +68,21 @@ type TrainingStatsResponse = {
 
 const QUERY_KEY = ['reports', 'training-stats'];
 
-// The 4 sub-tab buttons, each naming which track group(s) from the taxonomy
-// it pulls columns from. "english" intentionally maps to a track group name
-// that doesn't exist in TRAINING_COURSE_TAXONOMY yet (see backend
+// The 3 sub-tab buttons. `trackGroups` names which taxonomy track group(s)
+// supply this tab's COLUMNS; `subjectAreas` decides which ROWS (instructors)
+// show on it, matched against each row's `subject_area`. Tech's subject
+// areas come from the server's `tech_areas` list (the same RULES-derived set
+// classifyDepartment() uses) rather than being hardcoded here, so this file
+// can't drift out of sync with departmentTaxonomy.ts -- see 'TECH' handling
+// below. "english" intentionally maps to a track group name that doesn't
+// exist in TRAINING_COURSE_TAXONOMY yet (see backend
 // trainingCourseTaxonomy.ts) -- that's expected until Ankush's English
 // course list is confirmed, and is handled below as an empty tab rather
 // than an error.
-const SUB_TABS: { key: string; label: string; trackGroups: string[] }[] = [
-  { key: 'tech', label: 'Tech', trackGroups: ['Frontend Development', 'Backend Development', 'DSA', 'Gen AI', 'DSML'] },
-  { key: 'aptitude', label: 'Aptitude', trackGroups: ['Aptitude'] },
-  { key: 'math', label: 'Math', trackGroups: ['Math'] },
-  { key: 'english', label: 'English', trackGroups: ['English'] },
+const SUB_TABS: { key: string; label: string; trackGroups: string[]; subjectAreas: string[] | 'TECH' }[] = [
+  { key: 'tech', label: 'Tech', trackGroups: ['Frontend Development', 'Backend Development', 'DSA', 'Gen AI', 'DSML'], subjectAreas: 'TECH' },
+  { key: 'math_aptitude', label: 'Math and Aptitude', trackGroups: ['Aptitude', 'Math'], subjectAreas: ['Aptitude', 'Math'] },
+  { key: 'english', label: 'English', trackGroups: ['English'], subjectAreas: ['English'] },
 ];
 
 function useTrainingStats() {
@@ -146,11 +163,16 @@ export default function TrainingStatsPage() {
   };
 
   const activeSubTab = SUB_TABS.find((t) => t.key === activeTab) ?? SUB_TABS[0];
-  // Same instructor population/rows for every sub-tab -- only which taxonomy
-  // columns are shown changes. Re-derived per tab so page 2 of Tech doesn't
-  // carry over confusingly into Aptitude's row list.
   const activeTaxonomy = data ? data.taxonomy.filter((d) => activeSubTab.trackGroups.includes(d.trackGroup)) : [];
-  const pager = usePagedRows(data?.rows ?? [], 50);
+  // Each tab shows only ITS OWN subject's instructors (2026-09-24, per
+  // request -- see the big comment above SUB_TABS). "TECH" resolves against
+  // the server-supplied tech_areas list; the other tabs use their own static
+  // list. A row with subject_area === null never matches any tab. Re-derived
+  // per tab so page 2 of Tech doesn't carry over confusingly into Math and
+  // Aptitude's row list.
+  const activeSubjectAreas = activeSubTab.subjectAreas === 'TECH' ? (data?.tech_areas ?? []) : activeSubTab.subjectAreas;
+  const activeRows = data ? data.rows.filter((row) => row.subject_area !== null && activeSubjectAreas.includes(row.subject_area)) : [];
+  const pager = usePagedRows(activeRows, 50);
   const groups = groupByTrack(activeTaxonomy);
   const pendingCount = activeTaxonomy.filter((d) => d.courseTitles.length === 0).length;
 
@@ -184,8 +206,8 @@ export default function TrainingStatsPage() {
 
     {data && <div className="mb-6 grid max-w-xs grid-cols-1">
       <TopStat
-        label="Instructors + Mentors tracked"
-        value={formatKpi(data.count)}
+        label={`${activeSubTab.label} instructors tracked`}
+        value={formatKpi(activeRows.length)}
         meta={data.synced_at ? `Last synced -- ${new Date(data.synced_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' })}` : 'Not synced yet -- click Sync Now'}
         icon={<GraduationCap size={16} />}
         tone="navy"
@@ -203,6 +225,11 @@ export default function TrainingStatsPage() {
 
     {data && activeTaxonomy.length > 0 && (data.count === 0
       ? <EmptyState title="No training-status data yet" description="Click Sync Now to pull the latest from BigQuery." />
+      : activeRows.length === 0
+      ? <EmptyState
+          title={`No ${activeSubTab.label} instructors classified yet`}
+          description="No instructor's Subject is set to this area yet -- set it on the Instructors tab (Subject column) and it'll show up here."
+        />
       : <div className="rounded-lg border border-border">
         <div className="overflow-x-auto">
           <table className="w-max min-w-full border-collapse text-left">
