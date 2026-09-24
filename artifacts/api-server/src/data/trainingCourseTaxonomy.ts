@@ -35,7 +35,7 @@ export const TRAINING_COURSE_TAXONOMY: TrainingCourseDef[] = [
   { key: "static_web", label: "Static Web", trackGroup: "Frontend Development", courseTitles: ["Build Your Own Static Website"] },
   { key: "responsive_design", label: "Responsive Design", trackGroup: "Frontend Development", courseTitles: ["Build Your Own Responsive Website"] },
   { key: "modern_responsive_ui", label: "Modern Responsive UI", trackGroup: "Frontend Development", courseTitles: ["Modern Responsive Web Design"] },
-  { key: "javascript_sprint", label: "JavaScript Sprint", trackGroup: "Frontend Development", courseTitles: [] },
+  { key: "javascript_sprint", label: "JavaScript Sprint", trackGroup: "Frontend Development", courseTitles: ["JavaScript Quick Revision"] },
   { key: "javascript_essentials", label: "JavaScript Essentials", trackGroup: "Frontend Development", courseTitles: ["JS Essentials", "JavaScript Essentials"] },
   { key: "react_js", label: "React JS", trackGroup: "Frontend Development", courseTitles: ["React JS", "Introduction to React JS"] },
   // --- Backend Development ---

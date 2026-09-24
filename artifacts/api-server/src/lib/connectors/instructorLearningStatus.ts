@@ -279,6 +279,67 @@ export async function inspectTrainingStatusAggregation(): Promise<void> {
   console.log(rows.slice(0, 15));
 }
 
+/**
+ * Discovery helper (2026-09-24, per request) for resolving the three still-
+ * pending DSA-track taxonomy columns (dsa, dia, ips -- see
+ * trainingCourseTaxonomy.ts). Ankush provided the real "Session Name" values
+ * from the learning platform's own module breakdown for each of DSA/DIA/IPS
+ * -- see dsaTrackSessionNames.ts. Those match the grain of this table's
+ * `topic_title` column (confirmed via inspect:instructor-unit-completion:
+ * topic_title, e.g. "For Loop", groups several finer unit_title rows
+ * underneath it -- same level as a "Session Name").
+ *
+ * This looks up which real course_title(s) actually contain those topic
+ * names in the live data, so the taxonomy can be wired up correctly instead
+ * of guessing from the candidate course_title list alone.
+ */
+export async function findCoursesForTopics(topics: string[]): Promise<void> {
+  if (topics.length === 0) {
+    console.log("No topic names given.");
+    return;
+  }
+  const bq = client();
+  const ref = tableRef(UNIT_COMPLETION_TABLE);
+  const query = `
+    SELECT course_title, topic_title, COUNT(*) AS row_count
+    FROM \`${ref}\`
+    WHERE topic_title IN (${topics.map(bqStringLiteral).join(", ")})
+    GROUP BY course_title, topic_title
+    ORDER BY course_title, row_count DESC
+  `;
+
+  console.log(`Looking up which course_title(s) contain these ${topics.length} topic_title values...`);
+  let rows: Array<Record<string, unknown>>;
+  try {
+    const [result] = await runWithHardTimeout(() => bq.query({ query }), API_TIMEOUT_MS * 3 + 10000);
+    rows = result as Array<Record<string, unknown>>;
+  } catch (e) {
+    if (e instanceof HardTimeout) throw new InstructorLearningStatusError(`Query against ${ref} failed: ${e.message}`);
+    throw new InstructorLearningStatusError(`Query against ${ref} failed: ${(e as Error).message}`);
+  }
+
+  const byCourse = new Map<string, { rowCount: number; topics: Set<string> }>();
+  for (const r of rows) {
+    const course = String(r.course_title ?? "(null)");
+    if (!byCourse.has(course)) byCourse.set(course, { rowCount: 0, topics: new Set() });
+    const entry = byCourse.get(course)!;
+    entry.rowCount += Number(r.row_count ?? 0);
+    entry.topics.add(String(r.topic_title ?? ""));
+  }
+
+  console.log(`\ncourse_title values these topics appear under:`);
+  for (const [course, info] of [...byCourse.entries()].sort((a, b) => b[1].rowCount - a[1].rowCount)) {
+    console.log(`  "${course}" -- ${info.rowCount} rows, matches ${info.topics.size}/${topics.length} of the given topic names: ${[...info.topics].join(", ")}`);
+  }
+
+  const matchedTopics = new Set(rows.map((r) => String(r.topic_title ?? "")));
+  const unmatched = topics.filter((t) => !matchedTopics.has(t));
+  if (unmatched.length) {
+    console.log(`\n${unmatched.length} topic name(s) had NO match at all in the data (check spelling/casing/extra spaces):`);
+    unmatched.forEach((t) => console.log(`  - "${t}"`));
+  }
+}
+
 async function inspectTable(tableName: string): Promise<void> {
   const ref = tableRef(tableName);
   console.log(`Table: ${ref}`);
