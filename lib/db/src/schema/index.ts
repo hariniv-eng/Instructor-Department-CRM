@@ -352,6 +352,51 @@ export const insertInstructorTrainingStatusSchema = createInsertSchema(instructo
 export type InstructorTrainingStatus = typeof instructorTrainingStatusTable.$inferSelect;
 export type InsertInstructorTrainingStatus = z.infer<typeof insertInstructorTrainingStatusSchema>;
 
+// Aggregated per-instructor "Contribution" -- actual session-teaching hours
+// delivered, sourced from BigQuery's niat_instructor_session_schedule_details
+// (see artifacts/api-server/src/lib/connectors/instructorContribution.ts,
+// 2026-09-24, per request: replace the manual Contribution sheet Ankush used
+// to upload with a live BigQuery source, covering both Instructors and
+// Mentors -- "create a new tab for employee contribution, where we have
+// data of instructors as well mentor data there"). One row per
+// instructorUserId (already aggregated in BigQuery, not one row per raw
+// session) -- join against instructorsTable.teachosUserId to resolve a
+// person, same key reconcileCapabilityManager()/the Training Stats join
+// already use, since a contribution row can arrive for an instructor_user_id
+// this app hasn't matched to an employee_id yet.
+//
+// Only COMPLETED sessions count toward these totals (a PENDING/scheduled
+// session hasn't actually happened yet, so it isn't "hours worked"). Minutes
+// are summed from session_duration_in_mins_from_schedule_time (computed
+// live from each session's actual start/end datetime) rather than the
+// table's separate session_duration column, which sample data showed
+// returning a flat 60 regardless of the real scheduled window -- see
+// fetchContributionRows()'s own comment in instructorContribution.ts.
+//
+// lectureMinutes/practiceMinutes cover session_type = 'LECTURE' / 'PRACTICE'
+// respectively; otherMinutes is every other session_type (EXAM, and
+// anything else that shows up later) bucketed together, per request ("how
+// many hours of lecture session and also practice hours and also other
+// hours he has worked") -- a catch-all rather than an exhaustive enum list,
+// so a session_type this app has never seen before still lands somewhere
+// instead of being silently dropped.
+//
+// Full delete-then-insert on every sync, same convention as
+// instructorTrainingStatusTable above.
+export const instructorContributionTable = pgTable("instructor_contribution", {
+  id: serial("id").primaryKey(),
+  instructorUserId: text("instructor_user_id").notNull(),
+  lectureMinutes: integer("lecture_minutes").notNull().default(0),
+  practiceMinutes: integer("practice_minutes").notNull().default(0),
+  otherMinutes: integer("other_minutes").notNull().default(0),
+  sessionsCompleted: integer("sessions_completed").notNull().default(0),
+  syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const insertInstructorContributionSchema = createInsertSchema(instructorContributionTable);
+export type InstructorContribution = typeof instructorContributionTable.$inferSelect;
+export type InsertInstructorContribution = z.infer<typeof insertInstructorContributionSchema>;
+
 export const insertInstructorSchema = createInsertSchema(instructorsTable);
 export const insertUploadSchema = createInsertSchema(uploadsTable);
 export const insertDarwinboxActiveSchema = createInsertSchema(darwinboxActiveTable);

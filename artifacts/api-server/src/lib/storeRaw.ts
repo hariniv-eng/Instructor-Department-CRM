@@ -17,9 +17,11 @@ import {
   darwinboxFullRosterTable,
   teachosDeploymentTable,
   instructorTrainingStatusTable,
+  instructorContributionTable,
 } from "@workspace/db";
 import { cell, type SheetRow } from "./reconcile";
 import type { CourseStatusRow } from "./connectors/instructorLearningStatus";
+import type { ContributionRow } from "./connectors/instructorContribution";
 
 const CHUNK = 500;
 
@@ -100,6 +102,26 @@ export async function storeTrainingStatus(rows: CourseStatusRow[]): Promise<numb
         unitsCompleted: row.units_completed,
       }));
       if (batch.length) await tx.insert(instructorTrainingStatusTable).values(batch);
+    }
+  });
+  return rows.length;
+}
+
+// Instructor Contribution (2026-09-24) -- already aggregated server-side by
+// fetchContributionRows() (one row per instructor, not per raw session), so
+// same small-replace pattern as storeTrainingStatus() above.
+export async function storeContribution(rows: ContributionRow[]): Promise<number> {
+  await db.transaction(async (tx) => {
+    await tx.delete(instructorContributionTable);
+    for (let i = 0; i < rows.length; i += CHUNK) {
+      const batch = rows.slice(i, i + CHUNK).map((row) => ({
+        instructorUserId: row.instructor_user_id,
+        lectureMinutes: row.lecture_minutes,
+        practiceMinutes: row.practice_minutes,
+        otherMinutes: row.other_minutes,
+        sessionsCompleted: row.sessions_completed,
+      }));
+      if (batch.length) await tx.insert(instructorContributionTable).values(batch);
     }
   });
   return rows.length;

@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, instructorsTable, darwinboxFullRosterTable, darwinboxExitsTable, instructorTrainingStatusTable } from "@workspace/db";
+import { db, instructorsTable, darwinboxFullRosterTable, darwinboxExitsTable, instructorTrainingStatusTable, instructorContributionTable } from "@workspace/db";
 import { requireAuth, requireRole } from "../middlewares/auth";
 import { cell } from "../lib/reconcile";
 import { TRAINING_COURSE_TAXONOMY } from "../data/trainingCourseTaxonomy";
@@ -966,6 +966,64 @@ router.get("/reports/training-stats", requireAuth, requireRole("admin"), async (
     count: rows.length,
     rows,
     synced_at: statusRows[0]?.syncedAt ?? null,
+  });
+});
+
+// Instructor Contribution ("Contribution" tab, 2026-09-24, per request):
+// actual session-teaching hours delivered, sourced from BigQuery's
+// niat_instructor_session_schedule_details (aggregated per instructor by
+// fetchContributionRows() and synced into instructorContributionTable via
+// POST /sync/instructor-contribution, see routes/sync.ts). Replaces the
+// manual Contribution sheet Ankush previously uploaded.
+//
+// Same population as Training Stats above -- TeachOS-active, not one of the
+// excluded/ops/other-department buckets, i.e. Instructors AND Mentors
+// together ("create a new tab for employee contribution, where we have
+// data of instructors as well mentor data there") -- reuses
+// TRAINING_STATS_EXCLUDED_CLASSIFICATIONS since the population rule is
+// identical, just for a different metric.
+router.get("/reports/instructor-contribution", requireAuth, requireRole("admin"), async (_req, res) => {
+  const allRows = await db.select().from(instructorsTable);
+  const people = allRows
+    .filter((r) => r.inTeachos && !TRAINING_STATS_EXCLUDED_CLASSIFICATIONS.has(r.classification ?? ""))
+    .sort((a, b) => a.fullName.localeCompare(b.fullName));
+
+  const contributionRows = await db.select().from(instructorContributionTable);
+  // instructor_user_id (BigQuery's own hex ID) -> that row. Joined here, at
+  // read time, against instructorsTable.teachosUserId -- same key
+  // reconcileCapabilityManager() and the Training Stats join above already
+  // use, no separate reconcile/matching step needed for this sync either.
+  const byInstructor = new Map<string, (typeof contributionRows)[number]>();
+  for (const row of contributionRows) byInstructor.set(row.instructorUserId, row);
+
+  const rows = people.map((p) => {
+    const contribution = p.teachosUserId ? byInstructor.get(p.teachosUserId) : undefined;
+    const lectureMinutes = contribution?.lectureMinutes ?? 0;
+    const practiceMinutes = contribution?.practiceMinutes ?? 0;
+    const otherMinutes = contribution?.otherMinutes ?? 0;
+    return {
+      employee_id: p.employeeId,
+      full_name: p.fullName,
+      department: p.department,
+      capability_manager: p.teachosManager || p.manualCapabilityManager || null,
+      classification: p.classification,
+      // Distinct from 0 hours: this instructor has no BigQuery contribution
+      // rows at all (never synced, or their teachos_user_id hasn't matched
+      // anything in that table) -- vs. genuinely having zero COMPLETED
+      // sessions on file. Mirrors has_training_data above.
+      has_contribution_data: !!contribution,
+      lecture_hours: Math.round((lectureMinutes / 60) * 10) / 10,
+      practice_hours: Math.round((practiceMinutes / 60) * 10) / 10,
+      other_hours: Math.round((otherMinutes / 60) * 10) / 10,
+      total_hours: Math.round(((lectureMinutes + practiceMinutes + otherMinutes) / 60) * 10) / 10,
+      sessions_completed: contribution?.sessionsCompleted ?? 0,
+    };
+  });
+
+  res.json({
+    count: rows.length,
+    rows,
+    synced_at: contributionRows[0]?.syncedAt ?? null,
   });
 });
 

@@ -9,12 +9,13 @@ export type SyncResult =
   | { ok: true; source: string; stored: number; synced_at: string }
   | { ok: false; source: string; error: string; synced_at: string };
 
-export const LAST_SYNC: Record<"darwinbox_live" | "darwinbox_exits_live" | "teachos_live" | "niat_instructor_details_live" | "training_status_live", SyncResult | null> = {
+export const LAST_SYNC: Record<"darwinbox_live" | "darwinbox_exits_live" | "teachos_live" | "niat_instructor_details_live" | "training_status_live" | "contribution_live", SyncResult | null> = {
   darwinbox_live: null,
   darwinbox_exits_live: null,
   teachos_live: null,
   niat_instructor_details_live: null,
   training_status_live: null,
+  contribution_live: null,
 };
 
 // Result of the Capability Manager enrichment sub-step inside
