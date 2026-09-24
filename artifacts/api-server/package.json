@@ -21,6 +21,7 @@
     "check:teachos-column": "tsx src/lib/connectors/checkColumnValues.ts",
     "check:instructor-learning-column": "tsx src/lib/connectors/checkInstructorLearningColumn.ts",
     "check:dsa-track-topics": "tsx src/lib/connectors/checkDsaTrackTopics.ts",
+    "check:course-topics": "tsx src/lib/connectors/checkCourseTopics.ts",
     "check:darwinbox-ids": "tsx src/lib/connectors/checkDarwinboxIds.ts",
     "reconcile:from-csv": "tsx src/scripts/reconcileFromCsv.ts",
     "check:capability-managers": "tsx src/scripts/checkCapabilityManagerCandidates.ts",
