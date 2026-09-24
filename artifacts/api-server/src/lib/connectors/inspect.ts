@@ -7,6 +7,7 @@
 //   pnpm --filter @workspace/api-server run inspect:instructor-practice-exam
 //   pnpm --filter @workspace/api-server run inspect:training-status-aggregation
 //   pnpm --filter @workspace/api-server run inspect:instructor-session-schedule
+//   pnpm --filter @workspace/api-server run inspect:contribution-aggregation
 //
 // This only works once deployed somewhere with real network access to
 // Darwinbox / BigQuery — see LIVE_SYNC.md.
@@ -68,13 +69,14 @@ if (target === "darwinbox-exits-for") {
     "instructor-practice-exam": () => import("./instructorLearningStatus").then((m) => m.inspectPracticeExamAttempts),
     "training-status-aggregation": () => import("./instructorLearningStatus").then((m) => m.inspectTrainingStatusAggregation),
     "instructor-session-schedule": () => import("./instructorContribution").then((m) => m.inspectSessionScheduleDetails),
+    "contribution-aggregation": () => import("./instructorContribution").then((m) => m.inspectContributionAggregation),
   } as const;
 
   const loadRun = loaders[target as keyof typeof loaders];
 
   if (!loadRun) {
     console.error(
-      `Unknown target "${target}". Use one of: darwinbox, darwinbox-exits, darwinbox-exits-for, bigquery, instructor-unit-completion, instructor-practice-exam, training-status-aggregation, instructor-session-schedule.`
+      `Unknown target "${target}". Use one of: darwinbox, darwinbox-exits, darwinbox-exits-for, bigquery, instructor-unit-completion, instructor-practice-exam, training-status-aggregation, instructor-session-schedule, contribution-aggregation.`
     );
     process.exit(1);
   }

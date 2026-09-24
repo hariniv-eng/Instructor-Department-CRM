@@ -14,8 +14,9 @@ import { fetchExitRows, DarwinboxExitsError } from "../lib/connectors/darwinboxE
 import { fetchNiatInstructorDetailsRows, NiatInstructorDetailsError } from "../lib/connectors/niatInstructorDetails";
 import { fetchCapabilityManagerRows } from "../lib/connectors/capabilityManager";
 import { fetchCourseStatusRows, InstructorLearningStatusError } from "../lib/connectors/instructorLearningStatus";
+import { fetchContributionRows, InstructorContributionError } from "../lib/connectors/instructorContribution";
 import { resolvedCourseDefs } from "../data/trainingCourseTaxonomy";
-import { storeDarwinboxActive, storeDarwinboxExits, storeDarwinboxFullRoster, storeTeachosDeployment, storeTrainingStatus } from "../lib/storeRaw";
+import { storeDarwinboxActive, storeDarwinboxExits, storeDarwinboxFullRoster, storeTeachosDeployment, storeTrainingStatus, storeContribution } from "../lib/storeRaw";
 import { reconcileDarwin, reconcileDarwinFullRosterFallback, reconcileTeachos, reconcileTeachosEmployeeIdReference, reconcileCapabilityManager, recomputeStatuses } from "../lib/reconcile";
 import { LAST_SYNC, LAST_CAPABILITY_MANAGER_SYNC, setLastCapabilityManagerSync, type SyncResult } from "../lib/syncState";
 
@@ -166,6 +167,29 @@ async function runTrainingStatusSync(): Promise<SyncResult> {
 router.post("/sync/training-status", async (_req, res) => {
   const result = await runTrainingStatusSync();
   LAST_SYNC.training_status_live = result;
+  res.json(result);
+});
+
+// Instructor Contribution (2026-09-24, per request) -- same "aggregate in
+// BigQuery, store the aggregate" shape as runTrainingStatusSync() above, no
+// reconciliation step needed here either: contribution rows are matched
+// against instructorsTable.teachosUserId at read time (see GET
+// /reports/instructor-contribution in reports.ts), same as training status.
+async function runContributionSync(): Promise<SyncResult> {
+  try {
+    const rows = await fetchContributionRows();
+    const stored = await storeContribution(rows);
+    await db.insert(uploadsTable).values({ source: "Instructor Contribution", filename: "BigQuery sync (niat_instructor_session_schedule_details, aggregated per instructor)", rowCount: stored });
+    return { ok: true, source: "contribution_live", stored, synced_at: new Date().toISOString() };
+  } catch (e) {
+    const message = e instanceof InstructorContributionError ? e.message : `Unexpected error: ${(e as Error).message}`;
+    return { ok: false, source: "contribution_live", error: message, synced_at: new Date().toISOString() };
+  }
+}
+
+router.post("/sync/instructor-contribution", async (_req, res) => {
+  const result = await runContributionSync();
+  LAST_SYNC.contribution_live = result;
   res.json(result);
 });
 

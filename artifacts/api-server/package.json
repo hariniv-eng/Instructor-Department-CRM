@@ -15,6 +15,7 @@
     "inspect:instructor-practice-exam": "tsx src/lib/connectors/inspect.ts instructor-practice-exam",
     "inspect:training-status-aggregation": "tsx src/lib/connectors/inspect.ts training-status-aggregation",
     "inspect:instructor-session-schedule": "tsx src/lib/connectors/inspect.ts instructor-session-schedule",
+    "inspect:contribution-aggregation": "tsx src/lib/connectors/inspect.ts contribution-aggregation",
     "export:darwinbox": "tsx src/lib/connectors/export.ts darwinbox",
     "export:darwinbox-exits": "tsx src/lib/connectors/export.ts darwinbox-exits",
     "export:teachos": "tsx src/lib/connectors/export.ts teachos",
