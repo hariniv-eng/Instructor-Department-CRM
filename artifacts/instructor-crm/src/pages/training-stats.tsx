@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { GraduationCap, RefreshCw } from 'lucide-react';
-import { PageIntro, EmptyState, QueryError, SkeletonBlock, TopStat, TablePager, usePagedRows, formatKpi } from '@/components/ui-pieces';
+import { PageIntro, EmptyState, QueryError, SkeletonBlock, TopStat, TablePager, TableSearchInput, usePagedRows, formatKpi } from '@/components/ui-pieces';
 
 // "Training Stats" (2026-09-23, per request): an instructor's OWN
 // training/upskilling progress, distinct from every other tab here, which
@@ -172,7 +172,19 @@ export default function TrainingStatsPage() {
   // Aptitude's row list.
   const activeSubjectAreas = activeSubTab.subjectAreas === 'TECH' ? (data?.tech_areas ?? []) : activeSubTab.subjectAreas;
   const activeRows = data ? data.rows.filter((row) => row.subject_area !== null && activeSubjectAreas.includes(row.subject_area)) : [];
-  const pager = usePagedRows(activeRows, 50);
+  // Search box (2026-09-24, per request: "where ever there are tables in
+  // the application add search option to search for any person") -- matches
+  // name or employee ID, same two fields the Instructors tab's own search
+  // already checks. Applied after the subject-area filter above, so a
+  // search on the Tech tab only searches among tech instructors, not the
+  // whole roster.
+  const [search, setSearch] = useState('');
+  const searchedRows = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return activeRows;
+    return activeRows.filter((row) => row.full_name.toLowerCase().includes(query) || (row.employee_id ?? '').toLowerCase().includes(query));
+  }, [activeRows, search]);
+  const pager = usePagedRows(searchedRows, 50);
   const groups = groupByTrack(activeTaxonomy);
   const pendingCount = activeTaxonomy.filter((d) => d.courseTitles.length === 0).length;
 
@@ -204,14 +216,17 @@ export default function TrainingStatsPage() {
     {query.isLoading && <SkeletonBlock className="h-[520px]" />}
     {query.isError && <QueryError message="Training Stats is unavailable right now." />}
 
-    {data && <div className="mb-6 grid max-w-xs grid-cols-1">
-      <TopStat
-        label={`${activeSubTab.label} instructors tracked`}
-        value={formatKpi(activeRows.length)}
-        meta={data.synced_at ? `Last synced -- ${new Date(data.synced_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' })}` : 'Not synced yet -- click Sync Now'}
-        icon={<GraduationCap size={16} />}
-        tone="navy"
-      />
+    {data && <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+      <div className="grid max-w-xs grid-cols-1">
+        <TopStat
+          label={`${activeSubTab.label} instructors tracked`}
+          value={formatKpi(activeRows.length)}
+          meta={data.synced_at ? `Last synced -- ${new Date(data.synced_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' })}` : 'Not synced yet -- click Sync Now'}
+          icon={<GraduationCap size={16} />}
+          tone="navy"
+        />
+      </div>
+      {activeRows.length > 0 && <TableSearchInput value={search} onChange={setSearch} testId="input-search-training-stats" />}
     </div>}
 
     {data && pendingCount > 0 && <p className="mb-6 max-w-3xl text-[12px] leading-relaxed text-muted-foreground">
@@ -223,14 +238,17 @@ export default function TrainingStatsPage() {
       description={`The ${activeSubTab.label} tab is ready, but no courses have been mapped to it yet -- let Claude know which courses to track and this tab will populate the same way the others did.`}
     />}
 
-    {data && activeTaxonomy.length > 0 && (data.count === 0
-      ? <EmptyState title="No training-status data yet" description="Click Sync Now to pull the latest from BigQuery." />
-      : activeRows.length === 0
-      ? <EmptyState
-          title={`No ${activeSubTab.label} instructors classified yet`}
-          description="No instructor's Subject is set to this area yet -- set it on the Instructors tab (Subject column) and it'll show up here."
-        />
-      : <div className="rounded-lg border border-border">
+    {data && activeTaxonomy.length > 0 && data.count === 0 && <EmptyState title="No training-status data yet" description="Click Sync Now to pull the latest from BigQuery." />}
+
+    {data && activeTaxonomy.length > 0 && data.count > 0 && activeRows.length === 0 && <EmptyState
+      title={`No ${activeSubTab.label} instructors classified yet`}
+      description="No instructor's Subject is set to this area yet -- set it on the Instructors tab (Subject column) and it'll show up here."
+    />}
+
+    {data && activeTaxonomy.length > 0 && activeRows.length > 0 && searchedRows.length === 0 && <EmptyState title="No one matches this search" description="Try a broader search or clear the search box." />}
+
+    {data && activeTaxonomy.length > 0 && searchedRows.length > 0 && (
+      <div className="rounded-lg border border-border">
         <div className="overflow-x-auto">
           <table className="w-max min-w-full border-collapse text-left">
             <thead>

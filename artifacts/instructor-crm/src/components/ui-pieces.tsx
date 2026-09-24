@@ -1,6 +1,28 @@
 import { useMemo, useState } from 'react';
-import { AlertTriangle, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, CircleCheck, Download, LoaderCircle } from 'lucide-react';
+import { AlertTriangle, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, CircleCheck, Download, LoaderCircle, Search } from 'lucide-react';
 import { downloadCsv, slugify, toCsv } from '@/lib/csv';
+
+// Shared search box for any people table across the app (2026-09-24, per
+// request: "where ever there are tables in the application add search
+// option to search for any person") -- same look as the search box
+// instructors.tsx already had (Search icon + text input), just factored out
+// here so every other table gets the identical control instead of each page
+// reinventing its own. Purely a display filter: it narrows which rows
+// render (and, everywhere it's wired up, which rows a "Download CSV" button
+// exports), it never changes what the server returns.
+export function TableSearchInput({ value, onChange, placeholder = 'Search by name or employee ID...', testId }: { value: string; onChange: (value: string) => void; placeholder?: string; testId: string }) {
+  return <div className="relative">
+    <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+    <input
+      type="search"
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      placeholder={placeholder}
+      data-testid={testId}
+      className="h-9 w-full rounded-lg border border-border bg-background pl-8 pr-3 text-[12px] outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-primary focus:ring-2 focus:ring-ring/25 sm:w-[240px]"
+    />
+  </div>;
+}
 
 export function PageIntro({ eyebrow, title, description, action }: { eyebrow: string; title: string; description?: string; action?: React.ReactNode }) {
   return <div className="mb-7 flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
@@ -158,16 +180,32 @@ function candidateColumnValue(person: Candidate, column: CandidateColumn): strin
 
 export function BucketPanel({ title, subtitle, icon, bucket, emptyLabel, columns, defaultOpen }: { title: string; subtitle: string; icon: React.ReactNode; bucket: Bucket; emptyLabel: string; columns: CandidateColumn[]; defaultOpen: boolean }) {
   const [open, setOpen] = useState(defaultOpen && bucket.count > 0);
+  const [search, setSearch] = useState('');
   const toggle = () => setOpen((value) => !value);
   const downloadTestId = `button-download-${title.toLowerCase().replaceAll(' ', '-')}`;
+
+  // Search box (2026-09-24, per request: "where ever there are tables in
+  // the application add search option to search for any person") -- filters
+  // by name or employee ID, same two fields instructors.tsx's own search
+  // already matches against. A pure display/export filter: it narrows what
+  // renders below AND what "Download CSV" exports (same precedent as
+  // instructors.tsx's downloadInstructorsCsv, which exports the filtered
+  // `people` list, not the unfiltered one) -- it never touches bucket.count,
+  // which still reports this bucket's true total regardless of the search.
+  const people = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return bucket.people;
+    return bucket.people.filter((person) => person.full_name.toLowerCase().includes(query) || (person.employee_id ?? '').toLowerCase().includes(query));
+  }, [bucket.people, search]);
+
   const handleDownload = () => {
     const headers = columns.map((column) => COLUMN_LABELS[column]);
-    const rows = bucket.people.map((person) => columns.map((column) => candidateColumnValue(person, column)));
+    const rows = people.map((person) => columns.map((column) => candidateColumnValue(person, column)));
     downloadCsv(`${slugify(title)}.csv`, toCsv(headers, rows));
   };
 
   return <section className="rounded-xl border border-border bg-card shadow-xs">
-    <div className="flex w-full items-center justify-between gap-4 p-5 sm:p-6">
+    <div className="flex w-full flex-wrap items-center justify-between gap-4 p-5 sm:p-6">
       <button
         type="button"
         data-testid={`button-toggle-${title.toLowerCase().replaceAll(' ', '-')}`}
@@ -184,7 +222,8 @@ export function BucketPanel({ title, subtitle, icon, bucket, emptyLabel, columns
         </div>
       </button>
       <div className="flex shrink-0 items-center gap-2">
-        <DownloadCsvButton onClick={handleDownload} disabled={bucket.count === 0} testId={downloadTestId} />
+        {open && bucket.count > 0 && <TableSearchInput value={search} onChange={setSearch} testId={`input-search-${title.toLowerCase().replaceAll(' ', '-')}`} />}
+        <DownloadCsvButton onClick={handleDownload} disabled={people.length === 0} testId={downloadTestId} />
         <button type="button" aria-label={open ? `Collapse ${title}` : `Expand ${title}`} onClick={toggle} className="rounded-md p-1 text-muted-foreground hover:bg-secondary hover:text-foreground">
           {open ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
         </button>
@@ -193,13 +232,15 @@ export function BucketPanel({ title, subtitle, icon, bucket, emptyLabel, columns
     {open && <div className="border-t border-border px-5 pb-5 sm:px-6 sm:pb-6">
       {!bucket.people.length
         ? <div className="pt-5"><EmptyState title={emptyLabel} description="Nothing in this bucket right now." /></div>
+        : people.length === 0
+        ? <div className="pt-5"><EmptyState title="No one matches this search" description="Try a broader search or clear the search box." /></div>
         : <div className="mt-4 max-h-[420px] overflow-auto rounded-lg border border-border">
           <table className="w-full text-left text-[12px]">
             <thead className="sticky top-0 bg-secondary font-mono-ui text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
               <tr>{columns.map((column) => <th key={column} className="px-3 py-2">{COLUMN_LABELS[column]}</th>)}</tr>
             </thead>
             <tbody>
-              {bucket.people.map((person) => <tr key={person.id} data-testid={`row-candidate-${person.id}`} className="border-t border-border/70">
+              {people.map((person) => <tr key={person.id} data-testid={`row-candidate-${person.id}`} className="border-t border-border/70">
                 {columns.map((column) => <td key={column} className={column === 'name' ? 'px-3 py-2.5 font-semibold' : column === 'reason' ? 'px-3 py-2.5 text-muted-foreground' : 'px-3 py-2.5 font-mono-ui text-muted-foreground'}>
                   {column === 'name' && person.full_name}
                   {column === 'employee_id' && (person.employee_id ?? '—')}

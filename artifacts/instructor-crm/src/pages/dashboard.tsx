@@ -1,8 +1,8 @@
 import { Briefcase, Building2, GraduationCap, RefreshCw, UsersRound, X } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useGetReportsInstructors, getGetReportsInstructorsQueryKey, type AccessSplit, type InstructorSummary } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
-import { PageIntro, QueryError, SkeletonBlock, DownloadCsvButton } from '@/components/ui-pieces';
+import { PageIntro, QueryError, SkeletonBlock, DownloadCsvButton, TableSearchInput } from '@/components/ui-pieces';
 import { downloadCsv, slugify, toCsv } from '@/lib/csv';
 
 function formatKpi(value: number | undefined) {
@@ -155,6 +155,17 @@ function AccessDrilldown({ label, category, split, tab, onTabChange, onClose }: 
   const tabCount = (key: AccessTabKey) => key === 'all'
     ? (split?.darwin_only?.count ?? 0) + (split?.both?.count ?? 0) + (split?.teachos_only?.count ?? 0)
     : split?.[key]?.count;
+  // Search box (2026-09-24, per request: "where ever there are tables in
+  // the application add search option to search for any person") -- matches
+  // name or employee ID, same fields the Instructors tab's own search
+  // already checks. Filters both what renders below AND what "Download CSV"
+  // exports (same precedent as instructors.tsx's own search).
+  const [search, setSearch] = useState('');
+  const filteredPeople = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return people;
+    return people.filter((p) => p.full_name.toLowerCase().includes(query) || (p.employee_id ?? '').toLowerCase().includes(query));
+  }, [people, search]);
   // Designation (Darwin's "Designation" column, see reports.ts's
   // toApiInstructorSummary) used to be surfaced only for the Operations
   // team drill-down (2026-09-07). Now shown for every category (2026-09-09,
@@ -182,7 +193,7 @@ function AccessDrilldown({ label, category, split, tab, onTabChange, onClose }: 
   // InstructorSummary at all.
   const handleDownload = () => {
     const headers = ['Name', ...(showDesignation ? ['Designation'] : []), 'Employee ID', category === 'ops_team' ? 'Department' : 'Subject', ...(showDepartmentColumn ? ['Department'] : []), 'Campus', 'Capability Manager', 'Manager (Darwin)'];
-    const rows = people.map((p) => [
+    const rows = filteredPeople.map((p) => [
       p.full_name,
       ...(showDesignation ? [p.designation ?? ''] : []),
       p.employee_id ?? '',
@@ -201,8 +212,9 @@ function AccessDrilldown({ label, category, split, tab, onTabChange, onClose }: 
         <p className="font-mono-ui text-[10px] uppercase tracking-[0.17em] text-muted-foreground">{label} — by data source</p>
         <h2 className="mt-1 text-[16px] font-extrabold tracking-[-0.03em]">Who has access where</h2>
       </div>
-      <div className="flex items-center gap-2">
-        <DownloadCsvButton onClick={handleDownload} disabled={people.length === 0} testId="button-download-access-drilldown" />
+      <div className="flex flex-wrap items-center gap-2">
+        {people.length > 0 && <TableSearchInput value={search} onChange={setSearch} testId="input-search-access-drilldown" />}
+        <DownloadCsvButton onClick={handleDownload} disabled={filteredPeople.length === 0} testId="button-download-access-drilldown" />
         <button type="button" data-testid="button-close-access-drilldown" onClick={onClose} className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-[11px] font-bold text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
           <X size={13} /> Close
         </button>
@@ -237,7 +249,7 @@ function AccessDrilldown({ label, category, split, tab, onTabChange, onClose }: 
           </tr>
         </thead>
         <tbody>
-          {people.map((p) => <tr key={p.id} className="border-t border-border/70">
+          {filteredPeople.map((p) => <tr key={p.id} className="border-t border-border/70">
             <td className="px-3 py-2 font-semibold">{p.full_name}</td>
             {showDesignation && <td className="px-3 py-2 text-muted-foreground">{p.designation ?? '—'}</td>}
             <td className="px-3 py-2 font-mono-ui text-muted-foreground">{p.employee_id ?? '—'}</td>
@@ -247,7 +259,7 @@ function AccessDrilldown({ label, category, split, tab, onTabChange, onClose }: 
             <td className="px-3 py-2 text-muted-foreground">{p.capability_manager ?? '—'}</td>
             <td className="px-3 py-2 text-muted-foreground">{p.darwin_manager ?? '—'}</td>
           </tr>)}
-          {people.length === 0 && <tr><td colSpan={6 + (showDesignation ? 1 : 0) + (showDepartmentColumn ? 1 : 0)} className="px-3 py-8 text-center text-muted-foreground">No one in this bucket.</td></tr>}
+          {filteredPeople.length === 0 && <tr><td colSpan={6 + (showDesignation ? 1 : 0) + (showDepartmentColumn ? 1 : 0)} className="px-3 py-8 text-center text-muted-foreground">{people.length === 0 ? 'No one in this bucket.' : 'No one matches this search.'}</td></tr>}
         </tbody>
       </table>
     </div>

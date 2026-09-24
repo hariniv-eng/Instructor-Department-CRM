@@ -1,6 +1,7 @@
+import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { RefreshCw, Users } from 'lucide-react';
-import { PageIntro, EmptyState, QueryError, SkeletonBlock, TopStat, TablePager, usePagedRows, formatKpi } from '@/components/ui-pieces';
+import { PageIntro, EmptyState, QueryError, SkeletonBlock, TopStat, TablePager, TableSearchInput, usePagedRows, formatKpi } from '@/components/ui-pieces';
 
 // A flat, unreconciled dump of Darwin's full company roster (2026-09-18, per
 // request: "I don't need any breakdown there, I just want to see the whole
@@ -10,11 +11,17 @@ import { PageIntro, EmptyState, QueryError, SkeletonBlock, TopStat, TablePager, 
 // reports.ts). `columns` is derived server-side from whatever fields are
 // actually present rather than hardcoded, so this table always matches
 // whatever darwinbox.ts's ALIASES list currently maps.
-// No summary card or search box on this page, but the table itself is now
-// paginated client-side (2026-09-19, per request: "can we apply the pager
-// logic for the darwin full rooster and also the darwin exit tabs tables")
-// via usePagedRows/TablePager (ui-pieces.tsx) -- the API still returns every
-// row in one response, this just slices what's shown at a time.
+// No summary card on this page, but the table itself is paginated
+// client-side (2026-09-19, per request: "can we apply the pager logic for
+// the darwin full rooster and also the darwin exit tabs tables") via
+// usePagedRows/TablePager (ui-pieces.tsx) -- the API still returns every row
+// in one response, this just slices what's shown at a time. A search box
+// (2026-09-24, per request: "where ever there are tables in the application
+// add search option to search for any person") filters those rows before
+// pagination -- since `columns` is dynamic here (whatever fields Darwin's
+// roster actually has, not a fixed name/employee_id shape), the search
+// matches against EVERY column's value rather than a specific one, so
+// typing a name matches regardless of which column it lives in.
 type DarwinFullRoster = {
   count: number;
   columns: string[];
@@ -44,7 +51,13 @@ export default function DarwinFullRosterPage() {
   const query = useDarwinFullRoster();
   const data = query.data;
   const refresh = () => queryClient.invalidateQueries({ queryKey: QUERY_KEY });
-  const pager = usePagedRows(data?.rows ?? [], 50);
+  const [search, setSearch] = useState('');
+  const searchedRows = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query || !data) return data?.rows ?? [];
+    return data.rows.filter((row) => data.columns.some((column) => cellText(row[column]).toLowerCase().includes(query)));
+  }, [data, search]);
+  const pager = usePagedRows(searchedRows, 50);
 
   return <div className="mx-auto max-w-[1500px]">
     <PageIntro
@@ -57,19 +70,25 @@ export default function DarwinFullRosterPage() {
     {query.isLoading && <SkeletonBlock className="h-[520px]" />}
     {query.isError && <QueryError message="Darwin Full Roster is unavailable right now." />}
 
-    {data && <div className="mb-6 grid max-w-xs grid-cols-1">
-      <TopStat
-        label="Total employees (Darwin)"
-        value={formatKpi(data.count)}
-        meta={data.synced_at ? `As of last sync -- ${new Date(data.synced_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' })}` : 'Sync time unavailable'}
-        icon={<Users size={16} />}
-        tone="navy"
-      />
+    {data && <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+      <div className="grid max-w-xs grid-cols-1">
+        <TopStat
+          label="Total employees (Darwin)"
+          value={formatKpi(data.count)}
+          meta={data.synced_at ? `As of last sync -- ${new Date(data.synced_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' })}` : 'Sync time unavailable'}
+          icon={<Users size={16} />}
+          tone="navy"
+        />
+      </div>
+      {data.count > 0 && <TableSearchInput value={search} onChange={setSearch} testId="input-search-darwin-full-roster" />}
     </div>}
 
-    {data && (data.count === 0
-      ? <EmptyState title="No full-roster data yet" description="Sync Darwinbox (or upload a full-roster CSV) to see every record here." />
-      : <div className="rounded-lg border border-border">
+    {data && data.count === 0 && <EmptyState title="No full-roster data yet" description="Sync Darwinbox (or upload a full-roster CSV) to see every record here." />}
+
+    {data && data.count > 0 && searchedRows.length === 0 && <EmptyState title="No one matches this search" description="Try a broader search or clear the search box." />}
+
+    {data && data.count > 0 && searchedRows.length > 0 && (
+      <div className="rounded-lg border border-border">
         <div className="overflow-x-auto">
           <table className="w-max min-w-full border-collapse text-left">
             <thead>
