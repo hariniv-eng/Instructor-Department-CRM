@@ -3,6 +3,7 @@ import { db, instructorsTable, darwinboxFullRosterTable, darwinboxExitsTable, in
 import { requireAuth, requireRole } from "../middlewares/auth";
 import { cell } from "../lib/reconcile";
 import { TRAINING_COURSE_TAXONOMY } from "../data/trainingCourseTaxonomy";
+import { TECH_AREAS } from "../lib/departmentTaxonomy";
 
 const router: IRouter = Router();
 
@@ -940,6 +941,17 @@ router.get("/reports/training-stats", requireAuth, requireRole("admin"), async (
       department: p.department,
       capability_manager: p.teachosManager || p.manualCapabilityManager || null,
       classification: p.classification,
+      // Added 2026-09-24, per request ("if I'm trying to open only tech, to
+      // only see the tech-related instructors") -- same computed-then-manual
+      // fallback pattern as dept_area on /reports/instructors (toApiInstructorSummary),
+      // used by the frontend to filter WHICH ROWS show on each of the Tech /
+      // Math and Aptitude / English sub-tabs. null means classifyDepartment()
+      // couldn't resolve an area for this person (e.g. a flat "Mentors"
+      // department string with no sub-area, or missing Darwin data) -- they
+      // won't appear on any of the 3 subject tabs until a human fills in
+      // Manual Subject for them (same PATCH /instructors/:id/subject path
+      // the Instructors tab already uses).
+      subject_area: p.deptArea || p.manualDeptArea || null,
       has_training_data: hasTrainingData,
       courses,
     };
@@ -947,6 +959,10 @@ router.get("/reports/training-stats", requireAuth, requireRole("admin"), async (
 
   res.json({
     taxonomy: TRAINING_COURSE_TAXONOMY,
+    // Hands the frontend the authoritative "which areas count as Tech" list
+    // (see TECH_AREAS in departmentTaxonomy.ts) instead of it hardcoding a
+    // copy that could drift out of sync.
+    tech_areas: TECH_AREAS,
     count: rows.length,
     rows,
     synced_at: statusRows[0]?.syncedAt ?? null,

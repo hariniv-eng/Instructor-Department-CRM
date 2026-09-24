@@ -73,6 +73,16 @@ const RULES: Rule[] = [
 // recognizes. Derived rather than hand-duplicated on purpose.
 export const SUBJECT_AREAS: string[] = [...new Set(RULES.map((rule) => rule.area).filter((area): area is string => !!area))];
 
+// Same idea, narrowed to just the "tech" bucket's areas (2026-09-24, added
+// for the Training Stats page's per-subject tabs -- "if I'm trying to open
+// only tech, to only see the tech-related instructors"). Exported so
+// GET /reports/training-stats can hand this list to the frontend instead of
+// it hardcoding which areas count as "Tech", which would drift out of sync
+// with RULES above the same way SUBJECT_AREAS avoids drifting.
+export const TECH_AREAS: string[] = [
+  ...new Set(RULES.filter((rule) => rule.bucket === "tech").map((rule) => rule.area).filter((area): area is string => !!area)),
+];
+
 // Coarse fallback when there's no usable Darwin `department` string at all
 // (e.g. a TeachOS-only instructor who never matched Darwin) — TeachOS's own
 // `category` field (teachosCategory) at least gives Tech vs Non-tech, just
