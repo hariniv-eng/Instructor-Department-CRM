@@ -24,8 +24,14 @@ try {
   console.error(`Could not load ${envPath}:`, e instanceof Error ? e.message : e);
 }
 
-const tableArg = process.argv[2];
-const column = process.argv[3];
+// Filters out a literal "--" separator: some pnpm/shell combinations (seen
+// on Replit via PowerShell-invoked pnpm --filter ... run ... -- <args>)
+// don't strip it before forwarding, leaving process.argv[2] as "--" itself
+// rather than the intended first real argument. Safe either way this is
+// invoked.
+const args = process.argv.slice(2).filter((a) => a !== "--");
+const tableArg = args[0];
+const column = args[1];
 
 if (!tableArg || !column) {
   console.error(

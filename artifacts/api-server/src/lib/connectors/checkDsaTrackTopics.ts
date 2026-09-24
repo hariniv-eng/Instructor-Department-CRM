@@ -19,7 +19,12 @@ try {
   console.error(`Could not load ${envPath}:`, e instanceof Error ? e.message : e);
 }
 
-const key = process.argv[2];
+// Filters out a literal "--" separator: some pnpm/shell combinations (seen
+// on Replit via PowerShell-invoked pnpm --filter ... run ... -- <arg>) don't
+// strip it before forwarding, leaving process.argv[2] as "--" itself rather
+// than the intended first real argument. Safe either way this is invoked.
+const args = process.argv.slice(2).filter((a) => a !== "--");
+const key = args[0];
 
 if (!key || !["dsa", "dia", "ips"].includes(key)) {
   console.error("Usage: pnpm --filter @workspace/api-server run check:dsa-track-topics -- <dsa|dia|ips>");
