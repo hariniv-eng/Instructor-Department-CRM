@@ -133,8 +133,17 @@ async function loadLatestExitsByPerson(): Promise<{ byEmployeeId: Map<string, Ex
   for (const exit of exits) {
     const status = cell(exit.rawData, "Status", "status");
     const exitDate = cell(exit.rawData, "Exit Date", "exit_date");
-    const department = cell(exit.rawData, "Department", "Current Department", "Top Department", "department");
-    const designation = cell(exit.rawData, "Designation", "Current Designation", "designation");
+    // "Current Department"/"Current Designation" now checked FIRST, ahead of
+    // the plain "Department"/"Designation" fields (2026-09-24, per request:
+    // department/designation for payroll-converted instructors should come
+    // from the exit record's Current fields, not the possibly-stale plain
+    // ones). Safe to change here rather than scoping it further down in
+    // recomputeStatuses(): department/designation off this ExitInfo are only
+    // ever read for the isTeachosOnlyLeftover (payroll-converted) population
+    // — see the exitDeptInfo/classification block below — so this priority
+    // flip only affects payroll-converted instructors, nobody else.
+    const department = cell(exit.rawData, "Current Department", "Department", "Top Department", "department");
+    const designation = cell(exit.rawData, "Current Designation", "Designation", "designation");
     const gender = cell(exit.rawData, "Gender", "gender");
     const info: ExitInfo = { status, exitDate, department, designation, gender };
     const rank = parseLooseDate(exitDate);
