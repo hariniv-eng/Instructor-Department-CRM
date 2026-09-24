@@ -9,9 +9,19 @@ import { PageIntro, EmptyState, QueryError, SkeletonBlock, TopStat, TablePager, 
 // niat_instructor_unit_wise_completion_and_best_attempt_details, aggregated
 // server-side per (instructor, tracked course) -- see fetchCourseStatusRows
 // in api-server/src/lib/connectors/instructorLearningStatus.ts and GET
-// /reports/training-stats in reports.ts. Matches the layout of
-// Ankush's own reference sheet: 5 track groups (Frontend Development,
-// Backend Development, DSA, Gen AI, DSML), each with several named courses.
+// /reports/training-stats in reports.ts.
+//
+// Split into 4 SUB-TABS (2026-09-24, per request -- "tech separate, math
+// and aptitude separate, and also english separate" / "keep ... buttons:
+// tech, aptitude, math, english"): Tech groups the original 5 track groups
+// (Frontend Development, Backend Development, DSA, Gen AI, DSML) matching
+// Ankush's reference sheet; Aptitude and Math are their own track groups
+// added the same day; English has no taxonomy columns yet (still waiting on
+// Ankush's course list) -- its tab renders with an explanatory empty state
+// rather than being hidden, since all 4 buttons should always be visible.
+// All 4 tabs share the SAME instructor population (Instructors + Mentors,
+// confirmed 2026-09-24 -- no separate classification/department filter per
+// tab) -- only the COLUMNS shown differ per tab, not the rows/instructors.
 //
 // Scoped to Instructors + Mentors only, identified by employee_id (per
 // request) -- Delivery Support / Instructor Team Operations / other-
@@ -44,6 +54,19 @@ type TrainingStatsResponse = {
 };
 
 const QUERY_KEY = ['reports', 'training-stats'];
+
+// The 4 sub-tab buttons, each naming which track group(s) from the taxonomy
+// it pulls columns from. "english" intentionally maps to a track group name
+// that doesn't exist in TRAINING_COURSE_TAXONOMY yet (see backend
+// trainingCourseTaxonomy.ts) -- that's expected until Ankush's English
+// course list is confirmed, and is handled below as an empty tab rather
+// than an error.
+const SUB_TABS: { key: string; label: string; trackGroups: string[] }[] = [
+  { key: 'tech', label: 'Tech', trackGroups: ['Frontend Development', 'Backend Development', 'DSA', 'Gen AI', 'DSML'] },
+  { key: 'aptitude', label: 'Aptitude', trackGroups: ['Aptitude'] },
+  { key: 'math', label: 'Math', trackGroups: ['Math'] },
+  { key: 'english', label: 'English', trackGroups: ['English'] },
+];
 
 function useTrainingStats() {
   return useQuery<TrainingStatsResponse>({
@@ -99,6 +122,7 @@ export default function TrainingStatsPage() {
   const data = query.data;
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  const [activeTab, setActiveTab] = useState(SUB_TABS[0].key);
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: QUERY_KEY });
 
@@ -121,9 +145,14 @@ export default function TrainingStatsPage() {
     }
   };
 
+  const activeSubTab = SUB_TABS.find((t) => t.key === activeTab) ?? SUB_TABS[0];
+  // Same instructor population/rows for every sub-tab -- only which taxonomy
+  // columns are shown changes. Re-derived per tab so page 2 of Tech doesn't
+  // carry over confusingly into Aptitude's row list.
+  const activeTaxonomy = data ? data.taxonomy.filter((d) => activeSubTab.trackGroups.includes(d.trackGroup)) : [];
   const pager = usePagedRows(data?.rows ?? [], 50);
-  const groups = data ? groupByTrack(data.taxonomy) : [];
-  const pendingCount = data ? data.taxonomy.filter((d) => d.courseTitles.length === 0).length : 0;
+  const groups = groupByTrack(activeTaxonomy);
+  const pendingCount = activeTaxonomy.filter((d) => d.courseTitles.length === 0).length;
 
   return <div className="mx-auto max-w-[1600px]">
     <PageIntro
@@ -137,6 +166,18 @@ export default function TrainingStatsPage() {
     />
 
     {syncMessage && <p data-testid="status-sync-training-status" className={`mb-4 max-w-2xl rounded-lg px-3 py-2 text-[12px] font-semibold ${syncMessage.ok ? 'bg-[#e5f3ed] text-[#287469]' : 'bg-[#fff0ec] text-[#9b4434]'}`}>{syncMessage.text}</p>}
+
+    <div className="mb-6 flex flex-wrap gap-2 border-b border-border pb-3">
+      {SUB_TABS.map((tab) => <button
+        key={tab.key}
+        type="button"
+        data-testid={`button-tab-${tab.key}`}
+        onClick={() => setActiveTab(tab.key)}
+        className={`rounded-full px-4 py-2 text-[12px] font-bold transition-colors ${tab.key === activeTab ? 'bg-primary text-primary-foreground shadow-sm' : 'bg-secondary text-muted-foreground hover:text-foreground'}`}
+      >
+        {tab.label}
+      </button>)}
+    </div>
 
     {query.isLoading && <SkeletonBlock className="h-[520px]" />}
     {query.isError && <QueryError message="Training Stats is unavailable right now." />}
@@ -152,10 +193,15 @@ export default function TrainingStatsPage() {
     </div>}
 
     {data && pendingCount > 0 && <p className="mb-6 max-w-3xl text-[12px] leading-relaxed text-muted-foreground">
-      <strong className="font-semibold text-foreground">{pendingCount} column{pendingCount === 1 ? '' : 's'}</strong> ({data.taxonomy.filter((d) => d.courseTitles.length === 0).map((d) => d.label).join(', ')}) don't have a confirmed course mapping yet and show as "Mapping pending" for everyone -- see Instructor_Learning_Status_Course_Mapping_Review.xlsx.
+      <strong className="font-semibold text-foreground">{pendingCount} column{pendingCount === 1 ? '' : 's'}</strong> ({activeTaxonomy.filter((d) => d.courseTitles.length === 0).map((d) => d.label).join(', ')}) don't have a confirmed course mapping yet and show as "Mapping pending" for everyone -- see Instructor_Learning_Status_Course_Mapping_Review.xlsx.
     </p>}
 
-    {data && (data.count === 0
+    {data && activeTaxonomy.length === 0 && <EmptyState
+      title={`No ${activeSubTab.label} courses configured yet`}
+      description={`The ${activeSubTab.label} tab is ready, but no courses have been mapped to it yet -- let Claude know which courses to track and this tab will populate the same way the others did.`}
+    />}
+
+    {data && activeTaxonomy.length > 0 && (data.count === 0
       ? <EmptyState title="No training-status data yet" description="Click Sync Now to pull the latest from BigQuery." />
       : <div className="rounded-lg border border-border">
         <div className="overflow-x-auto">
@@ -178,7 +224,7 @@ export default function TrainingStatsPage() {
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] font-semibold text-foreground">{row.full_name}</td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-muted-foreground">{row.department || '—'}</td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-muted-foreground">{row.capability_manager || '—'}</td>
-                {data.taxonomy.map((def, i) => <td key={def.key} className={`px-3 py-2.5 text-center ${i === 0 ? 'border-l border-border' : ''}`}><StatusBadge status={row.courses[def.key] ?? 'NO_DATA'} /></td>)}
+                {activeTaxonomy.map((def, i) => <td key={def.key} className={`px-3 py-2.5 text-center ${i === 0 ? 'border-l border-border' : ''}`}><StatusBadge status={row.courses[def.key] ?? 'NO_DATA'} /></td>)}
               </tr>)}
             </tbody>
           </table>
