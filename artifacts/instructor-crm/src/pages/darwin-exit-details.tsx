@@ -1,6 +1,7 @@
+import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { RefreshCw, Users, Building2 } from 'lucide-react';
-import { PageIntro, EmptyState, QueryError, SkeletonBlock, TopStat, TablePager, usePagedRows, formatKpi } from '@/components/ui-pieces';
+import { PageIntro, EmptyState, QueryError, SkeletonBlock, TopStat, TablePager, TableSearchInput, usePagedRows, formatKpi } from '@/components/ui-pieces';
 
 // Full joined exit-record dump (2026-09-19, per request: "the darwin data
 // report id that we are using is limited to few details of data only ...
@@ -78,7 +79,20 @@ export default function DarwinExitDetailsPage() {
   // -- see usePagedRows/TablePager in ui-pieces.tsx. Only paginates the main
   // exit-records table below; the small department_breakdown list above is
   // short enough to show in full.
-  const pager = usePagedRows(data?.rows ?? [], 50);
+  //
+  // Search box (2026-09-24, per request: "where ever there are tables in
+  // the application add search option to search for any person") -- same
+  // approach as darwin-full-roster.tsx: `columns` here is dynamic (whatever
+  // the base + enrichment reports actually returned), so the search matches
+  // against every column's value rather than one fixed "name" field. Only
+  // filters the main exit-records table, not the small department list.
+  const [search, setSearch] = useState('');
+  const searchedRows = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query || !data) return data?.rows ?? [];
+    return data.rows.filter((row) => data.columns.some((column) => cellText(row[column]).toLowerCase().includes(query)));
+  }, [data, search]);
+  const pager = usePagedRows(searchedRows, 50);
 
   return <div className="mx-auto max-w-[1500px]">
     <PageIntro
@@ -91,14 +105,17 @@ export default function DarwinExitDetailsPage() {
     {query.isLoading && <SkeletonBlock className="h-[520px]" />}
     {query.isError && <QueryError message="Darwin Exit Details is unavailable right now." />}
 
-    {data && <div className="mb-3 grid max-w-xs grid-cols-1">
-      <TopStat
-        label="Instructor-team exit records"
-        value={formatKpi(data.count)}
-        meta={data.synced_at ? `As of last sync -- ${new Date(data.synced_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' })}` : 'Sync time unavailable'}
-        icon={<Users size={16} />}
-        tone="navy"
-      />
+    {data && <div className="mb-3 flex flex-wrap items-end justify-between gap-4">
+      <div className="grid max-w-xs grid-cols-1">
+        <TopStat
+          label="Instructor-team exit records"
+          value={formatKpi(data.count)}
+          meta={data.synced_at ? `As of last sync -- ${new Date(data.synced_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' })}` : 'Sync time unavailable'}
+          icon={<Users size={16} />}
+          tone="navy"
+        />
+      </div>
+      {data.count > 0 && <TableSearchInput value={search} onChange={setSearch} testId="input-search-darwin-exit-details" />}
     </div>}
 
     {data && <p className="mb-6 max-w-3xl text-[12px] leading-relaxed text-muted-foreground">
@@ -122,9 +139,12 @@ export default function DarwinExitDetailsPage() {
       </div>
     </div>}
 
-    {data && (data.count === 0
-      ? <EmptyState title="No exit records yet" description="Run the Exits sync (Source uploads) to pull the base exit report and its enrichment reports." />
-      : <div className="rounded-lg border border-border">
+    {data && data.count === 0 && <EmptyState title="No exit records yet" description="Run the Exits sync (Source uploads) to pull the base exit report and its enrichment reports." />}
+
+    {data && data.count > 0 && searchedRows.length === 0 && <EmptyState title="No one matches this search" description="Try a broader search or clear the search box." />}
+
+    {data && data.count > 0 && searchedRows.length > 0 && (
+      <div className="rounded-lg border border-border">
         <div className="overflow-x-auto">
           <table className="w-max min-w-full border-collapse text-left">
             <thead>
