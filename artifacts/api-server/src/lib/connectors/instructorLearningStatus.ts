@@ -280,6 +280,38 @@ export async function inspectTrainingStatusAggregation(): Promise<void> {
 }
 
 /**
+ * Discovery helper (2026-09-24, per request) -- lists every distinct
+ * topic_title under one specific course_title, with row counts, ordered by
+ * course_unit_order so they read in the actual curriculum sequence. Used
+ * after findCoursesForTopics() below turned up only partial/generic matches
+ * for the DSA-track session names Ankush provided -- this dumps the REAL
+ * topic_title wording for a candidate course so it can be eyeballed against
+ * his syllabus (the two are likely the same content under different exact
+ * phrasing, not a wrong course).
+ */
+export async function listTopicsForCourse(courseTitle: string): Promise<void> {
+  const bq = client();
+  const ref = tableRef(UNIT_COMPLETION_TABLE);
+  const query = `
+    SELECT topic_title, MIN(course_unit_order) AS min_order, COUNT(*) AS row_count
+    FROM \`${ref}\`
+    WHERE course_title = ${bqStringLiteral(courseTitle)}
+    GROUP BY topic_title
+    ORDER BY min_order
+  `;
+  console.log(`Distinct topic_title values under course_title = "${courseTitle}", in curriculum order:`);
+  try {
+    const [rows] = await runWithHardTimeout(() => bq.query({ query }), API_TIMEOUT_MS * 3 + 10000);
+    for (const row of rows as Record<string, unknown>[]) {
+      console.log(`  ${JSON.stringify(row["topic_title"])} -- ${row["row_count"]} rows (order ${row["min_order"]})`);
+    }
+  } catch (e) {
+    if (e instanceof HardTimeout) throw new InstructorLearningStatusError(`Query against ${ref} failed: ${e.message}`);
+    throw new InstructorLearningStatusError(`Query against ${ref} failed: ${(e as Error).message}`);
+  }
+}
+
+/**
  * Discovery helper (2026-09-24, per request) for resolving the three still-
  * pending DSA-track taxonomy columns (dsa, dia, ips -- see
  * trainingCourseTaxonomy.ts). Ankush provided the real "Session Name" values
