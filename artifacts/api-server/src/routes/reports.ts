@@ -844,7 +844,13 @@ router.get("/reports/darwin-exit-details", requireAuth, requireRole("admin"), as
     `${allStored.length - instructorTeamCount} did not match an Instructor-team department at all (see department_breakdown for the full split)`
   );
 
-  const columns: string[] = pinIdentityColumnsFirst(collectDynamicColumns(stored));
+  // "Current Department" dropped from this table's display (2026-09-26, per
+  // request: "remove the current department table that we have") -- it's
+  // still read from rawData elsewhere (reconcile.ts's payroll-converted
+  // department/designation fix, and the INSTRUCTOR_DEPARTMENT_FIELD_ALIASES
+  // fallback above), just no longer shown as its own column here. Darwin
+  // Full Roster is untouched -- this filter is scoped to this route only.
+  const columns: string[] = pinIdentityColumnsFirst(collectDynamicColumns(stored)).filter((column) => column !== "Current Department");
   const rows = stored.map((r) => {
     const data = r.rawData as Record<string, unknown>;
     const row: Record<string, unknown> = {};
