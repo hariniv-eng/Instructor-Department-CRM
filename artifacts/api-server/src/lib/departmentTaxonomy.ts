@@ -85,13 +85,25 @@ export const TECH_AREAS: string[] = [
 
 // Coarse fallback when there's no usable Darwin `department` string at all
 // (e.g. a TeachOS-only instructor who never matched Darwin) — TeachOS's own
-// `category` field (teachosCategory) at least gives Tech vs Non-tech, just
-// without a specific sub-area.
-const CATEGORY_FALLBACK: Record<string, Exclude<DeptBucket, null>> = {
-  TECH: "tech",
-  ENGLISH: "non_tech",
-  APTITUDE: "non_tech",
-  MATH: "non_tech",
+// `category` field (teachosCategory) gives Tech vs Non-tech, and for three
+// of the four values it's actually specific enough to resolve a real
+// Subject/area, not just the coarse bucket: TeachOS's ENGLISH/APTITUDE/MATH
+// categories map 1:1 onto three of the non-tech SUBJECT_AREAS above
+// (2026-09-26, per request: "for instructors who's subject is missing check
+// the instructor_category is english, aptitude or math take it from there").
+// This only ever runs when there's no Darwin-matched area to begin with (see
+// classifyDepartment below — this fallback is reached only after the RULES
+// loop over an actual `department` string found nothing), so it can only
+// fill in a genuinely missing Subject, never override one Darwin already
+// resolved. TECH deliberately keeps area: null — it covers four sub-areas
+// (Frontend/Backend/DSA/GenAI) that TeachOS's category alone can't tell
+// apart, so that case is deliberately left for the Manual Subject control
+// instead of guessing ("if it is tech just keep the manual entry").
+const CATEGORY_FALLBACK: Record<string, { bucket: Exclude<DeptBucket, null>; area: string | null }> = {
+  TECH: { bucket: "tech", area: null },
+  ENGLISH: { bucket: "non_tech", area: "English" },
+  APTITUDE: { bucket: "non_tech", area: "Aptitude" },
+  MATH: { bucket: "non_tech", area: "Math" },
 };
 
 export function classifyDepartment(
@@ -123,7 +135,7 @@ export function classifyDepartment(
   }
   const category = (teachosCategory ?? "").trim().toUpperCase();
   if (category && CATEGORY_FALLBACK[category])
-    return { bucket: CATEGORY_FALLBACK[category], area: null };
+    return CATEGORY_FALLBACK[category];
   return { bucket: null, area: null };
 }
 
