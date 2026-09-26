@@ -6,7 +6,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Link } from 'wouter';
 import { PageIntro, EmptyState, QueryError, SkeletonBlock, DownloadCsvButton, MiniStat, pct } from '@/components/ui-pieces';
 import { downloadCsv, slugify, toCsv } from '@/lib/csv';
-import { useAuth } from '@/hooks/use-auth';
 import { toast } from '@/hooks/use-toast';
 
 // Manual-entry saves (Gender/Exit Verification/Subject below) used to fail
@@ -906,14 +905,20 @@ function BifurcationCell({ person }: { person: InstructorSummary }) {
 // rows never had a Subject column, and their null dept_area is
 // intentional, not a gap this editor should fill.
 //
-// Admin-only, same gating as CapabilityManagerCell above (no separate
-// Manager login anymore, so `user` truthy means signed in as Admin). See
-// the dedicated PATCH /instructors/:id/subject route. Same
+// Reachable by either Admin or Manager, same population as Gender/Exit
+// above (2026-09-26, per request: "make sure the manual entry is also
+// accessed by the manager access") -- see the dedicated PATCH
+// /instructors/:id/subject route (requireAuth removed entirely). This
+// used to also gate on `user` being signed in (there being no separate
+// Manager login, `user` truthy meant Admin), which hid the dropdown
+// completely for unauthenticated Manager view -- now that the backend
+// route accepts unauthenticated requests too, that gate is gone; the
+// only remaining reason this renders read-only is a resolved Subject
+// (dept_area_source === 'computed'), same as before. Same
 // preventDefault + stopPropagation requirement as GenderCell above (the
 // whole row is a wouter <Link>, rendered as a real <a href=...> -- see
 // GenderCell's comment for why stopPropagation alone isn't enough).
 function SubjectCell({ person }: { person: InstructorSummary }) {
-  const { user } = useAuth();
   const queryClient = useQueryClient();
   const updateSubject = useUpdateInstructorSubject({
     mutation: {
@@ -930,18 +935,8 @@ function SubjectCell({ person }: { person: InstructorSummary }) {
   // been set manually either -- flagged distinctly (not just a blank/dash)
   // so a gap in this data is easy to spot at a glance while scanning the
   // table.
-  //
-  // The !user branch (2026-09-26, per report: manual entry on this field
-  // "not working") used to render identically to the computed/read-only
-  // case, with nothing distinguishing "this can't be edited" from "you're
-  // not signed in as Admin, so you can't edit it right now" -- someone
-  // browsing unauthenticated (e.g. Manager view, which never carries a
-  // session -- see App.tsx's Guard comment) would just see a plain "Missing"
-  // badge with no dropdown and no indication why, easy to mistake for a
-  // broken control rather than an access restriction. The title attribute
-  // below is the fix: same visual, but hovering it now says so.
-  if (person.dept_area_source === 'computed' || !user) {
-    return <div className="truncate text-[12px]" title={!user ? 'Sign in as Admin to set this' : undefined}>{person.dept_area ? <span className="text-muted-foreground">{person.dept_area}</span> : <span className="inline-flex rounded-full bg-[#fff7db] px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] text-[#8b6207]">Missing</span>}</div>;
+  if (person.dept_area_source === 'computed') {
+    return <div className="truncate text-[12px]">{person.dept_area ? <span className="text-muted-foreground">{person.dept_area}</span> : <span className="inline-flex rounded-full bg-[#fff7db] px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] text-[#8b6207]">Missing</span>}</div>;
   }
 
   const value = person.dept_area_source === 'manual' && person.dept_area ? person.dept_area : '';
