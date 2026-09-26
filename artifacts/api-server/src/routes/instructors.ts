@@ -151,12 +151,20 @@ router.patch("/instructors/:id", requireAuth, requireRole("admin"), async (req, 
 // Manual Gender is its own narrower endpoint, separate from the general
 // PATCH /instructors/:id above -- that one edits Manual Status, Exit Date,
 // etc. and is deliberately Admin-only. Gender was asked to be editable by
-// EITHER role (Admin or Manager), same population requireAuth alone already
-// covers (see middlewares/auth.ts) -- a dedicated route keeps that wider
-// access scoped to just this one low-stakes field instead of loosening the
-// other, more sensitive manual fields to the Manager role too (2026-09-09,
-// per request).
-router.patch("/instructors/:id/gender", requireAuth, async (req, res): Promise<void> => {
+// EITHER role (Admin or Manager) (2026-09-09, per request) -- a dedicated
+// route keeps that wider access scoped to just this one low-stakes field
+// instead of loosening the other, more sensitive manual fields to Manager
+// too. Public, no requireAuth (2026-09-26, per request: "make sure the
+// manual entry is also accessed by the manager access") -- this used to sit
+// behind requireAuth alone, which worked as "either role" back when Manager
+// had its own login, but since that Manager login was removed (2026-09,
+// "no Manager login anymore" -- see App.tsx's Guard comment), Manager view
+// never carries a session at all, so requireAuth had silently become
+// Admin-only in practice, exactly contradicting this comment's own stated
+// intent. Dropped entirely so Manager view (unauthenticated, per its
+// design) can actually reach this, matching how the base GET routes in this
+// same router are already public for the same reason (see routes/index.ts).
+router.patch("/instructors/:id/gender", async (req, res): Promise<void> => {
   const raw = (req.body as { manual_gender?: string | null }).manual_gender;
   if (raw !== "male" && raw !== "female" && raw !== null) {
     res.status(400).json({ error: 'manual_gender must be "male", "female", or null' });
@@ -200,10 +208,11 @@ router.patch("/instructors/:id/capability-manager", requireAuth, requireRole("ad
 // TeachOS-only row with no Darwin match at all -- a human who knows the
 // person's real teaching area can mark it here instead, constrained to
 // departmentTaxonomy.ts's own SUBJECT_AREAS rather than free text, so this
-// can't drift into an area name the taxonomy doesn't recognize. Admin-only,
-// same as Capability Manager above -- no explicit ask to widen this one to
-// Manager either.
-router.patch("/instructors/:id/subject", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {
+// can't drift into an area name the taxonomy doesn't recognize. Was
+// Admin-only; opened up to Manager too (2026-09-26, per request), same
+// reasoning as Gender above -- dropped requireAuth/requireRole entirely
+// since Manager view carries no session to check in the first place.
+router.patch("/instructors/:id/subject", async (req, res): Promise<void> => {
   const raw = (req.body as { manual_dept_area?: string | null }).manual_dept_area;
   if (raw !== null && !SUBJECT_AREAS.includes(raw as string)) {
     res.status(400).json({ error: "manual_dept_area must be one of departmentTaxonomy.ts's recognized area names, or null" });
@@ -224,10 +233,13 @@ const EXIT_VERIFICATION_VALUES = ["exited", "serving_notice_period", "payroll_co
 // see below): lets a Capability Manager record their read on an
 // exit-flagged record -- exited / serving notice period / payroll converted
 // / absconded -- directly from the Exit column on the Instructors tab
-// table. Reachable by either Admin or Manager (requireAuth only, no
-// requireRole), same population as Gender above -- there was an explicit
-// ask for Capability Managers themselves to be able to set this, and
-// Manager is the role without an Admin login. Deliberately does NOT touch
+// table. Reachable by either Admin or Manager, same population as Gender
+// above -- there was an explicit ask for Capability Managers themselves to
+// be able to set this. Public, no requireAuth (2026-09-26, per request --
+// see Gender's comment above for the full reasoning: Manager view carries
+// no session at all since its own login was removed, so requireAuth here
+// had quietly become Admin-only, blocking exactly the access this comment
+// already said it should have). Deliberately does NOT touch
 // manualStatus/computedStatus: this is a tracking label only, same
 // "flag, don't subtract" philosophy as exitFlag itself (see
 // recomputeStatuses() and its comment in the schema) -- actually excluding
@@ -244,7 +256,7 @@ const EXIT_VERIFICATION_VALUES = ["exited", "serving_notice_period", "payroll_co
 // exit_verification of "revoked" from before this change keeps being
 // excluded from the Exception queue (reports.ts still checks for it), it
 // just can no longer be newly set through this dropdown/endpoint.
-router.patch("/instructors/:id/exit-verification", requireAuth, async (req, res): Promise<void> => {
+router.patch("/instructors/:id/exit-verification", async (req, res): Promise<void> => {
   const raw = (req.body as { exit_verification?: string | null }).exit_verification;
   if (raw !== null && !EXIT_VERIFICATION_VALUES.includes(raw as (typeof EXIT_VERIFICATION_VALUES)[number])) {
     res.status(400).json({ error: 'exit_verification must be "exited", "serving_notice_period", "payroll_converted", "absconded", or null' });
