@@ -749,107 +749,35 @@ router.get("/reports/darwin-full-roster", requireAuth, requireRole("admin"), asy
 // same as darwin-full-roster above rather than hardcoded, since which
 // fields those enrichment reports actually carry isn't fixed ahead of time.
 //
-// Scoping history: briefly scoped to "Top Department === Instructors
-// Department (NWD_ID)" only, reverted to showing every department
-// unfiltered (2026-09-19, per request: "can we go back displaying all exit
-// data in the darwin exit tab"), then scoped again via a startsWith(
-// "instructor") heuristic (2026-09-21, per request: "now need to put
-// filter for only instructor team only ... get data of all the exit
-// people who have current department as 'instructor-...'") -- and finally
-// swapped for this exact allowlist (2026-09-21, same day, per the user
-// pasting the real department values off the page and listing which ones
-// should count). The heuristic was wrong: this table's Department field
-// follows Darwinbox's "NIAT_..." naming (e.g. "NIAT_Instructors_DSA"),
-// not the live roster's "Instructors – Frontend Technologies (NWD_ID_FT)"
-// convention darwinbox.ts's isInstructorRecord() matches -- so
-// startsWith("instructor") silently missed every "NIAT_..." value and
-// only ever caught the one literal "Instructors Department" string. An
-// exact, case-insensitive allowlist of the six real values the user
-// confirmed is safer than guessing at another pattern.
-const INSTRUCTOR_TEAM_DEPARTMENTS = [
-  "NIAT_Instructors & Mentors",
-  "NIAT_Instructors_Aptitude & English",
-  "NIAT_Instructors",
-  "NIAT_Maths Instructors and Mentors",
-  "NIAT_Instructors_DSA",
-  "Instructors Department",
-];
-const INSTRUCTOR_TEAM_DEPARTMENTS_LOWER = new Set(INSTRUCTOR_TEAM_DEPARTMENTS.map((d) => d.toLowerCase()));
-
-const INSTRUCTOR_DEPARTMENT_FIELD_ALIASES = ["Department", "Current Department", "Top Department"];
-
-function findDepartmentValue(rawData: Record<string, unknown> | null): unknown {
-  if (!rawData) return null;
-  const lowerMap = new Map(Object.keys(rawData).map((k) => [k.toLowerCase(), rawData[k]]));
-  for (const alias of INSTRUCTOR_DEPARTMENT_FIELD_ALIASES) {
-    if (alias in rawData && rawData[alias] != null && rawData[alias] !== "") return rawData[alias];
-    const hit = lowerMap.get(alias.toLowerCase());
-    if (hit != null && hit !== "") return hit;
-  }
-  return null;
-}
-
-// Broadened (2026-09-21, per request: "in the exit data also add the
-// instructor-'..' current instructors to the exit data") to ALSO match the
-// OTHER Darwinbox department-naming convention -- the primary Darwin roster
-// style used by darwinbox.ts's isInstructorRecord() ("Instructors – Frontend
-// Technologies (NWD_ID_FT)", em-dash or hyphen), not just the exact NIAT_...
-// values this exit-enrichment data normally carries. The two conventions
-// never collide (none of the six NIAT_/exact values below start with the
-// word "Instructor"), so this is purely additive -- every record the exact
-// allowlist already matched still matches; this just also catches an exit
-// record whose Department field happens to carry the primary-roster spelling
-// instead of the NIAT_ one.
-function isInstructorTeamDepartment(value: unknown): boolean {
-  if (typeof value !== "string") return false;
-  const trimmed = value.trim();
-  if (!trimmed) return false;
-  if (INSTRUCTOR_TEAM_DEPARTMENTS_LOWER.has(trimmed.toLowerCase())) return true;
-  return /^instructors?\b/i.test(trimmed);
-}
-
+// Scoping history: this route has gone back and forth between "every exit,
+// company-wide" and "Instructor-team departments only" several times (see
+// git history/prior comments here for the department-matching heuristics
+// that were tried and discarded along the way). Reverted once more, this
+// time for good (2026-09-27, per request: "we are going to remove all the
+// tables that we have right now ... load all the 3,000+ data that we have
+// for total companies") -- every department's exit records, unfiltered,
+// same as darwin-full-roster's philosophy above. The instructor-team
+// allowlist/regex matching and the department_breakdown diagnostic table
+// that existed purely to sanity-check that filter are removed along with
+// it -- there's no longer a filter to diagnose.
 router.get("/reports/darwin-exit-details", requireAuth, requireRole("admin"), async (_req, res) => {
   const allStored = await db.select().from(darwinboxExitsTable).orderBy(darwinboxExitsTable.id);
 
-  // department_breakdown stays unfiltered/company-wide on purpose (same as
-  // before this scoping change) -- it's what let us catch the earlier "why
-  // did i only get 41" gap, so keeping the full picture visible here means
-  // the same question is answerable at a glance if this filter ever looks
-  // like it's excluding people it shouldn't.
-  const NO_DEPARTMENT_LABEL = "No department on file";
-  const departmentCounts = new Map<string, number>();
-  let instructorTeamCount = 0;
-  let revokedCount = 0;
+  // Revoked means the separation request itself was cancelled/withdrawn --
+  // the person never actually exited, so this row shouldn't show up as an
+  // "exit" at all, regardless of department. This is the only filter left
+  // on this route.
   const stored = allStored.filter((r) => {
     const rawData = r.rawData as Record<string, unknown> | null;
-    const department = findDepartmentValue(rawData);
-    const label = typeof department === "string" && department.trim() ? department.trim() : NO_DEPARTMENT_LABEL;
-    departmentCounts.set(label, (departmentCounts.get(label) ?? 0) + 1);
-    const isInstructorTeam = isInstructorTeamDepartment(department);
-    if (isInstructorTeam) instructorTeamCount++;
-    // Revoked means the separation request itself was cancelled/withdrawn --
-    // the person never actually exited, so this row shouldn't show up as an
-    // "exit" at all, regardless of which department it matched.
     const status = rawData ? cell(rawData, "Status") : null;
-    const isRevoked = status?.toLowerCase() === "revoked";
-    if (isInstructorTeam && isRevoked) revokedCount++;
-    return isInstructorTeam && !isRevoked;
+    return status?.toLowerCase() !== "revoked";
   });
-  const departmentBreakdown = Array.from(departmentCounts.entries())
-    .map(([department, count]) => ({ department, count }))
-    .sort((a, b) => b.count - a.count);
-  console.log(
-    `darwin-exit-details: ${allStored.length} total exit records -- ` +
-    `${instructorTeamCount} matched an Instructor-team department (${revokedCount} of those Revoked and excluded), ` +
-    `${allStored.length - instructorTeamCount} did not match an Instructor-team department at all (see department_breakdown for the full split)`
-  );
 
   // "Current Department" dropped from this table's display (2026-09-26, per
   // request: "remove the current department table that we have") -- it's
   // still read from rawData elsewhere (reconcile.ts's payroll-converted
-  // department/designation fix, and the INSTRUCTOR_DEPARTMENT_FIELD_ALIASES
-  // fallback above), just no longer shown as its own column here. Darwin
-  // Full Roster is untouched -- this filter is scoped to this route only.
+  // department/designation fix), just no longer shown as its own column
+  // here.
   const columns: string[] = pinIdentityColumnsFirst(collectDynamicColumns(stored)).filter((column) => column !== "Current Department");
   const rows = stored.map((r) => {
     const data = r.rawData as Record<string, unknown>;
@@ -863,16 +791,8 @@ router.get("/reports/darwin-exit-details", requireAuth, requireRole("admin"), as
     columns,
     rows,
     synced_at: stored[0]?.syncedAt ?? null,
-    diagnostics: {
-      total_exit_records: allStored.length,
-      instructor_team: instructorTeamCount,
-      instructor_team_revoked_excluded: revokedCount,
-      other_or_unclassified: allStored.length - instructorTeamCount,
-    },
-    // The full list of departments present in Darwin's exit data, company-
-    // wide (not scoped to the Instructor team filter above), with how many
-    // exit records fell under each. Sorted by count, descending.
-    department_breakdown: departmentBreakdown,
+    total_exit_records: allStored.length,
+    revoked_excluded: allStored.length - stored.length,
   });
 });
 
