@@ -19,7 +19,13 @@ try {
   console.error(`Could not load ${envPath}:`, e instanceof Error ? e.message : e);
 }
 
-const column = process.argv[2];
+// Some pnpm setups (confirmed 2026-09-27, on Replit -- see the identical
+// fix in checkNiatInstructorDetailsColumn.ts) forward the "--" separator
+// itself as a literal argument alongside whatever follows it, so
+// process.argv can come through as ["--", "column_name"] instead of just
+// ["column_name"] -- filtering out any literal "--" tokens makes this work
+// either way, regardless of how many separators end up forwarded.
+const column = process.argv.slice(2).find((arg) => arg !== "--");
 if (!column) {
   console.error("Usage: pnpm --filter @workspace/api-server run check:teachos-column -- <column_name>");
   process.exit(1);

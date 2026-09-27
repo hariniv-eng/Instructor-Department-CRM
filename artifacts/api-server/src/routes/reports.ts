@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db, instructorsTable, darwinboxFullRosterTable, darwinboxExitsTable, instructorTrainingStatusTable, instructorContributionTable } from "@workspace/db";
 import { requireAuth, requireRole } from "../middlewares/auth";
-import { cell } from "../lib/reconcile";
+import { cell, normalize } from "../lib/reconcile";
 import { TRAINING_COURSE_TAXONOMY } from "../data/trainingCourseTaxonomy";
 import { TECH_AREAS } from "../lib/departmentTaxonomy";
 
@@ -800,14 +800,30 @@ router.get("/reports/darwin-exit-details", requireAuth, requireRole("admin"), as
   // Exception flag (2026-09-27, per request: "can you keep this exception
   // filter in the darwin exit tab that will help get the records of
   // exceptions") -- flags which of the rows above belong to someone
-  // currently sitting in the Instructors tab's Exception review queue
-  // (see computeDepartmentAndExceptionRows above for the full "who counts
-  // as an Exception" reasoning), matched by employee ID the same way
-  // findExit()/loadLatestExitsByPerson() (reconcile.ts) already match an
-  // instructor to their Darwin exit record -- an exact match against
-  // darwinbox_exits' own employeeId column, not anything inside rawData.
+  // currently sitting in the Instructors tab's Exception review queue (see
+  // computeDepartmentAndExceptionRows above for the full "who counts as an
+  // Exception" reasoning).
+  //
+  // Matched BOTH by employee ID and by normalized full name (2026-09-27,
+  // fixed same day per follow-up: "if we have only 41 of 50 exceptions in
+  // exit records, if other 9 people dont have exit record then why are they
+  // in the exception then") -- an employee-ID-only join under-counted by
+  // exactly this kind of gap. exitFlag on the instructor row comes from
+  // findExit() (reconcile.ts): it matches an instructor to their exit
+  // record by employee ID FIRST, but falls back to a normalized-full-name
+  // match whenever the ID doesn't line up (missing on either side, or no
+  // exit record shares it) -- see findExit()'s own two-line body. Someone
+  // exit-flagged via that name fallback is still a real exit record match
+  // (that's exactly why they're correctly in Exception), it just doesn't
+  // share a common employeeId between their instructor row and the exit
+  // row that matched them -- an employeeId-only join here would silently
+  // miss them, which is exactly the gap reported. Mirrors findExit()'s own
+  // priority exactly, just walked in the opposite direction (exit row ->
+  // instructor, instead of instructor -> exit row), using the same
+  // normalize() function so the two sides compare identically.
   const { exceptionRows } = computeDepartmentAndExceptionRows(await db.select().from(instructorsTable));
   const exceptionEmployeeIds = new Set(exceptionRows.map((r) => r.employeeId).filter((id): id is string => !!id));
+  const exceptionNames = new Set(exceptionRows.map((r) => normalize(r.fullName ?? "")).filter((n) => !!n));
 
   // "Current Department" dropped from this table's display (2026-09-26, per
   // request: "remove the current department table that we have") -- it's
@@ -819,7 +835,10 @@ router.get("/reports/darwin-exit-details", requireAuth, requireRole("admin"), as
     const data = r.rawData as Record<string, unknown>;
     const row: Record<string, unknown> = {};
     for (const key of columns) row[key] = data[key] ?? null;
-    row.is_exception = !!(r.employeeId && exceptionEmployeeIds.has(r.employeeId));
+    row.is_exception = !!(
+      (r.employeeId && exceptionEmployeeIds.has(r.employeeId))
+      || (r.fullName && exceptionNames.has(normalize(r.fullName)))
+    );
     return row;
   });
 

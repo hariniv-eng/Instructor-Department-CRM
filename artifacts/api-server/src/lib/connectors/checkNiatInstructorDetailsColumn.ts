@@ -23,7 +23,12 @@ try {
   console.error(`Could not load ${envPath}:`, e instanceof Error ? e.message : e);
 }
 
-const column = process.argv[2];
+// Some pnpm setups (confirmed 2026-09-27, on Replit) forward the "--"
+// separator itself as a literal argument alongside whatever follows it, so
+// process.argv can come through as ["--", "enroleplan"] instead of just
+// ["enroleplan"] -- filtering out any literal "--" tokens makes this work
+// either way, regardless of how many separators end up forwarded.
+const column = process.argv.slice(2).find((arg) => arg !== "--");
 if (!column) {
   console.error("Usage: pnpm --filter @workspace/api-server run check:niat-instructor-details-column -- <column_name>");
   process.exit(1);
