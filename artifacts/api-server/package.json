@@ -25,6 +25,7 @@
     "check:dsa-track-topics": "tsx src/lib/connectors/checkDsaTrackTopics.ts",
     "check:course-topics": "tsx src/lib/connectors/checkCourseTopics.ts",
     "check:darwinbox-ids": "tsx src/lib/connectors/checkDarwinboxIds.ts",
+    "check:niat-instructor-details-column": "tsx src/lib/connectors/checkNiatInstructorDetailsColumn.ts",
     "reconcile:from-csv": "tsx src/scripts/reconcileFromCsv.ts",
     "check:capability-managers": "tsx src/scripts/checkCapabilityManagerCandidates.ts",
     "check:instructor": "tsx src/scripts/checkInstructorRecord.ts",
