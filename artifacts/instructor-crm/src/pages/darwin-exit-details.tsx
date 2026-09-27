@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { RefreshCw, Users } from 'lucide-react';
+import { RefreshCw, Users, AlertTriangle } from 'lucide-react';
 import { PageIntro, EmptyState, QueryError, SkeletonBlock, TopStat, TablePager, TableSearchInput, DownloadCsvButton, usePagedRows, formatKpi } from '@/components/ui-pieces';
 import { toCsv, downloadCsv } from '@/lib/csv';
 
@@ -33,6 +33,15 @@ type DarwinExitDetails = {
   synced_at: string | null;
   total_exit_records: number;
   revoked_excluded: number;
+  // Exception filter (2026-09-27, per request: "can you keep this exception
+  // filter in the darwin exit tab that will help get the records of
+  // exceptions") -- `is_exception` on each row (not a displayed column,
+  // just a flag) says whether that exit record belongs to someone currently
+  // sitting in the Instructors tab's Exception review queue (exit-flagged,
+  // not yet resolved, within the Instructor Department population) -- see
+  // computeDepartmentAndExceptionRows() in reports.ts for the exact
+  // eligibility logic this mirrors.
+  exception_count: number;
 };
 
 const QUERY_KEY = ['reports', 'darwin-exit-details'];
@@ -69,23 +78,35 @@ export default function DarwinExitDetailsPage() {
   // the base + enrichment reports actually returned), so the search matches
   // against every column's value rather than one fixed "name" field.
   const [search, setSearch] = useState('');
-  const searchedRows = useMemo(() => {
+  // Exception-only toggle (2026-09-27, per request: "can you keep this
+  // exception filter in the darwin exit tab that will help get the records
+  // of exceptions") -- narrows the table down to just the rows flagged
+  // `is_exception` by the API, combined with the search box above (both
+  // apply together, same as any other filter+search combination elsewhere
+  // in the app).
+  const [exceptionOnly, setExceptionOnly] = useState(false);
+  const filteredRows = useMemo(() => {
+    if (!data) return [];
     const query = search.trim().toLowerCase();
-    if (!query || !data) return data?.rows ?? [];
-    return data.rows.filter((row) => data.columns.some((column) => cellText(row[column]).toLowerCase().includes(query)));
-  }, [data, search]);
-  const pager = usePagedRows(searchedRows, 50);
+    return data.rows.filter((row) => {
+      if (exceptionOnly && !row.is_exception) return false;
+      if (!query) return true;
+      return data.columns.some((column) => cellText(row[column]).toLowerCase().includes(query));
+    });
+  }, [data, search, exceptionOnly]);
+  const pager = usePagedRows(filteredRows, 50);
 
   // CSV export (2026-09-27, per request: "also try to add the download-in-
   // CSV option so that we can download that particular thing") -- same
   // client-side toCsv/downloadCsv pattern used across the app (Instructors,
   // Overview, breakdown panels): everything's already loaded in memory by
   // the time someone wants to download it, so no export endpoint is needed.
-  // Exports whatever the current search has matched (all of it, not just
-  // the current page), same columns as the table.
+  // Exports whatever the current search + Exception-only toggle has
+  // matched (all of it, not just the current page), same columns as the
+  // table.
   const handleDownload = () => {
     if (!data) return;
-    const csv = toCsv(data.columns, searchedRows.map((row) => data.columns.map((column) => cellText(row[column]))));
+    const csv = toCsv(data.columns, filteredRows.map((row) => data.columns.map((column) => cellText(row[column]))));
     downloadCsv('darwin-exit-details.csv', csv);
   };
 
@@ -112,6 +133,15 @@ export default function DarwinExitDetailsPage() {
       </div>
       <div className="flex flex-wrap items-center gap-3">
         {data.count > 0 && <TableSearchInput value={search} onChange={setSearch} testId="input-search-darwin-exit-details" />}
+        <button
+          type="button"
+          data-testid="button-toggle-exception-only-darwin-exit-details"
+          onClick={() => setExceptionOnly((value) => !value)}
+          aria-pressed={exceptionOnly}
+          className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[11px] font-bold transition-colors ${exceptionOnly ? 'border-[#a15417] bg-[#fdeadd] text-[#a15417]' : 'border-border bg-card text-foreground hover:bg-secondary'}`}
+        >
+          <AlertTriangle size={13} /> Exceptions only{data.exception_count > 0 ? ` (${formatKpi(data.exception_count)})` : ''}
+        </button>
         <DownloadCsvButton onClick={handleDownload} disabled={data.count === 0} testId="button-download-darwin-exit-details" />
       </div>
     </div>}
@@ -123,9 +153,9 @@ export default function DarwinExitDetailsPage() {
 
     {data && data.count === 0 && <EmptyState title="No exit records yet" description="Run the Exits sync (Source uploads) to pull the base exit report and its enrichment reports." />}
 
-    {data && data.count > 0 && searchedRows.length === 0 && <EmptyState title="No one matches this search" description="Try a broader search or clear the search box." />}
+    {data && data.count > 0 && filteredRows.length === 0 && <EmptyState title={exceptionOnly ? 'No Exceptions right now' : 'No one matches this search'} description={exceptionOnly ? "Nobody here is both exit-flagged and unresolved -- try clearing the search box, or turn off Exceptions only." : 'Try a broader search or clear the search box.'} />}
 
-    {data && data.count > 0 && searchedRows.length > 0 && (
+    {data && data.count > 0 && filteredRows.length > 0 && (
       <div className="rounded-lg border border-border">
         <div className="overflow-x-auto">
           <table className="w-max min-w-full border-collapse text-left">

@@ -149,6 +149,90 @@ const toApiInstructorSummary = (row: InstructorRow) => ({
   exit_verification: row.exitVerification,
 });
 
+// Instructor Department population (Instructors + Mentors + Ops team,
+// scoped exactly the way /reports/instructors's headline counts are below),
+// plus the Exception review queue carved out of it. Extracted into its own
+// function (2026-09-27, per request: "can you keep this exception filter in
+// the darwin exit tab that will help get the records of exceptions") so
+// /reports/darwin-exit-details can know which raw exit records belong to
+// someone currently sitting in that queue, without duplicating (and risking
+// drifting from) this exact eligibility logic — both routes now call this
+// one function instead of each keeping its own copy. See exceptionRows'
+// definition below for the full "who counts as an Exception" reasoning
+// (unresolved exit-flagged people within the Instructor Department
+// population only — a review queue, not a headcount bucket).
+function computeDepartmentAndExceptionRows(allRows: InstructorRow[]) {
+  // Mentors count (2026-09-04, per request): sourced from Darwin directly,
+  // not scoped to TeachOS — same population /reports/darwin-breakdown's
+  // mentors bucket uses (matched Darwin's Instructors department primary
+  // pass, classification "mentor"), regardless of whether that person has
+  // ever been onboarded into TeachOS.
+  const mentors = allRows.filter((r) => r.inDarwin && !r.inDarwinFullRoster && r.classification === "mentor");
+  // Operations team, specifically: Darwin's own "Delivery Support (Ops and
+  // Central Managers)" department (see departmentTaxonomy.ts), individually
+  // reviewed Ops overrides included (classificationOverrides.ts). Scoped
+  // across ALL rows, matching the Mentors precedent above — not just
+  // TeachOS-active ones.
+  const opsTeamRows = allRows.filter((r) => r.classification === "excluded_ops_managers");
+  // "Total instructor count" (2026-09-04, per request) applied across the
+  // ENTIRE dashboard: Darwin's own instructor headcount (matched Darwin's
+  // Instructors department directly, genuine Tech/Non-tech instructor, no
+  // override classification) PLUS the TeachOS "Payroll" bucket (active in
+  // TeachOS, never matched Darwin at all — folds in the former Needs-review
+  // remainder).
+  const darwinInstructorsForCount = allRows.filter((r) => r.inDarwin && !r.inDarwinFullRoster && !r.classification && (r.deptBucket === "tech" || r.deptBucket === "non_tech"));
+  const teachosOnlyForPayrollCount = allRows.filter((r) => r.inTeachos && !r.inDarwin);
+  const payrollConvertedForCount = teachosOnlyForPayrollCount.filter((r) => r.classification === "payroll_converted");
+  const needsReviewForCount = teachosOnlyForPayrollCount.filter((r) =>
+    r.classification !== "excluded_other_department"
+    && r.classification !== "excluded_non_department_team"
+    && r.classification !== "iit_kharagpur_team"
+    && r.classification !== "payroll_converted"
+  );
+  const countedInstructorRows: InstructorRow[] = [...darwinInstructorsForCount, ...payrollConvertedForCount, ...needsReviewForCount];
+  // The 4th "Instructor Department" Overview card: the whole department in
+  // one rollup: Instructors + Mentors + Operations team together. Safe to
+  // concatenate rather than re-deriving from allRows: these three lists are
+  // already mutually exclusive by construction — countedInstructorRows
+  // requires either no classification at all (the Darwin tech/non_tech
+  // population) or !inDarwin (the TeachOS-only payroll population), mentors
+  // requires classification === "mentor" (and inDarwin), opsTeamRows
+  // requires classification === "excluded_ops_managers" (and inDarwin) — a
+  // row can only ever match one of those three shapes.
+  const departmentRows: InstructorRow[] = [...countedInstructorRows, ...mentors, ...opsTeamRows];
+
+  // "Exception" bifurcation (2026-09-18, per request; scope revised
+  // 2026-09-19, per request) -- a review queue, not a headcount bucket:
+  // everyone here is already counted in their normal category above, and
+  // stays counted there no matter what this queue shows. A 2026-09-18
+  // version made "exited" auto-remove someone from their category's count;
+  // that was explicitly reverted the next day because actually removing
+  // someone from the active list needs to be a deliberate separate action
+  // (the Manual Status control on the instructor detail page), not a side
+  // effect of this dropdown -- see exitVerification's comment in the schema.
+  // So this queue exists purely to surface who still needs a look: everyone
+  // exit-flagged EXCEPT the "resolved" outcomes -- "payroll_converted" or
+  // "revoked" on the manual exit_verification dropdown, OR Darwinbox's own
+  // live exit record already reporting status "Revoked" (exitFlagStatus,
+  // set straight from the synced Darwinbox exit report's Status field by
+  // recomputeStatuses() in reconcile.ts -- see darwinboxExits.ts's comment:
+  // "Revoked" there means the resignation request itself was cancelled, not
+  // a completed exit). That second check (2026-09-19, per request) means a
+  // resignation Darwinbox itself already shows as cancelled never needs a
+  // Capability Manager to touch the dropdown at all -- it's excluded from
+  // this queue automatically. Manual exit-CSV uploads (reconcileExits() in
+  // reconcile.ts) never set exitFlagStatus, only the manual dropdown, which
+  // is why both checks exist side by side. That leaves null (not yet
+  // reviewed), "serving_notice_period" (shown here purely for visibility,
+  // per request), and "exited"/"absconded" (the real action items --
+  // waiting on someone to actually do the Manual Status removal) visible in
+  // this queue until resolved.
+  const hasRevokedExitStatus = (r: InstructorRow) => (r.exitFlagStatus ?? "").trim().toLowerCase() === "revoked";
+  const exceptionRows = departmentRows.filter((r) => r.exitFlag && !hasRevokedExitStatus(r) && r.exitVerification !== "payroll_converted" && r.exitVerification !== "revoked");
+
+  return { mentors, opsTeamRows, darwinInstructorsForCount, payrollConvertedForCount, needsReviewForCount, countedInstructorRows, departmentRows, exceptionRows };
+}
+
 // This is the single reporting surface for the breakdowns requested on top
 // of the TeachOS instructor-count standing rule (see reconcile.ts /
 // TEACHOS_INSTRUCTOR_COUNT_RULES.md): total instructor count, department
@@ -162,6 +246,7 @@ const toApiInstructorSummary = (row: InstructorRow) => ({
 // Breakdown and TeachOS Breakdown below stay Admin-only.
 router.get("/reports/instructors", async (_req, res) => {
   const allRows = await db.select().from(instructorsTable);
+  const { mentors, opsTeamRows, darwinInstructorsForCount, payrollConvertedForCount, needsReviewForCount, countedInstructorRows, departmentRows, exceptionRows } = computeDepartmentAndExceptionRows(allRows);
 
   // The "total instructor count" and every breakdown here are anchored on
   // TeachOS's own instructor roster (inTeachos=true) — that's the
@@ -172,33 +257,16 @@ router.get("/reports/instructors", async (_req, res) => {
   // TeachOS instructor count" and would otherwise inflate this report.
   const rows = allRows.filter((r) => r.inTeachos);
 
-  // Mentors count (2026-09-04, per request): sourced from Darwin directly,
-  // not scoped to TeachOS — same population /reports/darwin-breakdown's
-  // mentors bucket uses (matched Darwin's Instructors department primary
-  // pass, classification "mentor"), regardless of whether that person has
-  // ever been onboarded into TeachOS. The Overview standing-rule figure and
-  // the Darwin Breakdown tab were showing two different numbers (85 vs 90)
-  // for what's supposed to be the same headline count — the gap was mentors
-  // Darwin has on file who don't have a TeachOS record yet at all. Taking
-  // the Darwin count as the source of truth resolves that discrepancy.
-  const mentors = allRows.filter((r) => r.inDarwin && !r.inDarwinFullRoster && r.classification === "mentor");
   // "Counted as instructors" excludes: individual excluded overrides,
   // Delivery Support (Ops and Central Managers), and Mentors — none of
   // these are instructor roles. Mentors get their own reported section
-  // above (Darwin-scoped) rather than being silently dropped, but the
-  // instructor-pool exclusion below still needs to check every TeachOS-
-  // active row's own classification (a TeachOS-active mentor is still
-  // excluded here even if, in some edge case, they weren't in the
-  // Darwin-scoped `mentors` list above).
+  // above (Darwin-scoped, computed above via computeDepartmentAndExceptionRows)
+  // rather than being silently dropped, but the instructor-pool exclusion
+  // below still needs to check every TeachOS-active row's own
+  // classification (a TeachOS-active mentor is still excluded here even if,
+  // in some edge case, they weren't in the Darwin-scoped `mentors` list
+  // above).
   const excludedRows = rows.filter((r) => r.classification === "excluded_other_department" || r.classification === "excluded_non_department_team" || r.classification === "excluded_ops_managers");
-  // Operations team, specifically: Darwin's own "Delivery Support (Ops and
-  // Central Managers)" department (see departmentTaxonomy.ts), individually
-  // reviewed Ops overrides included (classificationOverrides.ts). Scoped
-  // across ALL rows (2026-09-04, matching the Mentors precedent above) —
-  // not just TeachOS-active ones — so a Darwin Ops person who was never
-  // onboarded into TeachOS still counts here, same reasoning as the
-  // Mentors 85-vs-90 fix.
-  const opsTeamRows = allRows.filter((r) => r.classification === "excluded_ops_managers");
   // The IIT Kharagpur team is set aside the same way mentors/excluded
   // people are — a real category, not silently dropped, but not counted as
   // an instructor either (see reconcile.ts's payroll cascade, 2026-09-03).
@@ -264,19 +332,10 @@ router.get("/reports/instructors", async (_req, res) => {
   // already folds in the former Needs-review remainder). This population —
   // not the older employee-ID-mapping pipeline above (still computed, for
   // the no_employee_id/other_department diagnostic kpis only) — is what
-  // countedInstructorRows is now built from, so every breakdown below
-  // (department, campus, manager, deployment, payroll split, the
-  // click-to-expand instructor list, and the CSV download) reflects it too.
-  const darwinInstructorsForCount = allRows.filter((r) => r.inDarwin && !r.inDarwinFullRoster && !r.classification && (r.deptBucket === "tech" || r.deptBucket === "non_tech"));
-  const teachosOnlyForPayrollCount = allRows.filter((r) => r.inTeachos && !r.inDarwin);
-  const payrollConvertedForCount = teachosOnlyForPayrollCount.filter((r) => r.classification === "payroll_converted");
-  const needsReviewForCount = teachosOnlyForPayrollCount.filter((r) =>
-    r.classification !== "excluded_other_department"
-    && r.classification !== "excluded_non_department_team"
-    && r.classification !== "iit_kharagpur_team"
-    && r.classification !== "payroll_converted"
-  );
-  const countedInstructorRows: InstructorRow[] = [...darwinInstructorsForCount, ...payrollConvertedForCount, ...needsReviewForCount];
+  // countedInstructorRows is built from (see computeDepartmentAndExceptionRows
+  // above), so every breakdown below (department, campus, manager,
+  // deployment, payroll split, the click-to-expand instructor list, and the
+  // CSV download) reflects it too.
 
   // Requirement #2: Tech vs Non-tech, with sub-areas within each.
   const byDeptBucket = (bucket: "tech" | "non_tech") => {
@@ -355,46 +414,11 @@ router.get("/reports/instructors", async (_req, res) => {
     both: toAccessBucket(list.filter((r) => r.inDarwin && r.inTeachos)),
     teachos_only: toAccessBucket(list.filter((r) => !r.inDarwin && r.inTeachos)),
   });
-  // The 4th "Instructor Department" Overview card (2026-09, per request) --
-  // the whole department in one rollup: Instructors + Mentors + Operations
-  // team together. Safe to concatenate rather than re-deriving from allRows:
-  // these three lists are already mutually exclusive by construction --
-  // countedInstructorRows requires either no classification at all (the
-  // Darwin tech/non_tech population) or !inDarwin (the TeachOS-only payroll
-  // population), mentors requires classification === "mentor" (and
-  // inDarwin), opsTeamRows requires classification ===
-  // "excluded_ops_managers" (and inDarwin) -- a row can only ever match one
-  // of those three shapes.
-  const departmentRows: InstructorRow[] = [...countedInstructorRows, ...mentors, ...opsTeamRows];
-
-  // "Exception" bifurcation (2026-09-18, per request; scope revised
-  // 2026-09-19, per request) -- a review queue, not a headcount bucket:
-  // everyone here is already counted in their normal category above, and
-  // stays counted there no matter what this queue shows. A 2026-09-18
-  // version made "exited" auto-remove someone from their category's count;
-  // that was explicitly reverted the next day because actually removing
-  // someone from the active list needs to be a deliberate separate action
-  // (the Manual Status control on the instructor detail page), not a side
-  // effect of this dropdown -- see exitVerification's comment in the schema.
-  // So this queue exists purely to surface who still needs a look: everyone
-  // exit-flagged EXCEPT the "resolved" outcomes -- "payroll_converted" or
-  // "revoked" on the manual exit_verification dropdown, OR Darwinbox's own
-  // live exit record already reporting status "Revoked" (exitFlagStatus,
-  // set straight from the synced Darwinbox exit report's Status field by
-  // recomputeStatuses() in reconcile.ts -- see darwinboxExits.ts's comment:
-  // "Revoked" there means the resignation request itself was cancelled, not
-  // a completed exit). That second check (2026-09-19, per request) means a
-  // resignation Darwinbox itself already shows as cancelled never needs a
-  // Capability Manager to touch the dropdown at all -- it's excluded from
-  // this queue automatically. Manual exit-CSV uploads (reconcileExits() in
-  // reconcile.ts) never set exitFlagStatus, only the manual dropdown, which
-  // is why both checks exist side by side. That leaves null (not yet
-  // reviewed), "serving_notice_period" (shown here purely for visibility,
-  // per request), and "exited"/"absconded" (the real action items --
-  // waiting on someone to actually do the Manual Status removal) visible in
-  // this queue until resolved.
-  const hasRevokedExitStatus = (r: InstructorRow) => (r.exitFlagStatus ?? "").trim().toLowerCase() === "revoked";
-  const exceptionRows = departmentRows.filter((r) => r.exitFlag && !hasRevokedExitStatus(r) && r.exitVerification !== "payroll_converted" && r.exitVerification !== "revoked");
+  // departmentRows (the 4th "Instructor Department" Overview card --
+  // Instructors + Mentors + Operations team together) and exceptionRows (the
+  // Exception review queue carved out of it) are both already computed
+  // above via computeDepartmentAndExceptionRows() -- see that function's own
+  // comment for the full "who counts as an Exception" reasoning.
 
   const accessBreakdown = {
     department: buildAccessSplit(departmentRows),
@@ -773,6 +797,18 @@ router.get("/reports/darwin-exit-details", requireAuth, requireRole("admin"), as
     return status?.toLowerCase() !== "revoked";
   });
 
+  // Exception flag (2026-09-27, per request: "can you keep this exception
+  // filter in the darwin exit tab that will help get the records of
+  // exceptions") -- flags which of the rows above belong to someone
+  // currently sitting in the Instructors tab's Exception review queue
+  // (see computeDepartmentAndExceptionRows above for the full "who counts
+  // as an Exception" reasoning), matched by employee ID the same way
+  // findExit()/loadLatestExitsByPerson() (reconcile.ts) already match an
+  // instructor to their Darwin exit record -- an exact match against
+  // darwinbox_exits' own employeeId column, not anything inside rawData.
+  const { exceptionRows } = computeDepartmentAndExceptionRows(await db.select().from(instructorsTable));
+  const exceptionEmployeeIds = new Set(exceptionRows.map((r) => r.employeeId).filter((id): id is string => !!id));
+
   // "Current Department" dropped from this table's display (2026-09-26, per
   // request: "remove the current department table that we have") -- it's
   // still read from rawData elsewhere (reconcile.ts's payroll-converted
@@ -783,6 +819,7 @@ router.get("/reports/darwin-exit-details", requireAuth, requireRole("admin"), as
     const data = r.rawData as Record<string, unknown>;
     const row: Record<string, unknown> = {};
     for (const key of columns) row[key] = data[key] ?? null;
+    row.is_exception = !!(r.employeeId && exceptionEmployeeIds.has(r.employeeId));
     return row;
   });
 
@@ -793,6 +830,7 @@ router.get("/reports/darwin-exit-details", requireAuth, requireRole("admin"), as
     synced_at: stored[0]?.syncedAt ?? null,
     total_exit_records: allStored.length,
     revoked_excluded: allStored.length - stored.length,
+    exception_count: rows.filter((r) => r.is_exception).length,
   });
 });
 
