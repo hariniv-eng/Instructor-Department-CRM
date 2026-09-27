@@ -121,16 +121,31 @@ function toISODate(value: string | null): string | null {
   return parsed.toISOString().slice(0, 10);
 }
 
-// Builds a lookup of the single most-recent exit record per person (by
-// employeeId, falling back to normalized name), from whatever's currently
-// in darwinboxExitsTable (fully replaced on every live exits sync — see
-// storeRaw.ts). Any hit here means "flag, don't subtract" per the standing
-// rule — this person still counts as an instructor, they're just annotated.
-async function loadLatestExitsByPerson(): Promise<{ byEmployeeId: Map<string, ExitInfo>; byName: Map<string, ExitInfo> }> {
+// Builds a lookup of the single most-recent exit record per person, by
+// employeeId ONLY, from whatever's currently in darwinboxExitsTable (fully
+// replaced on every live exits sync — see storeRaw.ts). Any hit here means
+// "flag, don't subtract" per the standing rule — this person still counts
+// as an instructor, they're just annotated.
+//
+// Name-based fallback matching was REMOVED here (2026-09-27, per request:
+// "only map the instructors with the same employee id not the names"),
+// after cross-checking the Instructors tab's Exception queue against Darwin
+// Exit Details turned up real false positives from it: several currently
+// active instructors were being exit-flagged purely because an unrelated
+// former employee happened to share their exact full name (e.g. a
+// "Shrinath Salunke" who exited in Nov 2025 under a different employee ID
+// than the currently active instructor of the same name), plus at least one
+// case of an employee ID itself being reused across two different real
+// people over time (matching by ID alone doesn't fully protect against
+// that, but it's a much narrower risk than matching by name, which any two
+// unrelated people can share). Employee ID is treated as the only reliable
+// join key between the two systems now — a person with no employeeId on
+// file simply never gets exit-flagged, rather than risking a wrong match.
+async function loadLatestExitsByPerson(): Promise<{ byEmployeeId: Map<string, ExitInfo> }> {
   const exits = await db.select().from(darwinboxExitsTable);
   const byEmployeeId = new Map<string, { info: ExitInfo; rank: number; id: number }>();
-  const byName = new Map<string, { info: ExitInfo; rank: number; id: number }>();
   for (const exit of exits) {
+    if (!exit.employeeId) continue;
     const status = cell(exit.rawData, "Status", "status");
     const exitDate = cell(exit.rawData, "Exit Date", "exit_date");
     // "Current Department"/"Current Designation" now checked FIRST, ahead of
@@ -149,23 +164,16 @@ async function loadLatestExitsByPerson(): Promise<{ byEmployeeId: Map<string, Ex
     const rank = parseLooseDate(exitDate);
     const candidate = { info, rank, id: exit.id };
     const isNewer = (existing?: { rank: number; id: number }) => !existing || rank > existing.rank || (rank === existing.rank && exit.id > existing.id);
-    if (exit.employeeId) {
-      if (isNewer(byEmployeeId.get(exit.employeeId))) byEmployeeId.set(exit.employeeId, candidate);
-    }
-    if (exit.fullName) {
-      const key = normalize(exit.fullName);
-      if (isNewer(byName.get(key))) byName.set(key, candidate);
-    }
+    if (isNewer(byEmployeeId.get(exit.employeeId))) byEmployeeId.set(exit.employeeId, candidate);
   }
   return {
     byEmployeeId: new Map([...byEmployeeId].map(([key, value]) => [key, value.info])),
-    byName: new Map([...byName].map(([key, value]) => [key, value.info])),
   };
 }
 
-function findExit(row: InstructorRow, exits: { byEmployeeId: Map<string, ExitInfo>; byName: Map<string, ExitInfo> }): ExitInfo | undefined {
-  if (row.employeeId && exits.byEmployeeId.has(row.employeeId)) return exits.byEmployeeId.get(row.employeeId);
-  return exits.byName.get(normalize(row.fullName));
+function findExit(row: InstructorRow, exits: { byEmployeeId: Map<string, ExitInfo> }): ExitInfo | undefined {
+  if (!row.employeeId) return undefined;
+  return exits.byEmployeeId.get(row.employeeId);
 }
 
 export const recomputeStatuses = async () => {
