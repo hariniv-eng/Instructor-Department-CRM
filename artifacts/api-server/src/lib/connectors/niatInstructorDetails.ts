@@ -69,6 +69,47 @@ function tableRef(): string {
   return `${config.BIGQUERY_PROJECT_ID}.${config.BIGQUERY_DATASET}.${TABLE_NAME}`;
 }
 
+export async function getSchema(): Promise<Array<[string, string]>> {
+  const bq = client();
+  const ref = tableRef();
+  try {
+    const [metadata] = await runWithHardTimeout(
+      () => bq.dataset(config.BIGQUERY_DATASET!).table(TABLE_NAME).getMetadata(),
+      API_TIMEOUT_MS + 10000
+    );
+    return (metadata.schema?.fields ?? []).map((f: { name: string; type: string }) => [f.name, f.type]);
+  } catch (e) {
+    if (e instanceof HardTimeout) throw new NiatInstructorDetailsError(`Could not read table ${ref}: ${e.message}`);
+    throw new NiatInstructorDetailsError(`Could not read table ${ref}: ${(e as Error).message}`);
+  }
+}
+
+// One-off column inspector (2026-09-27, per request: a new column
+// ("enroleplan") showed up on this table and we needed its distinct values
+// before deciding what, if anything, to do with it) -- same
+// checkDistinctValues() pattern as bigquery.ts, just pointed at this
+// connector's own table instead. See scripts/checkNiatInstructorDetailsColumn.ts
+// for the CLI entry point.
+export async function checkDistinctValues(column: string): Promise<void> {
+  const bq = client();
+  const ref = tableRef();
+  const schemaFields = new Set((await getSchema()).map(([name]) => name));
+  if (!schemaFields.has(column)) {
+    throw new NiatInstructorDetailsError(`Table ${ref} has no column "${column}". Actual columns: ${[...schemaFields].sort().join(", ")}.`);
+  }
+  const query = `SELECT ${column}, COUNT(*) AS row_count FROM \`${ref}\` GROUP BY ${column} ORDER BY row_count DESC`;
+  try {
+    const [rows] = await runWithHardTimeout(() => bq.query({ query }), API_TIMEOUT_MS * 3 + 10000);
+    console.log(`Distinct values of "${column}" in ${ref}:`);
+    for (const row of rows as Record<string, unknown>[]) {
+      console.log(`  ${JSON.stringify(row[column])} — ${row["row_count"]} rows`);
+    }
+  } catch (e) {
+    if (e instanceof HardTimeout) throw new NiatInstructorDetailsError(`Query against ${ref} failed: ${e.message}`);
+    throw new NiatInstructorDetailsError(`Query against ${ref} failed: ${(e as Error).message}`);
+  }
+}
+
 /**
  * Fetches niat_instructor_details rows (employee ID plus the institute/role/
  * category fields reconcileTeachos() needs), mapped to reconcile.ts's
