@@ -20,6 +20,29 @@ const REQUIRED = ["BIGQUERY_PROJECT_ID", "BIGQUERY_DATASET"] as const;
 const API_TIMEOUT_MS = 30000;
 const TABLE_NAME = process.env.NIAT_INSTRUCTOR_DETAILS_TABLE || "niat_instructor_details";
 
+// enrolled_plans (2026-09-27, per request: "in teachOs data...niat_instructor_
+// details table has a new column...enrolled_plan[s]...show it as a new
+// column") lives on a DIFFERENTLY-SCOPED copy of this same-named table, in a
+// DIFFERENT BigQuery dataset -- confirmed via search:bigquery-columns
+// (INFORMATION_SCHEMA across every dataset in the project): the main
+// EXPECTED_COLUMNS table above (in BIGQUERY_DATASET, i.e.
+// niat_instructor_automation_data) has no enrolled_plans column at all; it
+// only exists on niat_instructor_details inside niat_reverse_etl_bases.
+// Pulled in via a LEFT JOIN in fetchNiatInstructorDetailsRows() below, kept
+// as a same-project cross-dataset reference rather than switching this
+// connector's whole BIGQUERY_DATASET over (safer -- doesn't touch the 9
+// columns already relied on everywhere else).
+const REVERSE_ETL_DATASET = process.env.NIAT_REVERSE_ETL_DATASET || "niat_reverse_etl_bases";
+const REVERSE_ETL_TABLE = process.env.NIAT_REVERSE_ETL_TABLE || TABLE_NAME;
+// Join key guess -- instructor_user_id is the column EXPECTED_COLUMNS above
+// already keys off of on the primary side, and the reverse_etl table is a
+// copy of "the same table" by name, so it's the most likely shared key. NOT
+// confirmed against that dataset's live schema (this sandbox has no BigQuery
+// credentials to check with). If this guess is wrong, fetchNiatInstructorDetailsRows()
+// below falls back to the plain (non-joined) query rather than breaking the
+// whole TeachOS sync -- override via env once the real key is confirmed.
+const REVERSE_ETL_JOIN_KEY = process.env.NIAT_REVERSE_ETL_JOIN_KEY || "instructor_user_id";
+
 // Left = canonical name reconcileTeachosEmployeeIdReference() looks up via
 // cell(); right = actual BigQuery column name.
 const EXPECTED_COLUMNS: Record<string, string> = {
@@ -67,6 +90,10 @@ function client(): BigQuery {
 
 function tableRef(): string {
   return `${config.BIGQUERY_PROJECT_ID}.${config.BIGQUERY_DATASET}.${TABLE_NAME}`;
+}
+
+function reverseEtlTableRef(): string {
+  return `${config.BIGQUERY_PROJECT_ID}.${REVERSE_ETL_DATASET}.${REVERSE_ETL_TABLE}`;
 }
 
 export async function getSchema(): Promise<Array<[string, string]>> {
@@ -153,13 +180,40 @@ export async function checkDistinctValues(column: string): Promise<void> {
 export async function fetchNiatInstructorDetailsRows(): Promise<SheetRow[]> {
   const bq = client();
   const ref = tableRef();
-  const colsSql = Object.entries(EXPECTED_COLUMNS).map(([alias, col]) => `${col} AS ${alias}`).join(", ");
-  const query = `SELECT DISTINCT ${colsSql} FROM \`${ref}\` WHERE UPPER(${EXPECTED_COLUMNS.instructor_status}) = 'ACTIVE'`;
+  // Table aliased "a" so enrolled_plans' cross-dataset join (below) can
+  // qualify these columns unambiguously against the joined table "b".
+  const colsSql = Object.entries(EXPECTED_COLUMNS).map(([alias, col]) => `a.${col} AS ${alias}`).join(", ");
+  const baseWhere = `WHERE UPPER(a.${EXPECTED_COLUMNS.instructor_status}) = 'ACTIVE'`;
+
+  const joinedRef = reverseEtlTableRef();
+  const joinedQuery = `SELECT DISTINCT ${colsSql}, b.enrolled_plans AS enrolled_plans FROM \`${ref}\` a LEFT JOIN \`${joinedRef}\` b ON a.${REVERSE_ETL_JOIN_KEY} = b.${REVERSE_ETL_JOIN_KEY} ${baseWhere}`;
+  // Fallback if the join above doesn't work (wrong guessed key/dataset/table
+  // name on the reverse_etl side -- see REVERSE_ETL_JOIN_KEY's comment). Same
+  // shape as the query this replaced, just with an always-null enrolled_plans
+  // column so reconcile.ts's cell(item, "enrolled_plans", ...) still finds
+  // the key it expects.
+  const fallbackQuery = `SELECT DISTINCT ${colsSql}, CAST(NULL AS STRING) AS enrolled_plans FROM \`${ref}\` a ${baseWhere}`;
+
   try {
-    const [rows] = await runWithHardTimeout(() => bq.query({ query }), API_TIMEOUT_MS * 3 + 10000);
+    const [rows] = await runWithHardTimeout(() => bq.query({ query: joinedQuery }), API_TIMEOUT_MS * 3 + 10000);
     return rows as SheetRow[];
   } catch (e) {
     if (e instanceof HardTimeout) throw new NiatInstructorDetailsError(`Query against ${ref} failed: ${e.message}`);
-    throw new NiatInstructorDetailsError(`Query against ${ref} failed: ${(e as Error).message}`);
+    // Don't let an unconfirmed join guess (bad key/dataset/table name) break
+    // the whole TeachOS sync -- log it clearly and fall back to the query
+    // without enrolled_plans. Set NIAT_REVERSE_ETL_JOIN_KEY / NIAT_REVERSE_ETL_DATASET
+    // / NIAT_REVERSE_ETL_TABLE (env) once the real join key is confirmed against
+    // that dataset's live schema, then this join will start succeeding.
+    console.error(
+      `[niatInstructorDetails] enrolled_plans join against \`${joinedRef}\` (key: ${REVERSE_ETL_JOIN_KEY}) failed -- ` +
+      `falling back to the query without it, so the rest of the TeachOS sync isn't blocked. Error: ${(e as Error).message}`
+    );
+    try {
+      const [rows] = await runWithHardTimeout(() => bq.query({ query: fallbackQuery }), API_TIMEOUT_MS * 3 + 10000);
+      return rows as SheetRow[];
+    } catch (e2) {
+      if (e2 instanceof HardTimeout) throw new NiatInstructorDetailsError(`Query against ${ref} failed: ${e2.message}`);
+      throw new NiatInstructorDetailsError(`Query against ${ref} failed: ${(e2 as Error).message}`);
+    }
   }
 }

@@ -570,6 +570,9 @@ function MultiSelectFilter({ label, options, selected, onChange, testId, widthCl
 // Trailing 190px on every variant below is the new Exit column (2026-09-17,
 // per request) -- wide enough for the "Serving Notice Period" dropdown
 // option text (the longest of the three) without clipping.
+// Enrolled Plan (TeachOS's own enrolled_plans field, 2026-09-27, per
+// request) is now the very last column on every variant (170px) -- a plain
+// read-only value, same treatment as Capability Manager/Manager (Darwin).
 function gridColsClass(category: CategoryKey): string {
   // Payroll is now shown everywhere Subject/Campus are (2026-09-21, per
   // request: "make sure we have all the columns we have one ... for
@@ -585,14 +588,14 @@ function gridColsClass(category: CategoryKey): string {
   // mixed into Department/Exception just reads "Nxtwave" in this column,
   // same as any non-payroll instructor. Never wrong, just not usually the
   // interesting value there.
-  if (category === 'instructors' || category === 'mentors' || category === 'department' || category === 'exception') return 'grid-cols-[260px_190px_130px_280px_220px_150px_160px_170px_220px_140px_190px_190px_160px_130px_150px_190px]';
+  if (category === 'instructors' || category === 'mentors' || category === 'department' || category === 'exception') return 'grid-cols-[260px_190px_130px_280px_220px_150px_160px_170px_220px_140px_190px_190px_160px_130px_150px_190px_170px]';
   // Operations team keeps its own shape (2026-09-21: not part of the above
   // request) -- no Campus column (ops rows aren't deployed to a teaching
   // campus the way instructors and mentors are), a single Department
   // column instead of Subject+Department, and no Payroll either (same
   // reason it's never meaningful for Mentors: payroll_converted can't be
   // assigned to an ops row).
-  return 'grid-cols-[260px_190px_130px_280px_220px_150px_280px_140px_190px_190px_160px_150px_190px]';
+  return 'grid-cols-[260px_190px_130px_280px_220px_150px_280px_140px_190px_190px_160px_150px_190px_170px]';
 }
 
 // Manager (Darwin) (2026-09-22, per request: "in the overview table we have
@@ -648,6 +651,7 @@ function downloadInstructorsCsv(category: CategoryKey, people: InstructorSummary
   if (category !== 'ops_team') headers.push('Payroll');
   headers.push('Gender');
   headers.push('Exit');
+  headers.push('Enrolled Plan');
 
   const rows = people.map((person) => {
     const row: string[] = [person.full_name, person.designation ?? '', person.employee_id ?? '', person.teachos_user_id ?? '', person.org_email ?? '', person.work_location ?? ''];
@@ -663,6 +667,7 @@ function downloadInstructorsCsv(category: CategoryKey, people: InstructorSummary
     // exists but no Capability Manager has verified it yet; otherwise the
     // reviewed label -- mirrors ExitCell's dash-vs-dropdown split below.
     row.push(person.exit_flag ? EXIT_VERIFICATION_LABELS[person.exit_verification ?? ''] ?? 'Not reviewed' : '');
+    row.push(person.enrolled_plans ?? '');
     return row;
   });
 
@@ -690,6 +695,7 @@ function CategoryTable({ category, people }: { category: CategoryKey; people: In
           {category !== 'ops_team' && <span>Payroll</span>}
           <span>Gender</span>
           <span>Exit</span>
+          <span>Enrolled Plan</span>
         </div>
         <div>{people.map((person) => <PersonRow key={person.id} category={category} person={person} columns={columns} />)}</div>
       </div>
@@ -728,6 +734,7 @@ function PersonRow({ category, person, columns }: { category: CategoryKey; perso
     {category !== 'ops_team' && <div>{person.is_payroll ? <span className="inline-flex rounded-full bg-[#e6e9fb] px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] text-[#4a4fb0]">Payroll</span> : <span className="inline-flex rounded-full bg-secondary px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] text-muted-foreground">Nxtwave</span>}</div>}
     <GenderCell person={person} />
     <ExitCell person={person} />
+    <div className="truncate text-[12px] text-muted-foreground">{person.enrolled_plans || '—'}</div>
   </Link>;
 }
 

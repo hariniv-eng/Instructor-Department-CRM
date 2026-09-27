@@ -778,6 +778,7 @@ components:
         - gender_source
         - exit_flag
         - exit_verification
+        - enrolled_plans
       properties:
         id: { type: number }
         full_name: { type: string }
@@ -876,3 +877,11 @@ components:
         # is a tracking label only and never touches computed_status/
         # manual_status or the headcount.
         exit_verification: { type: ["string", "null"], enum: ["exited", "serving_notice_period", "payroll_converted", "absconded", "revoked", null] }
+        # TeachOS's own "enrolled_plans" column (2026-09-27, per request: "in
+        # teachOs data...niat_instructor_details table has a new column...
+        # enrolled_plans...show it as a new column"). Lives on a differently-
+        # scoped copy of niat_instructor_details, in a different BigQuery
+        # dataset than the rest of this connector reads from -- see
+        # niatInstructorDetails.ts's fetchNiatInstructorDetailsRows() for the
+        # cross-dataset join. No fallback source, plain display field.
+        enrolled_plans: { type: ["string", "null"] }

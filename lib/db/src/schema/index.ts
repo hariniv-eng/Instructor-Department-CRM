@@ -54,6 +54,15 @@ export const instructorsTable = pgTable("instructors", {
   teachosRole: text("teachos_role"),
   teachosCategory: text("teachos_category"),
   teachosManager: text("teachos_manager"),
+  // TeachOS's "enrolled_plans" column (2026-09-27, per request: "in teachOs
+  // data...niat_instructor_details table has a new column...enrolled_plans").
+  // Lives on a DIFFERENT copy of the niat_instructor_details table than the
+  // one the rest of this connector reads from -- see
+  // niatInstructorDetails.ts's fetchNiatInstructorDetailsRows() for the
+  // cross-dataset join that pulls it in. No manual fallback (unlike
+  // teachosManager above) -- this is a plain TeachOS-sourced display field,
+  // shown as its own "Enrolled Plan" column on the Instructors tab.
+  enrolledPlans: text("enrolled_plans"),
   // Manual fallback for `teachosManager` above (2026-09-15, per request) --
   // same pattern as manualGender above: for someone TeachOS's own
   // Capability Manager candidates don't resolve to any name on the

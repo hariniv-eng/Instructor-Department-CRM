@@ -1,0 +1,749 @@
+// Name-matching + reconciliation logic — extracted out of routes/uploads.ts
+// (unchanged) so routes/sync.ts (live Darwinbox/BigQuery sync) can reuse the
+// exact same matching behavior instead of duplicating it. Manual CSV/XLSX
+// uploads and live API syncs now both go through these same functions, so
+// behavior stays identical regardless of where the rows came from.
+
+import { and, eq } from "drizzle-orm";
+import { db, instructorsTable, darwinboxExitsTable, teachosIdReferenceTable } from "@workspace/db";
+import { EXCLUDED_EMPLOYEES, type ExcludedOverride, OTHER_DEPARTMENT_EMPLOYEES, type OtherDepartmentOverride } from "../data/classificationOverrides";
+import { VALID_CAPABILITY_MANAGERS, CAPABILITY_MANAGER_ALIASES } from "../data/validCapabilityManagers";
+import { classifyDepartment, classifyDeployment } from "./departmentTaxonomy";
+
+export type SheetRow = Record<string, unknown>;
+
+export const cell = (row: SheetRow, ...keys: string[]) => {
+  const found = Object.entries(row).find(([key]) => keys.some((candidate) => key.trim().toLowerCase() === candidate.toLowerCase()));
+  return found?.[1] === undefined || found[1] === null ? null : String(found[1]).trim() || null;
+};
+
+export const normalize = (value: string) => value.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^\p{L}\p{N}\s]/gu, "").replace(/\s+/g, " ").trim();
+
+export const findMatch = (rows: Array<typeof instructorsTable.$inferSelect>, name: string | null, employeeId?: string | null) => {
+  if (employeeId) {
+    const employee = rows.find((item) => item.employeeId === employeeId);
+    if (employee) return employee;
+  }
+  if (!name) return undefined;
+  const normalized = normalize(name);
+  return rows.find((item) => normalize(item.fullName) === normalized) ?? rows.find((item) => normalize(item.fullName).replaceAll(" ", "") === normalized.replaceAll(" ", ""));
+};
+
+// --- TeachOS instructor-count classification -------------------------------
+// Applies the maintained override lists (../data/classificationOverrides.ts)
+// plus live Darwinbox exit-record matching on top of whatever
+// reconcileDarwin/reconcileTeachos/reconcileExits already wrote. See
+// TEACHOS_INSTRUCTOR_COUNT_RULES.md for the narrative rule this encodes.
+
+type InstructorRow = typeof instructorsTable.$inferSelect;
+
+// teachosUserId first (exact match against TeachOS's stable instructor_user_id);
+// then employeeId (exact match, when both sides carry one); only falls back
+// to a normalized full-name match for an override entry that names no
+// employeeId at all. That last fallback used to apply unconditionally,
+// which let one override entry silently catch a completely different
+// person who merely shared the same full name — e.g. NW0007365 "Shaik
+// Musharaf" was being wrongly matched (and excluded) by an entry meant for
+// NW0005088, a different "Shaik Musharaf" (2026-09-04). An employeeId
+// present on both sides is authoritative enough to rule that out entirely.
+function findOverride<T extends { teachosUserId?: string; employeeId?: string; fullName: string }>(row: InstructorRow, list: T[]): T | undefined {
+  if (row.teachosUserId) {
+    const byId = list.find((entry) => entry.teachosUserId && entry.teachosUserId === row.teachosUserId);
+    if (byId) return byId;
+  }
+  if (row.employeeId) {
+    const byEmployeeId = list.find((entry) => entry.employeeId && entry.employeeId === row.employeeId);
+    if (byEmployeeId) return byEmployeeId;
+  }
+  const normalizedRowName = normalize(row.fullName);
+  return list.find((entry) => !entry.employeeId && normalize(entry.fullName) === normalizedRowName);
+}
+
+interface ExitInfo {
+  status: string | null;
+  exitDate: string | null;
+  // Department/Designation/Gender straight off the exit record itself
+  // (2026-09-21, per request: "get missing data of payroll converted
+  // instructors ... get that data from the exit, map the payroll instructors
+  // with there employee_id with the whole exit data") — same Darwinbox-
+  // sourced field names reconcileDarwin()/reconcileCapabilityManager() read
+  // elsewhere in this file ("Designation"/"Gender"), plus the "Current
+  // Department"/"Top Department" aliases confirmed real for this specific
+  // table (see reports.ts's darwin-exit-details route). Populated for every
+  // exit record regardless of who matches it; recomputeStatuses() below
+  // decides who actually gets to use it (isTeachosOnlyLeftover only).
+  department: string | null;
+  designation: string | null;
+  gender: string | null;
+}
+
+// Darwinbox exit records don't carry a stable numeric ordering we can trust
+// across sources, and "Exit Date" strings come from Darwinbox as-is (same
+// caveat as instructorsTable.exitDate elsewhere in this file — no format
+// normalization is done, consistent with the rest of this codebase). This
+// parses just well enough to pick a "most recent" record per person when
+// more than one comes back (e.g. a resignation that was Approved and later
+// Rejected, or Revoked and later re-Approved) — falls back to whichever
+// record was inserted last (highest id) when dates can't be compared.
+function parseLooseDate(value: string | null): number {
+  if (!value) return -Infinity;
+  const iso = Date.parse(value);
+  if (!Number.isNaN(iso)) return iso;
+  const dmy = /^(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})$/.exec(value.trim());
+  if (dmy) {
+    const [, d, m, y] = dmy;
+    const year = y.length === 2 ? 2000 + Number(y) : Number(y);
+    const parsed = new Date(year, Number(m) - 1, Number(d)).getTime();
+    if (!Number.isNaN(parsed)) return parsed;
+  }
+  return -Infinity;
+}
+
+// Converts a "DD-MM-YYYY" (or "DD/MM/YYYY") string from Darwinbox into the
+// ISO "YYYY-MM-DD" format Postgres date columns require. Darwinbox's exit
+// report emits dates day-first (e.g. "31-08-2025"), which Postgres's
+// default month-first date parser rejects once the day exceeds 12 — exactly
+// the failure the live exits sync hit. Returns null for anything that isn't
+// a recognizable calendar date, so a bad value is dropped, not crashed on.
+function toISODate(value: string | null): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) return trimmed.slice(0, 10);
+  const dmy = /^(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})$/.exec(trimmed);
+  if (!dmy) return null;
+  const [, d, m, y] = dmy;
+  const day = Number(d);
+  const month = Number(m);
+  const year = y.length === 2 ? 2000 + Number(y) : Number(y);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed.toISOString().slice(0, 10);
+}
+
+// Builds a lookup of the single most-recent exit record per person (by
+// employeeId, falling back to normalized name), from whatever's currently
+// in darwinboxExitsTable (fully replaced on every live exits sync — see
+// storeRaw.ts). Any hit here means "flag, don't subtract" per the standing
+// rule — this person still counts as an instructor, they're just annotated.
+async function loadLatestExitsByPerson(): Promise<{ byEmployeeId: Map<string, ExitInfo>; byName: Map<string, ExitInfo> }> {
+  const exits = await db.select().from(darwinboxExitsTable);
+  const byEmployeeId = new Map<string, { info: ExitInfo; rank: number; id: number }>();
+  const byName = new Map<string, { info: ExitInfo; rank: number; id: number }>();
+  for (const exit of exits) {
+    const status = cell(exit.rawData, "Status", "status");
+    const exitDate = cell(exit.rawData, "Exit Date", "exit_date");
+    // "Current Department"/"Current Designation" now checked FIRST, ahead of
+    // the plain "Department"/"Designation" fields (2026-09-24, per request:
+    // department/designation for payroll-converted instructors should come
+    // from the exit record's Current fields, not the possibly-stale plain
+    // ones). Safe to change here rather than scoping it further down in
+    // recomputeStatuses(): department/designation off this ExitInfo are only
+    // ever read for the isTeachosOnlyLeftover (payroll-converted) population
+    // — see the exitDeptInfo/classification block below — so this priority
+    // flip only affects payroll-converted instructors, nobody else.
+    const department = cell(exit.rawData, "Current Department", "Department", "Top Department", "department");
+    const designation = cell(exit.rawData, "Current Designation", "Designation", "designation");
+    const gender = cell(exit.rawData, "Gender", "gender");
+    const info: ExitInfo = { status, exitDate, department, designation, gender };
+    const rank = parseLooseDate(exitDate);
+    const candidate = { info, rank, id: exit.id };
+    const isNewer = (existing?: { rank: number; id: number }) => !existing || rank > existing.rank || (rank === existing.rank && exit.id > existing.id);
+    if (exit.employeeId) {
+      if (isNewer(byEmployeeId.get(exit.employeeId))) byEmployeeId.set(exit.employeeId, candidate);
+    }
+    if (exit.fullName) {
+      const key = normalize(exit.fullName);
+      if (isNewer(byName.get(key))) byName.set(key, candidate);
+    }
+  }
+  return {
+    byEmployeeId: new Map([...byEmployeeId].map(([key, value]) => [key, value.info])),
+    byName: new Map([...byName].map(([key, value]) => [key, value.info])),
+  };
+}
+
+function findExit(row: InstructorRow, exits: { byEmployeeId: Map<string, ExitInfo>; byName: Map<string, ExitInfo> }): ExitInfo | undefined {
+  if (row.employeeId && exits.byEmployeeId.has(row.employeeId)) return exits.byEmployeeId.get(row.employeeId);
+  return exits.byName.get(normalize(row.fullName));
+}
+
+export const recomputeStatuses = async () => {
+  const rows = await db.select().from(instructorsTable);
+  const exits = await loadLatestExitsByPerson();
+  await Promise.all(rows.map((row) => {
+    // Priority: an individual, human-reviewed override (classificationOverrides.ts)
+    // always wins first — EXCLUDED_EMPLOYEES, then OTHER_DEPARTMENT_EMPLOYEES
+    // (2026-09-04: people who DO match Darwin's Instructors department
+    // directly but a human has deliberately filed under "Other department"
+    // instead of instructor/mentor) — then the two department-level
+    // exclusion rules (Delivery Support -> ops/managers, Mentors -> mentor);
+    // then the payroll-converted override; only then the ordinary
+    // Darwin/TeachOS presence rules. See departmentTaxonomy.ts for the
+    // department matching.
+    const excludedOverride = findOverride<ExcludedOverride>(row, EXCLUDED_EMPLOYEES);
+    const otherDepartmentOverride = findOverride<OtherDepartmentOverride>(row, OTHER_DEPARTMENT_EMPLOYEES);
+    const deptInfo = classifyDepartment(row.department, row.teachosCategory, row.designation);
+    const isDeptExclusion = deptInfo.bucket === "excluded_ops_managers" || deptInfo.bucket === "mentor" || deptInfo.bucket === "instructor_ops";
+    // Subject/area exclusion is narrower than the bucket exclusion above
+    // (2026-09-21, per request: "apply the logic we have used for the
+    // instructors to get the subjects for mentors also"). classifyDepartment()
+    // already resolves a real sub-area (Frontend/Backend/DSA/GenAI/etc.) for
+    // a mentor embedded within an Instructors sub-department -- Darwin
+    // department string starts with "Instructors", designation says Mentor
+    // (see departmentTaxonomy.ts) -- using the exact same RULES-based
+    // matching an ordinary instructor gets. That computed area used to be
+    // discarded here along with deptBucket, which is why the Subject column
+    // read empty for every mentor even when classifyDepartment had a real
+    // answer. Only "excluded_ops_managers" and "instructor_ops" (roles that
+    // were never a teaching area in the first place) still null the area
+    // out; mentors now keep whatever classifyDepartment resolved -- null for
+    // the flat "Mentors" department (that string has no sub-area to read),
+    // a real area for one filed under an Instructors sub-department. A
+    // mentor left null this way can still be filled in by hand through the
+    // same Manual Subject control instructors already use (routes/
+    // instructors.ts's PATCH /instructors/:id/subject, SubjectCell on the
+    // frontend) -- that path was already open to mentors, it just never had
+    // a computed value to fall back past.
+    const isAreaExclusion = deptInfo.bucket === "excluded_ops_managers" || deptInfo.bucket === "instructor_ops";
+    const exit = findExit(row, exits);
+    const deploymentStatus = classifyDeployment(row.institutes);
+    // Payroll-converted status is now fully computed for the TeachOS-only
+    // "leftover" pool — never matched Darwin at all, neither the primary
+    // Instructors-department pass nor the full 3,000+ roster fallback pass
+    // (a full-roster match means inDarwin=true here, so falls out of this
+    // pool automatically and is handled by the ordinary Darwin/TeachOS
+    // presence rules below instead) — via a cascade that replaces the
+    // frozen PAYROLL_CONVERTED_EMPLOYEES override list entirely
+    // (2026-09-03), later simplified (2026-09-04) to fold the Darwin-exit
+    // case into payroll_converted instead of its own bucket, per request:
+    //   1. Has a Darwin exit record? -> payroll_converted, with the reason
+    //      text noting the exit record. (The separate exitFlag/
+    //      exitFlagStatus/exitFlagDate columns below still record this too,
+    //      for the "flag, don't subtract" annotation used elsewhere — it's
+    //      just no longer its own classification/bucket.)
+    //   2. TeachOS institute is IIT Kharagpur? -> iit_kharagpur_team, its
+    //      own team, not counted as payroll (reported together with
+    //      "other department" as of 2026-09-04 — see reports.ts).
+    //   3. Everyone still left in the pool -> payroll_converted.
+    const isTeachosOnlyLeftover = !!row.inTeachos && !row.inDarwin;
+    // Exit-derived gap-fill (2026-09-21, per request — see exitDepartment/
+    // exitDesignation/exitGender's comment in schema/index.ts): scoped to
+    // isTeachosOnlyLeftover only, so a normal Darwin-matched instructor who
+    // separately has an exit record on file (the "flag, don't subtract"
+    // case) never has this secondary source override their real Darwin
+    // department/designation/gender. Fed through classifyDepartment() the
+    // same way an ordinary Darwin department string would be, purely to
+    // resolve a Subject/area for deptArea below (deptInfo above already used
+    // row.department, which is always null for this population, so it never
+    // has one) — deliberately not used to decide deptBucket/classification;
+    // this population's classification stays whatever the cascade below
+    // already decides (payroll_converted / iit_kharagpur_team), regardless
+    // of what department the exit record happens to name.
+    const exitDeptInfo = isTeachosOnlyLeftover && exit && (exit.department || exit.designation)
+      ? classifyDepartment(exit.department, null, exit.designation)
+      : null;
+    // Narrowed back 2026-09-16, per request: institute_name === "IIT
+    // Kharagpur" only sets iit_kharagpur_team for someone with NO Darwin
+    // match at all (isTeachosOnlyLeftover). Anyone who has a Darwin match
+    // AND an IIT Kharagpur TeachOS institute is now treated as an ordinary
+    // instructor — falls through to the normal Darwin-based classification
+    // below, not iit_kharagpur_team.
+    //
+    // This reverses the "broadened 2026-09-08" behavior (see git history),
+    // which had made this fire unconditionally, even with a Darwin match —
+    // motivated at the time by Siddhanth Mosam (NW0002770), an active Darwin
+    // instructor (Instructors – Gen AI) whose TeachOS institute is also "IIT
+    // kharagpur". Per the 2026-09-16 request, that case (Darwin match + IIT
+    // Kharagpur institute) should now count as a normal instructor instead.
+    const isIitKharagpurCampus = (row.institutes ?? []).some((institute) => /kharagpur/i.test(institute));
+
+    let classification: string | null = null;
+    let classificationReason: string | null = null;
+    let computedStatus: string;
+
+    if (excludedOverride) {
+      classification = excludedOverride.classification;
+      classificationReason = excludedOverride.reason;
+      computedStatus = "excluded";
+    } else if (otherDepartmentOverride) {
+      classification = "other_department_manual";
+      classificationReason = otherDepartmentOverride.reason;
+      computedStatus = "other_department";
+    } else if (deptInfo.bucket === "excluded_ops_managers") {
+      classification = "excluded_ops_managers";
+      classificationReason = "Delivery Support (Ops and Central Managers) department — not an instructor role";
+      computedStatus = "excluded";
+    } else if (deptInfo.bucket === "mentor") {
+      classification = "mentor";
+      classificationReason = "Mentors department — tracked as its own section, not counted as an instructor";
+      computedStatus = "mentor";
+    } else if (deptInfo.bucket === "instructor_ops") {
+      classification = "instructor_ops";
+      classificationReason = "Instructors department, but designation isn't an Instructor or Mentor role — tracked as Instructor Team Operations, not counted as an instructor";
+      computedStatus = "instructor_ops";
+    } else if (isTeachosOnlyLeftover && exit) {
+      classification = "payroll_converted";
+      classificationReason = `No Darwin record anywhere (primary Instructors department or full 3,000+ roster) — payroll-converted, with a Darwin exit record also on file (status: ${exit.status ?? "unknown"}), combined into the Payroll bucket (2026-09-04).`;
+      computedStatus = "payroll_converted";
+    } else if (isTeachosOnlyLeftover && isIitKharagpurCampus) {
+      classification = "iit_kharagpur_team";
+      classificationReason = "No Darwin record anywhere (primary Instructors department or full 3,000+ roster), and TeachOS institute is IIT Kharagpur — tracked as its own team, not counted as a payroll-converted instructor.";
+      computedStatus = "iit_kharagpur_team";
+    } else if (isTeachosOnlyLeftover) {
+      classification = "payroll_converted";
+      classificationReason = "No Darwin record anywhere (primary Instructors department or full 3,000+ roster), no Darwin exit record, not IIT Kharagpur — remainder of the payroll-conversion pipeline.";
+      computedStatus = "payroll_converted";
+    } else {
+      computedStatus = row.inDarwin && row.darwinEmployeeStatus === "Active"
+        ? "active"
+        : row.inDarwin && !row.inTeachos
+          ? "pending_deployment"
+          : "needs_review";
+    }
+
+    return db.update(instructorsTable).set({
+      computedStatus,
+      classification,
+      classificationReason,
+      exitFlag: !!exit,
+      exitFlagStatus: exit?.status ?? null,
+      exitFlagDate: toISODate(exit?.exitDate ?? null),
+      exitDepartment: isTeachosOnlyLeftover ? (exit?.department ?? null) : null,
+      exitDesignation: isTeachosOnlyLeftover ? (exit?.designation ?? null) : null,
+      exitGender: isTeachosOnlyLeftover ? (exit?.gender ?? null) : null,
+      deptBucket: isDeptExclusion ? null : deptInfo.bucket,
+      deptArea: isAreaExclusion ? null : (deptInfo.area || exitDeptInfo?.area || null),
+      deploymentStatus,
+    }).where(eq(instructorsTable.id, row.id));
+  }));
+};
+
+export async function reconcileDarwin(rows: SheetRow[]) {
+  let newCount = 0;
+  let matchedCount = 0;
+  await db.update(instructorsTable).set({ inDarwin: false, darwinEmployeeStatus: null });
+  const people = await db.select().from(instructorsTable);
+  for (const item of rows) {
+    const fullName = cell(item, "Full Name", "full_name");
+    const employeeId = cell(item, "Employee Id", "employee_id");
+    if (!fullName) continue;
+    const match = findMatch(people, fullName, employeeId);
+    const values = {
+      employeeId,
+      fullName,
+      orgEmail: cell(item, "Org Email Id", "org_email"),
+      mobile: cell(item, "Primary Mobile Number", "mobile"),
+      dateOfJoining: cell(item, "Date Of Joining", "date_of_joining"),
+      department: cell(item, "Department", "department"),
+      subDepartment: cell(item, "Sub Department", "sub_department"),
+      designation: cell(item, "Designation", "designation"),
+      directManager: cell(item, "Direct Manager", "direct_manager"),
+      workLocation: cell(item, "Work Location", "work_location"),
+      workspace: cell(item, "Workspace", "workspace"),
+      gender: cell(item, "Gender", "gender"),
+      currentState: cell(item, "Current State", "current_state"),
+      currentCity: cell(item, "Current City", "current_city"),
+      darwinEmployeeStatus: cell(item, "Employee Status", "darwin_employee_status") ?? "Active",
+      inDarwin: true,
+    };
+    if (match) {
+      await db.update(instructorsTable).set(values).where(eq(instructorsTable.id, match.id));
+      matchedCount += 1;
+    } else {
+      const [created] = await db.insert(instructorsTable).values({ ...values, inTeachos: false, institutes: [], computedStatus: "pending_deployment", notes: null }).returning();
+      people.push(created);
+      newCount += 1;
+    }
+  }
+  return { new: newCount, matched: matchedCount, total_rows: rows.length };
+}
+
+export async function reconcileTeachos(rows: SheetRow[]) {
+  let newCount = 0;
+  let matchedCount = 0;
+  await db.update(instructorsTable).set({ inTeachos: false, teachosRole: null, teachosCategory: null, teachosManager: null, enrolledPlans: null, institutes: [] });
+  const people = await db.select().from(instructorsTable);
+  // Durable employee-ID bridge from the most recent "TeachOS ID Reference"
+  // upload/sync (see teachosIdReferenceTable + reconcileTeachosEmployeeIdReference
+  // below). Consulting it here — not just as a later one-off patch step —
+  // lets a TeachOS instructor whose name string doesn't closely match their
+  // Darwin name (nickname, spacing, transliteration, honorific) still
+  // resolve to the SAME existing person instead of being inserted as a
+  // duplicate "needs_review" record.
+  const bridgeByTeachosId = new Map(
+    (await db.select().from(teachosIdReferenceTable))
+      .filter((row) => row.instructorUserId)
+      .map((row) => [row.instructorUserId as string, row.employeeId]),
+  );
+  for (const item of rows) {
+    const fullName = cell(item, "instructor_name", "Instructor Name");
+    if (!fullName) continue;
+    // "Only ACTIVE TeachOS instructors count" needs to be guaranteed HERE,
+    // not left to whatever query/upload produced `rows` (2026-09-09 fix).
+    // It used to be enforced only inside fetchNiatInstructorDetailsRows()'s
+    // own SQL WHERE clause -- which protected the live BigQuery sync, but
+    // left both the manual "TeachOS" CSV upload (routes/uploads.ts) and the
+    // reconcile:from-csv script wide open: neither of those ever filtered
+    // status before handing rows to this function, so a manually uploaded
+    // export that includes inactive instructors would set inTeachos=true
+    // for them same as anyone active. A status value is treated
+    // permissively when the column is simply missing/blank (some sources,
+    // e.g. bigquery.ts's older table, don't always populate it, and a
+    // manual CSV may not carry this column at all) -- only an EXPLICIT
+    // non-"ACTIVE" value excludes a row, same spirit as the BigQuery query
+    // this mirrors.
+    const status = cell(item, "instructor_status", "Instructor Status");
+    if (status && status.trim().toUpperCase() !== "ACTIVE") continue;
+    const teachosUserId = cell(item, "instructor_user_id", "TeachOS User Id");
+    // Prefer an employee_id carried directly on the row itself — true as of
+    // the niat_instructor_details source (switched from
+    // niat_instructor_managers_and_instructors_details, which had no
+    // employee-ID column at all) — over the separately-persisted bridge
+    // table, which exists as a fallback for any source that doesn't carry
+    // employee_id inline.
+    const rowEmployeeId = cell(item, "Employee Id", "employee_id");
+    const bridgedEmployeeId = teachosUserId ? bridgeByTeachosId.get(teachosUserId) : undefined;
+    const match = findMatch(people, fullName, rowEmployeeId ?? bridgedEmployeeId);
+    const institute = cell(item, "institute_name", "Institute Name");
+    const values = {
+      teachosUserId: cell(item, "instructor_user_id", "TeachOS User Id"),
+      fullName,
+      teachosRole: cell(item, "instructor_role", "Instructor Role"),
+      teachosCategory: cell(item, "instructor_category", "Instructor Category"),
+      teachosManager: cell(item, "instructor_manager", "Instructor Manager"),
+      // enrolled_plans (2026-09-27, per request) -- pulled in via
+      // niatInstructorDetails.ts's cross-dataset join; see enrolledPlans'
+      // comment in the schema for where this actually lives in BigQuery.
+      enrolledPlans: cell(item, "enrolled_plans", "Enrolled Plans"),
+      inTeachos: true,
+      institutes: institute ? [institute] : [],
+      // Only set when the row actually carries one (niat_instructor_details
+      // does; older/manual sources may not) — omitted entirely rather than
+      // set to null/undefined so a match found purely by name doesn't wipe
+      // out an employeeId already on file from Darwin.
+      ...(rowEmployeeId ? { employeeId: rowEmployeeId } : {}),
+    };
+    // instructorsTable has TWO separate unique constraints that a TeachOS row
+    // can collide with: employee_id (this person's employee_id is already on
+    // a different record) and teachos_user_id (this exact TeachOS account is
+    // already on a different record — e.g. leftover state from an earlier
+    // reconciliation run, or a genuine duplicate/legacy account). Retry with
+    // whichever specific field(s) postgres names as the conflict dropped,
+    // rather than assuming it's always employeeId — a wrong assumption here
+    // previously surfaced as an unhandled 500 on the whole upload/sync
+    // instead of a per-row skip. See classificationOverrides.ts-style
+    // conflict-flagging used elsewhere in this file for the same pattern.
+    const write = async (vals: typeof values | Omit<typeof values, "employeeId" | "teachosUserId">) => {
+      if (match) {
+        const institutes = institute ? Array.from(new Set([...match.institutes, institute])) : match.institutes;
+        await db.update(instructorsTable).set({ ...vals, institutes }).where(eq(instructorsTable.id, match.id));
+        match.institutes = institutes;
+        if ("employeeId" in vals && vals.employeeId) match.employeeId = vals.employeeId;
+        matchedCount += 1;
+      } else {
+        const [created] = await db.insert(instructorsTable).values({ ...vals, inDarwin: false, computedStatus: "needs_review", notes: null }).returning();
+        people.push(created);
+        newCount += 1;
+      }
+    };
+    try {
+      await write(values);
+    } catch (e) {
+      // node-postgres populates .constraint on a unique_violation (23505),
+      // but check .detail too (e.g. 'Key (teachos_user_id)=(...) already
+      // exists.') in case it doesn't survive drizzle's error wrapping —
+      // belt-and-suspenders so a naming quirk here can't reproduce the
+      // unhandled-500 failure mode this replaces.
+      const cause = (e as { cause?: { constraint?: string; detail?: string } })?.cause;
+      const signal = `${cause?.constraint ?? ""} ${cause?.detail ?? ""}`;
+      const droppedFields: string[] = [];
+      let safeValues = { ...values };
+      if (signal.includes("employee_id") || signal.trim() === "") {
+        const { employeeId: _e, ...rest } = safeValues;
+        safeValues = rest as typeof safeValues;
+        droppedFields.push(`employee_id ${rowEmployeeId}`);
+      }
+      if (signal.includes("teachos_user_id")) {
+        const { teachosUserId: _t, ...rest } = safeValues;
+        safeValues = rest as typeof safeValues;
+        droppedFields.push(`teachos_user_id ${teachosUserId}`);
+      }
+      try {
+        await write(safeValues);
+      } catch {
+        // Still conflicting even with both unique fields dropped — give up
+        // on this row rather than crashing the whole upload/sync; it'll show
+        // up as a name-only "needs_review" entry for manual cleanup.
+        droppedFields.push("(and a second conflict on retry — needs manual review)");
+        if (!match) console.warn(`reconcileTeachos: dropped row for "${fullName}" (${teachosUserId}) — repeated unique-constraint conflict on insert.`);
+      }
+      if (match) {
+        await db.update(instructorsTable).set({
+          notes: `TeachOS lists ${droppedFields.join(", ")} for this person, but that value is already assigned to a different record. Needs manual review.`,
+        }).where(eq(instructorsTable.id, match.id));
+      }
+    }
+  }
+  return { new: newCount, matched: matchedCount, total_rows: rows.length };
+}
+
+// --- Darwin full-roster fallback match --------------------------------------
+// After the primary reconcileDarwin() pass (Instructors-department-filtered
+// Darwin data), some TeachOS instructors may still show inDarwin=false —
+// their Darwinbox record exists, it's just filed under a department other
+// than "Instructors" (Mentors is the confirmed real case; there may be
+// others). This pass takes Darwin's FULL/unfiltered company roster
+// (darwinbox_full_roster — see fetchDarwinRowsBoth() in
+// lib/connectors/darwinbox.ts and storeDarwinboxFullRoster() in
+// lib/storeRaw.ts) and re-checks exactly those remaining people against it.
+// A match here sets inDarwin=true (this person genuinely is in Darwinbox,
+// the primary sync just couldn't see them) plus inDarwinFullRoster=true as
+// an audit flag, and backfills department/status/manager fields so
+// recomputeStatuses()'s classifyDepartment() call picks the right bucket
+// (e.g. Mentors, or Delivery Support/Ops) exactly as it would have if the
+// primary sync had found them directly.
+//
+// Must run AFTER reconcileDarwin() (which needs a clean, freshly-matched
+// inDarwin state to know who's still unmatched) and does not depend on
+// reconcileTeachos() having *just* run — it reads whatever inTeachos state
+// is currently in instructorsTable, which reflects the most recent TeachOS
+// sync regardless of when that was.
+export async function reconcileDarwinFullRosterFallback(fullRosterRows: SheetRow[]) {
+  // Reset first so a person who dropped out of the full roster (or is now
+  // matched by the primary sync instead) doesn't keep a stale flag.
+  await db.update(instructorsTable).set({ inDarwinFullRoster: false });
+
+  const byEmployeeId = new Map<string, SheetRow>();
+  const byName = new Map<string, SheetRow>();
+  for (const row of fullRosterRows) {
+    const employeeId = cell(row, "Employee Id", "employee_id");
+    const fullName = cell(row, "Full Name", "full_name");
+    if (employeeId && !byEmployeeId.has(employeeId)) byEmployeeId.set(employeeId, row);
+    if (fullName) {
+      const key = normalize(fullName);
+      if (!byName.has(key)) byName.set(key, row);
+    }
+  }
+
+  const candidates = await db
+    .select()
+    .from(instructorsTable)
+    .where(and(eq(instructorsTable.inTeachos, true), eq(instructorsTable.inDarwin, false)));
+
+  let matchedCount = 0;
+  for (const person of candidates) {
+    const match = (person.employeeId && byEmployeeId.get(person.employeeId)) || byName.get(normalize(person.fullName));
+    if (!match) continue;
+
+    const employeeId = cell(match, "Employee Id", "employee_id");
+    const department = cell(match, "Department", "department");
+    const darwinEmployeeStatus = cell(match, "Employee Status", "darwin_employee_status") ?? "Active";
+
+    await db.update(instructorsTable).set({
+      inDarwin: true,
+      inDarwinFullRoster: true,
+      employeeId: employeeId ?? person.employeeId,
+      orgEmail: cell(match, "Org Email Id", "org_email") ?? person.orgEmail,
+      mobile: cell(match, "Primary Mobile Number", "mobile") ?? person.mobile,
+      dateOfJoining: cell(match, "Date Of Joining", "date_of_joining") ?? person.dateOfJoining,
+      department: department ?? person.department,
+      designation: cell(match, "Designation", "designation") ?? person.designation,
+      directManager: cell(match, "Direct Manager", "direct_manager") ?? person.directManager,
+      workLocation: cell(match, "Work Location", "work_location") ?? person.workLocation,
+      workspace: cell(match, "Workspace", "workspace") ?? person.workspace,
+      gender: cell(match, "Gender", "gender") ?? person.gender,
+      currentState: cell(match, "Current State", "current_state") ?? person.currentState,
+      currentCity: cell(match, "Current City", "current_city") ?? person.currentCity,
+      darwinEmployeeStatus,
+    }).where(eq(instructorsTable.id, person.id));
+    matchedCount += 1;
+  }
+
+  return { candidates: candidates.length, matched: matchedCount };
+}
+
+export async function reconcileExits(rows: SheetRow[]) {
+  let matchedCount = 0;
+  let unmatchedCount = 0;
+  const people = await db.select().from(instructorsTable);
+  for (const item of rows) {
+    const match = findMatch(people, cell(item, "Full Name", "full_name"), cell(item, "Employee Id", "employee_id"));
+    if (!match) {
+      unmatchedCount += 1;
+      continue;
+    }
+    await db.update(instructorsTable).set({
+      manualStatus: "exited",
+      exitDate: cell(item, "Exit Date", "exit_date"),
+      notes: cell(item, "Reason", "reason") ?? match.notes,
+    }).where(eq(instructorsTable.id, match.id));
+    matchedCount += 1;
+  }
+  return { matched: matchedCount, unmatched: unmatchedCount, total_rows: rows.length };
+}
+
+// TeachOS's own API/BigQuery data has no employee ID at all (see bigquery.ts
+// header comment) — this is the standing workaround: a periodically-uploaded
+// reference file that DOES carry employee_id per TeachOS instructor (from a
+// separate bulk-load/onboarding export), matched here by teachos_user_id
+// first, normalized name as fallback, same precedence classificationOverrides.ts
+// uses. Only ever fills in employeeId on an EXISTING inTeachos=true row —
+// never creates new instructors and never touches anyone not already in
+// TeachOS's own roster. People with no match here simply keep employeeId
+// null and are set aside per the standing pipeline (see
+// TEACHOS_INSTRUCTOR_COUNT_RULES.md) until a future reference file resolves
+// them.
+export async function reconcileTeachosEmployeeIdReference(rows: SheetRow[]) {
+  let matchedCount = 0;
+  let unmatchedCount = 0;
+  let conflictCount = 0;
+  const people = await db.select().from(instructorsTable).where(eq(instructorsTable.inTeachos, true));
+  const byTeachosId = new Map(people.filter((p) => p.teachosUserId).map((p) => [p.teachosUserId as string, p]));
+  const byName = new Map(people.map((p) => [normalize(p.fullName), p]));
+  for (const item of rows) {
+    const teachosUserId = cell(item, "Instructor User Id", "instructor_user_id");
+    const employeeId = cell(item, "Employee Id", "employee_id");
+    const fullName = cell(item, "Employee Name", "Instructor Name", "instructor_name", "full_name");
+    if (!employeeId) continue;
+    // Persist this instructor_user_id -> employee_id mapping durably, so a
+    // later reconcileTeachos() run (a fresh upload, or the live TeachOS
+    // sync) can consult it during matching instead of relying on fuzzy
+    // full-name string equality alone. Keyed on instructorUserId — a row
+    // without one can't be looked back up by a future TeachOS row anyway
+    // (reconcileTeachos matches on instructor_user_id), so it's skipped here.
+    if (teachosUserId) {
+      await db
+        .insert(teachosIdReferenceTable)
+        .values({ instructorUserId: teachosUserId, employeeId, fullName })
+        .onConflictDoUpdate({ target: teachosIdReferenceTable.instructorUserId, set: { employeeId, fullName, syncedAt: new Date() } });
+    }
+    const match = (teachosUserId && byTeachosId.get(teachosUserId)) || (fullName ? byName.get(normalize(fullName)) : undefined);
+    if (!match) {
+      unmatchedCount += 1;
+      continue;
+    }
+    try {
+      await db.update(instructorsTable).set({ employeeId }).where(eq(instructorsTable.id, match.id));
+      match.employeeId = employeeId;
+      matchedCount += 1;
+    } catch {
+      // Unique constraint on employeeId — this employee_id is already on a
+      // DIFFERENT row (a genuine data conflict between sources). Leave that
+      // other row's employeeId as-is rather than crashing the whole upload;
+      // flag it for manual review the same way classificationOverrides.ts
+      // conflicts are flagged.
+      await db.update(instructorsTable).set({
+        notes: `TeachOS ID reference file lists employee_id ${employeeId} for this person, but that id is already assigned to a different record. Needs manual review.`,
+      }).where(eq(instructorsTable.id, match.id));
+      conflictCount += 1;
+    }
+  }
+  return { matched: matchedCount, unmatched: unmatchedCount, conflicts: conflictCount, total_rows: rows.length };
+}
+
+// Supplementary enrichment pass, same shape as reconcileTeachosEmployeeIdReference()
+// above: patches ONE field (teachosManager -- exposed to the frontend as
+// "Capability Manager" for Instructors/Mentors, see reports.ts's
+// toApiInstructorSummary) onto rows the primary TeachOS sync already
+// matched, keyed on teachos_user_id. Never creates rows, never touches
+// anyone not already inTeachos=true. See capabilityManager.ts's header
+// comment for why this needs its own separate BigQuery table/query at all
+// -- the live sync's main table (niat_instructor_details) dropped the
+// manager column entirely when it switched over for reliable employee-ID
+// matching (2026-09), so this is how that assignment gets back onto each
+// row without reintroducing the employee-ID matching problems that switch
+// was meant to fix.
+// The BigQuery source this reads from carries up to ~8 candidate
+// "instructor_manager" rows per instructor -- stale/historical assignments
+// mixed in alongside the current one, evidently -- so a manager name has to
+// actually be on the maintained VALID_CAPABILITY_MANAGERS roster (see
+// ../data/validCapabilityManagers.ts) to be accepted. Every other candidate
+// is skipped rather than written, so a person's teachosManager only ever
+// ends up as either a real, confirmed Capability Manager or left unset --
+// never an arbitrary/wrong name (e.g. "Ranjith", "Rajat" -- both observed
+// candidates for real instructors, neither an actual Capability Manager).
+//
+// Maps a candidate's normalized form to the canonical full name that should
+// actually get written -- both the roster names themselves (self-mapped)
+// and CAPABILITY_MANAGER_ALIASES's raw-variant spellings (e.g. "Riya" ->
+// "Riya Rai"), so a candidate accepted via an alias still writes the same
+// canonical name a directly-matching candidate would, not the raw variant.
+const CANONICAL_CAPABILITY_MANAGER_BY_NORMALIZED = new Map<string, string>([
+  ...VALID_CAPABILITY_MANAGERS.map((name) => [normalize(name), name] as const),
+  ...Object.entries(CAPABILITY_MANAGER_ALIASES).map(([alias, canonical]) => [normalize(alias), canonical] as const),
+]);
+
+// "Garlapati Prudhvi Raj" is a real Capability Manager, but he also shows up
+// as a candidate row for far more instructors than the others -- evidently
+// some kind of default/fallback assignee in the source data, not always the
+// person's real manager (2026-09-08, per request). So he's treated as
+// lowest priority: if an instructor has ANY other valid Capability Manager
+// among their candidate rows, that one wins and Prudhvi is dropped, even if
+// his row is also present. He's only accepted when he's the sole valid
+// candidate for that person.
+const LOW_PRIORITY_MANAGER = normalize("Garlapati Prudhvi Raj");
+
+export async function reconcileCapabilityManager(rows: SheetRow[]) {
+  let matchedCount = 0;
+  let unmatchedCount = 0;
+  let invalidCount = 0;
+  let droppedLowPriorityCount = 0;
+  // Wipe first, same as reconcileTeachos() does for its own fields -- a
+  // stale/invalid value from before this filter existed (e.g. "Ranjith",
+  // written when any of the up-to-8 BigQuery candidates was accepted
+  // uncritically) must not linger just because this run doesn't happen to
+  // find a *replacement* value for that person.
+  await db.update(instructorsTable).set({ teachosManager: null }).where(eq(instructorsTable.inTeachos, true));
+  const people = await db.select().from(instructorsTable).where(eq(instructorsTable.inTeachos, true));
+  const byTeachosId = new Map(people.filter((p) => p.teachosUserId).map((p) => [p.teachosUserId as string, p]));
+
+  // Group every valid candidate row by teachos_user_id first -- can't
+  // decide anything per-row anymore now that Prudhvi's priority depends on
+  // what ELSE that same instructor was mapped to among their up-to-8 rows.
+  const validCandidatesByTeachosId = new Map<string, string[]>();
+  for (const item of rows) {
+    const teachosUserId = cell(item, "instructor_user_id", "Instructor User Id");
+    const manager = cell(item, "instructor_manager", "Instructor Manager");
+    if (!teachosUserId || !manager) continue;
+    const canonicalManager = CANONICAL_CAPABILITY_MANAGER_BY_NORMALIZED.get(normalize(manager));
+    if (!canonicalManager) {
+      invalidCount += 1;
+      continue;
+    }
+    const list = validCandidatesByTeachosId.get(teachosUserId) ?? [];
+    if (!list.includes(canonicalManager)) list.push(canonicalManager);
+    validCandidatesByTeachosId.set(teachosUserId, list);
+  }
+
+  for (const [teachosUserId, candidates] of validCandidatesByTeachosId) {
+    const nonLowPriority = candidates.filter((c) => normalize(c) !== LOW_PRIORITY_MANAGER);
+    let manager: string;
+    if (nonLowPriority.length > 0) {
+      manager = nonLowPriority[0];
+      if (candidates.length > nonLowPriority.length) droppedLowPriorityCount += 1;
+    } else {
+      // Only candidate(s) present are Prudhvi -- accept him as the fallback.
+      manager = candidates[0];
+    }
+    const match = byTeachosId.get(teachosUserId);
+    if (!match) {
+      unmatchedCount += 1;
+      continue;
+    }
+    if (match.teachosManager !== manager) {
+      await db.update(instructorsTable).set({ teachosManager: manager }).where(eq(instructorsTable.id, match.id));
+      match.teachosManager = manager;
+    }
+    matchedCount += 1;
+  }
+  return { matched: matchedCount, unmatched: unmatchedCount, invalid: invalidCount, droppedLowPriority: droppedLowPriorityCount, total_rows: rows.length };
+}
+
+// reconcilePayrollCandidates() was removed 2026-09-03 — payroll-converted
+// status is now fully computed by recomputeStatuses() above (exit check,
+// then IIT Kharagpur campus check, then remainder = payroll_converted) for
+// the TeachOS-only pool that never matches Darwin at all. The
+// PAYROLL_CONVERTED_EMPLOYEES hand-maintained override list was retired the
+// same day for the same reason. A "Payroll Candidates" upload no longer
+// does anything; the upload option was removed from the frontend too.

@@ -347,6 +347,8 @@ export interface InstructorSummary {
   exit_flag: boolean;
   /** Capability Manager's manual read on an exit-flagged record, settable via PATCH /instructors/{id}/exit-verification by either Admin or Manager. Tracking label only -- never affects computed_status/manual_status or headcount. @nullable */
   exit_verification: 'exited' | 'serving_notice_period' | 'payroll_converted' | 'absconded' | 'revoked' | null;
+  /** TeachOS's own "enrolled_plans" column. No fallback source, plain TeachOS-sourced display field. @nullable */
+  enrolled_plans: string | null;
 }
 
 export interface InstructorsReport {

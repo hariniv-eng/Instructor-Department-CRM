@@ -1,0 +1,887 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: API specification
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: auth
+    description: Login/session for the Admin and Manager dashboard accounts
+  - name: instructors
+    description: Instructor records and review
+  - name: dashboard
+    description: Dashboard summaries
+  - name: uploads
+    description: Source upload history
+  - name: sync
+    description: Live sync from Darwinbox and BigQuery/TeachOS
+  - name: reports
+    description: Instructor headcount and classification reporting
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+  # NOTE: these auth paths/schemas were hand-written to match this file's
+  # existing style rather than produced by `pnpm --filter @workspace/api-spec
+  # run codegen` (that tool doesn't run in the sandbox this was built in) —
+  # re-run codegen once on a machine where it works, to regenerate
+  # lib/api-zod and lib/api-client-react's generated/ files for real.
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Log in with email + password, sets the session cookie
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LoginInput" }
+      responses:
+        "200":
+          description: Logged in
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AppUser" }
+        "401":
+          description: Invalid email or password
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Log out, clears the session cookie
+      responses:
+        "204":
+          description: Logged out
+  /auth/me:
+    get:
+      operationId: getCurrentUser
+      tags: [auth]
+      summary: Get the logged-in user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AppUser" }
+        "401":
+          description: Not authenticated
+  /auth/password:
+    post:
+      operationId: changePassword
+      tags: [auth]
+      summary: Change the logged-in user's own password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ChangePasswordInput" }
+      responses:
+        "204":
+          description: Password changed
+        "401":
+          description: Not authenticated, or current_password is incorrect
+  /instructors:
+    get:
+      operationId: listInstructors
+      tags: [instructors]
+      summary: List instructors
+      parameters:
+        - in: query
+          name: search
+          schema: { type: string }
+        - in: query
+          name: status
+          schema: { type: string }
+        - in: query
+          name: sub_department
+          schema: { type: string }
+        - in: query
+          name: designation
+          schema: { type: string }
+        - in: query
+          name: source
+          schema: { type: string }
+        - in: query
+          name: classification
+          schema: { type: string }
+        - in: query
+          name: exit_flag
+          schema: { type: string }
+        - in: query
+          name: dept_bucket
+          description: >-
+            Either a raw dept_bucket value (tech, non_tech, mentor,
+            excluded_ops_managers, instructor_ops) or one of the three
+            UI-facing group names (instructor, mentor, excluded).
+          schema: { type: string }
+        - in: query
+          name: dept_area
+          description: "Subject/sub-area within a tech or non_tech dept_bucket, e.g. Frontend, Backend, DSA, GenAI, Math, English, Aptitude."
+          schema: { type: string }
+        - in: query
+          name: institute
+          description: Filters to instructors whose institutes array contains this campus/university name.
+          schema: { type: string }
+      responses:
+        "200":
+          description: Instructor records
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Instructor" }
+    post:
+      operationId: createInstructor
+      tags: [instructors]
+      summary: Create an instructor record
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/InstructorInput" }
+      responses:
+        "201":
+          description: Created instructor
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Instructor" }
+  /instructors/{id}:
+    get:
+      operationId: getInstructor
+      tags: [instructors]
+      summary: Get an instructor
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: number }
+      responses:
+        "200":
+          description: Instructor record
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Instructor" }
+        "404": { description: Not found }
+    patch:
+      operationId: updateInstructor
+      tags: [instructors]
+      summary: Update manual instructor status
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: number }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/InstructorUpdate" }
+      responses:
+        "200":
+          description: Updated instructor
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Instructor" }
+        "404": { description: Not found }
+  /instructors/{id}/gender:
+    patch:
+      operationId: updateInstructorGender
+      tags: [instructors]
+      summary: Set or clear an instructor's manual gender fallback (Admin or Manager)
+      description: >-
+        Narrower sibling of PATCH /instructors/{id} above (which is Admin-
+        only) -- this one is reachable by either role, since Manual Gender
+        is meant to be filled in by whoever knows the person, not just an
+        Admin. Only takes effect when Darwin doesn't already supply a
+        gender for this person (see InstructorSummary.gender_source);
+        Darwin's own value is never overridden by this.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: number }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/InstructorGenderUpdate" }
+      responses:
+        "200":
+          description: Updated instructor
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Instructor" }
+        "400": { description: "manual_gender must be \"male\", \"female\", or null" }
+        "404": { description: Not found }
+  /instructors/{id}/capability-manager:
+    patch:
+      operationId: updateInstructorCapabilityManager
+      tags: [instructors]
+      summary: Set or clear an instructor's manual Capability Manager fallback (Admin only)
+      description: >-
+        Narrower sibling of PATCH /instructors/{id} above -- both are
+        Admin-only, unlike the gender endpoint. Only takes effect when
+        TeachOS's own candidate rows didn't resolve to anyone on the
+        maintained Capability Manager roster (see
+        InstructorSummary.capability_manager_source); TeachOS's own value is
+        never overridden by this. The value must be one of the maintained
+        roster names (or null to clear it), not free text.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: number }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/InstructorCapabilityManagerUpdate" }
+      responses:
+        "200":
+          description: Updated instructor
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Instructor" }
+        "400": { description: "manual_capability_manager must be one of the maintained Capability Manager names, or null" }
+        "404": { description: Not found }
+  /instructors/{id}/subject:
+    patch:
+      operationId: updateInstructorSubject
+      tags: [instructors]
+      summary: Set or clear an instructor's manual Subject (dept_area) fallback (Admin only)
+      description: >-
+        Narrower sibling of PATCH /instructors/{id} above -- Admin-only,
+        same as the capability-manager endpoint. Only takes effect when
+        classifyDepartment() (departmentTaxonomy.ts) left this person
+        unclassified (see InstructorSummary.dept_area_source); the computed
+        value is never overridden by this. The value must be one of
+        departmentTaxonomy.ts's recognized area names (or null to clear
+        it), not free text. Not meaningful for Operations team rows, whose
+        dept_area is intentionally null.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: number }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/InstructorSubjectUpdate" }
+      responses:
+        "200":
+          description: Updated instructor
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Instructor" }
+        "400": { description: "manual_dept_area must be one of departmentTaxonomy.ts's recognized area names, or null" }
+        "404": { description: Not found }
+  /instructors/{id}/exit-verification:
+    patch:
+      operationId: updateInstructorExitVerification
+      tags: [instructors]
+      summary: Set or clear a Capability Manager's exit-verification label for an exit-flagged instructor (Admin or Manager)
+      description: >-
+        Both-role sibling of PATCH /instructors/{id} above, like the gender
+        endpoint -- reachable by either Admin or Manager, since a Capability
+        Manager may be logged in as either. Lets a Capability Manager record
+        their read on someone with a live Darwinbox exit record on file
+        (InstructorSummary.exit_flag) as one of "exited",
+        "serving_notice_period", "payroll_converted", or "absconded" (or
+        null to clear it back to unreviewed). This is a TRACKING LABEL ONLY
+        -- it never changes computed_status or manual_status, and never
+        affects the standing instructor headcount. Actually excluding
+        someone from the count stays the separate, deliberate Manual Status
+        control on PATCH /instructors/{id} (Admin-only). It does drive the
+        Instructors tab's Exception queue: everything except
+        "payroll_converted" (or anyone Darwinbox's own live exit sync
+        already reports as "Revoked" -- see exit_flag_status) keeps showing
+        there. "revoked" was removed as a settable value here (2026-09-19,
+        per request) since that automatic Darwinbox-status check already
+        covers it, making a manual "Revoked" label redundant.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: number }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/InstructorExitVerificationUpdate" }
+      responses:
+        "200":
+          description: Updated instructor
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Instructor" }
+        "400": { description: "exit_verification must be \"exited\", \"serving_notice_period\", \"payroll_converted\", \"absconded\", or null" }
+        "404": { description: Not found }
+  /dashboard:
+    get:
+      operationId: getDashboard
+      tags: [dashboard]
+      summary: Get headcount and attrition dashboard
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Dashboard" }
+  /uploads:
+    get:
+      operationId: listUploads
+      tags: [uploads]
+      summary: List recent uploads
+      responses:
+        "200":
+          description: Upload history
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Upload" }
+    post:
+      operationId: uploadSource
+      tags: [uploads]
+      summary: Record a source upload
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UploadInput" }
+      responses:
+        "201":
+          description: Upload recorded
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Upload" }
+  /sync/darwinbox:
+    post:
+      operationId: syncDarwinbox
+      tags: [sync]
+      summary: Pull active employees from Darwinbox's Master API and reconcile
+      responses:
+        "200":
+          description: Sync result
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SyncResult" }
+  /sync/darwinbox-exits:
+    post:
+      operationId: syncDarwinboxExits
+      tags: [sync]
+      summary: Pull the exit-employee report from Darwinbox's Reports Builder API and reconcile
+      responses:
+        "200":
+          description: Sync result
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SyncResult" }
+  /sync/teachos:
+    post:
+      operationId: syncTeachos
+      tags: [sync]
+      summary: Pull instructor deployment data from BigQuery and reconcile
+      responses:
+        "200":
+          description: Sync result
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SyncResult" }
+  /sync/status:
+    get:
+      operationId: getSyncStatus
+      tags: [sync]
+      summary: Get auto-sync interval and most recent sync result per source
+      responses:
+        "200":
+          description: Sync status
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SyncStatus" }
+  /reports/instructors:
+    get:
+      operationId: getReportsInstructors
+      tags: [reports]
+      summary: Total instructor count and full breakdown (department, payroll, campus, manager, deployment)
+      description: >
+        The single reporting surface for the TeachOS instructor-count
+        standing rule. Anchored on TeachOS's own instructor roster
+        (in_teachos=true) reconciled against Darwin (primary
+        Instructors-department match, then the full-roster fallback match —
+        see darwin_match in the response) and the maintained classification
+        overrides. kpis.total_instructor_count is the headline figure.
+      responses:
+        "200":
+          description: Instructor report
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InstructorsReport" }
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+    Instructor:
+      type: object
+      required: [id, full_name, institutes, in_darwin, in_teachos, computed_status]
+      properties:
+        id: { type: number }
+        employee_id: { type: ["string", "null"] }
+        teachos_user_id: { type: ["string", "null"] }
+        full_name: { type: string }
+        org_email: { type: ["string", "null"] }
+        mobile: { type: ["string", "null"] }
+        date_of_joining: { type: ["string", "null"], format: date }
+        department: { type: ["string", "null"] }
+        sub_department: { type: ["string", "null"] }
+        designation: { type: ["string", "null"] }
+        direct_manager: { type: ["string", "null"] }
+        work_location: { type: ["string", "null"] }
+        workspace: { type: ["string", "null"] }
+        gender: { type: ["string", "null"] }
+        current_state: { type: ["string", "null"] }
+        current_city: { type: ["string", "null"] }
+        darwin_employee_status: { type: ["string", "null"] }
+        in_darwin: { type: boolean }
+        in_teachos: { type: boolean }
+        teachos_role: { type: ["string", "null"] }
+        teachos_category: { type: ["string", "null"] }
+        teachos_manager: { type: ["string", "null"] }
+        manual_capability_manager: { type: ["string", "null"], description: "Manual fallback for the Capability Manager, settable via PATCH /instructors/{id}/capability-manager (Admin only). Only used when TeachOS's own candidate rows didn't resolve to anyone on the maintained roster for this person. Must be one of that maintained roster's names, or null." }
+        institutes:
+          type: array
+          items: { type: string }
+        computed_status: { type: string }
+        manual_status: { type: ["string", "null"] }
+        manual_gender: { type: ["string", "null"], description: "Manual fallback for gender, settable via PATCH /instructors/{id}/gender by either Admin or Manager. Only used when Darwin has no gender on file for this person." }
+        exit_date: { type: ["string", "null"], format: date }
+        converted_university_name: { type: ["string", "null"] }
+        notes: { type: ["string", "null"] }
+        classification: { type: ["string", "null"], description: "TeachOS instructor-count classification override match — one of excluded_other_department, excluded_non_department_team, payroll_converted, or null. See classificationOverrides.ts / TEACHOS_INSTRUCTOR_COUNT_RULES.md." }
+        classification_reason: { type: ["string", "null"] }
+        exit_flag: { type: boolean, description: "True when a live Darwinbox exit/resignation record was found for this person. Flagged only — NOT subtracted from the standing instructor count." }
+        exit_flag_status: { type: ["string", "null"], description: "Darwinbox resignation status as of the most recent exit sync, e.g. Approved, Pending With Approver, Rejected, Revoked." }
+        exit_flag_date: { type: ["string", "null"], format: date }
+        exit_verification: { type: ["string", "null"], enum: ["exited", "serving_notice_period", "payroll_converted", "absconded", "revoked", null], description: "Capability Manager's manual read on an exit-flagged record, settable via PATCH /instructors/{id}/exit-verification by either Admin or Manager. Tracking label only — never affects computed_status/manual_status or the headcount." }
+        dept_bucket: { type: ["string", "null"], description: "tech | non_tech | null. See departmentTaxonomy.ts. Null for excluded/mentor rows (see classification)." }
+        dept_area: { type: ["string", "null"], description: "Sub-area within dept_bucket, e.g. Frontend, Backend, DSA, GenAI, English, Aptitude, Math." }
+        manual_dept_area: { type: ["string", "null"], description: "Manual fallback for Subject/dept_area, settable via PATCH /instructors/{id}/subject (Admin only). Only used when classifyDepartment() left this person unclassified. Must be one of departmentTaxonomy.ts's recognized area names, or null." }
+        deployment_status: { type: ["string", "null"], description: "deployed | in_training | null, derived from TeachOS institutes (institute_name \"Training Institute\" = in_training)." }
+        in_darwin_full_roster: { type: boolean, description: "True when this person's Darwin match came from the full/unfiltered company roster fallback rather than the primary Instructors-department sync — see reconcileDarwinFullRosterFallback()." }
+    InstructorInput:
+      type: object
+      required: [full_name]
+      properties:
+        full_name: { type: string }
+        employee_id: { type: ["string", "null"] }
+        org_email: { type: ["string", "null"] }
+        sub_department: { type: ["string", "null"] }
+        designation: { type: ["string", "null"] }
+    InstructorUpdate:
+      type: object
+      properties:
+        manual_status: { type: ["string", "null"] }
+        exit_date: { type: ["string", "null"], format: date }
+        converted_university_name: { type: ["string", "null"] }
+        notes: { type: ["string", "null"] }
+    # Body for PATCH /instructors/{id}/gender -- a narrower, both-role
+    # sibling of InstructorUpdate above (which is Admin-only). "male" or
+    # "female" sets it, null clears it back to unknown.
+    InstructorGenderUpdate:
+      type: object
+      required: [manual_gender]
+      properties:
+        manual_gender: { type: ["string", "null"], enum: ["male", "female", null] }
+    # Body for PATCH /instructors/{id}/capability-manager -- Admin-only,
+    # unlike InstructorGenderUpdate above. Deliberately NOT an enum here:
+    # the valid roster (see data/validCapabilityManagers.ts) is a
+    # human-maintained list that changes over time, and duplicating its
+    # exact membership into this spec would be one more place to keep in
+    # sync. The route validates against that roster server-side and 400s
+    # on anything else.
+    InstructorCapabilityManagerUpdate:
+      type: object
+      required: [manual_capability_manager]
+      properties:
+        manual_capability_manager: { type: ["string", "null"], description: "Must be one of the names in data/validCapabilityManagers.ts, or null." }
+    # Body for PATCH /instructors/{id}/subject -- Admin-only, same pattern
+    # as InstructorCapabilityManagerUpdate above. Not an enum for the same
+    # reason: departmentTaxonomy.ts's SUBJECT_AREAS is the source of truth,
+    # duplicating it here would be one more place to keep in sync. The
+    # route validates against it server-side and 400s on anything else.
+    InstructorSubjectUpdate:
+      type: object
+      required: [manual_dept_area]
+      properties:
+        manual_dept_area: { type: ["string", "null"], description: "Must be one of departmentTaxonomy.ts's SUBJECT_AREAS, or null." }
+    # Body for PATCH /instructors/{id}/exit-verification -- both-role
+    # sibling like InstructorGenderUpdate above (a Capability Manager may be
+    # logged in as either Admin or Manager). Tracking label only: setting
+    # this never touches manual_status/computed_status or the headcount.
+    InstructorExitVerificationUpdate:
+      type: object
+      required: [exit_verification]
+      properties:
+        # "revoked" removed as a settable value (2026-09-19, per request) --
+        # reports.ts's Exception queue now auto-excludes anyone Darwinbox's
+        # own live exit sync reports as "Revoked" (exit_flag_status) on its
+        # own, making a manual "Revoked" label redundant. Instructor/
+        # InstructorSummary's exit_verification (the read side, below) still
+        # allows "revoked" since a row set that way before this change may
+        # still carry it.
+        exit_verification: { type: ["string", "null"], enum: ["exited", "serving_notice_period", "payroll_converted", "absconded", null] }
+    Dashboard:
+      type: object
+      required: [kpis, monthly_trend, sub_departments, designations]
+      properties:
+        kpis:
+          type: object
+          additionalProperties: { type: number }
+        monthly_trend:
+          type: array
+          items:
+            type: object
+            required: [month, joiners, exits]
+            properties:
+              month: { type: string }
+              joiners: { type: number }
+              exits: { type: number }
+        sub_departments:
+          type: array
+          items:
+            type: object
+            required: [name, count]
+            properties:
+              name: { type: string }
+              count: { type: number }
+        designations:
+          type: array
+          items:
+            type: object
+            required: [name, count]
+            properties:
+              name: { type: string }
+              count: { type: number }
+    Upload:
+      type: object
+      required: [id, source, filename, row_count, uploaded_at]
+      properties:
+        id: { type: number }
+        source: { type: string }
+        filename: { type: string }
+        row_count: { type: number }
+        uploaded_at: { type: string, format: date-time }
+    AppUser:
+      type: object
+      description: A dashboard login account (not an instructor record).
+      required: [id, email, full_name, role, is_active]
+      properties:
+        id: { type: number }
+        email: { type: string }
+        full_name: { type: string }
+        role: { type: string, enum: [admin, manager] }
+        is_active: { type: boolean }
+        last_login_at: { type: string, nullable: true }
+    LoginInput:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string }
+        password: { type: string }
+    ChangePasswordInput:
+      type: object
+      required: [current_password, new_password]
+      properties:
+        current_password: { type: string }
+        new_password: { type: string }
+    UploadInput:
+      type: object
+      required: [source, filename, row_count]
+      properties:
+        source: { type: string }
+        filename: { type: string }
+        row_count: { type: number }
+        rows:
+          type: array
+          description: Parsed tabular source rows, retained only long enough to reconcile the current snapshot.
+          items:
+            type: object
+            additionalProperties: true
+    SyncResult:
+      type: object
+      description: Result of one live sync attempt. Each sync replaces that source's own raw snapshot table only — sources are kept fully separate, nothing is matched/merged across them. `ok:false` means the attempt failed (network/credential/schema issue) — check `error`; `stored` is only meaningful when `ok:true`.
+      required: [ok, source, synced_at]
+      properties:
+        ok: { type: boolean }
+        source:
+          type: string
+          enum: [darwinbox_live, darwinbox_exits_live, teachos_live]
+        stored: { type: ["number", "null"], description: "Row count now stored for this source after the replace." }
+        error: { type: ["string", "null"] }
+        synced_at: { type: string, format: date-time }
+    SyncSourceStatus:
+      type: object
+      required: [auto_sync_interval_hours, last_sync]
+      properties:
+        auto_sync_interval_hours: { type: number }
+        last_sync:
+          oneOf:
+            - $ref: "#/components/schemas/SyncResult"
+            - type: "null"
+    SyncStatus:
+      type: object
+      required: [darwinbox, darwinbox_exits, teachos]
+      properties:
+        darwinbox: { $ref: "#/components/schemas/SyncSourceStatus" }
+        darwinbox_exits: { $ref: "#/components/schemas/SyncSourceStatus" }
+        teachos: { $ref: "#/components/schemas/SyncSourceStatus" }
+    InstructorsReport:
+      type: object
+      required: [kpis, darwin_match, department, payroll, campuses, managers, deployment, mentors, instructors]
+      properties:
+        kpis:
+          type: object
+          additionalProperties: { type: number }
+          description: total_instructor_count is the headline "TeachOS instructor count" figure.
+        darwin_match:
+          type: object
+          required: [matched_primary, matched_full_roster_fallback, not_in_darwin]
+          properties:
+            matched_primary: { type: number }
+            matched_full_roster_fallback: { type: number }
+            not_in_darwin: { type: number }
+        department:
+          type: object
+          properties:
+            tech: { $ref: "#/components/schemas/DeptBucketReport" }
+            non_tech: { $ref: "#/components/schemas/DeptBucketReport" }
+            unclassified: { type: number }
+        payroll:
+          type: object
+          properties:
+            payroll_converted: { type: number }
+            non_payroll: { type: number }
+        campuses:
+          type: array
+          items: { $ref: "#/components/schemas/GroupedInstructors" }
+        managers:
+          type: array
+          items: { $ref: "#/components/schemas/GroupedInstructors" }
+        deployment:
+          type: object
+          properties:
+            deployed: { type: number }
+            in_training: { type: number }
+            unknown: { type: number }
+        mentors:
+          type: array
+          items: { $ref: "#/components/schemas/ReportPerson" }
+        instructors:
+          type: array
+          description: Every person counted in kpis.total_instructor_count, sorted by name. Backs a click-to-expand details view under the headline count.
+          items: { $ref: "#/components/schemas/InstructorSummary" }
+        access_breakdown:
+          type: object
+          description: Darwin-only / TeachOS-only / both-access split for the Instructor Department, Instructors, Mentors, Operations team, and Exception KPI cards (2026-09-04; department card added 2026-09-07; exception added 2026-09-18). "department" is the union of instructors + mentors + ops_team (mutually exclusive populations, safe to sum). "exception" is a review-queue overlay on top of those three, not a fourth population to add in -- see reports.ts's exceptionRows comment.
+          properties:
+            department: { $ref: "#/components/schemas/AccessSplit" }
+            instructors: { $ref: "#/components/schemas/AccessSplit" }
+            mentors: { $ref: "#/components/schemas/AccessSplit" }
+            ops_team: { $ref: "#/components/schemas/AccessSplit" }
+            exception: { $ref: "#/components/schemas/AccessSplit" }
+    AccessBucket:
+      type: object
+      description: One darwin_only/both/teachos_only bucket -- a count plus the actual people in it, for the click-to-drill-down view.
+      properties:
+        count: { type: number }
+        people:
+          type: array
+          items: { $ref: "#/components/schemas/InstructorSummary" }
+    AccessSplit:
+      type: object
+      description: How a category's total splits by data source -- Darwin record only, TeachOS record only, or both -- each with its own people list.
+      properties:
+        darwin_only: { $ref: "#/components/schemas/AccessBucket" }
+        both: { $ref: "#/components/schemas/AccessBucket" }
+        teachos_only: { $ref: "#/components/schemas/AccessBucket" }
+    DeptBucketReport:
+      type: object
+      properties:
+        count: { type: number }
+        areas:
+          type: array
+          items:
+            type: object
+            properties:
+              area: { type: string }
+              count: { type: number }
+    GroupedInstructors:
+      type: object
+      properties:
+        campus: { type: string, description: "Present on campus-grouped entries." }
+        manager: { type: string, description: "Present on manager-grouped entries." }
+        count: { type: number }
+        instructors:
+          type: array
+          items: { $ref: "#/components/schemas/ReportPerson" }
+    ReportPerson:
+      type: object
+      properties:
+        id: { type: number }
+        full_name: { type: string }
+        employee_id: { type: ["string", "null"] }
+        designation: { type: ["string", "null"] }
+    InstructorSummary:
+      type: object
+      required:
+        - id
+        - full_name
+        - employee_id
+        - teachos_user_id
+        - designation
+        - department
+        - dept_bucket
+        - classification
+        - dept_area
+        - dept_area_source
+        - is_payroll
+        - deployment_status
+        - institutes
+        - capability_manager
+        - capability_manager_source
+        - darwin_manager
+        - date_of_joining
+        - org_email
+        - work_location
+        - gender
+        - gender_source
+        - exit_flag
+        - exit_verification
+        - enrolled_plans
+      properties:
+        id: { type: number }
+        full_name: { type: string }
+        employee_id: { type: ["string", "null"] }
+        teachos_user_id: { type: ["string", "null"] }
+        # Darwin's own value when present; else falls back to the matched
+        # Darwinbox exit record's Designation field (2026-09-21, per
+        # request) -- a payroll-converted person has no Darwin record at
+        # all, so this is otherwise always blank for that population.
+        designation: { type: ["string", "null"] }
+        # Same fallback as designation above (2026-09-21, per request) --
+        # Darwin's own value when present, else the matched exit record's
+        # Department field.
+        department: { type: ["string", "null"] }
+        dept_bucket: { type: ["string", "null"] }
+        # The row's underlying classification (see reconcile.ts's
+        # recomputeStatuses) -- added (2026-09-22) to power the Instructors
+        # tab's bifurcation column (Instructor / Mentor / Delivery Support).
+        # Unlike dept_bucket above, this is NEVER nulled for a Mentor/Ops
+        # row, so it's the reliable field for telling those apart once mixed
+        # into a combined list. Typical values seen on this report: null,
+        # "payroll_converted", or "iit_kharagpur_team" (all ordinary
+        # instructors), "mentor", or "excluded_ops_managers".
+        classification: { type: ["string", "null"] }
+        dept_area: { type: ["string", "null"] }
+        # Mirrors gender_source/capability_manager_source below (2026-09-15,
+        # per request): tells the frontend whether this value is locked
+        # (computed by classifyDepartment()) or editable (a manual entry,
+        # or nothing on file yet) -- see the PATCH /instructors/{id}/subject
+        # endpoint and manualDeptArea's comment in the schema. Not offered
+        # for Operations team rows, whose null dept_area is intentional.
+        dept_area_source: { type: ["string", "null"], enum: ["computed", "manual", null] }
+        is_payroll: { type: boolean }
+        deployment_status: { type: ["string", "null"] }
+        institutes:
+          type: array
+          items: { type: string }
+        # TeachOS's own Capability Manager assignment (instructor_manager),
+        # with no fallback to Darwin's Direct Manager -- see
+        # toApiInstructorSummary in reports.ts. Backs the "Capability
+        # Manager" column shown on every card in the Overview drill-down
+        # (2026-09-07/08). The old combined `manager` field (teachosManager
+        # || directManager fallback) was removed entirely (2026-09-08, per
+        # request) now that every card shows both explicit columns.
+        capability_manager: { type: ["string", "null"] }
+        # Mirrors gender_source below (2026-09-15, per request): tells the
+        # frontend whether this value is locked (from TeachOS) or editable
+        # (a manual entry, or nothing on file yet) -- see the PATCH
+        # /instructors/{id}/capability-manager endpoint and
+        # manualCapabilityManager's comment in the schema.
+        capability_manager_source: { type: ["string", "null"], enum: ["teachos", "manual", null] }
+        # Darwin's own "Direct Manager" field, shown as its own column
+        # ("Manager (Darwin)") alongside capability_manager on every card
+        # in the Overview drill-down (2026-09-07/08).
+        darwin_manager: { type: ["string", "null"] }
+        # Darwin's Date of joining -- shown on the Instructors tab table
+        # (2026-09, per request), mirroring the same field already on every
+        # Darwin Breakdown bucket (see Candidate schema).
+        date_of_joining: { type: ["string", "null"] }
+        # Darwin's own "Org Email Id" field, shown as an Email column on the
+        # Instructors tab table (2026-09-15, per request). Same gating as
+        # date_of_joining above -- blank rather than a stale value when
+        # there's no current Darwin access for this person.
+        org_email: { type: ["string", "null"] }
+        # Shown as the "Location (Darwin)" column on the Instructors tab
+        # table (2026-09-15, per request) -- distinct from the Campus column
+        # (institutes, TeachOS deployment). Same gating as date_of_joining/
+        # org_email above. Originally sourced from Darwin's "Work Location"
+        # field; switched to Darwin's "Workspace" field instead (2026-09-17,
+        # per request) -- same API field name and frontend column, just a
+        # different Darwin source column feeding it.
+        work_location: { type: ["string", "null"] }
+        # Effective gender -- Darwin's own "Gender" field (typically "Male"/
+        # "Female") when present, else the manually-set fallback (2026-09-09
+        # follow-up: manualGender) for someone Darwin can't supply it for.
+        # Darwin's value, when present, always wins.
+        gender: { type: ["string", "null"] }
+        # Whether `gender` above came from Darwin (locked -- the Instructors
+        # tab shows plain text), a payroll-converted person's matched
+        # Darwinbox exit record ("exit", 2026-09-21 -- editable, same
+        # dropdown as manual, since an exit record is a secondary source and
+        # not locked fact the way Darwin's own field is), or was set/left
+        # blank manually (the Instructors tab shows the manual-gender
+        # dropdown instead).
+        gender_source: { type: ["string", "null"], enum: ["darwin", "exit", "manual", null] }
+        # True when a live Darwinbox exit/resignation record was found for
+        # this person (2026-09-17, per request) -- powers the Instructors
+        # tab's Exit column: true shows the manual-verification dropdown,
+        # false shows a plain dash. Flagged only, same "flag, don't
+        # subtract" philosophy as elsewhere -- never subtracted from the
+        # standing instructor count by itself.
+        exit_flag: { type: boolean }
+        # Capability Manager's manual read on an exit-flagged record,
+        # settable via PATCH /instructors/{id}/exit-verification by either
+        # Admin or Manager -- see that endpoint's description for why this
+        # is a tracking label only and never touches computed_status/
+        # manual_status or the headcount.
+        exit_verification: { type: ["string", "null"], enum: ["exited", "serving_notice_period", "payroll_converted", "absconded", "revoked", null] }
+        # TeachOS's own "enrolled_plans" column (2026-09-27, per request: "in
+        # teachOs data...niat_instructor_details table has a new column...
+        # enrolled_plans...show it as a new column"). Lives on a differently-
+        # scoped copy of niat_instructor_details, in a different BigQuery
+        # dataset than the rest of this connector reads from -- see
+        # niatInstructorDetails.ts's fetchNiatInstructorDetailsRows() for the
+        # cross-dataset join. No fallback source, plain display field.
+        enrolled_plans: { type: ["string", "null"] }

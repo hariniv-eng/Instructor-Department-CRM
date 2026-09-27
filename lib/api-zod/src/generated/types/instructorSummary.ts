@@ -49,4 +49,6 @@ export interface InstructorSummary {
   exit_flag: boolean;
   /** @nullable */
   exit_verification: 'exited' | 'serving_notice_period' | 'payroll_converted' | 'absconded' | 'revoked' | null;
+  /** TeachOS's own "enrolled_plans" column. @nullable */
+  enrolled_plans: string | null;
 }
