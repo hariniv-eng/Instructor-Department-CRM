@@ -9,6 +9,7 @@ import { db, instructorsTable, darwinboxExitsTable, teachosIdReferenceTable } fr
 import { EXCLUDED_EMPLOYEES, type ExcludedOverride, OTHER_DEPARTMENT_EMPLOYEES, type OtherDepartmentOverride } from "../data/classificationOverrides";
 import { VALID_CAPABILITY_MANAGERS, CAPABILITY_MANAGER_ALIASES } from "../data/validCapabilityManagers";
 import { classifyDepartment, classifyDeployment } from "./departmentTaxonomy";
+import { archiveInstructors } from "./archiveInstructors";
 
 export type SheetRow = Record<string, unknown>;
 
@@ -350,6 +351,10 @@ export const recomputeStatuses = async () => {
       deploymentStatus,
     }).where(eq(instructorsTable.id, row.id));
   }));
+  // Permanent archive (2026-09-28, per request) -- see archiveInstructors.ts.
+  // Runs after every row above is fully updated, so it archives this
+  // reconcile pass's final state, not a stale pre-update snapshot.
+  await archiveInstructors();
 };
 
 export async function reconcileDarwin(rows: SheetRow[]) {

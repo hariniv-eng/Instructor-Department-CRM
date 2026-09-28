@@ -240,6 +240,87 @@ export const instructorsTable = pgTable("instructors", {
   payrollCandidateNote: text("payroll_candidate_note"),
 });
 
+// Permanent instructor archive (2026-09-28, per request: "every time an
+// instructor is converted to payroll, his darwin box is getting deleted...
+// the only information we're going to have about that payroll instructor is
+// in the teachos data... create a whole table where we store all the
+// instructor data, even if they're exited"). A full mirror of
+// instructorsTable's own data columns, kept ADDITIVE-ONLY -- see
+// archiveInstructors() in artifacts/api-server/src/lib/archiveInstructors.ts
+// (called at the end of every recomputeStatuses() run, so it updates on the
+// same cadence as every Darwin/TeachOS sync):
+//   - A person never seen before gets a brand-new row here.
+//   - A person already archived gets each field refreshed ONLY where the
+//     live instructorsTable row currently has a real (non-null, non-empty)
+//     value for it -- a field that's gone null/empty on the live side
+//     (e.g. designation/department/work_location after a Darwin record is
+//     removed on payroll conversion) simply keeps whatever was archived
+//     last time it WAS populated, instead of being overwritten with the
+//     gap.
+//   - No code path ever deletes a row from this table, including the
+//     one-off /admin/reset-instructors wipe in routes/uploads.ts (which
+//     only ever touches instructorsTable/uploadsTable/
+//     teachosIdReferenceTable) -- this table's row count can only grow.
+// matchedBy/firstSeenAt/lastSyncedAt below are archive-only bookkeeping,
+// not mirrored from instructorsTable.
+export const instructorArchiveTable = pgTable("instructor_archive", {
+  id: serial("id").primaryKey(),
+  employeeId: text("employee_id").unique(),
+  teachosUserId: text("teachos_user_id").unique(),
+  fullName: text("full_name").notNull(),
+  orgEmail: text("org_email"),
+  mobile: text("mobile"),
+  dateOfJoining: date("date_of_joining"),
+  department: text("department"),
+  subDepartment: text("sub_department"),
+  designation: text("designation"),
+  directManager: text("direct_manager"),
+  workLocation: text("work_location"),
+  workspace: text("workspace"),
+  gender: text("gender"),
+  manualGender: text("manual_gender"),
+  currentState: text("current_state"),
+  currentCity: text("current_city"),
+  darwinEmployeeStatus: text("darwin_employee_status"),
+  inDarwin: boolean("in_darwin").notNull().default(false),
+  inTeachos: boolean("in_teachos").notNull().default(false),
+  teachosRole: text("teachos_role"),
+  teachosCategory: text("teachos_category"),
+  teachosManager: text("teachos_manager"),
+  enrolledPlans: text("enrolled_plans"),
+  manualCapabilityManager: text("manual_capability_manager"),
+  institutes: text("institutes").array().notNull().default([]),
+  computedStatus: text("computed_status").notNull().default("needs_review"),
+  manualStatus: text("manual_status"),
+  exitDate: date("exit_date"),
+  convertedUniversityName: text("converted_university_name"),
+  notes: text("notes"),
+  classification: text("classification"),
+  classificationReason: text("classification_reason"),
+  exitFlag: boolean("exit_flag").notNull().default(false),
+  exitFlagStatus: text("exit_flag_status"),
+  exitFlagDate: date("exit_flag_date"),
+  exitVerification: text("exit_verification"),
+  inDarwinFullRoster: boolean("in_darwin_full_roster").notNull().default(false),
+  deptBucket: text("dept_bucket"),
+  deptArea: text("dept_area"),
+  manualDeptArea: text("manual_dept_area"),
+  exitDepartment: text("exit_department"),
+  exitDesignation: text("exit_designation"),
+  exitGender: text("exit_gender"),
+  deploymentStatus: text("deployment_status"),
+  payrollCandidateMatched: boolean("payroll_candidate_matched").notNull().default(false),
+  payrollCandidateNote: text("payroll_candidate_note"),
+  // Which key resolved this row to an existing archive entry the last time
+  // it was updated: "employee_id" | "teachos_user_id" | "name" | null (row
+  // just created, nothing to match against yet). Purely diagnostic -- lets
+  // you spot a person only ever matched by fuzzy name if that ever needs
+  // auditing.
+  archiveMatchedBy: text("archive_matched_by"),
+  firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull().defaultNow(),
+  lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const uploadsTable = pgTable("uploads", {
   id: serial("id").primaryKey(),
   source: text("source").notNull(),
