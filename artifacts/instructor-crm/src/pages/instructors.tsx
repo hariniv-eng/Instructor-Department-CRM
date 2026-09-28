@@ -788,7 +788,7 @@ function downloadInstructorsCsv(category: CategoryKey, people: InstructorSummary
   headers.push('Bifurcation');
   if (category !== 'ops_team') headers.push('Payroll');
   headers.push('Gender');
-  headers.push('Exit');
+  headers.push('Employee Status');
   headers.push('Enrolled Plan');
 
   const rows = people.map((person) => {
@@ -832,7 +832,7 @@ function CategoryTable({ category, people, backQuery }: { category: CategoryKey;
           <span>Bifurcation</span>
           {category !== 'ops_team' && <span>Payroll</span>}
           <span>Gender</span>
-          <span>Exit</span>
+          <span>Employee Status</span>
           <span>Enrolled Plan</span>
         </div>
         <div>{people.map((person) => <PersonRow key={person.id} category={category} person={person} columns={columns} backQuery={backQuery} />)}</div>
