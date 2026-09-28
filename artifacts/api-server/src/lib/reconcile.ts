@@ -147,6 +147,23 @@ async function loadLatestExitsByPerson(): Promise<{ byEmployeeId: Map<string, Ex
   for (const exit of exits) {
     if (!exit.employeeId) continue;
     const status = cell(exit.rawData, "Status", "status");
+    // Revoked and Rejected both mean this particular separation request
+    // never actually took effect -- Revoked was cancelled/withdrawn after
+    // being raised, Rejected was declined outright (2026-09-28, per request:
+    // "in the exception dont add rejected status" -- Revoked was fixed the
+    // same way the same day, see that comment's history). Neither should set
+    // exitFlag on its own. Skipped HERE, upstream of the "most recent record
+    // wins" ranking below, rather than only filtered out of the Exception
+    // queue further downstream (reports.ts's hasRevokedExitStatus) -- that
+    // way a person whose exit records are ALL Revoked/Rejected gets no exit
+    // flag anywhere in the app, while someone who had a Revoked or Rejected
+    // attempt and LATER genuinely exited (a separate, newer record with some
+    // other status) still correctly flags off that later, real record --
+    // "if an employee have multiple records take the most latest one" is
+    // exactly what this ranking already does once these two non-exits are
+    // excluded from competing for it.
+    const normalizedStatus = (status ?? "").trim().toLowerCase();
+    if (normalizedStatus === "revoked" || normalizedStatus === "rejected") continue;
     const exitDate = cell(exit.rawData, "Exit Date", "exit_date");
     // "Current Department"/"Current Designation" now checked FIRST, ahead of
     // the plain "Department"/"Designation" fields (2026-09-24, per request:

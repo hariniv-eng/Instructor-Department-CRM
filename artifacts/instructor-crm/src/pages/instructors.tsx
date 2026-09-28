@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, Briefcase, BookOpen, Building2, ChevronDown, GraduationCap, MapPin, Search, UserCheck, Users, UsersRound, Wallet, X } from 'lucide-react';
+import { AlertTriangle, Briefcase, BookOpen, Building2, ChevronDown, GraduationCap, Layers, MapPin, Search, UserCheck, Users, UsersRound, Wallet, X } from 'lucide-react';
 import { useGetReportsInstructors, useUpdateInstructorGender, useUpdateInstructorSubject, useUpdateInstructorExitVerification, getGetReportsInstructorsQueryKey, ApiError } from '@workspace/api-client-react';
 import type { AccessSplit, InstructorSummary } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -117,6 +117,13 @@ const UNSPECIFIED_SUBJECT = '__unspecified__';
 // touching as TeachOS's own roster of managers changes over time.
 const NO_CAPABILITY_MANAGER = '__none__';
 
+// Enrolled Plan filter (2026-09-28, per request: "keep a filter to check for
+// enrollment plan for the column enrolled_plan") -- same "computed from
+// whatever values are actually present" treatment as Capability Manager
+// above, rather than a hardcoded list, since TeachOS's own set of plan names
+// isn't fixed here.
+const NO_ENROLLED_PLAN = '__none__';
+
 // Payroll filter (2026-09-15, per request) -- mirrors the Payroll/Nxtwave
 // badge already shown in the table for the Instructors category.
 type PayrollFilterKey = 'payroll' | 'nxtwave';
@@ -180,17 +187,19 @@ export default function InstructorsPage() {
   const [capabilityManagerFilter, setCapabilityManagerFilter] = useState<string[]>([]);
   const [payrollFilter, setPayrollFilter] = useState<PayrollFilterKey[]>([]);
   const [campusFilter, setCampusFilter] = useState<string[]>([]);
+  const [enrolledPlanFilter, setEnrolledPlanFilter] = useState<string[]>([]);
 
   // Resets every filter back to "nothing selected" (= all) in one click
   // (2026-09-15, per request) -- deliberately leaves `search` and
   // `category` alone, since those aren't filters in the same sense (the
-  // tab you're on, and a free-text lookup), just the 5 filters above.
+  // tab you're on, and a free-text lookup), just the 6 filters above.
   function clearFilters() {
     setGenderFilter([]);
     setSubjectFilter([]);
     setCapabilityManagerFilter([]);
     setPayrollFilter([]);
     setCampusFilter([]);
+    setEnrolledPlanFilter([]);
   }
 
   const split = report?.access_breakdown?.[category];
@@ -203,10 +212,11 @@ export default function InstructorsPage() {
       if (capabilityManagerFilter.length > 0 && !capabilityManagerFilter.includes(person.capability_manager || NO_CAPABILITY_MANAGER)) return false;
       if (payrollFilter.length > 0 && !payrollFilter.includes(person.is_payroll ? 'payroll' : 'nxtwave')) return false;
       if (campusFilter.length > 0 && !matchesCampus(person, campusFilter)) return false;
+      if (enrolledPlanFilter.length > 0 && !enrolledPlanFilter.includes(person.enrolled_plans || NO_ENROLLED_PLAN)) return false;
       if (!query) return true;
       return person.full_name.toLowerCase().includes(query) || (person.employee_id ?? '').toLowerCase().includes(query) || (person.teachos_user_id ?? '').toLowerCase().includes(query);
     });
-  }, [allPeople, search, genderFilter, subjectFilter, capabilityManagerFilter, payrollFilter, campusFilter]);
+  }, [allPeople, search, genderFilter, subjectFilter, capabilityManagerFilter, payrollFilter, campusFilter, enrolledPlanFilter]);
 
   const activeTab = CATEGORY_TABS.find((tab) => tab.key === category)!;
 
@@ -326,7 +336,29 @@ export default function InstructorsPage() {
     });
   }, [report, campusFilter]);
 
-  const anyFilterActive = genderFilter.length > 0 || subjectFilter.length > 0 || capabilityManagerFilter.length > 0 || payrollFilter.length > 0 || campusFilter.length > 0;
+  // Enrolled Plan filter options + counts, same pattern as Subject/
+  // Capability Manager above (2026-09-28, per request).
+  const enrolledPlanOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const person of allPeople) {
+      const key = person.enrolled_plans || NO_ENROLLED_PLAN;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    const plans = [...counts.keys()].filter((key) => key !== NO_ENROLLED_PLAN).sort((a, b) => a.localeCompare(b));
+    const options = plans.map((plan) => ({ key: plan, label: plan, count: counts.get(plan)! }));
+    if (counts.has(NO_ENROLLED_PLAN)) options.push({ key: NO_ENROLLED_PLAN, label: 'Not on file', count: counts.get(NO_ENROLLED_PLAN)! });
+    return options;
+  }, [allPeople]);
+
+  const enrolledPlanBreakdown = useMemo(() => {
+    if (enrolledPlanFilter.length === 0 || !report?.access_breakdown) return null;
+    return CATEGORY_TABS.map((tab) => {
+      const tabPeople = mergedPeople(report.access_breakdown?.[tab.key]);
+      return { key: tab.key, label: tab.label, count: tabPeople.filter((person) => enrolledPlanFilter.includes(person.enrolled_plans || NO_ENROLLED_PLAN)).length, total: tabPeople.length };
+    });
+  }, [report, enrolledPlanFilter]);
+
+  const anyFilterActive = genderFilter.length > 0 || subjectFilter.length > 0 || capabilityManagerFilter.length > 0 || payrollFilter.length > 0 || campusFilter.length > 0 || enrolledPlanFilter.length > 0;
 
   return <div className="mx-auto max-w-[1500px]">
     <PageIntro
@@ -369,6 +401,7 @@ export default function InstructorsPage() {
           widthClass="w-[170px]"
         />
         <MultiSelectFilter label="Campus" options={campusOptions} selected={campusFilter} onChange={setCampusFilter} testId="select-campus-filter" />
+        <MultiSelectFilter label="Enrolled Plan" options={enrolledPlanOptions} selected={enrolledPlanFilter} onChange={setEnrolledPlanFilter} testId="select-enrolled-plan-filter" />
         {anyFilterActive && <button type="button" data-testid="button-clear-filters" onClick={clearFilters} className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-[11px] font-bold text-foreground transition-colors hover:bg-secondary">
           <X size={13} /> Clear filters
         </button>}
@@ -438,6 +471,19 @@ export default function InstructorsPage() {
       </div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {campusBreakdown.map((row) => <MiniStat key={row.key} label={row.label} value={row.count} meta={`${pct(row.count, row.total)} of ${row.label.toLowerCase()}`} tone="muted" />)}
+      </div>
+    </section>}
+
+    {enrolledPlanFilter.length > 0 && enrolledPlanBreakdown && <section className="mb-5 rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6">
+      <div className="mb-4 flex items-center gap-2">
+        <span className="grid h-8 w-8 place-items-center rounded-lg bg-[#eef0fb] text-[#4a4fb0]"><Layers size={16} /></span>
+        <div>
+          <p className="font-mono-ui text-[10px] uppercase tracking-[0.17em] text-muted-foreground">TeachOS — Enrolled Plan</p>
+          <h2 className="text-[15px] font-extrabold tracking-[-0.03em]">{selectionSummary(enrolledPlanFilter, (key) => (key === NO_ENROLLED_PLAN ? 'Not on file' : key))} headcount, by category</h2>
+        </div>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {enrolledPlanBreakdown.map((row) => <MiniStat key={row.key} label={row.label} value={row.count} meta={`${pct(row.count, row.total)} of ${row.label.toLowerCase()}`} tone="muted" />)}
       </div>
     </section>}
 
