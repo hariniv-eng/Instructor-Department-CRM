@@ -117,12 +117,11 @@ const UNSPECIFIED_SUBJECT = '__unspecified__';
 // touching as TeachOS's own roster of managers changes over time.
 const NO_CAPABILITY_MANAGER = '__none__';
 
-// Enrolled Plan filter (2026-09-28, per request: "keep a filter to check for
-// enrollment plan for the column enrolled_plan") -- same "computed from
-// whatever values are actually present" treatment as Capability Manager
-// above, rather than a hardcoded list, since TeachOS's own set of plan names
-// isn't fixed here.
-const NO_ENROLLED_PLAN = '__none__';
+// Product filter (2026-09-28, per request) -- replaces the Enrolled Plan
+// filter above (removed same day, per request) now that Enrolled Plan's
+// data feeds the derived Product column instead (see productLabel() below
+// this page's PersonRow section). No "not on file" sentinel needed here --
+// productLabel() always returns one of the four product names, never null.
 
 // Payroll filter (2026-09-15, per request) -- mirrors the Payroll/Nxtwave
 // badge already shown in the table for the Instructors category.
@@ -205,7 +204,7 @@ type FilterState = {
   capabilityManagerFilter: string[];
   payrollFilter: PayrollFilterKey[];
   campusFilter: string[];
-  enrolledPlanFilter: string[];
+  productFilter: string[];
 };
 
 function serializeFilters(state: FilterState): string {
@@ -217,7 +216,7 @@ function serializeFilters(state: FilterState): string {
   if (state.capabilityManagerFilter.length > 0) params.set('manager', state.capabilityManagerFilter.join(','));
   if (state.payrollFilter.length > 0) params.set('payroll', state.payrollFilter.join(','));
   if (state.campusFilter.length > 0) params.set('campus', state.campusFilter.join(','));
-  if (state.enrolledPlanFilter.length > 0) params.set('plan', state.enrolledPlanFilter.join(','));
+  if (state.productFilter.length > 0) params.set('product', state.productFilter.join(','));
   return params.toString();
 }
 
@@ -239,8 +238,8 @@ function parseFilters(queryString: string): Partial<FilterState> {
   if (payroll.length > 0) result.payrollFilter = payroll;
   const campus = splitParam('campus');
   if (campus.length > 0) result.campusFilter = campus;
-  const plan = splitParam('plan');
-  if (plan.length > 0) result.enrolledPlanFilter = plan;
+  const product = splitParam('product');
+  if (product.length > 0) result.productFilter = product;
   return result;
 }
 
@@ -258,7 +257,7 @@ export default function InstructorsPage() {
   const [capabilityManagerFilter, setCapabilityManagerFilter] = useState<string[]>(initialFilters.capabilityManagerFilter ?? []);
   const [payrollFilter, setPayrollFilter] = useState<PayrollFilterKey[]>(initialFilters.payrollFilter ?? []);
   const [campusFilter, setCampusFilter] = useState<string[]>(initialFilters.campusFilter ?? []);
-  const [enrolledPlanFilter, setEnrolledPlanFilter] = useState<string[]>(initialFilters.enrolledPlanFilter ?? []);
+  const [productFilter, setProductFilter] = useState<string[]>(initialFilters.productFilter ?? []);
 
   // Keeps the URL bar in sync with the current filters/search/category
   // (2026-09-28, per request: "whenever we go back make it go back to the
@@ -272,7 +271,7 @@ export default function InstructorsPage() {
   // a crash on this tab; a plain replaceState updates the address bar
   // without wouter's router ever seeing it, which is all bookmarking and
   // the back-link need.
-  const filterQueryString = serializeFilters({ category, search, genderFilter, subjectFilter, capabilityManagerFilter, payrollFilter, campusFilter, enrolledPlanFilter });
+  const filterQueryString = serializeFilters({ category, search, genderFilter, subjectFilter, capabilityManagerFilter, payrollFilter, campusFilter, productFilter });
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const next = filterQueryString ? `/instructors?${filterQueryString}` : '/instructors';
@@ -291,7 +290,7 @@ export default function InstructorsPage() {
     setCapabilityManagerFilter([]);
     setPayrollFilter([]);
     setCampusFilter([]);
-    setEnrolledPlanFilter([]);
+    setProductFilter([]);
   }
 
   const split = report?.access_breakdown?.[category];
@@ -304,11 +303,11 @@ export default function InstructorsPage() {
       if (capabilityManagerFilter.length > 0 && !capabilityManagerFilter.includes(person.capability_manager || NO_CAPABILITY_MANAGER)) return false;
       if (payrollFilter.length > 0 && !payrollFilter.includes(person.is_payroll ? 'payroll' : 'nxtwave')) return false;
       if (campusFilter.length > 0 && !matchesCampus(person, campusFilter)) return false;
-      if (enrolledPlanFilter.length > 0 && !enrolledPlanFilter.includes(person.enrolled_plans || NO_ENROLLED_PLAN)) return false;
+      if (productFilter.length > 0 && !productFilter.includes(productLabel(person))) return false;
       if (!query) return true;
       return person.full_name.toLowerCase().includes(query) || (person.employee_id ?? '').toLowerCase().includes(query) || (person.teachos_user_id ?? '').toLowerCase().includes(query);
     });
-  }, [allPeople, search, genderFilter, subjectFilter, capabilityManagerFilter, payrollFilter, campusFilter, enrolledPlanFilter]);
+  }, [allPeople, search, genderFilter, subjectFilter, capabilityManagerFilter, payrollFilter, campusFilter, productFilter]);
 
   const activeTab = CATEGORY_TABS.find((tab) => tab.key === category)!;
 
@@ -428,29 +427,30 @@ export default function InstructorsPage() {
     });
   }, [report, campusFilter]);
 
-  // Enrolled Plan filter options + counts, same pattern as Subject/
-  // Capability Manager above (2026-09-28, per request).
-  const enrolledPlanOptions = useMemo(() => {
+  // Product filter options + counts (2026-09-28, per request) -- same
+  // pattern as Subject/Capability Manager above, but built from the
+  // derived productLabel() rather than a raw field, and with no
+  // "unspecified" bucket since productLabel() is total (always NIAT,
+  // Academy, Intensive, or IIT X DSA).
+  const productOptions = useMemo(() => {
     const counts = new Map<string, number>();
     for (const person of allPeople) {
-      const key = person.enrolled_plans || NO_ENROLLED_PLAN;
+      const key = productLabel(person);
       counts.set(key, (counts.get(key) ?? 0) + 1);
     }
-    const plans = [...counts.keys()].filter((key) => key !== NO_ENROLLED_PLAN).sort((a, b) => a.localeCompare(b));
-    const options = plans.map((plan) => ({ key: plan, label: plan, count: counts.get(plan)! }));
-    if (counts.has(NO_ENROLLED_PLAN)) options.push({ key: NO_ENROLLED_PLAN, label: 'Not on file', count: counts.get(NO_ENROLLED_PLAN)! });
-    return options;
+    const products = [...counts.keys()].sort((a, b) => a.localeCompare(b));
+    return products.map((product) => ({ key: product, label: product, count: counts.get(product)! }));
   }, [allPeople]);
 
-  const enrolledPlanBreakdown = useMemo(() => {
-    if (enrolledPlanFilter.length === 0 || !report?.access_breakdown) return null;
+  const productBreakdown = useMemo(() => {
+    if (productFilter.length === 0 || !report?.access_breakdown) return null;
     return CATEGORY_TABS.map((tab) => {
       const tabPeople = mergedPeople(report.access_breakdown?.[tab.key]);
-      return { key: tab.key, label: tab.label, count: tabPeople.filter((person) => enrolledPlanFilter.includes(person.enrolled_plans || NO_ENROLLED_PLAN)).length, total: tabPeople.length };
+      return { key: tab.key, label: tab.label, count: tabPeople.filter((person) => productFilter.includes(productLabel(person))).length, total: tabPeople.length };
     });
-  }, [report, enrolledPlanFilter]);
+  }, [report, productFilter]);
 
-  const anyFilterActive = genderFilter.length > 0 || subjectFilter.length > 0 || capabilityManagerFilter.length > 0 || payrollFilter.length > 0 || campusFilter.length > 0 || enrolledPlanFilter.length > 0;
+  const anyFilterActive = genderFilter.length > 0 || subjectFilter.length > 0 || capabilityManagerFilter.length > 0 || payrollFilter.length > 0 || campusFilter.length > 0 || productFilter.length > 0;
 
   return <div className="mx-auto max-w-[1500px]">
     <PageIntro
@@ -493,7 +493,7 @@ export default function InstructorsPage() {
           widthClass="w-[170px]"
         />
         <MultiSelectFilter label="Campus" options={campusOptions} selected={campusFilter} onChange={setCampusFilter} testId="select-campus-filter" />
-        <MultiSelectFilter label="Enrolled Plan" options={enrolledPlanOptions} selected={enrolledPlanFilter} onChange={setEnrolledPlanFilter} testId="select-enrolled-plan-filter" />
+        <MultiSelectFilter label="Product" options={productOptions} selected={productFilter} onChange={setProductFilter} testId="select-product-filter" />
         {anyFilterActive && <button type="button" data-testid="button-clear-filters" onClick={clearFilters} className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-[11px] font-bold text-foreground transition-colors hover:bg-secondary">
           <X size={13} /> Clear filters
         </button>}
@@ -566,16 +566,16 @@ export default function InstructorsPage() {
       </div>
     </section>}
 
-    {enrolledPlanFilter.length > 0 && enrolledPlanBreakdown && <section className="mb-5 rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6">
+    {productFilter.length > 0 && productBreakdown && <section className="mb-5 rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6">
       <div className="mb-4 flex items-center gap-2">
         <span className="grid h-8 w-8 place-items-center rounded-lg bg-[#eef0fb] text-[#4a4fb0]"><Layers size={16} /></span>
         <div>
-          <p className="font-mono-ui text-[10px] uppercase tracking-[0.17em] text-muted-foreground">TeachOS — Enrolled Plan</p>
-          <h2 className="text-[15px] font-extrabold tracking-[-0.03em]">{selectionSummary(enrolledPlanFilter, (key) => (key === NO_ENROLLED_PLAN ? 'Not on file' : key))} headcount, by category</h2>
+          <p className="font-mono-ui text-[10px] uppercase tracking-[0.17em] text-muted-foreground">Product</p>
+          <h2 className="text-[15px] font-extrabold tracking-[-0.03em]">{selectionSummary(productFilter, (key) => key)} headcount, by category</h2>
         </div>
       </div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {enrolledPlanBreakdown.map((row) => <MiniStat key={row.key} label={row.label} value={row.count} meta={`${pct(row.count, row.total)} of ${row.label.toLowerCase()}`} tone="muted" />)}
+        {productBreakdown.map((row) => <MiniStat key={row.key} label={row.label} value={row.count} meta={`${pct(row.count, row.total)} of ${row.label.toLowerCase()}`} tone="muted" />)}
       </div>
     </section>}
 
@@ -778,7 +778,16 @@ function bifurcationLabel(classification: string | null): string {
 //     Darwin Location (work_location) is "Kapil Kavuri Hub (KKH) - 5th
 //     Floor" -- both conditions required, per request.
 //   - Intensive: Campus (institutes) includes "Intensive Offline DC".
-//   - Everyone else: NIAT.
+//   - Everyone else: NIAT, further split in two (2026-09-28, per request,
+//     same day) --
+//       - NIAT (Training): Campus (institutes) includes the literal
+//         "Training Institute" entry.
+//       - NIAT (Deployed): everyone else in the NIAT bucket -- per
+//         request, "if they have any name or a college name" in Campus.
+//         This is also the fallback for a NIAT-bucket person with an
+//         empty Campus/institutes list (no case for that was given
+//         explicitly) -- flag this if that default is wrong for, say,
+//         Operations team rows.
 // 140px, added to both grid templates below and every list below, as the
 // new last column (matching how Enrolled Plan was added as the last column
 // on 2026-09-27).
@@ -787,7 +796,8 @@ function productLabel(person: InstructorSummary): string {
   const designation = (person.designation ?? '').trim().toLowerCase();
   if (designation === 'software developer instructor' && person.work_location === 'Kapil Kavuri Hub (KKH) - 5th Floor') return 'IIT X DSA';
   if ((person.institutes ?? []).includes('Intensive Offline DC')) return 'Intensive';
-  return 'NIAT';
+  if ((person.institutes ?? []).includes('Training Institute')) return 'NIAT (Training)';
+  return 'NIAT (Deployed)';
 }
 
 // Name column header/label is per-category -- "Instructor Department" mixes
