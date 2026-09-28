@@ -120,6 +120,8 @@ export async function storeContribution(rows: ContributionRow[]): Promise<number
         practiceMinutes: row.practice_minutes,
         otherMinutes: row.other_minutes,
         sessionsCompleted: row.sessions_completed,
+        allBatches: row.all_batches,
+        recentBatches: row.recent_batches,
       }));
       if (batch.length) await tx.insert(instructorContributionTable).values(batch);
     }

@@ -39,6 +39,12 @@ type ContributionRow = {
   other_hours: number;
   total_hours: number;
   sessions_completed: number;
+  // Batch coverage (2026-09-28, per request: "add all the batches that are
+  // associated with all the instructors, and in other column only put
+  // batch_names which he have been taking from past 1 month") -- both
+  // scoped to COMPLETED sessions, same as every other column here.
+  all_batches: string[];
+  recent_batches: string[];
 };
 
 type ContributionResponse = {
@@ -170,6 +176,8 @@ export default function ContributionPage() {
                 <th className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Other Hrs</th>
                 <th className="whitespace-nowrap border-l border-border px-4 py-3 text-right font-mono-ui text-[10px] font-bold uppercase tracking-[0.12em] text-foreground">Total Hrs</th>
                 <th className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Sessions</th>
+                <th className="whitespace-nowrap border-l border-border px-4 py-3 text-left font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">All Batches</th>
+                <th className="whitespace-nowrap px-4 py-3 text-left font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Batches (Last 30 Days)</th>
               </tr>
             </thead>
             <tbody>
@@ -186,8 +194,10 @@ export default function ContributionPage() {
                     <td className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[12px] tabular-nums text-foreground">{formatHours(row.other_hours)}</td>
                     <td className="whitespace-nowrap border-l border-border px-4 py-3 text-right font-mono-ui text-[12px] font-bold tabular-nums text-foreground">{formatHours(row.total_hours)}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[12px] tabular-nums text-muted-foreground">{formatKpi(row.sessions_completed)}</td>
+                    <td className="max-w-[280px] truncate border-l border-border px-4 py-3 text-[12px] text-muted-foreground" title={row.all_batches.join(', ')}>{row.all_batches.length > 0 ? row.all_batches.join(', ') : '—'}</td>
+                    <td className="max-w-[280px] truncate px-4 py-3 text-[12px] text-muted-foreground" title={row.recent_batches.join(', ')}>{row.recent_batches.length > 0 ? row.recent_batches.join(', ') : '—'}</td>
                   </>
-                  : <td colSpan={5} className="whitespace-nowrap border-l border-border px-4 py-3 text-center text-[11px] italic text-muted-foreground">No data</td>}
+                  : <td colSpan={7} className="whitespace-nowrap border-l border-border px-4 py-3 text-center text-[11px] italic text-muted-foreground">No data</td>}
               </tr>)}
             </tbody>
           </table>
