@@ -147,23 +147,6 @@ async function loadLatestExitsByPerson(): Promise<{ byEmployeeId: Map<string, Ex
   for (const exit of exits) {
     if (!exit.employeeId) continue;
     const status = cell(exit.rawData, "Status", "status");
-    // Revoked and Rejected both mean this particular separation request
-    // never actually took effect -- Revoked was cancelled/withdrawn after
-    // being raised, Rejected was declined outright (2026-09-28, per request:
-    // "in the exception dont add rejected status" -- Revoked was fixed the
-    // same way the same day, see that comment's history). Neither should set
-    // exitFlag on its own. Skipped HERE, upstream of the "most recent record
-    // wins" ranking below, rather than only filtered out of the Exception
-    // queue further downstream (reports.ts's hasRevokedExitStatus) -- that
-    // way a person whose exit records are ALL Revoked/Rejected gets no exit
-    // flag anywhere in the app, while someone who had a Revoked or Rejected
-    // attempt and LATER genuinely exited (a separate, newer record with some
-    // other status) still correctly flags off that later, real record --
-    // "if an employee have multiple records take the most latest one" is
-    // exactly what this ranking already does once these two non-exits are
-    // excluded from competing for it.
-    const normalizedStatus = (status ?? "").trim().toLowerCase();
-    if (normalizedStatus === "revoked" || normalizedStatus === "rejected") continue;
     const exitDate = cell(exit.rawData, "Exit Date", "exit_date");
     // "Current Department"/"Current Designation" now checked FIRST, ahead of
     // the plain "Department"/"Designation" fields (2026-09-24, per request:
@@ -180,12 +163,37 @@ async function loadLatestExitsByPerson(): Promise<{ byEmployeeId: Map<string, Ex
     const info: ExitInfo = { status, exitDate, department, designation, gender };
     const rank = parseLooseDate(exitDate);
     const candidate = { info, rank, id: exit.id };
+    // "Most recent record wins" is decided across EVERY status here,
+    // including Revoked/Rejected -- see the Revoked/Rejected check below for
+    // why those two are excluded only AFTER this ranking, not before it.
     const isNewer = (existing?: { rank: number; id: number }) => !existing || rank > existing.rank || (rank === existing.rank && exit.id > existing.id);
     if (isNewer(byEmployeeId.get(exit.employeeId))) byEmployeeId.set(exit.employeeId, candidate);
   }
-  return {
-    byEmployeeId: new Map([...byEmployeeId].map(([key, value]) => [key, value.info])),
-  };
+  // Revoked and Rejected both mean this particular separation request never
+  // actually took effect -- Revoked was cancelled/withdrawn after being
+  // raised, Rejected was declined outright. Checked against the WINNING
+  // (most recent) record per employee here, not used to exclude candidate
+  // records from the ranking above (2026-09-28, fixed same day per
+  // follow-up: "if the most recent record on the exit data is reject also
+  // dont add in the exception") -- an earlier version of this function
+  // skipped Revoked/Rejected records before ranking, which could wrongly
+  // resurface an OLDER, stale Approved/Pending record as "the" exit whenever
+  // someone's actual most recent record was Revoked/Rejected. Now: find the
+  // single most recent record regardless of status, then only treat it as a
+  // real exit if THAT record isn't Revoked/Rejected. Someone whose most
+  // recent record is Revoked/Rejected gets no exit flag at all; someone
+  // whose most recent record is anything else (Approved, Pending With
+  // Approver, etc.) is flagged off that record, whatever earlier history
+  // they have -- "if an employee have multiple records take the most latest
+  // one" is exactly this: rank first, across every status, then judge only
+  // the winner.
+  const byEmployeeIdFiltered = new Map<string, ExitInfo>();
+  for (const [employeeId, candidate] of byEmployeeId) {
+    const normalizedStatus = (candidate.info.status ?? "").trim().toLowerCase();
+    if (normalizedStatus === "revoked" || normalizedStatus === "rejected") continue;
+    byEmployeeIdFiltered.set(employeeId, candidate.info);
+  }
+  return { byEmployeeId: byEmployeeIdFiltered };
 }
 
 function findExit(row: InstructorRow, exits: { byEmployeeId: Map<string, ExitInfo> }): ExitInfo | undefined {

@@ -3,7 +3,7 @@ import { AlertTriangle, Briefcase, BookOpen, Building2, ChevronDown, GraduationC
 import { useGetReportsInstructors, useUpdateInstructorGender, useUpdateInstructorSubject, useUpdateInstructorExitVerification, getGetReportsInstructorsQueryKey, ApiError } from '@workspace/api-client-react';
 import type { AccessSplit, InstructorSummary } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Link } from 'wouter';
+import { Link, useLocation } from 'wouter';
 import { PageIntro, EmptyState, QueryError, SkeletonBlock, DownloadCsvButton, MiniStat, pct } from '@/components/ui-pieces';
 import { downloadCsv, slugify, toCsv } from '@/lib/csv';
 import { toast } from '@/hooks/use-toast';
@@ -177,17 +177,103 @@ const SUBJECT_AREAS: string[] = [
   'Math',
 ];
 
+// URL <-> filter-state sync (2026-09-28, per request: "whenever we go back
+// make it go back to the last step not remove all the filters") -- every
+// filter/search/category on this page used to live only in local React
+// state, so navigating to an instructor's profile and back unmounted and
+// remounted this component with fresh defaults, silently dropping whatever
+// was selected. These two functions are inverses of each other:
+// serializeFilters turns the current state into a query string that's kept
+// in sync with the browser's URL (see the useEffect in InstructorsPage
+// below) and is also handed to each PersonRow so its link to the profile
+// page can carry it forward; parseFilters reads that same query string back
+// out, whether it's the real URL this page loaded with (a bookmark, a
+// shared link, browser back/forward) or the `back` param
+// instructor-detail.tsx decodes and hands back. Anything at its default
+// value is simply omitted, so a plain "/instructors" with no filters
+// applied stays a clean bare URL, and an unrecognized value (a stale or
+// hand-edited URL) is dropped rather than trusted verbatim.
+const CATEGORY_KEYS: CategoryKey[] = ['department', 'instructors', 'mentors', 'ops_team', 'exception'];
+const GENDER_KEYS: GenderFilterKey[] = ['male', 'female', 'unknown'];
+const PAYROLL_KEYS: PayrollFilterKey[] = ['payroll', 'nxtwave'];
+
+type FilterState = {
+  category: CategoryKey;
+  search: string;
+  genderFilter: GenderFilterKey[];
+  subjectFilter: string[];
+  capabilityManagerFilter: string[];
+  payrollFilter: PayrollFilterKey[];
+  campusFilter: string[];
+  enrolledPlanFilter: string[];
+};
+
+function serializeFilters(state: FilterState): string {
+  const params = new URLSearchParams();
+  if (state.category !== 'instructors') params.set('category', state.category);
+  if (state.search.trim()) params.set('q', state.search);
+  if (state.genderFilter.length > 0) params.set('gender', state.genderFilter.join(','));
+  if (state.subjectFilter.length > 0) params.set('subject', state.subjectFilter.join(','));
+  if (state.capabilityManagerFilter.length > 0) params.set('manager', state.capabilityManagerFilter.join(','));
+  if (state.payrollFilter.length > 0) params.set('payroll', state.payrollFilter.join(','));
+  if (state.campusFilter.length > 0) params.set('campus', state.campusFilter.join(','));
+  if (state.enrolledPlanFilter.length > 0) params.set('plan', state.enrolledPlanFilter.join(','));
+  return params.toString();
+}
+
+function parseFilters(queryString: string): Partial<FilterState> {
+  const params = new URLSearchParams(queryString);
+  const splitParam = (key: string) => (params.get(key) ?? '').split(',').filter(Boolean);
+  const result: Partial<FilterState> = {};
+  const category = params.get('category');
+  if (category && (CATEGORY_KEYS as string[]).includes(category)) result.category = category as CategoryKey;
+  const q = params.get('q');
+  if (q) result.search = q;
+  const gender = splitParam('gender').filter((key) => (GENDER_KEYS as string[]).includes(key)) as GenderFilterKey[];
+  if (gender.length > 0) result.genderFilter = gender;
+  const subject = splitParam('subject');
+  if (subject.length > 0) result.subjectFilter = subject;
+  const manager = splitParam('manager');
+  if (manager.length > 0) result.capabilityManagerFilter = manager;
+  const payroll = splitParam('payroll').filter((key) => (PAYROLL_KEYS as string[]).includes(key)) as PayrollFilterKey[];
+  if (payroll.length > 0) result.payrollFilter = payroll;
+  const campus = splitParam('campus');
+  if (campus.length > 0) result.campusFilter = campus;
+  const plan = splitParam('plan');
+  if (plan.length > 0) result.enrolledPlanFilter = plan;
+  return result;
+}
+
 export default function InstructorsPage() {
   const reportQuery = useGetReportsInstructors();
   const report = reportQuery.data;
-  const [category, setCategory] = useState<CategoryKey>('instructors');
-  const [search, setSearch] = useState('');
-  const [genderFilter, setGenderFilter] = useState<GenderFilterKey[]>([]);
-  const [subjectFilter, setSubjectFilter] = useState<string[]>([]);
-  const [capabilityManagerFilter, setCapabilityManagerFilter] = useState<string[]>([]);
-  const [payrollFilter, setPayrollFilter] = useState<PayrollFilterKey[]>([]);
-  const [campusFilter, setCampusFilter] = useState<string[]>([]);
-  const [enrolledPlanFilter, setEnrolledPlanFilter] = useState<string[]>([]);
+  const [, navigate] = useLocation();
+  // Parsed once, on mount only -- either the real URL this page loaded
+  // with, or the `back` param instructor-detail.tsx hands back (see
+  // parseFilters above).
+  const initialFilters = useMemo(() => parseFilters(typeof window !== 'undefined' ? window.location.search : ''), []);
+  const [category, setCategory] = useState<CategoryKey>(initialFilters.category ?? 'instructors');
+  const [search, setSearch] = useState(initialFilters.search ?? '');
+  const [genderFilter, setGenderFilter] = useState<GenderFilterKey[]>(initialFilters.genderFilter ?? []);
+  const [subjectFilter, setSubjectFilter] = useState<string[]>(initialFilters.subjectFilter ?? []);
+  const [capabilityManagerFilter, setCapabilityManagerFilter] = useState<string[]>(initialFilters.capabilityManagerFilter ?? []);
+  const [payrollFilter, setPayrollFilter] = useState<PayrollFilterKey[]>(initialFilters.payrollFilter ?? []);
+  const [campusFilter, setCampusFilter] = useState<string[]>(initialFilters.campusFilter ?? []);
+  const [enrolledPlanFilter, setEnrolledPlanFilter] = useState<string[]>(initialFilters.enrolledPlanFilter ?? []);
+
+  // Keeps the URL in sync with the current filters/search/category
+  // (2026-09-28, per request: "whenever we go back make it go back to the
+  // last step not remove all the filters") -- so a person row's link to
+  // their profile can carry this exact view forward (see filterQueryString
+  // below and PersonRow's backQuery prop), a bookmarked/shared /instructors
+  // link reopens with the same filters applied, and the browser's own
+  // back/forward buttons land on a matching state too. `replace` is used so
+  // picking filters doesn't spam browser history with one entry per click.
+  const filterQueryString = serializeFilters({ category, search, genderFilter, subjectFilter, capabilityManagerFilter, payrollFilter, campusFilter, enrolledPlanFilter });
+  useEffect(() => {
+    navigate(filterQueryString ? `/instructors?${filterQueryString}` : '/instructors', { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterQueryString]);
 
   // Resets every filter back to "nothing selected" (= all) in one click
   // (2026-09-15, per request) -- deliberately leaves `search` and
@@ -743,15 +829,20 @@ function CategoryTable({ category, people }: { category: CategoryKey; people: In
           <span>Exit</span>
           <span>Enrolled Plan</span>
         </div>
-        <div>{people.map((person) => <PersonRow key={person.id} category={category} person={person} columns={columns} />)}</div>
+        <div>{people.map((person) => <PersonRow key={person.id} category={category} person={person} columns={columns} backQuery={filterQueryString} />)}</div>
       </div>
     </div>
   </div>;
 }
 
-function PersonRow({ category, person, columns }: { category: CategoryKey; person: InstructorSummary; columns: string }) {
+function PersonRow({ category, person, columns, backQuery }: { category: CategoryKey; person: InstructorSummary; columns: string; backQuery: string }) {
   const campus = person.institutes && person.institutes.length > 0 ? person.institutes.join(', ') : '—';
-  return <Link href={`/instructors/${person.id}`} data-testid={`link-instructor-${person.id}`} className={`group grid items-center gap-4 border-b border-border/70 px-5 py-4 transition-colors last:border-0 hover:bg-[#f8fafb] ${columns}`}>
+  // Carries the Instructors tab's current filters/search/category forward
+  // to this profile page (2026-09-28, per request) so its back link can
+  // restore exactly this view -- see instructor-detail.tsx's backHref,
+  // which decodes this same `back` param.
+  const href = backQuery ? `/instructors/${person.id}?back=${encodeURIComponent(backQuery)}` : `/instructors/${person.id}`;
+  return <Link href={href} data-testid={`link-instructor-${person.id}`} className={`group grid items-center gap-4 border-b border-border/70 px-5 py-4 transition-colors last:border-0 hover:bg-[#f8fafb] ${columns}`}>
     <div className="flex min-w-0 items-center gap-3">
       <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#e1eaf1] text-[11px] font-extrabold text-primary">{initials(person.full_name)}</span>
       <span className="min-w-0">
