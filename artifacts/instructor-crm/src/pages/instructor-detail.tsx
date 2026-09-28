@@ -12,6 +12,16 @@ export default function InstructorDetailPage() {
   const params = useParams<{ id: string }>();
   const id = Number(params.id);
   const [, setLocation] = useLocation();
+  // Restores the Instructors tab's filters/search/category exactly as they
+  // were when this profile was opened (2026-09-28, per request: "whenever
+  // we go back make it go back to the last step not remove all the
+  // filters") -- PersonRow's link on the Instructors tab encodes that
+  // state as a `back` query param (see instructors.tsx's
+  // serializeFilters/PersonRow), so the two back links below just decode
+  // it and hand it straight back to /instructors instead of always
+  // resetting to the bare, filter-less URL.
+  const backParam = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('back') : null;
+  const backHref = backParam ? `/instructors?${backParam}` : '/instructors';
   const queryClient = useQueryClient();
   const instructorQuery = useGetInstructor(id, { query: { queryKey: getGetInstructorQueryKey(id), enabled: Number.isFinite(id) } });
   const updateInstructor = useUpdateInstructor();
@@ -36,11 +46,11 @@ export default function InstructorDetailPage() {
   };
 
   if (instructorQuery.isLoading) return <div className="mx-auto max-w-[1200px]"><SkeletonBlock className="mb-7 h-28" /><div className="grid gap-5 lg:grid-cols-[.75fr_1.25fr]"><SkeletonBlock className="h-[450px]" /><SkeletonBlock className="h-[450px]" /></div></div>;
-  if (instructorQuery.isError || !instructor) return <div className="mx-auto max-w-[1200px]"><QueryError message="This instructor record could not be loaded." /><Link href="/instructors" data-testid="link-back-instructors-error" className="mt-4 inline-flex items-center gap-2 text-[12px] font-bold text-primary hover:underline"><ArrowLeft size={14} /> Back to register</Link></div>;
+  if (instructorQuery.isError || !instructor) return <div className="mx-auto max-w-[1200px]"><QueryError message="This instructor record could not be loaded." /><Link href={backHref} data-testid="link-back-instructors-error" className="mt-4 inline-flex items-center gap-2 text-[12px] font-bold text-primary hover:underline"><ArrowLeft size={14} /> Back to register</Link></div>;
 
   const status = instructor.manual_status || instructor.computed_status || 'Pending';
   return <div className="mx-auto max-w-[1200px]">
-    <Link href="/instructors" data-testid="link-back-instructors" className="mb-6 inline-flex items-center gap-2 text-[12px] font-bold text-muted-foreground transition-colors hover:text-foreground"><ArrowLeft size={14} /> Instructor register</Link>
+    <Link href={backHref} data-testid="link-back-instructors" className="mb-6 inline-flex items-center gap-2 text-[12px] font-bold text-muted-foreground transition-colors hover:text-foreground"><ArrowLeft size={14} /> Instructor register</Link>
     <PageIntro eyebrow={`Record / ${instructor.employee_id || `ID-${instructor.id}`}`} title={instructor.full_name} description={`${instructor.designation || 'Instructor'}${instructor.sub_department ? ` · ${instructor.sub_department}` : ''}`} action={<span data-testid="status-detail-record" className={`inline-flex w-fit rounded-full px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.08em] ${statusTone(status)}`}>{status}</span>} />
     {instructor.classification && <div data-testid="banner-classification" className="mb-5 flex items-start gap-2.5 rounded-lg border border-[#d8dce4] bg-[#f4f5fa] px-4 py-3 text-[12px] leading-5 text-[#4a4fb0]"><ShieldOff size={16} className="mt-0.5 shrink-0" /><span><strong className="font-extrabold">{classificationLabel(instructor.classification)}.</strong> {instructor.classification_reason ? ` ${instructor.classification_reason}` : ''} This is a maintained classification decision — update classificationOverrides.ts to change it.</span></div>}
     {instructor.exit_flag && <div data-testid="banner-exit-flag" className="mb-5 flex items-start gap-2.5 rounded-lg border border-[#f0dca0] bg-[#fff7db] px-4 py-3 text-[12px] leading-5 text-[#79601a]"><AlertTriangle size={16} className="mt-0.5 shrink-0" /><span><strong className="font-extrabold">Darwinbox exit record on file{instructor.exit_flag_status ? ` — ${instructor.exit_flag_status}` : ''}.</strong> Flagged for review, not automatically removed from the instructor count. Mark the record's manual status Exited below if this should be excluded.</span></div>}
