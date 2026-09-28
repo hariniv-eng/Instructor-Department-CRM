@@ -3,7 +3,7 @@ import { AlertTriangle, Briefcase, BookOpen, Building2, ChevronDown, GraduationC
 import { useGetReportsInstructors, useUpdateInstructorGender, useUpdateInstructorSubject, useUpdateInstructorExitVerification, getGetReportsInstructorsQueryKey, ApiError } from '@workspace/api-client-react';
 import type { AccessSplit, InstructorSummary } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Link, useLocation } from 'wouter';
+import { Link } from 'wouter';
 import { PageIntro, EmptyState, QueryError, SkeletonBlock, DownloadCsvButton, MiniStat, pct } from '@/components/ui-pieces';
 import { downloadCsv, slugify, toCsv } from '@/lib/csv';
 import { toast } from '@/hooks/use-toast';
@@ -247,7 +247,6 @@ function parseFilters(queryString: string): Partial<FilterState> {
 export default function InstructorsPage() {
   const reportQuery = useGetReportsInstructors();
   const report = reportQuery.data;
-  const [, navigate] = useLocation();
   // Parsed once, on mount only -- either the real URL this page loaded
   // with, or the `back` param instructor-detail.tsx hands back (see
   // parseFilters above).
@@ -261,18 +260,25 @@ export default function InstructorsPage() {
   const [campusFilter, setCampusFilter] = useState<string[]>(initialFilters.campusFilter ?? []);
   const [enrolledPlanFilter, setEnrolledPlanFilter] = useState<string[]>(initialFilters.enrolledPlanFilter ?? []);
 
-  // Keeps the URL in sync with the current filters/search/category
+  // Keeps the URL bar in sync with the current filters/search/category
   // (2026-09-28, per request: "whenever we go back make it go back to the
   // last step not remove all the filters") -- so a person row's link to
   // their profile can carry this exact view forward (see filterQueryString
-  // below and PersonRow's backQuery prop), a bookmarked/shared /instructors
-  // link reopens with the same filters applied, and the browser's own
-  // back/forward buttons land on a matching state too. `replace` is used so
-  // picking filters doesn't spam browser history with one entry per click.
+  // below and PersonRow's backQuery prop), and a bookmarked/shared
+  // /instructors link reopens with the same filters applied. This uses the
+  // raw History API directly rather than wouter's own navigate() -- this
+  // app's Guard/RoutedErrorBoundary (see App.tsx) both key off wouter's
+  // location on every render, and driving that through wouter here caused
+  // a crash on this tab; a plain replaceState updates the address bar
+  // without wouter's router ever seeing it, which is all bookmarking and
+  // the back-link need.
   const filterQueryString = serializeFilters({ category, search, genderFilter, subjectFilter, capabilityManagerFilter, payrollFilter, campusFilter, enrolledPlanFilter });
   useEffect(() => {
-    navigate(filterQueryString ? `/instructors?${filterQueryString}` : '/instructors', { replace: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (typeof window === 'undefined') return;
+    const next = filterQueryString ? `/instructors?${filterQueryString}` : '/instructors';
+    if (window.location.pathname + window.location.search !== next) {
+      window.history.replaceState(window.history.state, '', next);
+    }
   }, [filterQueryString]);
 
   // Resets every filter back to "nothing selected" (= all) in one click
