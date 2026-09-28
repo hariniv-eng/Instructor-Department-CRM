@@ -726,14 +726,14 @@ function gridColsClass(category: CategoryKey): string {
   // mixed into Department/Exception just reads "Nxtwave" in this column,
   // same as any non-payroll instructor. Never wrong, just not usually the
   // interesting value there.
-  if (category === 'instructors' || category === 'mentors' || category === 'department' || category === 'exception') return 'grid-cols-[260px_190px_130px_280px_220px_150px_160px_170px_220px_140px_190px_190px_160px_130px_150px_190px_170px]';
+  if (category === 'instructors' || category === 'mentors' || category === 'department' || category === 'exception') return 'grid-cols-[260px_190px_130px_280px_220px_150px_160px_170px_220px_140px_190px_190px_160px_130px_150px_190px_170px_140px]';
   // Operations team keeps its own shape (2026-09-21: not part of the above
   // request) -- no Campus column (ops rows aren't deployed to a teaching
   // campus the way instructors and mentors are), a single Department
   // column instead of Subject+Department, and no Payroll either (same
   // reason it's never meaningful for Mentors: payroll_converted can't be
   // assigned to an ops row).
-  return 'grid-cols-[260px_190px_130px_280px_220px_150px_280px_140px_190px_190px_160px_150px_190px_170px]';
+  return 'grid-cols-[260px_190px_130px_280px_220px_150px_280px_140px_190px_190px_160px_150px_190px_170px_140px]';
 }
 
 // Manager (Darwin) (2026-09-22, per request: "in the overview table we have
@@ -767,6 +767,29 @@ function bifurcationLabel(classification: string | null): string {
   return 'Instructor';
 }
 
+// Product (2026-09-28, per request: divide instructors across the
+// company's four products -- NIAT, Academy, Intensive, IIT X DSA) --
+// derived read-only, same treatment as Bifurcation above: checked in a
+// fixed priority order (Academy, then IIT X DSA, then Intensive), with
+// NIAT as the default for everyone who matches none of the other three.
+//   - Academy: TeachOS Enrolled Plan is CCBP_ACADEMY_GENIUS_CAREER_PLUS
+//     (the "CCBP Academy Genius" plan).
+//   - IIT X DSA: Darwin Designation is "Software Developer Instructor" AND
+//     Darwin Location (work_location) is "Kapil Kavuri Hub (KKH) - 5th
+//     Floor" -- both conditions required, per request.
+//   - Intensive: Campus (institutes) includes "Intensive Offline DC".
+//   - Everyone else: NIAT.
+// 140px, added to both grid templates below and every list below, as the
+// new last column (matching how Enrolled Plan was added as the last column
+// on 2026-09-27).
+function productLabel(person: InstructorSummary): string {
+  if (person.enrolled_plans === 'CCBP_ACADEMY_GENIUS_CAREER_PLUS') return 'Academy';
+  const designation = (person.designation ?? '').trim().toLowerCase();
+  if (designation === 'software developer instructor' && person.work_location === 'Kapil Kavuri Hub (KKH) - 5th Floor') return 'IIT X DSA';
+  if ((person.institutes ?? []).includes('Intensive Offline DC')) return 'Intensive';
+  return 'NIAT';
+}
+
 // Name column header/label is per-category -- "Instructor Department" mixes
 // all three roles, so it gets a neutral "Person" rather than "Instructor".
 function nameColumnLabel(category: CategoryKey): string {
@@ -790,6 +813,7 @@ function downloadInstructorsCsv(category: CategoryKey, people: InstructorSummary
   headers.push('Gender');
   headers.push('Employee Status');
   headers.push('Enrolled Plan');
+  headers.push('Product');
 
   const rows = people.map((person) => {
     const row: string[] = [person.full_name, person.designation ?? '', person.employee_id ?? '', person.teachos_user_id ?? '', person.org_email ?? '', person.work_location ?? ''];
@@ -806,6 +830,7 @@ function downloadInstructorsCsv(category: CategoryKey, people: InstructorSummary
     // reviewed label -- mirrors ExitCell's dash-vs-dropdown split below.
     row.push(person.exit_flag ? EXIT_VERIFICATION_LABELS[person.exit_verification ?? ''] ?? 'Not reviewed' : '');
     row.push(person.enrolled_plans ?? '');
+    row.push(productLabel(person));
     return row;
   });
 
@@ -835,6 +860,7 @@ function CategoryTable({ category, people, backQuery }: { category: CategoryKey;
           <span>Gender</span>
           <span>Employee Status</span>
           <span>Enrolled Plan</span>
+          <span>Product</span>
         </div>
         <div>{pager.pageRows.map((person) => <PersonRow key={person.id} category={category} person={person} columns={columns} backQuery={backQuery} />)}</div>
       </div>
@@ -889,6 +915,7 @@ function PersonRow({ category, person, columns, backQuery }: { category: Categor
     <GenderCell person={person} />
     <ExitCell person={person} />
     <div className="truncate text-[12px] text-muted-foreground">{person.enrolled_plans || '—'}</div>
+    <div className="truncate text-[12px] text-muted-foreground">{productLabel(person)}</div>
   </Link>;
 }
 
