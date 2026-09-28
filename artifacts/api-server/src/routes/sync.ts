@@ -43,6 +43,27 @@ const router: IRouter = Router();
 // exitFlagStatus/exitFlagDate. Marking someone as actually, fully exited
 // stays a deliberate manual action via the Exit List upload.
 
+// Drizzle wraps a failed insert/update/delete as a DrizzleQueryError whose
+// own .message is just "Failed query: <sql>\nparams: <params>" -- useful for
+// reproducing the query, useless for knowing WHY it failed. The actual
+// driver/Postgres error (missing column, malformed array literal, value too
+// long, etc.) is attached as `.cause` and gets silently dropped if we just
+// read e.message like the sync handlers below used to. This pulls that real
+// reason back out and appends it, and caps the (potentially huge, once a
+// batch insert's full param list is included) base message so the Sync Now
+// UI stays readable instead of dumping thousands of params into a toast.
+function describeUnexpectedError(e: unknown): string {
+  const err = e as (Error & { cause?: unknown }) | undefined;
+  // Always log the raw error (with stack + cause) server-side too, so a
+  // Replit log check can confirm the full picture even if the UI message
+  // above ends up truncated or the cause turns out not to be an Error.
+  console.error("[sync] unexpected error:", err);
+  const base = err?.message ?? String(e);
+  const truncatedBase = base.length > 500 ? `${base.slice(0, 500)}… (truncated)` : base;
+  const cause = err?.cause instanceof Error ? err.cause.message : undefined;
+  return cause ? `Unexpected error: ${truncatedBase} | cause: ${cause}` : `Unexpected error: ${truncatedBase}`;
+}
+
 async function runDarwinboxSync(): Promise<SyncResult> {
   try {
     // One Master API round trip yields both the Instructors-department-
@@ -59,7 +80,7 @@ async function runDarwinboxSync(): Promise<SyncResult> {
     await db.insert(uploadsTable).values({ source: "Darwin", filename: "Darwinbox API sync (raw + full roster + reconciled)", rowCount: stored });
     return { ok: true, source: "darwinbox_live", stored, synced_at: new Date().toISOString() };
   } catch (e) {
-    const message = e instanceof DarwinboxError ? e.message : `Unexpected error: ${(e as Error).message}`;
+    const message = e instanceof DarwinboxError ? e.message : describeUnexpectedError(e);
     return { ok: false, source: "darwinbox_live", error: message, synced_at: new Date().toISOString() };
   }
 }
@@ -72,7 +93,7 @@ async function runDarwinboxExitsSync(): Promise<SyncResult> {
     await db.insert(uploadsTable).values({ source: "Exit List", filename: "Darwinbox reports-API sync (raw, flagged only)", rowCount: stored });
     return { ok: true, source: "darwinbox_exits_live", stored, synced_at: new Date().toISOString() };
   } catch (e) {
-    const message = e instanceof DarwinboxExitsError ? e.message : `Unexpected error: ${(e as Error).message}`;
+    const message = e instanceof DarwinboxExitsError ? e.message : describeUnexpectedError(e);
     return { ok: false, source: "darwinbox_exits_live", error: message, synced_at: new Date().toISOString() };
   }
 }
@@ -118,7 +139,7 @@ async function runTeachosSync(): Promise<SyncResult> {
     await db.insert(uploadsTable).values({ source: "TeachOS", filename: "BigQuery sync (niat_instructor_details, raw + reconciled)", rowCount: stored });
     return { ok: true, source: "teachos_live", stored, synced_at: new Date().toISOString() };
   } catch (e) {
-    const message = e instanceof NiatInstructorDetailsError ? e.message : `Unexpected error: ${(e as Error).message}`;
+    const message = e instanceof NiatInstructorDetailsError ? e.message : describeUnexpectedError(e);
     return { ok: false, source: "teachos_live", error: message, synced_at: new Date().toISOString() };
   }
 }
@@ -132,7 +153,7 @@ async function runNiatInstructorDetailsSync(): Promise<SyncResult> {
     console.log(`niat_instructor_details sync: matched=${result.matched} unmatched=${result.unmatched} conflicts=${result.conflicts} total_rows=${result.total_rows}`);
     return { ok: true, source: "niat_instructor_details_live", stored: rows.length, synced_at: new Date().toISOString() };
   } catch (e) {
-    const message = e instanceof NiatInstructorDetailsError ? e.message : `Unexpected error: ${(e as Error).message}`;
+    const message = e instanceof NiatInstructorDetailsError ? e.message : describeUnexpectedError(e);
     return { ok: false, source: "niat_instructor_details_live", error: message, synced_at: new Date().toISOString() };
   }
 }
@@ -159,7 +180,7 @@ async function runTrainingStatusSync(): Promise<SyncResult> {
     await db.insert(uploadsTable).values({ source: "Instructor Training Status", filename: "BigQuery sync (niat_instructor_unit_wise_completion_and_best_attempt_details, aggregated per course)", rowCount: stored });
     return { ok: true, source: "training_status_live", stored, synced_at: new Date().toISOString() };
   } catch (e) {
-    const message = e instanceof InstructorLearningStatusError ? e.message : `Unexpected error: ${(e as Error).message}`;
+    const message = e instanceof InstructorLearningStatusError ? e.message : describeUnexpectedError(e);
     return { ok: false, source: "training_status_live", error: message, synced_at: new Date().toISOString() };
   }
 }
@@ -182,7 +203,7 @@ async function runContributionSync(): Promise<SyncResult> {
     await db.insert(uploadsTable).values({ source: "Instructor Contribution", filename: "BigQuery sync (niat_instructor_session_schedule_details, aggregated per instructor)", rowCount: stored });
     return { ok: true, source: "contribution_live", stored, synced_at: new Date().toISOString() };
   } catch (e) {
-    const message = e instanceof InstructorContributionError ? e.message : `Unexpected error: ${(e as Error).message}`;
+    const message = e instanceof InstructorContributionError ? e.message : describeUnexpectedError(e);
     return { ok: false, source: "contribution_live", error: message, synced_at: new Date().toISOString() };
   }
 }
@@ -204,7 +225,7 @@ router.get("/sync/niat-instructor-details/data", async (_req, res) => {
     const rows = await fetchNiatInstructorDetailsRows();
     res.json({ count: rows.length, rows });
   } catch (e) {
-    const message = e instanceof NiatInstructorDetailsError ? e.message : `Unexpected error: ${(e as Error).message}`;
+    const message = e instanceof NiatInstructorDetailsError ? e.message : describeUnexpectedError(e);
     res.status(500).json({ ok: false, error: message });
   }
 });
