@@ -590,7 +590,7 @@ export default function InstructorsPage() {
     {reportQuery.isLoading && <div className="overflow-hidden rounded-xl border border-border bg-card"><div className="space-y-3 p-4">{[1, 2, 3, 4, 5].map((item) => <SkeletonBlock key={item} className="h-12" />)}</div></div>}
     {reportQuery.isError && <QueryError message="The instructor register could not be loaded." />}
     {!reportQuery.isLoading && !reportQuery.isError && people.length === 0 && <EmptyState title={`No ${activeTab.label.toLowerCase()} match this search`} description="Try a broader search or clear the search box." />}
-    {!reportQuery.isLoading && !reportQuery.isError && people.length > 0 && <CategoryTable category={category} people={people} />}
+    {!reportQuery.isLoading && !reportQuery.isError && people.length > 0 && <CategoryTable category={category} people={people} backQuery={filterQueryString} />}
   </div>;
 }
 
@@ -812,7 +812,7 @@ function downloadInstructorsCsv(category: CategoryKey, people: InstructorSummary
   downloadCsv(`${slugify(category)}.csv`, toCsv(headers, rows));
 }
 
-function CategoryTable({ category, people }: { category: CategoryKey; people: InstructorSummary[] }) {
+function CategoryTable({ category, people, backQuery }: { category: CategoryKey; people: InstructorSummary[]; backQuery: string }) {
   const columns = gridColsClass(category);
   return <div className="overflow-hidden rounded-xl border border-border bg-card shadow-xs">
     <div className="overflow-x-auto">
@@ -835,7 +835,7 @@ function CategoryTable({ category, people }: { category: CategoryKey; people: In
           <span>Exit</span>
           <span>Enrolled Plan</span>
         </div>
-        <div>{people.map((person) => <PersonRow key={person.id} category={category} person={person} columns={columns} backQuery={filterQueryString} />)}</div>
+        <div>{people.map((person) => <PersonRow key={person.id} category={category} person={person} columns={columns} backQuery={backQuery} />)}</div>
       </div>
     </div>
   </div>;
