@@ -4,7 +4,7 @@ import { useGetReportsInstructors, useUpdateInstructorGender, useUpdateInstructo
 import type { AccessSplit, InstructorSummary } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link } from 'wouter';
-import { PageIntro, EmptyState, QueryError, SkeletonBlock, DownloadCsvButton, MiniStat, pct } from '@/components/ui-pieces';
+import { PageIntro, EmptyState, QueryError, SkeletonBlock, DownloadCsvButton, MiniStat, pct, usePagedRows, TablePager } from '@/components/ui-pieces';
 import { downloadCsv, slugify, toCsv } from '@/lib/csv';
 import { toast } from '@/hooks/use-toast';
 
@@ -814,6 +814,7 @@ function downloadInstructorsCsv(category: CategoryKey, people: InstructorSummary
 
 function CategoryTable({ category, people, backQuery }: { category: CategoryKey; people: InstructorSummary[]; backQuery: string }) {
   const columns = gridColsClass(category);
+  const pager = usePagedRows(people, 50);
   return <div className="overflow-hidden rounded-xl border border-border bg-card shadow-xs">
     <div className="overflow-x-auto">
       <div className="w-max min-w-full">
@@ -835,9 +836,19 @@ function CategoryTable({ category, people, backQuery }: { category: CategoryKey;
           <span>Employee Status</span>
           <span>Enrolled Plan</span>
         </div>
-        <div>{people.map((person) => <PersonRow key={person.id} category={category} person={person} columns={columns} backQuery={backQuery} />)}</div>
+        <div>{pager.pageRows.map((person) => <PersonRow key={person.id} category={category} person={person} columns={columns} backQuery={backQuery} />)}</div>
       </div>
     </div>
+    <TablePager
+      page={pager.page}
+      pageCount={pager.pageCount}
+      pageSize={pager.pageSize}
+      start={pager.start}
+      end={pager.end}
+      total={pager.total}
+      onPageChange={pager.setPage}
+      onPageSizeChange={pager.setPageSize}
+    />
   </div>;
 }
 
