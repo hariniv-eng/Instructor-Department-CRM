@@ -399,6 +399,12 @@ export const instructorContributionTable = pgTable("instructor_contribution", {
   practiceMinutes: integer("practice_minutes").notNull().default(0),
   otherMinutes: integer("other_minutes").notNull().default(0),
   sessionsCompleted: integer("sessions_completed").notNull().default(0),
+  // Batch coverage (2026-09-28, per request) -- every distinct batch_name
+  // this instructor has taught a COMPLETED session for, all-time vs. the
+  // last 30 days. Same array-column convention as instructorsTable's
+  // `institutes` field above.
+  allBatches: text("all_batches").array().notNull().default([]),
+  recentBatches: text("recent_batches").array().notNull().default([]),
   syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

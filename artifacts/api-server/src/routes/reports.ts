@@ -1004,6 +1004,9 @@ router.get("/reports/instructor-contribution", requireAuth, requireRole("admin")
       other_hours: Math.round((otherMinutes / 60) * 10) / 10,
       total_hours: Math.round(((lectureMinutes + practiceMinutes + otherMinutes) / 60) * 10) / 10,
       sessions_completed: contribution?.sessionsCompleted ?? 0,
+      // Batch coverage (2026-09-28, per request) -- see instructorContribution.ts.
+      all_batches: contribution?.allBatches ?? [],
+      recent_batches: contribution?.recentBatches ?? [],
     };
   });
 

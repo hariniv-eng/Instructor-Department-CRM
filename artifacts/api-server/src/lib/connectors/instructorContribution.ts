@@ -167,6 +167,16 @@ export type ContributionRow = {
   practice_minutes: number;
   other_minutes: number;
   sessions_completed: number;
+  // Batch coverage (2026-09-28, per request: "in one column add all the
+  // batches that are associated with all the instructors, and in other
+  // column only put batch_names which he have been taking from past 1
+  // month") -- both scoped to COMPLETED sessions only, same as every other
+  // column on this row (see the WHERE clause below), for consistency with
+  // the rest of the Contribution tab. all_batches is every distinct
+  // batch_name this instructor has ever taught; recent_batches is the
+  // subset taught in the last 30 days (by session_start_datetime).
+  all_batches: string[];
+  recent_batches: string[];
 };
 
 /**
@@ -203,7 +213,9 @@ export async function fetchContributionRows(): Promise<ContributionRow[]> {
       SUM(CASE WHEN session_type = 'LECTURE' THEN session_duration_in_mins_from_schedule_time ELSE 0 END) AS lecture_minutes,
       SUM(CASE WHEN session_type = 'PRACTICE' THEN session_duration_in_mins_from_schedule_time ELSE 0 END) AS practice_minutes,
       SUM(CASE WHEN session_type NOT IN ('LECTURE', 'PRACTICE') THEN session_duration_in_mins_from_schedule_time ELSE 0 END) AS other_minutes,
-      COUNT(*) AS sessions_completed
+      COUNT(*) AS sessions_completed,
+      ARRAY_AGG(DISTINCT batch_name IGNORE NULLS) AS all_batches,
+      ARRAY_AGG(DISTINCT CASE WHEN session_start_datetime >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 30 DAY) THEN batch_name END IGNORE NULLS) AS recent_batches
     FROM \`${ref}\`
     WHERE session_status = 'COMPLETED' AND instructor_user_id IS NOT NULL
     GROUP BY instructor_user_id
@@ -218,6 +230,8 @@ export async function fetchContributionRows(): Promise<ContributionRow[]> {
         practice_minutes: Number(r.practice_minutes ?? 0),
         other_minutes: Number(r.other_minutes ?? 0),
         sessions_completed: Number(r.sessions_completed ?? 0),
+        all_batches: Array.isArray(r.all_batches) ? r.all_batches.map((v) => String(v)) : [],
+        recent_batches: Array.isArray(r.recent_batches) ? r.recent_batches.map((v) => String(v)) : [],
       }))
       .filter((r) => r.instructor_user_id);
   } catch (e) {
