@@ -774,9 +774,23 @@ function bifurcationLabel(classification: string | null): string {
 // NIAT as the default for everyone who matches none of the other three.
 //   - Academy: TeachOS Enrolled Plan is CCBP_ACADEMY_GENIUS_CAREER_PLUS
 //     (the "CCBP Academy Genius" plan).
-//   - IIT X DSA: Darwin Designation is "Software Developer Instructor" AND
-//     Darwin Location (work_location) is "Kapil Kavuri Hub (KKH) - 5th
-//     Floor" -- both conditions required, per request.
+//   - IIT X DSA: Darwin Designation contains "software developer" (matches
+//     "Software Developer and Instructor", "Software Developer & Instructor
+//     - DSA", "Senior Software Developer & Instructor", etc. -- but NOT the
+//     differently-worded "Software Development Instructor" role, which is
+//     a real, different designation in the live data) AND Darwin Location
+//     (work_location -- itself sourced from Darwin's Workspace field, see
+//     reports.ts's toApiInstructorSummary) contains "Kapil Kavuri Hub", any
+//     floor (2026-09-28, per request/investigation -- see git history for
+//     the _tmp_product_check.ts diagnostic that found this: the live data
+//     has no designation exactly "Software Developer Instructor" and no
+//     work_location exactly "Kapil Kavuri Hub (KKH) - 5th Floor" -- real
+//     values are e.g. "Software Developer and Instructor
+//     (NWD_ID_DS&A_SDI_D)" and "Kapil Kavuri Hub (KKH) - 5th Floor" /
+//     "-5th Floor" / "- 5thFloor" / "(KKH)- 5th Floor" / "- 1st Floor",
+//     inconsistently spaced Darwin data -- hence the loose, substring
+//     match on both sides rather than an exact one, and "any floor" rather
+//     than 5th-floor-only, per request).
 //   - Intensive: Campus (institutes) includes "Intensive Offline DC".
 //   - Everyone else: NIAT, further split in two (2026-09-28, per request,
 //     same day) --
@@ -793,8 +807,9 @@ function bifurcationLabel(classification: string | null): string {
 // on 2026-09-27).
 function productLabel(person: InstructorSummary): string {
   if (person.enrolled_plans === 'CCBP_ACADEMY_GENIUS_CAREER_PLUS') return 'Academy';
-  const designation = (person.designation ?? '').trim().toLowerCase();
-  if (designation === 'software developer instructor' && person.work_location === 'Kapil Kavuri Hub (KKH) - 5th Floor') return 'IIT X DSA';
+  const designation = (person.designation ?? '').toLowerCase();
+  const location = (person.work_location ?? '').toLowerCase();
+  if (designation.includes('software developer') && location.includes('kapil kavuri hub')) return 'IIT X DSA';
   if ((person.institutes ?? []).includes('Intensive Offline DC')) return 'Intensive';
   if ((person.institutes ?? []).includes('Training Institute')) return 'NIAT (Training)';
   return 'NIAT (Deployed)';
