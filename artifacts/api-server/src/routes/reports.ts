@@ -1034,6 +1034,9 @@ router.get("/reports/instructor-contribution", requireAuth, requireRole("admin")
       // Batch coverage (2026-09-28, per request) -- see instructorContribution.ts.
       all_batches: contribution?.allBatches ?? [],
       recent_batches: contribution?.recentBatches ?? [],
+      // NIAT cohort year(s) (2026-09-29, per request) -- see
+      // BATCH_NAME_TO_NIAT_COHORT in instructorContribution.ts.
+      niat_cohorts: contribution?.niatCohorts ?? [],
     };
   });
 

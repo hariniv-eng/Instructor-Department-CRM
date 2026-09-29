@@ -161,6 +161,140 @@ export async function inspectSessionScheduleDetails(): Promise<void> {
   await inspectTable(SESSION_SCHEDULE_TABLE);
 }
 
+/**
+ * NIAT cohort per real-world student batch (2026-09-29, per request --
+ * business logic given directly by Ankush, not derivable from BigQuery
+ * itself since the source table has no cohort/intake-year column):
+ *
+ * - Nxtwave Institute of Advanced Technologies (the founding institute)
+ *   only ever ran one batch, named "Batch 2" in this table -- that's the
+ *   company's very first cohort, NIAT 2024.
+ * - Every other university that has both a Batch 1 and a Batch 2: Batch 1
+ *   = NIAT 2025, Batch 2 = NIAT 2026.
+ * - Exception: NIAT Chevella and Malla Reddy Vishwavidyapeeth each only
+ *   have one batch (no Batch 2), but that one batch is still NIAT 2025,
+ *   same as a "Batch 1" would be -- not NIAT 2026 like other single-batch
+ *   universities.
+ * - Every other university with only one batch (i.e. every single-batch
+ *   university except the two exceptions above): that one batch = NIAT
+ *   2026.
+ * - Left out entirely (no cohort assigned, simply absent from this map) --
+ *   Training Institute (NIAT's own internal training program, not a
+ *   partner university), IIT Kharagpur (a course collaboration, not a
+ *   college batch of enrolled students -- "we will not touch IIT
+ *   Kharagpur instructors or that classes"), and every Intensive
+ *   Offline/Training internal program batch_name (IO B../IO PFS../IO
+ *   JFS.., M1/M2/A1, "Intensive Offline Python Batch N", "Intensive
+ *   Training Python Batch 1", "Intensive Offline Placed Batch") -- none
+ *   of these are college-batch partnerships in the first place.
+ *
+ * Keyed by the raw batch_name string (same convention as all_batches/
+ * recent_batches below) rather than institute_id. Exactly one ambiguous
+ * case exists in the real data: a single stray session row tagged to a
+ * separate "Chalapathy (CIET)" institute_id shares the exact literal
+ * batch_name ("CITY Batch -1") with the real "Chalapathy (CITY)"
+ * university's Batch 1. Keying by string folds that stray row into
+ * CITY's Batch 1 (2025) rather than giving it its own entry -- the right
+ * outcome, since it's almost certainly the same real batch just
+ * mis-tagged, and Ankush confirmed to leave "Chalapathy (CIET)" out as
+ * its own distinct entity ("leave this one").
+ *
+ * Confirmed against the full distinct institute_id/batch_name breakdown
+ * on 2026-09-29 (see _tmp_institute_name_batches.ts). If BigQuery ever
+ * returns a batch_name not in this map (a new batch just started, or a
+ * new partner institute), cohortsForBatches() below simply won't produce
+ * a cohort for it rather than guessing -- it just needs an entry added
+ * here once someone confirms which cohort it belongs to.
+ */
+export const NIAT_COHORT_2024 = "NIAT 2024";
+export const NIAT_COHORT_2025 = "NIAT 2025";
+export const NIAT_COHORT_2026 = "NIAT 2026";
+
+export const BATCH_NAME_TO_NIAT_COHORT: Record<string, string> = {
+  // Nxtwave Institute of Advanced Technologies -- the founding cohort.
+  "Batch 2": NIAT_COHORT_2024,
+
+  // Universities running both Batch 1 (-> 2025) and Batch 2 (-> 2026).
+  "ADYPU Batch-1": NIAT_COHORT_2025,
+  "ADYPU Batch-2": NIAT_COHORT_2026,
+  "AMET Batch -1": NIAT_COHORT_2025,
+  "AMET Batch - 2": NIAT_COHORT_2026,
+  "ANNAMACHARYA Batch- 1": NIAT_COHORT_2025,
+  "Annamacharya University Batch 2": NIAT_COHORT_2026,
+  "AURORA Batch -1": NIAT_COHORT_2025,
+  "AURORA Batch -2": NIAT_COHORT_2026,
+  "CDU Batch-1": NIAT_COHORT_2025,
+  "Chaitanya Deemed-to-be University": NIAT_COHORT_2026,
+  "CITY Batch -1": NIAT_COHORT_2025,
+  "CITY Batch 2": NIAT_COHORT_2026,
+  "CU Batch-1": NIAT_COHORT_2025,
+  "Crescent University Batch 2": NIAT_COHORT_2026,
+  "NRI Batch-1": NIAT_COHORT_2025,
+  "NRI Batch 2": NIAT_COHORT_2026,
+  "NSRIT Batch-1": NIAT_COHORT_2025,
+  "NSRIT University Batch 2": NIAT_COHORT_2026,
+  "S-VYASA Batch-1": NIAT_COHORT_2025,
+  "S-VYASA Batch-2": NIAT_COHORT_2026,
+  "SGU Batch-1": NIAT_COHORT_2025,
+  "SGU Batch - 2": NIAT_COHORT_2026,
+  "TU Batch-1": NIAT_COHORT_2025,
+  "Takshasila University Batch 2": NIAT_COHORT_2026,
+  "VGU Batch-1": NIAT_COHORT_2025,
+  "VGU Batch-2": NIAT_COHORT_2026,
+  "YENEPOYA Batch-1 CSE AI": NIAT_COHORT_2025,
+  "YENEPOYA Batch-2 CSE AI": NIAT_COHORT_2026,
+
+  // Exception pair -- only one batch each, but still NIAT 2025.
+  "NIAT Chevella Batch-1": NIAT_COHORT_2025,
+  "Malla Reddy Batch-1 CSE AI Data Science": NIAT_COHORT_2025,
+
+  // Every other single-batch university -> NIAT 2026.
+  "Alard University Batch 1": NIAT_COHORT_2026,
+  "BEST University Batch 1": NIAT_COHORT_2026,
+  "Bharath University": NIAT_COHORT_2026,
+  "GMRIT": NIAT_COHORT_2026,
+  "Geeta-Batch 1": NIAT_COHORT_2026,
+  "Joy University Batch 1": NIAT_COHORT_2026,
+  "LIMAT": NIAT_COHORT_2026,
+  "Lingaya's Vidyapeeth Batch 1": NIAT_COHORT_2026,
+  "Malla Reddy Tirupati Batch 1": NIAT_COHORT_2026,
+  "Malla Reddy University Batch 1": NIAT_COHORT_2026,
+  "Noida International University Batch -1": NIAT_COHORT_2026,
+  "Noida International University Batch 1": NIAT_COHORT_2026,
+  "P K Das University": NIAT_COHORT_2026,
+  "SGSU Batch 1": NIAT_COHORT_2026,
+  "SMRU Batch 1": NIAT_COHORT_2026,
+  "SNS University": NIAT_COHORT_2026,
+  "SPIHER Bengaluru Batch 1": NIAT_COHORT_2026,
+  "SPIHER University Chennai Batch 1": NIAT_COHORT_2026,
+  "Sandip University Batch 1": NIAT_COHORT_2026,
+  "Sanskriti University Batch 1": NIAT_COHORT_2026,
+  "Sri Sri University Batch 1": NIAT_COHORT_2026,
+  "Subharti University- Batch 1": NIAT_COHORT_2026,
+  "Sushanth Batch 1": NIAT_COHORT_2026,
+  "TS Mishra Batch 1": NIAT_COHORT_2026,
+  "Visakha Institute of Engineering & Technology Batch 1": NIAT_COHORT_2026,
+  "YENEPOYA BA Batch-1 CSE AI": NIAT_COHORT_2026,
+
+  // Deliberately NOT in this map -- see comment above: "Training_Institute_
+  // Batch-1", "Foundations of Generative AI Micro-specialization Batch 1"
+  // (IIT Kharagpur), and every Intensive Offline/Training batch_name.
+};
+
+/**
+ * Distinct NIAT cohort year(s) a set of batch_name values maps to, sorted --
+ * silently skips any batch_name with no confirmed cohort (see
+ * BATCH_NAME_TO_NIAT_COHORT above), rather than guessing.
+ */
+export function cohortsForBatches(batchNames: string[]): string[] {
+  const cohorts = new Set<string>();
+  for (const name of batchNames) {
+    const cohort = BATCH_NAME_TO_NIAT_COHORT[name];
+    if (cohort) cohorts.add(cohort);
+  }
+  return [...cohorts].sort();
+}
+
 export type ContributionRow = {
   instructor_user_id: string;
   lecture_minutes: number;
@@ -177,6 +311,10 @@ export type ContributionRow = {
   // subset taught in the last 30 days (by session_start_datetime).
   all_batches: string[];
   recent_batches: string[];
+  // NIAT cohort year(s) (2026-09-29, per request) -- derived from all_batches
+  // via BATCH_NAME_TO_NIAT_COHORT above, so it reflects every cohort this
+  // instructor has ever taught, not just their most recent one.
+  niat_cohorts: string[];
 };
 
 /**
@@ -224,15 +362,22 @@ export async function fetchContributionRows(): Promise<ContributionRow[]> {
   try {
     const [rows] = await runWithHardTimeout(() => bq.query({ query }), API_TIMEOUT_MS * 3 + 10000);
     return (rows as Array<Record<string, unknown>>)
-      .map((r) => ({
-        instructor_user_id: String(r.instructor_user_id ?? ""),
-        lecture_minutes: Number(r.lecture_minutes ?? 0),
-        practice_minutes: Number(r.practice_minutes ?? 0),
-        other_minutes: Number(r.other_minutes ?? 0),
-        sessions_completed: Number(r.sessions_completed ?? 0),
-        all_batches: Array.isArray(r.all_batches) ? r.all_batches.map((v) => String(v)) : [],
-        recent_batches: Array.isArray(r.recent_batches) ? r.recent_batches.map((v) => String(v)) : [],
-      }))
+      .map((r) => {
+        const allBatches = Array.isArray(r.all_batches) ? r.all_batches.map((v) => String(v)) : [];
+        return {
+          instructor_user_id: String(r.instructor_user_id ?? ""),
+          lecture_minutes: Number(r.lecture_minutes ?? 0),
+          practice_minutes: Number(r.practice_minutes ?? 0),
+          other_minutes: Number(r.other_minutes ?? 0),
+          sessions_completed: Number(r.sessions_completed ?? 0),
+          all_batches: allBatches,
+          recent_batches: Array.isArray(r.recent_batches) ? r.recent_batches.map((v) => String(v)) : [],
+          // Derived from all_batches (all-time), not recent_batches, so a
+          // person who switched cohorts still shows every cohort they've
+          // ever taught, not just their current one.
+          niat_cohorts: cohortsForBatches(allBatches),
+        };
+      })
       .filter((r) => r.instructor_user_id);
   } catch (e) {
     if (e instanceof HardTimeout) throw new InstructorContributionError(`Query against ${ref} failed: ${e.message}`);

@@ -122,6 +122,7 @@ export async function storeContribution(rows: ContributionRow[]): Promise<number
         sessionsCompleted: row.sessions_completed,
         allBatches: row.all_batches,
         recentBatches: row.recent_batches,
+        niatCohorts: row.niat_cohorts,
       }));
       if (batch.length) await tx.insert(instructorContributionTable).values(batch);
     }
