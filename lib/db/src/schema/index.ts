@@ -486,6 +486,11 @@ export const instructorContributionTable = pgTable("instructor_contribution", {
   // `institutes` field above.
   allBatches: text("all_batches").array().notNull().default([]),
   recentBatches: text("recent_batches").array().notNull().default([]),
+  // NIAT cohort year(s) (2026-09-29, per request) -- e.g. "NIAT 2025" /
+  // "NIAT 2026" -- derived from allBatches via BATCH_NAME_TO_NIAT_COHORT
+  // in instructorContribution.ts (business logic Ankush gave directly;
+  // not something BigQuery's source table has a column for).
+  niatCohorts: text("niat_cohorts").array().notNull().default([]),
   syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
