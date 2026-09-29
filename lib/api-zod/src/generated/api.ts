@@ -18,6 +18,54 @@ export const HealthCheckResponse = zod.object({
 
 
 /**
+ * @summary Log in with email + password, sets the session cookie
+ */
+export const LoginBody = zod.object({
+  "email": zod.string(),
+  "password": zod.string()
+})
+
+export const LoginResponse = zod.object({
+  "id": zod.number(),
+  "email": zod.string(),
+  "full_name": zod.string(),
+  "role": zod.enum(['admin', 'manager']),
+  "is_active": zod.boolean(),
+  "last_login_at": zod.string().nullish()
+}).describe('A dashboard login account (not an instructor record).')
+
+
+/**
+ * @summary Log out, clears the session cookie
+ */
+export const LogoutResponse = zod.void()
+
+
+/**
+ * @summary Get the logged-in user
+ */
+export const GetCurrentUserResponse = zod.object({
+  "id": zod.number(),
+  "email": zod.string(),
+  "full_name": zod.string(),
+  "role": zod.enum(['admin', 'manager']),
+  "is_active": zod.boolean(),
+  "last_login_at": zod.string().nullish()
+}).describe('A dashboard login account (not an instructor record).')
+
+
+/**
+ * @summary Change the logged-in user's own password
+ */
+export const ChangePasswordBody = zod.object({
+  "current_password": zod.string(),
+  "new_password": zod.string()
+})
+
+export const ChangePasswordResponse = zod.void()
+
+
+/**
  * @summary List instructors
  */
 export const ListInstructorsQueryParams = zod.object({
@@ -28,9 +76,9 @@ export const ListInstructorsQueryParams = zod.object({
   "source": zod.coerce.string().optional(),
   "classification": zod.coerce.string().optional(),
   "exit_flag": zod.coerce.string().optional(),
-  "dept_bucket": zod.coerce.string().optional(),
-  "dept_area": zod.coerce.string().optional(),
-  "institute": zod.coerce.string().optional()
+  "dept_bucket": zod.coerce.string().optional().describe('Either a raw dept_bucket value (tech, non_tech, mentor, excluded_ops_managers, instructor_ops) or one of the three UI-facing group names (instructor, mentor, excluded).'),
+  "dept_area": zod.coerce.string().optional().describe('Subject\/sub-area within a tech or non_tech dept_bucket, e.g. Frontend, Backend, DSA, GenAI, Math, English, Aptitude.'),
+  "institute": zod.coerce.string().optional().describe('Filters to instructors whose institutes array contains this campus\/university name.')
 })
 
 export const ListInstructorsResponseItem = zod.object({
@@ -56,9 +104,11 @@ export const ListInstructorsResponseItem = zod.object({
   "teachos_role": zod.string().nullish(),
   "teachos_category": zod.string().nullish(),
   "teachos_manager": zod.string().nullish(),
+  "manual_capability_manager": zod.string().nullish().describe('Manual fallback for the Capability Manager, settable via PATCH \/instructors\/{id}\/capability-manager (Admin only). Only used when TeachOS\'s own candidate rows didn\'t resolve to anyone on the maintained roster for this person. Must be one of that maintained roster\'s names, or null.'),
   "institutes": zod.array(zod.string()),
   "computed_status": zod.string(),
   "manual_status": zod.string().nullish(),
+  "manual_gender": zod.string().nullish().describe('Manual fallback for gender, settable via PATCH \/instructors\/{id}\/gender by either Admin or Manager. Only used when Darwin has no gender on file for this person.'),
   "exit_date": zod.coerce.date().nullish(),
   "converted_university_name": zod.string().nullish(),
   "notes": zod.string().nullish(),
@@ -67,8 +117,10 @@ export const ListInstructorsResponseItem = zod.object({
   "exit_flag": zod.boolean().optional().describe('True when a live Darwinbox exit\/resignation record was found for this person. Flagged only — NOT subtracted from the standing instructor count.'),
   "exit_flag_status": zod.string().nullish().describe('Darwinbox resignation status as of the most recent exit sync, e.g. Approved, Pending With Approver, Rejected, Revoked.'),
   "exit_flag_date": zod.coerce.date().nullish(),
+  "exit_verification": zod.union([zod.literal('exited'),zod.literal('serving_notice_period'),zod.literal('payroll_converted'),zod.literal('absconded'),zod.literal('revoked'),zod.literal(null)]).nullish().describe('Capability Manager\'s manual read on an exit-flagged record, settable via PATCH \/instructors\/{id}\/exit-verification by either Admin or Manager. Tracking label only — never affects computed_status\/manual_status or the headcount.'),
   "dept_bucket": zod.string().nullish().describe('tech | non_tech | null. See departmentTaxonomy.ts. Null for excluded\/mentor rows (see classification).'),
   "dept_area": zod.string().nullish().describe('Sub-area within dept_bucket, e.g. Frontend, Backend, DSA, GenAI, English, Aptitude, Math.'),
+  "manual_dept_area": zod.string().nullish().describe('Manual fallback for Subject\/dept_area, settable via PATCH \/instructors\/{id}\/subject (Admin only). Only used when classifyDepartment() left this person unclassified. Must be one of departmentTaxonomy.ts\'s recognized area names, or null.'),
   "deployment_status": zod.string().nullish().describe('deployed | in_training | null, derived from TeachOS institutes (institute_name \"Training Institute\" = in_training).'),
   "in_darwin_full_roster": zod.boolean().optional().describe('True when this person\'s Darwin match came from the full\/unfiltered company roster fallback rather than the primary Instructors-department sync — see reconcileDarwinFullRosterFallback().')
 })
@@ -109,9 +161,11 @@ export const CreateInstructorResponse = zod.object({
   "teachos_role": zod.string().nullish(),
   "teachos_category": zod.string().nullish(),
   "teachos_manager": zod.string().nullish(),
+  "manual_capability_manager": zod.string().nullish().describe('Manual fallback for the Capability Manager, settable via PATCH \/instructors\/{id}\/capability-manager (Admin only). Only used when TeachOS\'s own candidate rows didn\'t resolve to anyone on the maintained roster for this person. Must be one of that maintained roster\'s names, or null.'),
   "institutes": zod.array(zod.string()),
   "computed_status": zod.string(),
   "manual_status": zod.string().nullish(),
+  "manual_gender": zod.string().nullish().describe('Manual fallback for gender, settable via PATCH \/instructors\/{id}\/gender by either Admin or Manager. Only used when Darwin has no gender on file for this person.'),
   "exit_date": zod.coerce.date().nullish(),
   "converted_university_name": zod.string().nullish(),
   "notes": zod.string().nullish(),
@@ -120,8 +174,10 @@ export const CreateInstructorResponse = zod.object({
   "exit_flag": zod.boolean().optional().describe('True when a live Darwinbox exit\/resignation record was found for this person. Flagged only — NOT subtracted from the standing instructor count.'),
   "exit_flag_status": zod.string().nullish().describe('Darwinbox resignation status as of the most recent exit sync, e.g. Approved, Pending With Approver, Rejected, Revoked.'),
   "exit_flag_date": zod.coerce.date().nullish(),
+  "exit_verification": zod.union([zod.literal('exited'),zod.literal('serving_notice_period'),zod.literal('payroll_converted'),zod.literal('absconded'),zod.literal('revoked'),zod.literal(null)]).nullish().describe('Capability Manager\'s manual read on an exit-flagged record, settable via PATCH \/instructors\/{id}\/exit-verification by either Admin or Manager. Tracking label only — never affects computed_status\/manual_status or the headcount.'),
   "dept_bucket": zod.string().nullish().describe('tech | non_tech | null. See departmentTaxonomy.ts. Null for excluded\/mentor rows (see classification).'),
   "dept_area": zod.string().nullish().describe('Sub-area within dept_bucket, e.g. Frontend, Backend, DSA, GenAI, English, Aptitude, Math.'),
+  "manual_dept_area": zod.string().nullish().describe('Manual fallback for Subject\/dept_area, settable via PATCH \/instructors\/{id}\/subject (Admin only). Only used when classifyDepartment() left this person unclassified. Must be one of departmentTaxonomy.ts\'s recognized area names, or null.'),
   "deployment_status": zod.string().nullish().describe('deployed | in_training | null, derived from TeachOS institutes (institute_name \"Training Institute\" = in_training).'),
   "in_darwin_full_roster": zod.boolean().optional().describe('True when this person\'s Darwin match came from the full\/unfiltered company roster fallback rather than the primary Instructors-department sync — see reconcileDarwinFullRosterFallback().')
 })
@@ -157,9 +213,11 @@ export const GetInstructorResponse = zod.object({
   "teachos_role": zod.string().nullish(),
   "teachos_category": zod.string().nullish(),
   "teachos_manager": zod.string().nullish(),
+  "manual_capability_manager": zod.string().nullish().describe('Manual fallback for the Capability Manager, settable via PATCH \/instructors\/{id}\/capability-manager (Admin only). Only used when TeachOS\'s own candidate rows didn\'t resolve to anyone on the maintained roster for this person. Must be one of that maintained roster\'s names, or null.'),
   "institutes": zod.array(zod.string()),
   "computed_status": zod.string(),
   "manual_status": zod.string().nullish(),
+  "manual_gender": zod.string().nullish().describe('Manual fallback for gender, settable via PATCH \/instructors\/{id}\/gender by either Admin or Manager. Only used when Darwin has no gender on file for this person.'),
   "exit_date": zod.coerce.date().nullish(),
   "converted_university_name": zod.string().nullish(),
   "notes": zod.string().nullish(),
@@ -168,8 +226,10 @@ export const GetInstructorResponse = zod.object({
   "exit_flag": zod.boolean().optional().describe('True when a live Darwinbox exit\/resignation record was found for this person. Flagged only — NOT subtracted from the standing instructor count.'),
   "exit_flag_status": zod.string().nullish().describe('Darwinbox resignation status as of the most recent exit sync, e.g. Approved, Pending With Approver, Rejected, Revoked.'),
   "exit_flag_date": zod.coerce.date().nullish(),
+  "exit_verification": zod.union([zod.literal('exited'),zod.literal('serving_notice_period'),zod.literal('payroll_converted'),zod.literal('absconded'),zod.literal('revoked'),zod.literal(null)]).nullish().describe('Capability Manager\'s manual read on an exit-flagged record, settable via PATCH \/instructors\/{id}\/exit-verification by either Admin or Manager. Tracking label only — never affects computed_status\/manual_status or the headcount.'),
   "dept_bucket": zod.string().nullish().describe('tech | non_tech | null. See departmentTaxonomy.ts. Null for excluded\/mentor rows (see classification).'),
   "dept_area": zod.string().nullish().describe('Sub-area within dept_bucket, e.g. Frontend, Backend, DSA, GenAI, English, Aptitude, Math.'),
+  "manual_dept_area": zod.string().nullish().describe('Manual fallback for Subject\/dept_area, settable via PATCH \/instructors\/{id}\/subject (Admin only). Only used when classifyDepartment() left this person unclassified. Must be one of departmentTaxonomy.ts\'s recognized area names, or null.'),
   "deployment_status": zod.string().nullish().describe('deployed | in_training | null, derived from TeachOS institutes (institute_name \"Training Institute\" = in_training).'),
   "in_darwin_full_roster": zod.boolean().optional().describe('True when this person\'s Darwin match came from the full\/unfiltered company roster fallback rather than the primary Instructors-department sync — see reconcileDarwinFullRosterFallback().')
 })
@@ -212,9 +272,11 @@ export const UpdateInstructorResponse = zod.object({
   "teachos_role": zod.string().nullish(),
   "teachos_category": zod.string().nullish(),
   "teachos_manager": zod.string().nullish(),
+  "manual_capability_manager": zod.string().nullish().describe('Manual fallback for the Capability Manager, settable via PATCH \/instructors\/{id}\/capability-manager (Admin only). Only used when TeachOS\'s own candidate rows didn\'t resolve to anyone on the maintained roster for this person. Must be one of that maintained roster\'s names, or null.'),
   "institutes": zod.array(zod.string()),
   "computed_status": zod.string(),
   "manual_status": zod.string().nullish(),
+  "manual_gender": zod.string().nullish().describe('Manual fallback for gender, settable via PATCH \/instructors\/{id}\/gender by either Admin or Manager. Only used when Darwin has no gender on file for this person.'),
   "exit_date": zod.coerce.date().nullish(),
   "converted_university_name": zod.string().nullish(),
   "notes": zod.string().nullish(),
@@ -223,8 +285,238 @@ export const UpdateInstructorResponse = zod.object({
   "exit_flag": zod.boolean().optional().describe('True when a live Darwinbox exit\/resignation record was found for this person. Flagged only — NOT subtracted from the standing instructor count.'),
   "exit_flag_status": zod.string().nullish().describe('Darwinbox resignation status as of the most recent exit sync, e.g. Approved, Pending With Approver, Rejected, Revoked.'),
   "exit_flag_date": zod.coerce.date().nullish(),
+  "exit_verification": zod.union([zod.literal('exited'),zod.literal('serving_notice_period'),zod.literal('payroll_converted'),zod.literal('absconded'),zod.literal('revoked'),zod.literal(null)]).nullish().describe('Capability Manager\'s manual read on an exit-flagged record, settable via PATCH \/instructors\/{id}\/exit-verification by either Admin or Manager. Tracking label only — never affects computed_status\/manual_status or the headcount.'),
   "dept_bucket": zod.string().nullish().describe('tech | non_tech | null. See departmentTaxonomy.ts. Null for excluded\/mentor rows (see classification).'),
   "dept_area": zod.string().nullish().describe('Sub-area within dept_bucket, e.g. Frontend, Backend, DSA, GenAI, English, Aptitude, Math.'),
+  "manual_dept_area": zod.string().nullish().describe('Manual fallback for Subject\/dept_area, settable via PATCH \/instructors\/{id}\/subject (Admin only). Only used when classifyDepartment() left this person unclassified. Must be one of departmentTaxonomy.ts\'s recognized area names, or null.'),
+  "deployment_status": zod.string().nullish().describe('deployed | in_training | null, derived from TeachOS institutes (institute_name \"Training Institute\" = in_training).'),
+  "in_darwin_full_roster": zod.boolean().optional().describe('True when this person\'s Darwin match came from the full\/unfiltered company roster fallback rather than the primary Instructors-department sync — see reconcileDarwinFullRosterFallback().')
+})
+
+
+/**
+ * Narrower sibling of PATCH /instructors/{id} above (which is Admin- only) -- this one is reachable by either role, since Manual Gender is meant to be filled in by whoever knows the person, not just an Admin. Only takes effect when Darwin doesn't already supply a gender for this person (see InstructorSummary.gender_source); Darwin's own value is never overridden by this.
+ * @summary Set or clear an instructor's manual gender fallback (Admin or Manager)
+ */
+export const UpdateInstructorGenderParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateInstructorGenderBody = zod.object({
+  "manual_gender": zod.union([zod.literal('male'),zod.literal('female'),zod.literal(null)]).nullable()
+})
+
+export const UpdateInstructorGenderResponse = zod.object({
+  "id": zod.number(),
+  "employee_id": zod.string().nullish(),
+  "teachos_user_id": zod.string().nullish(),
+  "full_name": zod.string(),
+  "org_email": zod.string().nullish(),
+  "mobile": zod.string().nullish(),
+  "date_of_joining": zod.coerce.date().nullish(),
+  "department": zod.string().nullish(),
+  "sub_department": zod.string().nullish(),
+  "designation": zod.string().nullish(),
+  "direct_manager": zod.string().nullish(),
+  "work_location": zod.string().nullish(),
+  "workspace": zod.string().nullish(),
+  "gender": zod.string().nullish(),
+  "current_state": zod.string().nullish(),
+  "current_city": zod.string().nullish(),
+  "darwin_employee_status": zod.string().nullish(),
+  "in_darwin": zod.boolean(),
+  "in_teachos": zod.boolean(),
+  "teachos_role": zod.string().nullish(),
+  "teachos_category": zod.string().nullish(),
+  "teachos_manager": zod.string().nullish(),
+  "manual_capability_manager": zod.string().nullish().describe('Manual fallback for the Capability Manager, settable via PATCH \/instructors\/{id}\/capability-manager (Admin only). Only used when TeachOS\'s own candidate rows didn\'t resolve to anyone on the maintained roster for this person. Must be one of that maintained roster\'s names, or null.'),
+  "institutes": zod.array(zod.string()),
+  "computed_status": zod.string(),
+  "manual_status": zod.string().nullish(),
+  "manual_gender": zod.string().nullish().describe('Manual fallback for gender, settable via PATCH \/instructors\/{id}\/gender by either Admin or Manager. Only used when Darwin has no gender on file for this person.'),
+  "exit_date": zod.coerce.date().nullish(),
+  "converted_university_name": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "classification": zod.string().nullish().describe('TeachOS instructor-count classification override match — one of excluded_other_department, excluded_non_department_team, payroll_converted, or null. See classificationOverrides.ts \/ TEACHOS_INSTRUCTOR_COUNT_RULES.md.'),
+  "classification_reason": zod.string().nullish(),
+  "exit_flag": zod.boolean().optional().describe('True when a live Darwinbox exit\/resignation record was found for this person. Flagged only — NOT subtracted from the standing instructor count.'),
+  "exit_flag_status": zod.string().nullish().describe('Darwinbox resignation status as of the most recent exit sync, e.g. Approved, Pending With Approver, Rejected, Revoked.'),
+  "exit_flag_date": zod.coerce.date().nullish(),
+  "exit_verification": zod.union([zod.literal('exited'),zod.literal('serving_notice_period'),zod.literal('payroll_converted'),zod.literal('absconded'),zod.literal('revoked'),zod.literal(null)]).nullish().describe('Capability Manager\'s manual read on an exit-flagged record, settable via PATCH \/instructors\/{id}\/exit-verification by either Admin or Manager. Tracking label only — never affects computed_status\/manual_status or the headcount.'),
+  "dept_bucket": zod.string().nullish().describe('tech | non_tech | null. See departmentTaxonomy.ts. Null for excluded\/mentor rows (see classification).'),
+  "dept_area": zod.string().nullish().describe('Sub-area within dept_bucket, e.g. Frontend, Backend, DSA, GenAI, English, Aptitude, Math.'),
+  "manual_dept_area": zod.string().nullish().describe('Manual fallback for Subject\/dept_area, settable via PATCH \/instructors\/{id}\/subject (Admin only). Only used when classifyDepartment() left this person unclassified. Must be one of departmentTaxonomy.ts\'s recognized area names, or null.'),
+  "deployment_status": zod.string().nullish().describe('deployed | in_training | null, derived from TeachOS institutes (institute_name \"Training Institute\" = in_training).'),
+  "in_darwin_full_roster": zod.boolean().optional().describe('True when this person\'s Darwin match came from the full\/unfiltered company roster fallback rather than the primary Instructors-department sync — see reconcileDarwinFullRosterFallback().')
+})
+
+
+/**
+ * Narrower sibling of PATCH /instructors/{id} above -- both are Admin-only, unlike the gender endpoint. Only takes effect when TeachOS's own candidate rows didn't resolve to anyone on the maintained Capability Manager roster (see InstructorSummary.capability_manager_source); TeachOS's own value is never overridden by this. The value must be one of the maintained roster names (or null to clear it), not free text.
+ * @summary Set or clear an instructor's manual Capability Manager fallback (Admin only)
+ */
+export const UpdateInstructorCapabilityManagerParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateInstructorCapabilityManagerBody = zod.object({
+  "manual_capability_manager": zod.string().nullable().describe('Must be one of the names in data\/validCapabilityManagers.ts, or null.')
+})
+
+export const UpdateInstructorCapabilityManagerResponse = zod.object({
+  "id": zod.number(),
+  "employee_id": zod.string().nullish(),
+  "teachos_user_id": zod.string().nullish(),
+  "full_name": zod.string(),
+  "org_email": zod.string().nullish(),
+  "mobile": zod.string().nullish(),
+  "date_of_joining": zod.coerce.date().nullish(),
+  "department": zod.string().nullish(),
+  "sub_department": zod.string().nullish(),
+  "designation": zod.string().nullish(),
+  "direct_manager": zod.string().nullish(),
+  "work_location": zod.string().nullish(),
+  "workspace": zod.string().nullish(),
+  "gender": zod.string().nullish(),
+  "current_state": zod.string().nullish(),
+  "current_city": zod.string().nullish(),
+  "darwin_employee_status": zod.string().nullish(),
+  "in_darwin": zod.boolean(),
+  "in_teachos": zod.boolean(),
+  "teachos_role": zod.string().nullish(),
+  "teachos_category": zod.string().nullish(),
+  "teachos_manager": zod.string().nullish(),
+  "manual_capability_manager": zod.string().nullish().describe('Manual fallback for the Capability Manager, settable via PATCH \/instructors\/{id}\/capability-manager (Admin only). Only used when TeachOS\'s own candidate rows didn\'t resolve to anyone on the maintained roster for this person. Must be one of that maintained roster\'s names, or null.'),
+  "institutes": zod.array(zod.string()),
+  "computed_status": zod.string(),
+  "manual_status": zod.string().nullish(),
+  "manual_gender": zod.string().nullish().describe('Manual fallback for gender, settable via PATCH \/instructors\/{id}\/gender by either Admin or Manager. Only used when Darwin has no gender on file for this person.'),
+  "exit_date": zod.coerce.date().nullish(),
+  "converted_university_name": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "classification": zod.string().nullish().describe('TeachOS instructor-count classification override match — one of excluded_other_department, excluded_non_department_team, payroll_converted, or null. See classificationOverrides.ts \/ TEACHOS_INSTRUCTOR_COUNT_RULES.md.'),
+  "classification_reason": zod.string().nullish(),
+  "exit_flag": zod.boolean().optional().describe('True when a live Darwinbox exit\/resignation record was found for this person. Flagged only — NOT subtracted from the standing instructor count.'),
+  "exit_flag_status": zod.string().nullish().describe('Darwinbox resignation status as of the most recent exit sync, e.g. Approved, Pending With Approver, Rejected, Revoked.'),
+  "exit_flag_date": zod.coerce.date().nullish(),
+  "exit_verification": zod.union([zod.literal('exited'),zod.literal('serving_notice_period'),zod.literal('payroll_converted'),zod.literal('absconded'),zod.literal('revoked'),zod.literal(null)]).nullish().describe('Capability Manager\'s manual read on an exit-flagged record, settable via PATCH \/instructors\/{id}\/exit-verification by either Admin or Manager. Tracking label only — never affects computed_status\/manual_status or the headcount.'),
+  "dept_bucket": zod.string().nullish().describe('tech | non_tech | null. See departmentTaxonomy.ts. Null for excluded\/mentor rows (see classification).'),
+  "dept_area": zod.string().nullish().describe('Sub-area within dept_bucket, e.g. Frontend, Backend, DSA, GenAI, English, Aptitude, Math.'),
+  "manual_dept_area": zod.string().nullish().describe('Manual fallback for Subject\/dept_area, settable via PATCH \/instructors\/{id}\/subject (Admin only). Only used when classifyDepartment() left this person unclassified. Must be one of departmentTaxonomy.ts\'s recognized area names, or null.'),
+  "deployment_status": zod.string().nullish().describe('deployed | in_training | null, derived from TeachOS institutes (institute_name \"Training Institute\" = in_training).'),
+  "in_darwin_full_roster": zod.boolean().optional().describe('True when this person\'s Darwin match came from the full\/unfiltered company roster fallback rather than the primary Instructors-department sync — see reconcileDarwinFullRosterFallback().')
+})
+
+
+/**
+ * Narrower sibling of PATCH /instructors/{id} above -- Admin-only, same as the capability-manager endpoint. Only takes effect when classifyDepartment() (departmentTaxonomy.ts) left this person unclassified (see InstructorSummary.dept_area_source); the computed value is never overridden by this. The value must be one of departmentTaxonomy.ts's recognized area names (or null to clear it), not free text. Not meaningful for Operations team rows, whose dept_area is intentionally null.
+ * @summary Set or clear an instructor's manual Subject (dept_area) fallback (Admin only)
+ */
+export const UpdateInstructorSubjectParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateInstructorSubjectBody = zod.object({
+  "manual_dept_area": zod.string().nullable().describe('Must be one of departmentTaxonomy.ts\'s SUBJECT_AREAS, or null.')
+})
+
+export const UpdateInstructorSubjectResponse = zod.object({
+  "id": zod.number(),
+  "employee_id": zod.string().nullish(),
+  "teachos_user_id": zod.string().nullish(),
+  "full_name": zod.string(),
+  "org_email": zod.string().nullish(),
+  "mobile": zod.string().nullish(),
+  "date_of_joining": zod.coerce.date().nullish(),
+  "department": zod.string().nullish(),
+  "sub_department": zod.string().nullish(),
+  "designation": zod.string().nullish(),
+  "direct_manager": zod.string().nullish(),
+  "work_location": zod.string().nullish(),
+  "workspace": zod.string().nullish(),
+  "gender": zod.string().nullish(),
+  "current_state": zod.string().nullish(),
+  "current_city": zod.string().nullish(),
+  "darwin_employee_status": zod.string().nullish(),
+  "in_darwin": zod.boolean(),
+  "in_teachos": zod.boolean(),
+  "teachos_role": zod.string().nullish(),
+  "teachos_category": zod.string().nullish(),
+  "teachos_manager": zod.string().nullish(),
+  "manual_capability_manager": zod.string().nullish().describe('Manual fallback for the Capability Manager, settable via PATCH \/instructors\/{id}\/capability-manager (Admin only). Only used when TeachOS\'s own candidate rows didn\'t resolve to anyone on the maintained roster for this person. Must be one of that maintained roster\'s names, or null.'),
+  "institutes": zod.array(zod.string()),
+  "computed_status": zod.string(),
+  "manual_status": zod.string().nullish(),
+  "manual_gender": zod.string().nullish().describe('Manual fallback for gender, settable via PATCH \/instructors\/{id}\/gender by either Admin or Manager. Only used when Darwin has no gender on file for this person.'),
+  "exit_date": zod.coerce.date().nullish(),
+  "converted_university_name": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "classification": zod.string().nullish().describe('TeachOS instructor-count classification override match — one of excluded_other_department, excluded_non_department_team, payroll_converted, or null. See classificationOverrides.ts \/ TEACHOS_INSTRUCTOR_COUNT_RULES.md.'),
+  "classification_reason": zod.string().nullish(),
+  "exit_flag": zod.boolean().optional().describe('True when a live Darwinbox exit\/resignation record was found for this person. Flagged only — NOT subtracted from the standing instructor count.'),
+  "exit_flag_status": zod.string().nullish().describe('Darwinbox resignation status as of the most recent exit sync, e.g. Approved, Pending With Approver, Rejected, Revoked.'),
+  "exit_flag_date": zod.coerce.date().nullish(),
+  "exit_verification": zod.union([zod.literal('exited'),zod.literal('serving_notice_period'),zod.literal('payroll_converted'),zod.literal('absconded'),zod.literal('revoked'),zod.literal(null)]).nullish().describe('Capability Manager\'s manual read on an exit-flagged record, settable via PATCH \/instructors\/{id}\/exit-verification by either Admin or Manager. Tracking label only — never affects computed_status\/manual_status or the headcount.'),
+  "dept_bucket": zod.string().nullish().describe('tech | non_tech | null. See departmentTaxonomy.ts. Null for excluded\/mentor rows (see classification).'),
+  "dept_area": zod.string().nullish().describe('Sub-area within dept_bucket, e.g. Frontend, Backend, DSA, GenAI, English, Aptitude, Math.'),
+  "manual_dept_area": zod.string().nullish().describe('Manual fallback for Subject\/dept_area, settable via PATCH \/instructors\/{id}\/subject (Admin only). Only used when classifyDepartment() left this person unclassified. Must be one of departmentTaxonomy.ts\'s recognized area names, or null.'),
+  "deployment_status": zod.string().nullish().describe('deployed | in_training | null, derived from TeachOS institutes (institute_name \"Training Institute\" = in_training).'),
+  "in_darwin_full_roster": zod.boolean().optional().describe('True when this person\'s Darwin match came from the full\/unfiltered company roster fallback rather than the primary Instructors-department sync — see reconcileDarwinFullRosterFallback().')
+})
+
+
+/**
+ * Both-role sibling of PATCH /instructors/{id} above, like the gender endpoint -- reachable by either Admin or Manager, since a Capability Manager may be logged in as either. Lets a Capability Manager record their read on someone with a live Darwinbox exit record on file (InstructorSummary.exit_flag) as one of "exited", "serving_notice_period", "payroll_converted", or "absconded" (or null to clear it back to unreviewed). This is a TRACKING LABEL ONLY -- it never changes computed_status or manual_status, and never affects the standing instructor headcount. Actually excluding someone from the count stays the separate, deliberate Manual Status control on PATCH /instructors/{id} (Admin-only). It does drive the Instructors tab's Exception queue: everything except "payroll_converted" (or anyone Darwinbox's own live exit sync already reports as "Revoked" -- see exit_flag_status) keeps showing there. "revoked" was removed as a settable value here (2026-09-19, per request) since that automatic Darwinbox-status check already covers it, making a manual "Revoked" label redundant.
+ * @summary Set or clear a Capability Manager's exit-verification label for an exit-flagged instructor (Admin or Manager)
+ */
+export const UpdateInstructorExitVerificationParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateInstructorExitVerificationBody = zod.object({
+  "exit_verification": zod.union([zod.literal('exited'),zod.literal('serving_notice_period'),zod.literal('payroll_converted'),zod.literal('absconded'),zod.literal(null)]).nullable()
+})
+
+export const UpdateInstructorExitVerificationResponse = zod.object({
+  "id": zod.number(),
+  "employee_id": zod.string().nullish(),
+  "teachos_user_id": zod.string().nullish(),
+  "full_name": zod.string(),
+  "org_email": zod.string().nullish(),
+  "mobile": zod.string().nullish(),
+  "date_of_joining": zod.coerce.date().nullish(),
+  "department": zod.string().nullish(),
+  "sub_department": zod.string().nullish(),
+  "designation": zod.string().nullish(),
+  "direct_manager": zod.string().nullish(),
+  "work_location": zod.string().nullish(),
+  "workspace": zod.string().nullish(),
+  "gender": zod.string().nullish(),
+  "current_state": zod.string().nullish(),
+  "current_city": zod.string().nullish(),
+  "darwin_employee_status": zod.string().nullish(),
+  "in_darwin": zod.boolean(),
+  "in_teachos": zod.boolean(),
+  "teachos_role": zod.string().nullish(),
+  "teachos_category": zod.string().nullish(),
+  "teachos_manager": zod.string().nullish(),
+  "manual_capability_manager": zod.string().nullish().describe('Manual fallback for the Capability Manager, settable via PATCH \/instructors\/{id}\/capability-manager (Admin only). Only used when TeachOS\'s own candidate rows didn\'t resolve to anyone on the maintained roster for this person. Must be one of that maintained roster\'s names, or null.'),
+  "institutes": zod.array(zod.string()),
+  "computed_status": zod.string(),
+  "manual_status": zod.string().nullish(),
+  "manual_gender": zod.string().nullish().describe('Manual fallback for gender, settable via PATCH \/instructors\/{id}\/gender by either Admin or Manager. Only used when Darwin has no gender on file for this person.'),
+  "exit_date": zod.coerce.date().nullish(),
+  "converted_university_name": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "classification": zod.string().nullish().describe('TeachOS instructor-count classification override match — one of excluded_other_department, excluded_non_department_team, payroll_converted, or null. See classificationOverrides.ts \/ TEACHOS_INSTRUCTOR_COUNT_RULES.md.'),
+  "classification_reason": zod.string().nullish(),
+  "exit_flag": zod.boolean().optional().describe('True when a live Darwinbox exit\/resignation record was found for this person. Flagged only — NOT subtracted from the standing instructor count.'),
+  "exit_flag_status": zod.string().nullish().describe('Darwinbox resignation status as of the most recent exit sync, e.g. Approved, Pending With Approver, Rejected, Revoked.'),
+  "exit_flag_date": zod.coerce.date().nullish(),
+  "exit_verification": zod.union([zod.literal('exited'),zod.literal('serving_notice_period'),zod.literal('payroll_converted'),zod.literal('absconded'),zod.literal('revoked'),zod.literal(null)]).nullish().describe('Capability Manager\'s manual read on an exit-flagged record, settable via PATCH \/instructors\/{id}\/exit-verification by either Admin or Manager. Tracking label only — never affects computed_status\/manual_status or the headcount.'),
+  "dept_bucket": zod.string().nullish().describe('tech | non_tech | null. See departmentTaxonomy.ts. Null for excluded\/mentor rows (see classification).'),
+  "dept_area": zod.string().nullish().describe('Sub-area within dept_bucket, e.g. Frontend, Backend, DSA, GenAI, English, Aptitude, Math.'),
+  "manual_dept_area": zod.string().nullish().describe('Manual fallback for Subject\/dept_area, settable via PATCH \/instructors\/{id}\/subject (Admin only). Only used when classifyDepartment() left this person unclassified. Must be one of departmentTaxonomy.ts\'s recognized area names, or null.'),
   "deployment_status": zod.string().nullish().describe('deployed | in_training | null, derived from TeachOS institutes (institute_name \"Training Institute\" = in_training).'),
   "in_darwin_full_roster": zod.boolean().optional().describe('True when this person\'s Darwin match came from the full\/unfiltered company roster fallback rather than the primary Instructors-department sync — see reconcileDarwinFullRosterFallback().')
 })
@@ -425,15 +717,491 @@ export const GetReportsInstructorsResponse = zod.object({
   "id": zod.number(),
   "full_name": zod.string(),
   "employee_id": zod.string().nullable(),
+  "teachos_user_id": zod.string().nullable(),
   "designation": zod.string().nullable(),
   "department": zod.string().nullable(),
   "dept_bucket": zod.string().nullable(),
+  "classification": zod.string().nullable(),
   "dept_area": zod.string().nullable(),
+  "dept_area_source": zod.union([zod.literal('computed'),zod.literal('manual'),zod.literal(null)]).nullable(),
   "is_payroll": zod.boolean(),
   "deployment_status": zod.string().nullable(),
   "institutes": zod.array(zod.string()),
-  "manager": zod.string().nullable()
-})).describe('Every person counted in kpis.total_instructor_count, sorted by name. Backs a click-to-expand details view under the headline count.')
+  "capability_manager": zod.string().nullable(),
+  "capability_manager_source": zod.union([zod.literal('teachos'),zod.literal('manual'),zod.literal(null)]).nullable(),
+  "darwin_manager": zod.string().nullable(),
+  "date_of_joining": zod.string().nullable(),
+  "org_email": zod.string().nullable(),
+  "work_location": zod.string().nullable(),
+  "gender": zod.string().nullable(),
+  "gender_source": zod.union([zod.literal('darwin'),zod.literal('exit'),zod.literal('manual'),zod.literal(null)]).nullable(),
+  "exit_flag": zod.boolean(),
+  "exit_verification": zod.union([zod.literal('exited'),zod.literal('serving_notice_period'),zod.literal('payroll_converted'),zod.literal('absconded'),zod.literal('revoked'),zod.literal(null)]).nullable(),
+  "enrolled_plans": zod.string().nullable(),
+  "niat_cohorts": zod.array(zod.string())
+})).describe('Every person counted in kpis.total_instructor_count, sorted by name. Backs a click-to-expand details view under the headline count.'),
+  "access_breakdown": zod.object({
+  "department": zod.object({
+  "darwin_only": zod.object({
+  "count": zod.number().optional(),
+  "people": zod.array(zod.object({
+  "id": zod.number(),
+  "full_name": zod.string(),
+  "employee_id": zod.string().nullable(),
+  "teachos_user_id": zod.string().nullable(),
+  "designation": zod.string().nullable(),
+  "department": zod.string().nullable(),
+  "dept_bucket": zod.string().nullable(),
+  "classification": zod.string().nullable(),
+  "dept_area": zod.string().nullable(),
+  "dept_area_source": zod.union([zod.literal('computed'),zod.literal('manual'),zod.literal(null)]).nullable(),
+  "is_payroll": zod.boolean(),
+  "deployment_status": zod.string().nullable(),
+  "institutes": zod.array(zod.string()),
+  "capability_manager": zod.string().nullable(),
+  "capability_manager_source": zod.union([zod.literal('teachos'),zod.literal('manual'),zod.literal(null)]).nullable(),
+  "darwin_manager": zod.string().nullable(),
+  "date_of_joining": zod.string().nullable(),
+  "org_email": zod.string().nullable(),
+  "work_location": zod.string().nullable(),
+  "gender": zod.string().nullable(),
+  "gender_source": zod.union([zod.literal('darwin'),zod.literal('exit'),zod.literal('manual'),zod.literal(null)]).nullable(),
+  "exit_flag": zod.boolean(),
+  "exit_verification": zod.union([zod.literal('exited'),zod.literal('serving_notice_period'),zod.literal('payroll_converted'),zod.literal('absconded'),zod.literal('revoked'),zod.literal(null)]).nullable(),
+  "enrolled_plans": zod.string().nullable(),
+  "niat_cohorts": zod.array(zod.string())
+})).optional()
+}).optional().describe('One darwin_only\/both\/teachos_only bucket -- a count plus the actual people in it, for the click-to-drill-down view.'),
+  "both": zod.object({
+  "count": zod.number().optional(),
+  "people": zod.array(zod.object({
+  "id": zod.number(),
+  "full_name": zod.string(),
+  "employee_id": zod.string().nullable(),
+  "teachos_user_id": zod.string().nullable(),
+  "designation": zod.string().nullable(),
+  "department": zod.string().nullable(),
+  "dept_bucket": zod.string().nullable(),
+  "classification": zod.string().nullable(),
+  "dept_area": zod.string().nullable(),
+  "dept_area_source": zod.union([zod.literal('computed'),zod.literal('manual'),zod.literal(null)]).nullable(),
+  "is_payroll": zod.boolean(),
+  "deployment_status": zod.string().nullable(),
+  "institutes": zod.array(zod.string()),
+  "capability_manager": zod.string().nullable(),
+  "capability_manager_source": zod.union([zod.literal('teachos'),zod.literal('manual'),zod.literal(null)]).nullable(),
+  "darwin_manager": zod.string().nullable(),
+  "date_of_joining": zod.string().nullable(),
+  "org_email": zod.string().nullable(),
+  "work_location": zod.string().nullable(),
+  "gender": zod.string().nullable(),
+  "gender_source": zod.union([zod.literal('darwin'),zod.literal('exit'),zod.literal('manual'),zod.literal(null)]).nullable(),
+  "exit_flag": zod.boolean(),
+  "exit_verification": zod.union([zod.literal('exited'),zod.literal('serving_notice_period'),zod.literal('payroll_converted'),zod.literal('absconded'),zod.literal('revoked'),zod.literal(null)]).nullable(),
+  "enrolled_plans": zod.string().nullable(),
+  "niat_cohorts": zod.array(zod.string())
+})).optional()
+}).optional().describe('One darwin_only\/both\/teachos_only bucket -- a count plus the actual people in it, for the click-to-drill-down view.'),
+  "teachos_only": zod.object({
+  "count": zod.number().optional(),
+  "people": zod.array(zod.object({
+  "id": zod.number(),
+  "full_name": zod.string(),
+  "employee_id": zod.string().nullable(),
+  "teachos_user_id": zod.string().nullable(),
+  "designation": zod.string().nullable(),
+  "department": zod.string().nullable(),
+  "dept_bucket": zod.string().nullable(),
+  "classification": zod.string().nullable(),
+  "dept_area": zod.string().nullable(),
+  "dept_area_source": zod.union([zod.literal('computed'),zod.literal('manual'),zod.literal(null)]).nullable(),
+  "is_payroll": zod.boolean(),
+  "deployment_status": zod.string().nullable(),
+  "institutes": zod.array(zod.string()),
+  "capability_manager": zod.string().nullable(),
+  "capability_manager_source": zod.union([zod.literal('teachos'),zod.literal('manual'),zod.literal(null)]).nullable(),
+  "darwin_manager": zod.string().nullable(),
+  "date_of_joining": zod.string().nullable(),
+  "org_email": zod.string().nullable(),
+  "work_location": zod.string().nullable(),
+  "gender": zod.string().nullable(),
+  "gender_source": zod.union([zod.literal('darwin'),zod.literal('exit'),zod.literal('manual'),zod.literal(null)]).nullable(),
+  "exit_flag": zod.boolean(),
+  "exit_verification": zod.union([zod.literal('exited'),zod.literal('serving_notice_period'),zod.literal('payroll_converted'),zod.literal('absconded'),zod.literal('revoked'),zod.literal(null)]).nullable(),
+  "enrolled_plans": zod.string().nullable(),
+  "niat_cohorts": zod.array(zod.string())
+})).optional()
+}).optional().describe('One darwin_only\/both\/teachos_only bucket -- a count plus the actual people in it, for the click-to-drill-down view.')
+}).optional().describe('How a category\'s total splits by data source -- Darwin record only, TeachOS record only, or both -- each with its own people list.'),
+  "instructors": zod.object({
+  "darwin_only": zod.object({
+  "count": zod.number().optional(),
+  "people": zod.array(zod.object({
+  "id": zod.number(),
+  "full_name": zod.string(),
+  "employee_id": zod.string().nullable(),
+  "teachos_user_id": zod.string().nullable(),
+  "designation": zod.string().nullable(),
+  "department": zod.string().nullable(),
+  "dept_bucket": zod.string().nullable(),
+  "classification": zod.string().nullable(),
+  "dept_area": zod.string().nullable(),
+  "dept_area_source": zod.union([zod.literal('computed'),zod.literal('manual'),zod.literal(null)]).nullable(),
+  "is_payroll": zod.boolean(),
+  "deployment_status": zod.string().nullable(),
+  "institutes": zod.array(zod.string()),
+  "capability_manager": zod.string().nullable(),
+  "capability_manager_source": zod.union([zod.literal('teachos'),zod.literal('manual'),zod.literal(null)]).nullable(),
+  "darwin_manager": zod.string().nullable(),
+  "date_of_joining": zod.string().nullable(),
+  "org_email": zod.string().nullable(),
+  "work_location": zod.string().nullable(),
+  "gender": zod.string().nullable(),
+  "gender_source": zod.union([zod.literal('darwin'),zod.literal('exit'),zod.literal('manual'),zod.literal(null)]).nullable(),
+  "exit_flag": zod.boolean(),
+  "exit_verification": zod.union([zod.literal('exited'),zod.literal('serving_notice_period'),zod.literal('payroll_converted'),zod.literal('absconded'),zod.literal('revoked'),zod.literal(null)]).nullable(),
+  "enrolled_plans": zod.string().nullable(),
+  "niat_cohorts": zod.array(zod.string())
+})).optional()
+}).optional().describe('One darwin_only\/both\/teachos_only bucket -- a count plus the actual people in it, for the click-to-drill-down view.'),
+  "both": zod.object({
+  "count": zod.number().optional(),
+  "people": zod.array(zod.object({
+  "id": zod.number(),
+  "full_name": zod.string(),
+  "employee_id": zod.string().nullable(),
+  "teachos_user_id": zod.string().nullable(),
+  "designation": zod.string().nullable(),
+  "department": zod.string().nullable(),
+  "dept_bucket": zod.string().nullable(),
+  "classification": zod.string().nullable(),
+  "dept_area": zod.string().nullable(),
+  "dept_area_source": zod.union([zod.literal('computed'),zod.literal('manual'),zod.literal(null)]).nullable(),
+  "is_payroll": zod.boolean(),
+  "deployment_status": zod.string().nullable(),
+  "institutes": zod.array(zod.string()),
+  "capability_manager": zod.string().nullable(),
+  "capability_manager_source": zod.union([zod.literal('teachos'),zod.literal('manual'),zod.literal(null)]).nullable(),
+  "darwin_manager": zod.string().nullable(),
+  "date_of_joining": zod.string().nullable(),
+  "org_email": zod.string().nullable(),
+  "work_location": zod.string().nullable(),
+  "gender": zod.string().nullable(),
+  "gender_source": zod.union([zod.literal('darwin'),zod.literal('exit'),zod.literal('manual'),zod.literal(null)]).nullable(),
+  "exit_flag": zod.boolean(),
+  "exit_verification": zod.union([zod.literal('exited'),zod.literal('serving_notice_period'),zod.literal('payroll_converted'),zod.literal('absconded'),zod.literal('revoked'),zod.literal(null)]).nullable(),
+  "enrolled_plans": zod.string().nullable(),
+  "niat_cohorts": zod.array(zod.string())
+})).optional()
+}).optional().describe('One darwin_only\/both\/teachos_only bucket -- a count plus the actual people in it, for the click-to-drill-down view.'),
+  "teachos_only": zod.object({
+  "count": zod.number().optional(),
+  "people": zod.array(zod.object({
+  "id": zod.number(),
+  "full_name": zod.string(),
+  "employee_id": zod.string().nullable(),
+  "teachos_user_id": zod.string().nullable(),
+  "designation": zod.string().nullable(),
+  "department": zod.string().nullable(),
+  "dept_bucket": zod.string().nullable(),
+  "classification": zod.string().nullable(),
+  "dept_area": zod.string().nullable(),
+  "dept_area_source": zod.union([zod.literal('computed'),zod.literal('manual'),zod.literal(null)]).nullable(),
+  "is_payroll": zod.boolean(),
+  "deployment_status": zod.string().nullable(),
+  "institutes": zod.array(zod.string()),
+  "capability_manager": zod.string().nullable(),
+  "capability_manager_source": zod.union([zod.literal('teachos'),zod.literal('manual'),zod.literal(null)]).nullable(),
+  "darwin_manager": zod.string().nullable(),
+  "date_of_joining": zod.string().nullable(),
+  "org_email": zod.string().nullable(),
+  "work_location": zod.string().nullable(),
+  "gender": zod.string().nullable(),
+  "gender_source": zod.union([zod.literal('darwin'),zod.literal('exit'),zod.literal('manual'),zod.literal(null)]).nullable(),
+  "exit_flag": zod.boolean(),
+  "exit_verification": zod.union([zod.literal('exited'),zod.literal('serving_notice_period'),zod.literal('payroll_converted'),zod.literal('absconded'),zod.literal('revoked'),zod.literal(null)]).nullable(),
+  "enrolled_plans": zod.string().nullable(),
+  "niat_cohorts": zod.array(zod.string())
+})).optional()
+}).optional().describe('One darwin_only\/both\/teachos_only bucket -- a count plus the actual people in it, for the click-to-drill-down view.')
+}).optional().describe('How a category\'s total splits by data source -- Darwin record only, TeachOS record only, or both -- each with its own people list.'),
+  "mentors": zod.object({
+  "darwin_only": zod.object({
+  "count": zod.number().optional(),
+  "people": zod.array(zod.object({
+  "id": zod.number(),
+  "full_name": zod.string(),
+  "employee_id": zod.string().nullable(),
+  "teachos_user_id": zod.string().nullable(),
+  "designation": zod.string().nullable(),
+  "department": zod.string().nullable(),
+  "dept_bucket": zod.string().nullable(),
+  "classification": zod.string().nullable(),
+  "dept_area": zod.string().nullable(),
+  "dept_area_source": zod.union([zod.literal('computed'),zod.literal('manual'),zod.literal(null)]).nullable(),
+  "is_payroll": zod.boolean(),
+  "deployment_status": zod.string().nullable(),
+  "institutes": zod.array(zod.string()),
+  "capability_manager": zod.string().nullable(),
+  "capability_manager_source": zod.union([zod.literal('teachos'),zod.literal('manual'),zod.literal(null)]).nullable(),
+  "darwin_manager": zod.string().nullable(),
+  "date_of_joining": zod.string().nullable(),
+  "org_email": zod.string().nullable(),
+  "work_location": zod.string().nullable(),
+  "gender": zod.string().nullable(),
+  "gender_source": zod.union([zod.literal('darwin'),zod.literal('exit'),zod.literal('manual'),zod.literal(null)]).nullable(),
+  "exit_flag": zod.boolean(),
+  "exit_verification": zod.union([zod.literal('exited'),zod.literal('serving_notice_period'),zod.literal('payroll_converted'),zod.literal('absconded'),zod.literal('revoked'),zod.literal(null)]).nullable(),
+  "enrolled_plans": zod.string().nullable(),
+  "niat_cohorts": zod.array(zod.string())
+})).optional()
+}).optional().describe('One darwin_only\/both\/teachos_only bucket -- a count plus the actual people in it, for the click-to-drill-down view.'),
+  "both": zod.object({
+  "count": zod.number().optional(),
+  "people": zod.array(zod.object({
+  "id": zod.number(),
+  "full_name": zod.string(),
+  "employee_id": zod.string().nullable(),
+  "teachos_user_id": zod.string().nullable(),
+  "designation": zod.string().nullable(),
+  "department": zod.string().nullable(),
+  "dept_bucket": zod.string().nullable(),
+  "classification": zod.string().nullable(),
+  "dept_area": zod.string().nullable(),
+  "dept_area_source": zod.union([zod.literal('computed'),zod.literal('manual'),zod.literal(null)]).nullable(),
+  "is_payroll": zod.boolean(),
+  "deployment_status": zod.string().nullable(),
+  "institutes": zod.array(zod.string()),
+  "capability_manager": zod.string().nullable(),
+  "capability_manager_source": zod.union([zod.literal('teachos'),zod.literal('manual'),zod.literal(null)]).nullable(),
+  "darwin_manager": zod.string().nullable(),
+  "date_of_joining": zod.string().nullable(),
+  "org_email": zod.string().nullable(),
+  "work_location": zod.string().nullable(),
+  "gender": zod.string().nullable(),
+  "gender_source": zod.union([zod.literal('darwin'),zod.literal('exit'),zod.literal('manual'),zod.literal(null)]).nullable(),
+  "exit_flag": zod.boolean(),
+  "exit_verification": zod.union([zod.literal('exited'),zod.literal('serving_notice_period'),zod.literal('payroll_converted'),zod.literal('absconded'),zod.literal('revoked'),zod.literal(null)]).nullable(),
+  "enrolled_plans": zod.string().nullable(),
+  "niat_cohorts": zod.array(zod.string())
+})).optional()
+}).optional().describe('One darwin_only\/both\/teachos_only bucket -- a count plus the actual people in it, for the click-to-drill-down view.'),
+  "teachos_only": zod.object({
+  "count": zod.number().optional(),
+  "people": zod.array(zod.object({
+  "id": zod.number(),
+  "full_name": zod.string(),
+  "employee_id": zod.string().nullable(),
+  "teachos_user_id": zod.string().nullable(),
+  "designation": zod.string().nullable(),
+  "department": zod.string().nullable(),
+  "dept_bucket": zod.string().nullable(),
+  "classification": zod.string().nullable(),
+  "dept_area": zod.string().nullable(),
+  "dept_area_source": zod.union([zod.literal('computed'),zod.literal('manual'),zod.literal(null)]).nullable(),
+  "is_payroll": zod.boolean(),
+  "deployment_status": zod.string().nullable(),
+  "institutes": zod.array(zod.string()),
+  "capability_manager": zod.string().nullable(),
+  "capability_manager_source": zod.union([zod.literal('teachos'),zod.literal('manual'),zod.literal(null)]).nullable(),
+  "darwin_manager": zod.string().nullable(),
+  "date_of_joining": zod.string().nullable(),
+  "org_email": zod.string().nullable(),
+  "work_location": zod.string().nullable(),
+  "gender": zod.string().nullable(),
+  "gender_source": zod.union([zod.literal('darwin'),zod.literal('exit'),zod.literal('manual'),zod.literal(null)]).nullable(),
+  "exit_flag": zod.boolean(),
+  "exit_verification": zod.union([zod.literal('exited'),zod.literal('serving_notice_period'),zod.literal('payroll_converted'),zod.literal('absconded'),zod.literal('revoked'),zod.literal(null)]).nullable(),
+  "enrolled_plans": zod.string().nullable(),
+  "niat_cohorts": zod.array(zod.string())
+})).optional()
+}).optional().describe('One darwin_only\/both\/teachos_only bucket -- a count plus the actual people in it, for the click-to-drill-down view.')
+}).optional().describe('How a category\'s total splits by data source -- Darwin record only, TeachOS record only, or both -- each with its own people list.'),
+  "ops_team": zod.object({
+  "darwin_only": zod.object({
+  "count": zod.number().optional(),
+  "people": zod.array(zod.object({
+  "id": zod.number(),
+  "full_name": zod.string(),
+  "employee_id": zod.string().nullable(),
+  "teachos_user_id": zod.string().nullable(),
+  "designation": zod.string().nullable(),
+  "department": zod.string().nullable(),
+  "dept_bucket": zod.string().nullable(),
+  "classification": zod.string().nullable(),
+  "dept_area": zod.string().nullable(),
+  "dept_area_source": zod.union([zod.literal('computed'),zod.literal('manual'),zod.literal(null)]).nullable(),
+  "is_payroll": zod.boolean(),
+  "deployment_status": zod.string().nullable(),
+  "institutes": zod.array(zod.string()),
+  "capability_manager": zod.string().nullable(),
+  "capability_manager_source": zod.union([zod.literal('teachos'),zod.literal('manual'),zod.literal(null)]).nullable(),
+  "darwin_manager": zod.string().nullable(),
+  "date_of_joining": zod.string().nullable(),
+  "org_email": zod.string().nullable(),
+  "work_location": zod.string().nullable(),
+  "gender": zod.string().nullable(),
+  "gender_source": zod.union([zod.literal('darwin'),zod.literal('exit'),zod.literal('manual'),zod.literal(null)]).nullable(),
+  "exit_flag": zod.boolean(),
+  "exit_verification": zod.union([zod.literal('exited'),zod.literal('serving_notice_period'),zod.literal('payroll_converted'),zod.literal('absconded'),zod.literal('revoked'),zod.literal(null)]).nullable(),
+  "enrolled_plans": zod.string().nullable(),
+  "niat_cohorts": zod.array(zod.string())
+})).optional()
+}).optional().describe('One darwin_only\/both\/teachos_only bucket -- a count plus the actual people in it, for the click-to-drill-down view.'),
+  "both": zod.object({
+  "count": zod.number().optional(),
+  "people": zod.array(zod.object({
+  "id": zod.number(),
+  "full_name": zod.string(),
+  "employee_id": zod.string().nullable(),
+  "teachos_user_id": zod.string().nullable(),
+  "designation": zod.string().nullable(),
+  "department": zod.string().nullable(),
+  "dept_bucket": zod.string().nullable(),
+  "classification": zod.string().nullable(),
+  "dept_area": zod.string().nullable(),
+  "dept_area_source": zod.union([zod.literal('computed'),zod.literal('manual'),zod.literal(null)]).nullable(),
+  "is_payroll": zod.boolean(),
+  "deployment_status": zod.string().nullable(),
+  "institutes": zod.array(zod.string()),
+  "capability_manager": zod.string().nullable(),
+  "capability_manager_source": zod.union([zod.literal('teachos'),zod.literal('manual'),zod.literal(null)]).nullable(),
+  "darwin_manager": zod.string().nullable(),
+  "date_of_joining": zod.string().nullable(),
+  "org_email": zod.string().nullable(),
+  "work_location": zod.string().nullable(),
+  "gender": zod.string().nullable(),
+  "gender_source": zod.union([zod.literal('darwin'),zod.literal('exit'),zod.literal('manual'),zod.literal(null)]).nullable(),
+  "exit_flag": zod.boolean(),
+  "exit_verification": zod.union([zod.literal('exited'),zod.literal('serving_notice_period'),zod.literal('payroll_converted'),zod.literal('absconded'),zod.literal('revoked'),zod.literal(null)]).nullable(),
+  "enrolled_plans": zod.string().nullable(),
+  "niat_cohorts": zod.array(zod.string())
+})).optional()
+}).optional().describe('One darwin_only\/both\/teachos_only bucket -- a count plus the actual people in it, for the click-to-drill-down view.'),
+  "teachos_only": zod.object({
+  "count": zod.number().optional(),
+  "people": zod.array(zod.object({
+  "id": zod.number(),
+  "full_name": zod.string(),
+  "employee_id": zod.string().nullable(),
+  "teachos_user_id": zod.string().nullable(),
+  "designation": zod.string().nullable(),
+  "department": zod.string().nullable(),
+  "dept_bucket": zod.string().nullable(),
+  "classification": zod.string().nullable(),
+  "dept_area": zod.string().nullable(),
+  "dept_area_source": zod.union([zod.literal('computed'),zod.literal('manual'),zod.literal(null)]).nullable(),
+  "is_payroll": zod.boolean(),
+  "deployment_status": zod.string().nullable(),
+  "institutes": zod.array(zod.string()),
+  "capability_manager": zod.string().nullable(),
+  "capability_manager_source": zod.union([zod.literal('teachos'),zod.literal('manual'),zod.literal(null)]).nullable(),
+  "darwin_manager": zod.string().nullable(),
+  "date_of_joining": zod.string().nullable(),
+  "org_email": zod.string().nullable(),
+  "work_location": zod.string().nullable(),
+  "gender": zod.string().nullable(),
+  "gender_source": zod.union([zod.literal('darwin'),zod.literal('exit'),zod.literal('manual'),zod.literal(null)]).nullable(),
+  "exit_flag": zod.boolean(),
+  "exit_verification": zod.union([zod.literal('exited'),zod.literal('serving_notice_period'),zod.literal('payroll_converted'),zod.literal('absconded'),zod.literal('revoked'),zod.literal(null)]).nullable(),
+  "enrolled_plans": zod.string().nullable(),
+  "niat_cohorts": zod.array(zod.string())
+})).optional()
+}).optional().describe('One darwin_only\/both\/teachos_only bucket -- a count plus the actual people in it, for the click-to-drill-down view.')
+}).optional().describe('How a category\'s total splits by data source -- Darwin record only, TeachOS record only, or both -- each with its own people list.'),
+  "exception": zod.object({
+  "darwin_only": zod.object({
+  "count": zod.number().optional(),
+  "people": zod.array(zod.object({
+  "id": zod.number(),
+  "full_name": zod.string(),
+  "employee_id": zod.string().nullable(),
+  "teachos_user_id": zod.string().nullable(),
+  "designation": zod.string().nullable(),
+  "department": zod.string().nullable(),
+  "dept_bucket": zod.string().nullable(),
+  "classification": zod.string().nullable(),
+  "dept_area": zod.string().nullable(),
+  "dept_area_source": zod.union([zod.literal('computed'),zod.literal('manual'),zod.literal(null)]).nullable(),
+  "is_payroll": zod.boolean(),
+  "deployment_status": zod.string().nullable(),
+  "institutes": zod.array(zod.string()),
+  "capability_manager": zod.string().nullable(),
+  "capability_manager_source": zod.union([zod.literal('teachos'),zod.literal('manual'),zod.literal(null)]).nullable(),
+  "darwin_manager": zod.string().nullable(),
+  "date_of_joining": zod.string().nullable(),
+  "org_email": zod.string().nullable(),
+  "work_location": zod.string().nullable(),
+  "gender": zod.string().nullable(),
+  "gender_source": zod.union([zod.literal('darwin'),zod.literal('exit'),zod.literal('manual'),zod.literal(null)]).nullable(),
+  "exit_flag": zod.boolean(),
+  "exit_verification": zod.union([zod.literal('exited'),zod.literal('serving_notice_period'),zod.literal('payroll_converted'),zod.literal('absconded'),zod.literal('revoked'),zod.literal(null)]).nullable(),
+  "enrolled_plans": zod.string().nullable(),
+  "niat_cohorts": zod.array(zod.string())
+})).optional()
+}).optional().describe('One darwin_only\/both\/teachos_only bucket -- a count plus the actual people in it, for the click-to-drill-down view.'),
+  "both": zod.object({
+  "count": zod.number().optional(),
+  "people": zod.array(zod.object({
+  "id": zod.number(),
+  "full_name": zod.string(),
+  "employee_id": zod.string().nullable(),
+  "teachos_user_id": zod.string().nullable(),
+  "designation": zod.string().nullable(),
+  "department": zod.string().nullable(),
+  "dept_bucket": zod.string().nullable(),
+  "classification": zod.string().nullable(),
+  "dept_area": zod.string().nullable(),
+  "dept_area_source": zod.union([zod.literal('computed'),zod.literal('manual'),zod.literal(null)]).nullable(),
+  "is_payroll": zod.boolean(),
+  "deployment_status": zod.string().nullable(),
+  "institutes": zod.array(zod.string()),
+  "capability_manager": zod.string().nullable(),
+  "capability_manager_source": zod.union([zod.literal('teachos'),zod.literal('manual'),zod.literal(null)]).nullable(),
+  "darwin_manager": zod.string().nullable(),
+  "date_of_joining": zod.string().nullable(),
+  "org_email": zod.string().nullable(),
+  "work_location": zod.string().nullable(),
+  "gender": zod.string().nullable(),
+  "gender_source": zod.union([zod.literal('darwin'),zod.literal('exit'),zod.literal('manual'),zod.literal(null)]).nullable(),
+  "exit_flag": zod.boolean(),
+  "exit_verification": zod.union([zod.literal('exited'),zod.literal('serving_notice_period'),zod.literal('payroll_converted'),zod.literal('absconded'),zod.literal('revoked'),zod.literal(null)]).nullable(),
+  "enrolled_plans": zod.string().nullable(),
+  "niat_cohorts": zod.array(zod.string())
+})).optional()
+}).optional().describe('One darwin_only\/both\/teachos_only bucket -- a count plus the actual people in it, for the click-to-drill-down view.'),
+  "teachos_only": zod.object({
+  "count": zod.number().optional(),
+  "people": zod.array(zod.object({
+  "id": zod.number(),
+  "full_name": zod.string(),
+  "employee_id": zod.string().nullable(),
+  "teachos_user_id": zod.string().nullable(),
+  "designation": zod.string().nullable(),
+  "department": zod.string().nullable(),
+  "dept_bucket": zod.string().nullable(),
+  "classification": zod.string().nullable(),
+  "dept_area": zod.string().nullable(),
+  "dept_area_source": zod.union([zod.literal('computed'),zod.literal('manual'),zod.literal(null)]).nullable(),
+  "is_payroll": zod.boolean(),
+  "deployment_status": zod.string().nullable(),
+  "institutes": zod.array(zod.string()),
+  "capability_manager": zod.string().nullable(),
+  "capability_manager_source": zod.union([zod.literal('teachos'),zod.literal('manual'),zod.literal(null)]).nullable(),
+  "darwin_manager": zod.string().nullable(),
+  "date_of_joining": zod.string().nullable(),
+  "org_email": zod.string().nullable(),
+  "work_location": zod.string().nullable(),
+  "gender": zod.string().nullable(),
+  "gender_source": zod.union([zod.literal('darwin'),zod.literal('exit'),zod.literal('manual'),zod.literal(null)]).nullable(),
+  "exit_flag": zod.boolean(),
+  "exit_verification": zod.union([zod.literal('exited'),zod.literal('serving_notice_period'),zod.literal('payroll_converted'),zod.literal('absconded'),zod.literal('revoked'),zod.literal(null)]).nullable(),
+  "enrolled_plans": zod.string().nullable(),
+  "niat_cohorts": zod.array(zod.string())
+})).optional()
+}).optional().describe('One darwin_only\/both\/teachos_only bucket -- a count plus the actual people in it, for the click-to-drill-down view.')
+}).optional().describe('How a category\'s total splits by data source -- Darwin record only, TeachOS record only, or both -- each with its own people list.')
+}).optional().describe('Darwin-only \/ TeachOS-only \/ both-access split for the Instructor Department, Instructors, Mentors, Operations team, and Exception KPI cards (2026-09-04; department card added 2026-09-07; exception added 2026-09-18). \"department\" is the union of instructors + mentors + ops_team (mutually exclusive populations, safe to sum). \"exception\" is a review-queue overlay on top of those three, not a fourth population to add in -- see reports.ts\'s exceptionRows comment.')
 })
 
 

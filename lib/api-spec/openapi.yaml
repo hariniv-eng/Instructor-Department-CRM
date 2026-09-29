@@ -779,6 +779,7 @@ components:
         - exit_flag
         - exit_verification
         - enrolled_plans
+        - niat_cohorts
       properties:
         id: { type: number }
         full_name: { type: string }
@@ -885,3 +886,13 @@ components:
         # niatInstructorDetails.ts's fetchNiatInstructorDetailsRows() for the
         # cross-dataset join. No fallback source, plain display field.
         enrolled_plans: { type: ["string", "null"] }
+        # NIAT cohort year(s) this person is currently contributing to
+        # (2026-09-29, per request: "the contribution column that we have
+        # created... should be reflected in the instructor table, in the
+        # instructor tab also") -- same values as the Contribution tab's
+        # own Contribution column ("NIAT 2024" / "NIAT 2025" / "NIAT 2026"),
+        # joined here via instructor_contribution.instructor_user_id ==
+        # teachos_user_id. Empty array, never null, when there's no match.
+        niat_cohorts:
+          type: array
+          items: { type: string }

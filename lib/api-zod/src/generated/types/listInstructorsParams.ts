@@ -14,7 +14,16 @@ designation?: string;
 source?: string;
 classification?: string;
 exit_flag?: string;
+/**
+ * Either a raw dept_bucket value (tech, non_tech, mentor, excluded_ops_managers, instructor_ops) or one of the three UI-facing group names (instructor, mentor, excluded).
+ */
 dept_bucket?: string;
+/**
+ * Subject/sub-area within a tech or non_tech dept_bucket, e.g. Frontend, Backend, DSA, GenAI, Math, English, Aptitude.
+ */
 dept_area?: string;
+/**
+ * Filters to instructors whose institutes array contains this campus/university name.
+ */
 institute?: string;
 };

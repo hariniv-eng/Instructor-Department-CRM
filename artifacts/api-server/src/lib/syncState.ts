@@ -5,6 +5,20 @@
 // it to survive restarts (e.g. store on the most recent matching `uploads`
 // row instead).
 
+// The background auto-sync now runs once a day, at a fixed 5:00 AM IST
+// wall-clock time, for every live source (Darwin, Darwin Exits, TeachOS,
+// Training Status, Contribution) -- see lib/scheduler.ts for the actual
+// cron job (2026-09-29, per request: "every day at 5am it has to be
+// auto-synced... change it to every 24 hours", replacing the old
+// per-source *_SYNC_INTERVAL_HOURS env vars, which ran every 12h from
+// whenever the server happened to start rather than at a fixed time).
+// GET /sync/status (routes/sync.ts) reports this as `auto_sync_interval_
+// hours: 24` -- kept as the existing `number` field/type (not a new
+// string field) deliberately, so no OpenAPI spec / generated client
+// change is needed; the Uploads page's existing "Auto-syncs every Xh"
+// text already reads correctly off the new value.
+export const DAILY_AUTO_SYNC_INTERVAL_HOURS = 24;
+
 export type SyncResult =
   | { ok: true; source: string; stored: number; synced_at: string }
   | { ok: false; source: string; error: string; synced_at: string };

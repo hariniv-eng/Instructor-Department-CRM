@@ -7,7 +7,10 @@
  */
 import type { InstructorSummary } from './instructorSummary';
 
-export type AccessBucket = {
+/**
+ * One darwin_only/both/teachos_only bucket -- a count plus the actual people in it, for the click-to-drill-down view.
+ */
+export interface AccessBucket {
   count?: number;
   people?: InstructorSummary[];
-};
+}

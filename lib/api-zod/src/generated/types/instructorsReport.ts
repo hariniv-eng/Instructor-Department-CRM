@@ -27,5 +27,6 @@ export interface InstructorsReport {
   mentors: ReportPerson[];
   /** Every person counted in kpis.total_instructor_count, sorted by name. Backs a click-to-expand details view under the headline count. */
   instructors: InstructorSummary[];
+  /** Darwin-only / TeachOS-only / both-access split for the Instructor Department, Instructors, Mentors, Operations team, and Exception KPI cards (2026-09-04; department card added 2026-09-07; exception added 2026-09-18). "department" is the union of instructors + mentors + ops_team (mutually exclusive populations, safe to sum). "exception" is a review-queue overlay on top of those three, not a fourth population to add in -- see reports.ts's exceptionRows comment. */
   access_breakdown?: InstructorsReportAccessBreakdown;
 }

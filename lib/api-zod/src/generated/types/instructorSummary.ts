@@ -5,6 +5,10 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { InstructorSummaryCapabilityManagerSource } from './instructorSummaryCapabilityManagerSource';
+import type { InstructorSummaryDeptAreaSource } from './instructorSummaryDeptAreaSource';
+import type { InstructorSummaryExitVerification } from './instructorSummaryExitVerification';
+import type { InstructorSummaryGenderSource } from './instructorSummaryGenderSource';
 
 export interface InstructorSummary {
   id: number;
@@ -24,7 +28,7 @@ export interface InstructorSummary {
   /** @nullable */
   dept_area: string | null;
   /** @nullable */
-  dept_area_source: 'computed' | 'manual' | null;
+  dept_area_source: InstructorSummaryDeptAreaSource;
   is_payroll: boolean;
   /** @nullable */
   deployment_status: string | null;
@@ -32,7 +36,7 @@ export interface InstructorSummary {
   /** @nullable */
   capability_manager: string | null;
   /** @nullable */
-  capability_manager_source: 'teachos' | 'manual' | null;
+  capability_manager_source: InstructorSummaryCapabilityManagerSource;
   /** @nullable */
   darwin_manager: string | null;
   /** @nullable */
@@ -44,11 +48,11 @@ export interface InstructorSummary {
   /** @nullable */
   gender: string | null;
   /** @nullable */
-  gender_source: 'darwin' | 'exit' | 'manual' | null;
-  /** True when a live Darwinbox exit/resignation record was found for this person -- powers the Exit column's dropdown vs. dash. */
+  gender_source: InstructorSummaryGenderSource;
   exit_flag: boolean;
   /** @nullable */
-  exit_verification: 'exited' | 'serving_notice_period' | 'payroll_converted' | 'absconded' | 'revoked' | null;
-  /** TeachOS's own "enrolled_plans" column. @nullable */
+  exit_verification: InstructorSummaryExitVerification;
+  /** @nullable */
   enrolled_plans: string | null;
+  niat_cohorts: string[];
 }

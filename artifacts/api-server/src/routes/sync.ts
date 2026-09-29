@@ -8,7 +8,6 @@ import {
   teachosDeploymentTable,
 } from "@workspace/db";
 import { desc } from "drizzle-orm";
-import { config } from "../lib/connectors/config";
 import { fetchDarwinRowsBoth, DarwinboxError } from "../lib/connectors/darwinbox";
 import { fetchExitRows, DarwinboxExitsError } from "../lib/connectors/darwinboxExits";
 import { fetchNiatInstructorDetailsRows, NiatInstructorDetailsError } from "../lib/connectors/niatInstructorDetails";
@@ -18,7 +17,7 @@ import { fetchContributionRows, InstructorContributionError } from "../lib/conne
 import { resolvedCourseDefs } from "../data/trainingCourseTaxonomy";
 import { storeDarwinboxActive, storeDarwinboxExits, storeDarwinboxFullRoster, storeTeachosDeployment, storeTrainingStatus, storeContribution } from "../lib/storeRaw";
 import { reconcileDarwin, reconcileDarwinFullRosterFallback, reconcileTeachos, reconcileTeachosEmployeeIdReference, reconcileCapabilityManager, recomputeStatuses } from "../lib/reconcile";
-import { LAST_SYNC, LAST_CAPABILITY_MANAGER_SYNC, setLastCapabilityManagerSync, type SyncResult } from "../lib/syncState";
+import { LAST_SYNC, LAST_CAPABILITY_MANAGER_SYNC, setLastCapabilityManagerSync, DAILY_AUTO_SYNC_INTERVAL_HOURS, type SyncResult } from "../lib/syncState";
 
 const router: IRouter = Router();
 
@@ -250,11 +249,15 @@ router.post("/sync/teachos", async (_req, res) => {
 
 router.get("/sync/status", (_req, res) => {
   res.json({
-    darwinbox: { auto_sync_interval_hours: config.DARWINBOX_SYNC_INTERVAL_HOURS, last_sync: LAST_SYNC.darwinbox_live },
-    darwinbox_exits: { auto_sync_interval_hours: config.DARWINBOX_EXITS_SYNC_INTERVAL_HOURS, last_sync: LAST_SYNC.darwinbox_exits_live },
-    teachos: { auto_sync_interval_hours: config.BIGQUERY_SYNC_INTERVAL_HOURS, last_sync: LAST_SYNC.teachos_live },
+    darwinbox: { auto_sync_interval_hours: DAILY_AUTO_SYNC_INTERVAL_HOURS, last_sync: LAST_SYNC.darwinbox_live },
+    darwinbox_exits: { auto_sync_interval_hours: DAILY_AUTO_SYNC_INTERVAL_HOURS, last_sync: LAST_SYNC.darwinbox_exits_live },
+    teachos: { auto_sync_interval_hours: DAILY_AUTO_SYNC_INTERVAL_HOURS, last_sync: LAST_SYNC.teachos_live },
+    training_status: { auto_sync_interval_hours: DAILY_AUTO_SYNC_INTERVAL_HOURS, last_sync: LAST_SYNC.training_status_live },
+    contribution: { auto_sync_interval_hours: DAILY_AUTO_SYNC_INTERVAL_HOURS, last_sync: LAST_SYNC.contribution_live },
+    // Deliberately NOT part of the daily 5am job -- see comment on
+    // runNiatInstructorDetailsSync() above, still manual-only via its own
+    // Uploads-page tile.
     niat_instructor_details: { auto_sync_interval_hours: 0, last_sync: LAST_SYNC.niat_instructor_details_live },
-    training_status: { auto_sync_interval_hours: 0, last_sync: LAST_SYNC.training_status_live },
     // Capability Manager enrichment (2026-09-08, per request): a separate,
     // non-fatal sub-step of the TeachOS sync above -- teachos.last_sync can
     // say ok:true even when this failed silently, so it's tracked and
@@ -288,5 +291,5 @@ router.get("/sync/darwinbox-full-roster/data", async (_req, res) => {
   res.json({ count: rows.length, rows });
 });
 
-export { runDarwinboxSync, runDarwinboxExitsSync, runTeachosSync, runTrainingStatusSync };
+export { runDarwinboxSync, runDarwinboxExitsSync, runTeachosSync, runTrainingStatusSync, runContributionSync };
 export default router;

@@ -25,11 +25,11 @@ import type {
   Dashboard,
   HealthStatus,
   Instructor,
-  InstructorGenderUpdate,
   InstructorCapabilityManagerUpdate,
-  InstructorSubjectUpdate,
   InstructorExitVerificationUpdate,
+  InstructorGenderUpdate,
   InstructorInput,
+  InstructorSubjectUpdate,
   InstructorUpdate,
   InstructorsReport,
   ListInstructorsParams,
@@ -144,6 +144,296 @@ export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, 
 
 
 
+
+export const getLoginUrl = () => {
+
+
+
+
+  return `/api/auth/login`
+}
+
+/**
+ * @summary Log in with email + password, sets the session cookie
+ */
+export const login = async (loginInput: LoginInput, options?: Parameters<typeof customFetch>[1]): Promise<AppUser> => {
+
+  return customFetch<AppUser>(getLoginUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(loginInput)
+  }
+);}
+
+
+
+
+
+export const getLoginMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof login>>, TError,{data: BodyType<LoginInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof login>>, TError,{data: BodyType<LoginInput>}, TContext> => {
+
+const mutationKey = ['login'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof login>>, {data: BodyType<LoginInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  login(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type LoginMutationResult = NonNullable<Awaited<ReturnType<typeof login>>>
+    export type LoginMutationBody = BodyType<LoginInput>
+    export type LoginMutationError = ErrorType<void>
+
+    /**
+ * @summary Log in with email + password, sets the session cookie
+ */
+export const useLogin = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof login>>, TError,{data: BodyType<LoginInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof login>>,
+        TError,
+        {data: BodyType<LoginInput>},
+        TContext
+      > => {
+      return useMutation(getLoginMutationOptions(options));
+    }
+
+export const getLogoutUrl = () => {
+
+
+
+
+  return `/api/auth/logout`
+}
+
+/**
+ * @summary Log out, clears the session cookie
+ */
+export const logout = async ( options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getLogoutUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getLogoutMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof logout>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof logout>>, TError,void, TContext> => {
+
+const mutationKey = ['logout'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof logout>>, void> = () => {
+
+
+          return  logout(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type LogoutMutationResult = NonNullable<Awaited<ReturnType<typeof logout>>>
+
+    export type LogoutMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Log out, clears the session cookie
+ */
+export const useLogout = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof logout>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof logout>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getLogoutMutationOptions(options));
+    }
+
+export const getGetCurrentUserUrl = () => {
+
+
+
+
+  return `/api/auth/me`
+}
+
+/**
+ * @summary Get the logged-in user
+ */
+export const getCurrentUser = async ( options?: Parameters<typeof customFetch>[1]): Promise<AppUser> => {
+
+  return customFetch<AppUser>(getGetCurrentUserUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCurrentUserQueryKey = () => {
+    return [
+    `/api/auth/me`
+    ] as const;
+    }
+
+
+export const getGetCurrentUserQueryOptions = <TData = Awaited<ReturnType<typeof getCurrentUser>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCurrentUser>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCurrentUserQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCurrentUser>>> = ({ signal }) => getCurrentUser({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCurrentUser>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCurrentUserQueryResult = NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>
+export type GetCurrentUserQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get the logged-in user
+ */
+
+export function useGetCurrentUser<TData = Awaited<ReturnType<typeof getCurrentUser>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCurrentUser>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCurrentUserQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getChangePasswordUrl = () => {
+
+
+
+
+  return `/api/auth/password`
+}
+
+/**
+ * @summary Change the logged-in user's own password
+ */
+export const changePassword = async (changePasswordInput: ChangePasswordInput, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getChangePasswordUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(changePasswordInput)
+  }
+);}
+
+
+
+
+
+export const getChangePasswordMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof changePassword>>, TError,{data: BodyType<ChangePasswordInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof changePassword>>, TError,{data: BodyType<ChangePasswordInput>}, TContext> => {
+
+const mutationKey = ['changePassword'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof changePassword>>, {data: BodyType<ChangePasswordInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  changePassword(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ChangePasswordMutationResult = NonNullable<Awaited<ReturnType<typeof changePassword>>>
+    export type ChangePasswordMutationBody = BodyType<ChangePasswordInput>
+    export type ChangePasswordMutationError = ErrorType<void>
+
+    /**
+ * @summary Change the logged-in user's own password
+ */
+export const useChangePassword = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof changePassword>>, TError,{data: BodyType<ChangePasswordInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof changePassword>>,
+        TError,
+        {data: BodyType<ChangePasswordInput>},
+        TContext
+      > => {
+      return useMutation(getChangePasswordMutationOptions(options));
+    }
 
 export const getListInstructorsUrl = (params?: ListInstructorsParams,) => {
   const normalizedParams = new URLSearchParams();
@@ -449,18 +739,16 @@ export const useUpdateInstructor = <TError = ErrorType<void>,
       return useMutation(getUpdateInstructorMutationOptions(options));
     }
 
-// Hand-added (2026-09-09, per request) to mirror updateInstructor/
-// useUpdateInstructor above -- NOT run through orval, since this session's
-// codegen tooling is broken (see repo notes). Regenerate this file for real
-// once openapi.yaml's /instructors/{id}/gender path is picked up by a
-// working orval run; until then this hand-matched version is the source of
-// truth for it.
 export const getUpdateInstructorGenderUrl = (id: number,) => {
+
+
+
 
   return `/api/instructors/${id}/gender`
 }
 
 /**
+ * Narrower sibling of PATCH /instructors/{id} above (which is Admin- only) -- this one is reachable by either role, since Manual Gender is meant to be filled in by whoever knows the person, not just an Admin. Only takes effect when Darwin doesn't already supply a gender for this person (see InstructorSummary.gender_source); Darwin's own value is never overridden by this.
  * @summary Set or clear an instructor's manual gender fallback (Admin or Manager)
  */
 export const updateInstructorGender = async (id: number,
@@ -475,6 +763,10 @@ export const updateInstructorGender = async (id: number,
   }
 );}
 
+
+
+
+
 export const getUpdateInstructorGenderMutationOptions = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateInstructorGender>>, TError,{id: number;data: BodyType<InstructorGenderUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof updateInstructorGender>>, TError,{id: number;data: BodyType<InstructorGenderUpdate>}, TContext> => {
@@ -486,11 +778,19 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       : {...options, mutation: {...options.mutation, mutationKey}}
       : {mutation: { mutationKey, }, request: undefined};
 
+
+
+
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateInstructorGender>>, {id: number;data: BodyType<InstructorGenderUpdate>}> = (props) => {
           const {id,data} = props ?? {};
 
           return  updateInstructorGender(id,data,requestOptions)
         }
+
+
+
+
+
 
   return  { mutationFn, ...mutationOptions }}
 
@@ -512,16 +812,16 @@ export const useUpdateInstructorGender = <TError = ErrorType<void>,
       return useMutation(getUpdateInstructorGenderMutationOptions(options));
     }
 
-// Hand-matched to mirror updateInstructorGender/useUpdateInstructorGender
-// above exactly -- this session's orval codegen is broken, so
-// /instructors/{id}/capability-manager's client is hand-written against
-// openapi.yaml's shape instead of generated for real.
 export const getUpdateInstructorCapabilityManagerUrl = (id: number,) => {
+
+
+
 
   return `/api/instructors/${id}/capability-manager`
 }
 
 /**
+ * Narrower sibling of PATCH /instructors/{id} above -- both are Admin-only, unlike the gender endpoint. Only takes effect when TeachOS's own candidate rows didn't resolve to anyone on the maintained Capability Manager roster (see InstructorSummary.capability_manager_source); TeachOS's own value is never overridden by this. The value must be one of the maintained roster names (or null to clear it), not free text.
  * @summary Set or clear an instructor's manual Capability Manager fallback (Admin only)
  */
 export const updateInstructorCapabilityManager = async (id: number,
@@ -536,6 +836,10 @@ export const updateInstructorCapabilityManager = async (id: number,
   }
 );}
 
+
+
+
+
 export const getUpdateInstructorCapabilityManagerMutationOptions = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateInstructorCapabilityManager>>, TError,{id: number;data: BodyType<InstructorCapabilityManagerUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof updateInstructorCapabilityManager>>, TError,{id: number;data: BodyType<InstructorCapabilityManagerUpdate>}, TContext> => {
@@ -547,11 +851,19 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       : {...options, mutation: {...options.mutation, mutationKey}}
       : {mutation: { mutationKey, }, request: undefined};
 
+
+
+
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateInstructorCapabilityManager>>, {id: number;data: BodyType<InstructorCapabilityManagerUpdate>}> = (props) => {
           const {id,data} = props ?? {};
 
           return  updateInstructorCapabilityManager(id,data,requestOptions)
         }
+
+
+
+
+
 
   return  { mutationFn, ...mutationOptions }}
 
@@ -573,16 +885,16 @@ export const useUpdateInstructorCapabilityManager = <TError = ErrorType<void>,
       return useMutation(getUpdateInstructorCapabilityManagerMutationOptions(options));
     }
 
-// Hand-matched to mirror updateInstructorCapabilityManager/
-// useUpdateInstructorCapabilityManager above exactly -- this session's
-// orval codegen is broken, so /instructors/{id}/subject's client is
-// hand-written against openapi.yaml's shape instead of generated for real.
 export const getUpdateInstructorSubjectUrl = (id: number,) => {
+
+
+
 
   return `/api/instructors/${id}/subject`
 }
 
 /**
+ * Narrower sibling of PATCH /instructors/{id} above -- Admin-only, same as the capability-manager endpoint. Only takes effect when classifyDepartment() (departmentTaxonomy.ts) left this person unclassified (see InstructorSummary.dept_area_source); the computed value is never overridden by this. The value must be one of departmentTaxonomy.ts's recognized area names (or null to clear it), not free text. Not meaningful for Operations team rows, whose dept_area is intentionally null.
  * @summary Set or clear an instructor's manual Subject (dept_area) fallback (Admin only)
  */
 export const updateInstructorSubject = async (id: number,
@@ -597,6 +909,10 @@ export const updateInstructorSubject = async (id: number,
   }
 );}
 
+
+
+
+
 export const getUpdateInstructorSubjectMutationOptions = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateInstructorSubject>>, TError,{id: number;data: BodyType<InstructorSubjectUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof updateInstructorSubject>>, TError,{id: number;data: BodyType<InstructorSubjectUpdate>}, TContext> => {
@@ -608,11 +924,19 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       : {...options, mutation: {...options.mutation, mutationKey}}
       : {mutation: { mutationKey, }, request: undefined};
 
+
+
+
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateInstructorSubject>>, {id: number;data: BodyType<InstructorSubjectUpdate>}> = (props) => {
           const {id,data} = props ?? {};
 
           return  updateInstructorSubject(id,data,requestOptions)
         }
+
+
+
+
+
 
   return  { mutationFn, ...mutationOptions }}
 
@@ -634,17 +958,16 @@ export const useUpdateInstructorSubject = <TError = ErrorType<void>,
       return useMutation(getUpdateInstructorSubjectMutationOptions(options));
     }
 
-// Hand-matched to mirror updateInstructorGender/useUpdateInstructorGender
-// above exactly (both-role editable, not Admin-only like Capability Manager/
-// Subject above) -- this session's orval codegen is broken, so
-// /instructors/{id}/exit-verification's client is hand-written against
-// openapi.yaml's shape instead of generated for real.
 export const getUpdateInstructorExitVerificationUrl = (id: number,) => {
+
+
+
 
   return `/api/instructors/${id}/exit-verification`
 }
 
 /**
+ * Both-role sibling of PATCH /instructors/{id} above, like the gender endpoint -- reachable by either Admin or Manager, since a Capability Manager may be logged in as either. Lets a Capability Manager record their read on someone with a live Darwinbox exit record on file (InstructorSummary.exit_flag) as one of "exited", "serving_notice_period", "payroll_converted", or "absconded" (or null to clear it back to unreviewed). This is a TRACKING LABEL ONLY -- it never changes computed_status or manual_status, and never affects the standing instructor headcount. Actually excluding someone from the count stays the separate, deliberate Manual Status control on PATCH /instructors/{id} (Admin-only). It does drive the Instructors tab's Exception queue: everything except "payroll_converted" (or anyone Darwinbox's own live exit sync already reports as "Revoked" -- see exit_flag_status) keeps showing there. "revoked" was removed as a settable value here (2026-09-19, per request) since that automatic Darwinbox-status check already covers it, making a manual "Revoked" label redundant.
  * @summary Set or clear a Capability Manager's exit-verification label for an exit-flagged instructor (Admin or Manager)
  */
 export const updateInstructorExitVerification = async (id: number,
@@ -659,6 +982,10 @@ export const updateInstructorExitVerification = async (id: number,
   }
 );}
 
+
+
+
+
 export const getUpdateInstructorExitVerificationMutationOptions = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateInstructorExitVerification>>, TError,{id: number;data: BodyType<InstructorExitVerificationUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof updateInstructorExitVerification>>, TError,{id: number;data: BodyType<InstructorExitVerificationUpdate>}, TContext> => {
@@ -670,11 +997,19 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       : {...options, mutation: {...options.mutation, mutationKey}}
       : {mutation: { mutationKey, }, request: undefined};
 
+
+
+
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateInstructorExitVerification>>, {id: number;data: BodyType<InstructorExitVerificationUpdate>}> = (props) => {
           const {id,data} = props ?? {};
 
           return  updateInstructorExitVerification(id,data,requestOptions)
         }
+
+
+
+
+
 
   return  { mutationFn, ...mutationOptions }}
 
@@ -1289,282 +1624,3 @@ export function useGetReportsInstructors<TData = Awaited<ReturnType<typeof getRe
 
 
 
-export const getLoginUrl = () => {
-
-
-
-
-  return `/api/auth/login`
-}
-
-/**
- * @summary Log in with email + password, sets the session cookie
- */
-export const login = async (loginInput: LoginInput, options?: Parameters<typeof customFetch>[1]): Promise<AppUser> => {
-
-  return customFetch<AppUser>(getLoginUrl(),
-  {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(loginInput)
-  }
-);}
-
-
-
-
-export const getLoginMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof login>>, TError,{data: BodyType<LoginInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof login>>, TError,{data: BodyType<LoginInput>}, TContext> => {
-
-const mutationKey = ['login'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof login>>, {data: BodyType<LoginInput>}> = (props) => {
-          const {data} = props ?? {};
-
-          return  login(data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type LoginMutationResult = NonNullable<Awaited<ReturnType<typeof login>>>
-    export type LoginMutationBody = BodyType<LoginInput>
-    export type LoginMutationError = ErrorType<unknown>
-
-    /**
- * @summary Log in with email + password, sets the session cookie
- */
-export const useLogin = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof login>>, TError,{data: BodyType<LoginInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
- ): UseMutationResult<
-        Awaited<ReturnType<typeof login>>,
-        TError,
-        {data: BodyType<LoginInput>},
-        TContext
-      > => {
-      return useMutation(getLoginMutationOptions(options));
-    }
-
-export const getLogoutUrl = () => {
-
-
-
-
-  return `/api/auth/logout`
-}
-
-/**
- * @summary Log out, clears the session cookie
- */
-export const logout = async ( options?: Parameters<typeof customFetch>[1]): Promise<void> => {
-
-  return customFetch<void>(getLogoutUrl(),
-  {
-    ...options,
-    method: 'POST'
-
-
-  }
-);}
-
-
-
-
-export const getLogoutMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof logout>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof logout>>, TError,void, TContext> => {
-
-const mutationKey = ['logout'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof logout>>, void> = () => {
-
-
-          return  logout(requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type LogoutMutationResult = NonNullable<Awaited<ReturnType<typeof logout>>>
-
-    export type LogoutMutationError = ErrorType<unknown>
-
-    /**
- * @summary Log out, clears the session cookie
- */
-export const useLogout = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof logout>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
- ): UseMutationResult<
-        Awaited<ReturnType<typeof logout>>,
-        TError,
-        void,
-        TContext
-      > => {
-      return useMutation(getLogoutMutationOptions(options));
-    }
-
-export const getGetCurrentUserUrl = () => {
-
-
-
-
-  return `/api/auth/me`
-}
-
-/**
- * @summary Get the logged-in user
- */
-export const getCurrentUser = async ( options?: Parameters<typeof customFetch>[1]): Promise<AppUser> => {
-
-  return customFetch<AppUser>(getGetCurrentUserUrl(),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-export const getGetCurrentUserQueryKey = () => {
-    return [
-    `/api/auth/me`
-    ] as const;
-    }
-
-
-export const getGetCurrentUserQueryOptions = <TData = Awaited<ReturnType<typeof getCurrentUser>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCurrentUser>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getGetCurrentUserQueryKey();
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCurrentUser>>> = ({ signal }) => getCurrentUser({ signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCurrentUser>>, TError, TData> & { queryKey: QueryKey }
-}
-
-export type GetCurrentUserQueryResult = NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>
-export type GetCurrentUserQueryError = ErrorType<unknown>
-
-
-/**
- * @summary Get the logged-in user
- */
-
-export function useGetCurrentUser<TData = Awaited<ReturnType<typeof getCurrentUser>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCurrentUser>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-
-  const queryOptions = getGetCurrentUserQueryOptions(options)
-
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-export const getChangePasswordUrl = () => {
-
-
-
-
-  return `/api/auth/password`
-}
-
-/**
- * @summary Change the logged-in user's own password
- */
-export const changePassword = async (changePasswordInput: ChangePasswordInput, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
-
-  return customFetch<void>(getChangePasswordUrl(),
-  {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(changePasswordInput)
-  }
-);}
-
-
-
-
-export const getChangePasswordMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof changePassword>>, TError,{data: BodyType<ChangePasswordInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof changePassword>>, TError,{data: BodyType<ChangePasswordInput>}, TContext> => {
-
-const mutationKey = ['changePassword'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof changePassword>>, {data: BodyType<ChangePasswordInput>}> = (props) => {
-          const {data} = props ?? {};
-
-          return  changePassword(data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type ChangePasswordMutationResult = NonNullable<Awaited<ReturnType<typeof changePassword>>>
-    export type ChangePasswordMutationBody = BodyType<ChangePasswordInput>
-    export type ChangePasswordMutationError = ErrorType<unknown>
-
-    /**
- * @summary Change the logged-in user's own password
- */
-export const useChangePassword = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof changePassword>>, TError,{data: BodyType<ChangePasswordInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
- ): UseMutationResult<
-        Awaited<ReturnType<typeof changePassword>>,
-        TError,
-        {data: BodyType<ChangePasswordInput>},
-        TContext
-      > => {
-      return useMutation(getChangePasswordMutationOptions(options));
-    }
