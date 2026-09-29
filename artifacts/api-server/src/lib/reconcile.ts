@@ -360,7 +360,34 @@ export const recomputeStatuses = async () => {
 export async function reconcileDarwin(rows: SheetRow[]) {
   let newCount = 0;
   let matchedCount = 0;
-  await db.update(instructorsTable).set({ inDarwin: false, darwinEmployeeStatus: null });
+  // Full reset of every Darwin-sourced field, not just inDarwin/
+  // darwinEmployeeStatus (2026-09-29 fix) -- previously, someone who
+  // dropped out of the Darwin match entirely (e.g. converted to payroll,
+  // Darwin box removed) correctly got inDarwin flipped to false here, but
+  // their department/designation/etc. were left stale from their last
+  // actual Darwin match, since only a person matched THIS pass has those
+  // fields overwritten below. The classification cascade in
+  // recomputeStatuses() reads row.department/row.designation directly
+  // (via classifyDepartment()) with no inDarwin guard, so a stale
+  // department string could keep misclassifying someone as e.g. a Mentor
+  // long after they'd genuinely left Darwin -- instead of correctly
+  // falling through to payroll_converted, which is what should happen
+  // once there's no current Darwin record at all. Mirrors the equivalent
+  // full reset reconcileTeachos() already does for its own fields, just
+  // below.
+  await db.update(instructorsTable).set({
+    inDarwin: false,
+    darwinEmployeeStatus: null,
+    department: null,
+    subDepartment: null,
+    designation: null,
+    directManager: null,
+    workLocation: null,
+    workspace: null,
+    gender: null,
+    currentState: null,
+    currentCity: null,
+  });
   const people = await db.select().from(instructorsTable);
   for (const item of rows) {
     const fullName = cell(item, "Full Name", "full_name");
