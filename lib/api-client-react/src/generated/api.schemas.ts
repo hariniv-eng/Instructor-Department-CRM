@@ -9,6 +9,21 @@ export interface HealthStatus {
   status: string;
 }
 
+/**
+ * Capability Manager's manual read on an exit-flagged record, settable via PATCH /instructors/{id}/exit-verification by either Admin or Manager. Tracking label only — never affects computed_status/manual_status or the headcount.
+ * @nullable
+ */
+export type InstructorExitVerification = typeof InstructorExitVerification[keyof typeof InstructorExitVerification] | null;
+
+
+export const InstructorExitVerification = {
+  exited: 'exited',
+  serving_notice_period: 'serving_notice_period',
+  payroll_converted: 'payroll_converted',
+  absconded: 'absconded',
+  revoked: 'revoked',
+} as const;
+
 export interface Instructor {
   id: number;
   /** @nullable */
@@ -50,15 +65,19 @@ export interface Instructor {
   teachos_category?: string | null;
   /** @nullable */
   teachos_manager?: string | null;
-  /** Manual fallback for the Capability Manager, settable via PATCH /instructors/{id}/capability-manager (Admin only). Only used when TeachOS's own candidate rows didn't resolve to anyone on the maintained roster for this person. Must be one of that maintained roster's names, or null.
-     * @nullable */
+  /**
+     * Manual fallback for the Capability Manager, settable via PATCH /instructors/{id}/capability-manager (Admin only). Only used when TeachOS's own candidate rows didn't resolve to anyone on the maintained roster for this person. Must be one of that maintained roster's names, or null.
+     * @nullable
+     */
   manual_capability_manager?: string | null;
   institutes: string[];
   computed_status: string;
   /** @nullable */
   manual_status?: string | null;
-  /** Manual fallback for `gender`, settable via PATCH /instructors/{id}/gender by either Admin or Manager. Only used when Darwin has no gender on file for this person.
-     * @nullable */
+  /**
+     * Manual fallback for gender, settable via PATCH /instructors/{id}/gender by either Admin or Manager. Only used when Darwin has no gender on file for this person.
+     * @nullable
+     */
   manual_gender?: string | null;
   /** @nullable */
   exit_date?: string | null;
@@ -82,9 +101,11 @@ export interface Instructor {
   exit_flag_status?: string | null;
   /** @nullable */
   exit_flag_date?: string | null;
-  /** Capability Manager's manual read on an exit-flagged record -- exited | serving_notice_period | payroll_converted | absconded | revoked | null. Tracking label only; never affects computed_status/manual_status.
-     * @nullable */
-  exit_verification?: 'exited' | 'serving_notice_period' | 'payroll_converted' | 'absconded' | 'revoked' | null;
+  /**
+     * Capability Manager's manual read on an exit-flagged record, settable via PATCH /instructors/{id}/exit-verification by either Admin or Manager. Tracking label only — never affects computed_status/manual_status or the headcount.
+     * @nullable
+     */
+  exit_verification?: InstructorExitVerification;
   /**
      * tech | non_tech | null. See departmentTaxonomy.ts. Null for excluded/mentor rows (see classification).
      * @nullable
@@ -95,8 +116,10 @@ export interface Instructor {
      * @nullable
      */
   dept_area?: string | null;
-  /** Manual fallback for Subject/dept_area, settable via PATCH /instructors/{id}/subject (Admin only). Only used when classifyDepartment() left this person unclassified. Must be one of departmentTaxonomy.ts's recognized area names, or null.
-     * @nullable */
+  /**
+     * Manual fallback for Subject/dept_area, settable via PATCH /instructors/{id}/subject (Admin only). Only used when classifyDepartment() left this person unclassified. Must be one of departmentTaxonomy.ts's recognized area names, or null.
+     * @nullable
+     */
   manual_dept_area?: string | null;
   /**
      * deployed | in_training | null, derived from TeachOS institutes (institute_name "Training Institute" = in_training).
@@ -130,24 +153,54 @@ export interface InstructorUpdate {
   notes?: string | null;
 }
 
-/** Body for PATCH /instructors/{id}/gender -- a narrower, both-role-editable sibling of InstructorUpdate above (which is Admin-only). "male" or "female" to set it, null to clear it back to unknown. */
+/**
+ * @nullable
+ */
+export type InstructorGenderUpdateManualGender = typeof InstructorGenderUpdateManualGender[keyof typeof InstructorGenderUpdateManualGender] | null;
+
+
+export const InstructorGenderUpdateManualGender = {
+  male: 'male',
+  female: 'female',
+} as const;
+
 export interface InstructorGenderUpdate {
-  manual_gender: 'male' | 'female' | null;
+  /** @nullable */
+  manual_gender: InstructorGenderUpdateManualGender;
 }
 
-/** Body for PATCH /instructors/{id}/capability-manager -- Admin-only, unlike InstructorGenderUpdate above. Deliberately not a fixed union here: the valid roster (data/validCapabilityManagers.ts) is human-maintained and changes over time; the route validates against it server-side and 400s on anything else. */
 export interface InstructorCapabilityManagerUpdate {
+  /**
+     * Must be one of the names in data/validCapabilityManagers.ts, or null.
+     * @nullable
+     */
   manual_capability_manager: string | null;
 }
 
-/** Body for PATCH /instructors/{id}/subject -- Admin-only, same pattern as InstructorCapabilityManagerUpdate above. Not a fixed union: departmentTaxonomy.ts's SUBJECT_AREAS is the source of truth; the route validates against it server-side and 400s on anything else. */
 export interface InstructorSubjectUpdate {
+  /**
+     * Must be one of departmentTaxonomy.ts's SUBJECT_AREAS, or null.
+     * @nullable
+     */
   manual_dept_area: string | null;
 }
 
-/** Body for PATCH /instructors/{id}/exit-verification -- both-role-editable like InstructorGenderUpdate above (Capability Managers may be logged in as either Admin or Manager). Tracking label only -- never touches manual_status/computed_status. "revoked" removed as a settable value (2026-09-19, per request) -- reports.ts now auto-excludes Darwinbox-reported "Revoked" exits from the Exception queue on its own. */
+/**
+ * @nullable
+ */
+export type InstructorExitVerificationUpdateExitVerification = typeof InstructorExitVerificationUpdateExitVerification[keyof typeof InstructorExitVerificationUpdateExitVerification] | null;
+
+
+export const InstructorExitVerificationUpdateExitVerification = {
+  exited: 'exited',
+  serving_notice_period: 'serving_notice_period',
+  payroll_converted: 'payroll_converted',
+  absconded: 'absconded',
+} as const;
+
 export interface InstructorExitVerificationUpdate {
-  exit_verification: 'exited' | 'serving_notice_period' | 'payroll_converted' | 'absconded' | null;
+  /** @nullable */
+  exit_verification: InstructorExitVerificationUpdateExitVerification;
 }
 
 export type DashboardKpis = {[key: string]: number};
@@ -181,6 +234,36 @@ export interface Upload {
   filename: string;
   row_count: number;
   uploaded_at: string;
+}
+
+export type AppUserRole = typeof AppUserRole[keyof typeof AppUserRole];
+
+
+export const AppUserRole = {
+  admin: 'admin',
+  manager: 'manager',
+} as const;
+
+/**
+ * A dashboard login account (not an instructor record).
+ */
+export interface AppUser {
+  id: number;
+  email: string;
+  full_name: string;
+  role: AppUserRole;
+  is_active: boolean;
+  last_login_at?: string | null;
+}
+
+export interface LoginInput {
+  email: string;
+  password: string;
+}
+
+export interface ChangePasswordInput {
+  current_password: string;
+  new_password: string;
 }
 
 export type UploadInputRowsItem = { [key: string]: unknown };
@@ -267,17 +350,121 @@ export type InstructorsReportDeployment = {
   unknown?: number;
 };
 
-export type AccessBucket = {
+/**
+ * @nullable
+ */
+export type InstructorSummaryDeptAreaSource = typeof InstructorSummaryDeptAreaSource[keyof typeof InstructorSummaryDeptAreaSource] | null;
+
+
+export const InstructorSummaryDeptAreaSource = {
+  computed: 'computed',
+  manual: 'manual',
+} as const;
+
+/**
+ * @nullable
+ */
+export type InstructorSummaryCapabilityManagerSource = typeof InstructorSummaryCapabilityManagerSource[keyof typeof InstructorSummaryCapabilityManagerSource] | null;
+
+
+export const InstructorSummaryCapabilityManagerSource = {
+  teachos: 'teachos',
+  manual: 'manual',
+} as const;
+
+/**
+ * @nullable
+ */
+export type InstructorSummaryGenderSource = typeof InstructorSummaryGenderSource[keyof typeof InstructorSummaryGenderSource] | null;
+
+
+export const InstructorSummaryGenderSource = {
+  darwin: 'darwin',
+  exit: 'exit',
+  manual: 'manual',
+} as const;
+
+/**
+ * @nullable
+ */
+export type InstructorSummaryExitVerification = typeof InstructorSummaryExitVerification[keyof typeof InstructorSummaryExitVerification] | null;
+
+
+export const InstructorSummaryExitVerification = {
+  exited: 'exited',
+  serving_notice_period: 'serving_notice_period',
+  payroll_converted: 'payroll_converted',
+  absconded: 'absconded',
+  revoked: 'revoked',
+} as const;
+
+export interface InstructorSummary {
+  id: number;
+  full_name: string;
+  /** @nullable */
+  employee_id: string | null;
+  /** @nullable */
+  teachos_user_id: string | null;
+  /** @nullable */
+  designation: string | null;
+  /** @nullable */
+  department: string | null;
+  /** @nullable */
+  dept_bucket: string | null;
+  /** @nullable */
+  classification: string | null;
+  /** @nullable */
+  dept_area: string | null;
+  /** @nullable */
+  dept_area_source: InstructorSummaryDeptAreaSource;
+  is_payroll: boolean;
+  /** @nullable */
+  deployment_status: string | null;
+  institutes: string[];
+  /** @nullable */
+  capability_manager: string | null;
+  /** @nullable */
+  capability_manager_source: InstructorSummaryCapabilityManagerSource;
+  /** @nullable */
+  darwin_manager: string | null;
+  /** @nullable */
+  date_of_joining: string | null;
+  /** @nullable */
+  org_email: string | null;
+  /** @nullable */
+  work_location: string | null;
+  /** @nullable */
+  gender: string | null;
+  /** @nullable */
+  gender_source: InstructorSummaryGenderSource;
+  exit_flag: boolean;
+  /** @nullable */
+  exit_verification: InstructorSummaryExitVerification;
+  /** @nullable */
+  enrolled_plans: string | null;
+  niat_cohorts: string[];
+}
+
+/**
+ * One darwin_only/both/teachos_only bucket -- a count plus the actual people in it, for the click-to-drill-down view.
+ */
+export interface AccessBucket {
   count?: number;
   people?: InstructorSummary[];
-};
+}
 
-export type AccessSplit = {
+/**
+ * How a category's total splits by data source -- Darwin record only, TeachOS record only, or both -- each with its own people list.
+ */
+export interface AccessSplit {
   darwin_only?: AccessBucket;
   both?: AccessBucket;
   teachos_only?: AccessBucket;
-};
+}
 
+/**
+ * Darwin-only / TeachOS-only / both-access split for the Instructor Department, Instructors, Mentors, Operations team, and Exception KPI cards (2026-09-04; department card added 2026-09-07; exception added 2026-09-18). "department" is the union of instructors + mentors + ops_team (mutually exclusive populations, safe to sum). "exception" is a review-queue overlay on top of those three, not a fourth population to add in -- see reports.ts's exceptionRows comment.
+ */
 export type InstructorsReportAccessBreakdown = {
   department?: AccessSplit;
   instructors?: AccessSplit;
@@ -304,53 +491,6 @@ export interface GroupedInstructors {
   instructors?: ReportPerson[];
 }
 
-export interface InstructorSummary {
-  id: number;
-  full_name: string;
-  /** @nullable */
-  employee_id: string | null;
-  /** @nullable */
-  teachos_user_id: string | null;
-  /** @nullable */
-  designation: string | null;
-  /** @nullable */
-  department: string | null;
-  /** @nullable */
-  dept_bucket: string | null;
-  /** @nullable */
-  classification: string | null;
-  /** @nullable */
-  dept_area: string | null;
-  /** Whether `dept_area` above came from classifyDepartment() (locked, not editable here) or was set/left blank manually ("manual" or null). Not offered for Operations team rows, whose null dept_area is intentional. @nullable */
-  dept_area_source: 'computed' | 'manual' | null;
-  is_payroll: boolean;
-  /** @nullable */
-  deployment_status: string | null;
-  institutes: string[];
-  /** @nullable */
-  capability_manager: string | null;
-  /** Whether `capability_manager` above came from TeachOS (locked, not editable here) or was set/left blank manually ("manual" or null). Drives whether the Instructors tab shows a plain value or the manual-entry dropdown for this row. @nullable */
-  capability_manager_source: 'teachos' | 'manual' | null;
-  /** @nullable */
-  darwin_manager: string | null;
-  /** @nullable */
-  date_of_joining: string | null;
-  /** Darwin's own "Org Email Id" field, shown as an Email column on the Instructors tab table. Blank (not a stale value) when there's no current Darwin access for this person. @nullable */
-  org_email: string | null;
-  /** Darwin's own "Work Location" field, shown as a Location column on the Instructors tab table. Distinct from the Campus column (institutes, TeachOS deployment). @nullable */
-  work_location: string | null;
-  /** Effective gender -- Darwin's value when present, else the manually-set fallback. @nullable */
-  gender: string | null;
-  /** Whether `gender` above came from Darwin (locked, not editable here), a payroll-converted person's matched Darwinbox exit record ("exit" -- editable, same as manual), or was set/left blank manually ("manual" or null). Drives whether the Instructors tab shows a plain value or the manual-gender dropdown for this row. @nullable */
-  gender_source: 'darwin' | 'exit' | 'manual' | null;
-  /** True when a live Darwinbox exit/resignation record was found for this person. Drives whether the Instructors tab's Exit column shows the manual-verification dropdown (true) or a plain dash (false). */
-  exit_flag: boolean;
-  /** Capability Manager's manual read on an exit-flagged record, settable via PATCH /instructors/{id}/exit-verification by either Admin or Manager. Tracking label only -- never affects computed_status/manual_status or headcount. @nullable */
-  exit_verification: 'exited' | 'serving_notice_period' | 'payroll_converted' | 'absconded' | 'revoked' | null;
-  /** TeachOS's own "enrolled_plans" column. No fallback source, plain TeachOS-sourced display field. @nullable */
-  enrolled_plans: string | null;
-}
-
 export interface InstructorsReport {
   /** total_instructor_count is the headline "TeachOS instructor count" figure. */
   kpis: InstructorsReportKpis;
@@ -363,6 +503,7 @@ export interface InstructorsReport {
   mentors: ReportPerson[];
   /** Every person counted in kpis.total_instructor_count, sorted by name. Backs a click-to-expand details view under the headline count. */
   instructors: InstructorSummary[];
+  /** Darwin-only / TeachOS-only / both-access split for the Instructor Department, Instructors, Mentors, Operations team, and Exception KPI cards (2026-09-04; department card added 2026-09-07; exception added 2026-09-18). "department" is the union of instructors + mentors + ops_team (mutually exclusive populations, safe to sum). "exception" is a review-queue overlay on top of those three, not a fourth population to add in -- see reports.ts's exceptionRows comment. */
   access_breakdown?: InstructorsReportAccessBreakdown;
 }
 
@@ -374,28 +515,17 @@ designation?: string;
 source?: string;
 classification?: string;
 exit_flag?: string;
+/**
+ * Either a raw dept_bucket value (tech, non_tech, mentor, excluded_ops_managers, instructor_ops) or one of the three UI-facing group names (instructor, mentor, excluded).
+ */
 dept_bucket?: string;
+/**
+ * Subject/sub-area within a tech or non_tech dept_bucket, e.g. Frontend, Backend, DSA, GenAI, Math, English, Aptitude.
+ */
 dept_area?: string;
+/**
+ * Filters to instructors whose institutes array contains this campus/university name.
+ */
 institute?: string;
 };
 
-
-export interface AppUser {
-  id: number;
-  email: string;
-  full_name: string;
-  role: 'admin' | 'manager';
-  is_active: boolean;
-  /** @nullable */
-  last_login_at?: string | null;
-}
-
-export interface LoginInput {
-  email: string;
-  password: string;
-}
-
-export interface ChangePasswordInput {
-  current_password: string;
-  new_password: string;
-}

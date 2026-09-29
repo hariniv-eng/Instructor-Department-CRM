@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { InstructorExitVerification } from './instructorExitVerification';
 
 export interface Instructor {
   id: number;
@@ -47,13 +48,19 @@ export interface Instructor {
   teachos_category?: string | null;
   /** @nullable */
   teachos_manager?: string | null;
-  /** @nullable */
+  /**
+     * Manual fallback for the Capability Manager, settable via PATCH /instructors/{id}/capability-manager (Admin only). Only used when TeachOS's own candidate rows didn't resolve to anyone on the maintained roster for this person. Must be one of that maintained roster's names, or null.
+     * @nullable
+     */
   manual_capability_manager?: string | null;
   institutes: string[];
   computed_status: string;
   /** @nullable */
   manual_status?: string | null;
-  /** @nullable */
+  /**
+     * Manual fallback for gender, settable via PATCH /instructors/{id}/gender by either Admin or Manager. Only used when Darwin has no gender on file for this person.
+     * @nullable
+     */
   manual_gender?: string | null;
   /** @nullable */
   exit_date?: Date | null;
@@ -78,10 +85,10 @@ export interface Instructor {
   /** @nullable */
   exit_flag_date?: Date | null;
   /**
-     * Capability Manager's manual read on an exit-flagged record -- exited | serving_notice_period | payroll_converted | absconded | revoked | null. Tracking label only; never affects computed_status/manual_status.
+     * Capability Manager's manual read on an exit-flagged record, settable via PATCH /instructors/{id}/exit-verification by either Admin or Manager. Tracking label only — never affects computed_status/manual_status or the headcount.
      * @nullable
      */
-  exit_verification?: string | null;
+  exit_verification?: InstructorExitVerification;
   /**
      * tech | non_tech | null. See departmentTaxonomy.ts. Null for excluded/mentor rows (see classification).
      * @nullable
@@ -92,7 +99,10 @@ export interface Instructor {
      * @nullable
      */
   dept_area?: string | null;
-  /** @nullable */
+  /**
+     * Manual fallback for Subject/dept_area, settable via PATCH /instructors/{id}/subject (Admin only). Only used when classifyDepartment() left this person unclassified. Must be one of departmentTaxonomy.ts's recognized area names, or null.
+     * @nullable
+     */
   manual_dept_area?: string | null;
   /**
      * deployed | in_training | null, derived from TeachOS institutes (institute_name "Training Institute" = in_training).

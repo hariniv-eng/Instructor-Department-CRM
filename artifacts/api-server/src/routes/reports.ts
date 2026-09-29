@@ -20,7 +20,7 @@ const toApiPerson = (row: InstructorRow) => ({
 // what powers a click-to-expand details view on top of the headline total
 // instructor count card (department/campus/payroll status per person, not
 // just name+id like toApiPerson above).
-const toApiInstructorSummary = (row: InstructorRow) => ({
+const toApiInstructorSummary = (row: InstructorRow, contributionByTeachosId: Map<string, string[]>) => ({
   id: row.id,
   full_name: row.fullName,
   employee_id: row.employeeId,
@@ -152,6 +152,17 @@ const toApiInstructorSummary = (row: InstructorRow) => ({
   // field. See enrolledPlans' comment in the schema for where this actually
   // lives in BigQuery (a separate dataset from the rest of this connector).
   enrolled_plans: row.enrolledPlans,
+  // NIAT cohort year(s) (2026-09-29, per request: "the contribution column
+  // that we have created... should be reflected in the instructor table,
+  // in the instructor tab also") -- same values as the Contribution tab's
+  // own Contribution column (see BATCH_NAME_TO_NIAT_COHORT in
+  // instructorContribution.ts), joined here against instructorContributionTable
+  // via teachosUserId (same key toApiInstructorSummary's caller already
+  // uses for everything else that's TeachOS-sourced). Empty for anyone with
+  // no teachosUserId, or no matching contribution row at all (never synced,
+  // or genuinely no COMPLETED sessions in the last 30 days) -- same "empty,
+  // not missing" convention as institutes/enrolled_plans above.
+  niat_cohorts: (row.teachosUserId && contributionByTeachosId.get(row.teachosUserId)) || [],
 });
 
 // Instructor Department population (Instructors + Mentors + Ops team,
@@ -207,33 +218,34 @@ function computeDepartmentAndExceptionRows(allRows: InstructorRow[]) {
   const departmentRows: InstructorRow[] = [...countedInstructorRows, ...mentors, ...opsTeamRows];
 
   // "Exception" bifurcation (2026-09-18, per request; scope revised
-  // 2026-09-19, per request) -- a review queue, not a headcount bucket:
-  // everyone here is already counted in their normal category above, and
-  // stays counted there no matter what this queue shows. A 2026-09-18
-  // version made "exited" auto-remove someone from their category's count;
-  // that was explicitly reverted the next day because actually removing
-  // someone from the active list needs to be a deliberate separate action
-  // (the Manual Status control on the instructor detail page), not a side
-  // effect of this dropdown -- see exitVerification's comment in the schema.
-  // So this queue exists purely to surface who still needs a look: everyone
-  // exit-flagged EXCEPT the "resolved" outcomes -- "payroll_converted" or
-  // "revoked" on the manual exit_verification dropdown, OR Darwinbox's own
-  // live exit record already reporting status "Revoked" (exitFlagStatus,
-  // set straight from the synced Darwinbox exit report's Status field by
-  // recomputeStatuses() in reconcile.ts -- see darwinboxExits.ts's comment:
-  // "Revoked" there means the resignation request itself was cancelled, not
-  // a completed exit). That second check (2026-09-19, per request) means a
-  // resignation Darwinbox itself already shows as cancelled never needs a
-  // Capability Manager to touch the dropdown at all -- it's excluded from
-  // this queue automatically. Manual exit-CSV uploads (reconcileExits() in
-  // reconcile.ts) never set exitFlagStatus, only the manual dropdown, which
-  // is why both checks exist side by side. That leaves null (not yet
-  // reviewed), "serving_notice_period" (shown here purely for visibility,
-  // per request), and "exited"/"absconded" (the real action items --
-  // waiting on someone to actually do the Manual Status removal) visible in
-  // this queue until resolved.
+  // 2026-09-19; revised again 2026-09-29, per request: "whenever a
+  // capability manager... try to edit the exit list or the values that we
+  // have, the count of exceptions has to be decreased... only show the
+  // exceptions number when that manual entry is not reviewed") -- a review
+  // queue, not a headcount bucket: everyone here is already counted in
+  // their normal category above, and stays counted there no matter what
+  // this queue shows; only whether they show up IN THIS QUEUE changes.
+  //
+  // Two ways a row leaves the queue: Darwinbox's own live exit record
+  // already reporting status "Revoked" (exitFlagStatus, set straight from
+  // the synced Darwinbox exit report's Status field by recomputeStatuses()
+  // in reconcile.ts -- see darwinboxExits.ts's comment: "Revoked" there
+  // means the resignation request itself was cancelled, not a completed
+  // exit) -- so a resignation Darwinbox itself already shows as cancelled
+  // never needs a Capability Manager to touch anything; OR a Capability
+  // Manager has recorded ANY outcome at all on the manual exit_verification
+  // dropdown ("exited", "serving_notice_period", "payroll_converted",
+  // "absconded" -- see EXIT_VERIFICATION_VALUES in routes/instructors.ts).
+  // Reviewing is what clears the queue now, not which specific outcome was
+  // picked -- an earlier version (2026-09-18/19) kept "exited"/"absconded"/
+  // "serving_notice_period" visible even after being set, treating only
+  // "payroll_converted"/"revoked" as resolved; that distinction is gone as
+  // of this revision. Note this only affects the QUEUE, never the person's
+  // actual counted category -- moving someone off the active headcount
+  // still requires the separate, deliberate Manual Status control on the
+  // instructor detail page (see exitVerification's comment in the schema).
   const hasRevokedExitStatus = (r: InstructorRow) => (r.exitFlagStatus ?? "").trim().toLowerCase() === "revoked";
-  const exceptionRows = departmentRows.filter((r) => r.exitFlag && !hasRevokedExitStatus(r) && r.exitVerification !== "payroll_converted" && r.exitVerification !== "revoked");
+  const exceptionRows = departmentRows.filter((r) => r.exitFlag && !hasRevokedExitStatus(r) && !r.exitVerification);
 
   return { mentors, opsTeamRows, darwinInstructorsForCount, payrollConvertedForCount, needsReviewForCount, countedInstructorRows, departmentRows, exceptionRows };
 }
@@ -252,6 +264,14 @@ function computeDepartmentAndExceptionRows(allRows: InstructorRow[]) {
 router.get("/reports/instructors", async (_req, res) => {
   const allRows = await db.select().from(instructorsTable);
   const { mentors, opsTeamRows, darwinInstructorsForCount, payrollConvertedForCount, needsReviewForCount, countedInstructorRows, departmentRows, exceptionRows } = computeDepartmentAndExceptionRows(allRows);
+
+  // NIAT cohort join (2026-09-29, per request -- see niat_cohorts' comment
+  // on toApiInstructorSummary above): one extra query, keyed by
+  // instructor_user_id (== instructorsTable.teachosUserId), same shape as
+  // every other TeachOS-sourced join this report already does at read time.
+  const contributionRows = await db.select().from(instructorContributionTable);
+  const contributionByTeachosId = new Map(contributionRows.map((c) => [c.instructorUserId, c.niatCohorts]));
+  const summarize = (row: InstructorRow) => toApiInstructorSummary(row, contributionByTeachosId);
 
   // The "total instructor count" and every breakdown here are anchored on
   // TeachOS's own instructor roster (inTeachos=true) — that's the
@@ -412,7 +432,7 @@ router.get("/reports/instructors", async (_req, res) => {
   // rules.
   const toAccessBucket = (list: InstructorRow[]) => ({
     count: list.length,
-    people: list.map(toApiInstructorSummary),
+    people: list.map(summarize),
   });
   const buildAccessSplit = (list: InstructorRow[]) => ({
     darwin_only: toAccessBucket(list.filter((r) => r.inDarwin && !r.inTeachos)),
@@ -489,7 +509,7 @@ router.get("/reports/instructors", async (_req, res) => {
     // in kpis.total_instructor_count, but surfaced so they're reviewable
     // instead of silently dropped.
     no_employee_id: noEmployeeIdRows.map(toApiPerson),
-    other_department: otherDepartmentRows.map(toApiInstructorSummary),
+    other_department: otherDepartmentRows.map(summarize),
     // Flat list backing the click-to-expand details view under the total
     // instructor count card — every person counted in
     // kpis.total_instructor_count (Darwin's own instructor headcount plus
@@ -497,7 +517,7 @@ router.get("/reports/instructors", async (_req, res) => {
     // sorted by name.
     instructors: [...countedInstructorRows]
       .sort((a, b) => a.fullName.localeCompare(b.fullName))
-      .map(toApiInstructorSummary),
+      .map(summarize),
     access_breakdown: accessBreakdown,
   });
 });

@@ -7,8 +7,11 @@
  */
 import type { AccessBucket } from './accessBucket';
 
-export type AccessSplit = {
+/**
+ * How a category's total splits by data source -- Darwin record only, TeachOS record only, or both -- each with its own people list.
+ */
+export interface AccessSplit {
   darwin_only?: AccessBucket;
   both?: AccessBucket;
   teachos_only?: AccessBucket;
-};
+}

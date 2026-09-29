@@ -39,25 +39,28 @@ type CategoryKey = 'department' | 'instructors' | 'mentors' | 'ops_team' | 'exce
 // KPI card of the same name -- access_breakdown.department already existed
 // on the API response for that card, so this tab needed no backend change,
 // just wiring up the same field here.
-// "Exception" (2026-09-18, per request; scope revised 2026-09-19, per
-// request) is a review queue, not a fourth population alongside
+// "Exception" (2026-09-18, per request; scope revised 2026-09-19; revised
+// again 2026-09-29, per request: "whenever a capability manager... try to
+// edit the exit list... the count of exceptions has to be decreased...
+// only show the exceptions number when that manual entry is not
+// reviewed") is a review queue, not a fourth population alongside
 // Instructors/Mentors/Ops -- anyone shown here is already counted in
 // exactly one of those three (and in Department), and STAYS counted there
-// regardless of what's picked in the Exit column: picking any value,
-// including Exited, never changes the headcount -- actually removing
-// someone from the active list is a deliberate separate step (the Manual
-// Status control on the instructor detail page). This tab lists everyone
-// with an exit record that isn't yet resolved: not reviewed, Serving Notice
-// Period (shown for visibility), Exited, or Absconded (the real action
-// items -- waiting on that separate removal). Payroll Converted or Revoked
-// mean it's resolved, so those drop off. See reports.ts's exceptionRows
-// comment for the full rule.
+// regardless of what's picked in the Exit column: picking any value never
+// changes the headcount -- actually removing someone from the active list
+// is a deliberate separate step (the Manual Status control on the
+// instructor detail page). This tab lists everyone with an exit record
+// that hasn't been reviewed at all yet (the Exit column is still blank) --
+// picking ANY value there (Serving Notice Period, Exited, Absconded, or
+// Payroll Converted) clears them from this queue, same as Darwinbox's own
+// live exit record already showing "Revoked". See reports.ts's
+// exceptionRows comment for the full rule.
 const CATEGORY_TABS: { key: CategoryKey; label: string; icon: typeof UsersRound; description: string }[] = [
   { key: 'department', label: 'Instructor Department', icon: Building2, description: 'Instructors + Mentors + Operations team, combined.' },
   { key: 'instructors', label: 'Instructors', icon: UsersRound, description: 'Everyone counted toward the TeachOS instructor count.' },
   { key: 'mentors', label: 'Mentors', icon: GraduationCap, description: 'Darwin — Mentors department.' },
   { key: 'ops_team', label: 'Operations team', icon: Briefcase, description: 'Darwin — Delivery Support (Ops), filed under Operations rather than Instructor or Mentor.' },
-  { key: 'exception', label: 'Exception', icon: AlertTriangle, description: 'Instructors, Mentors, and Ops team members with an unresolved exit record -- not yet Payroll Converted or Revoked. Everyone here still counts normally; use the Exit column to record what actually happened.' },
+  { key: 'exception', label: 'Exception', icon: AlertTriangle, description: 'Instructors, Mentors, and Ops team members with an exit record that has not been reviewed yet. Everyone here still counts normally; use the Exit column to record what actually happened -- picking any value there removes them from this queue.' },
 ];
 
 function formatCount(value: number | undefined) {
@@ -726,14 +729,14 @@ function gridColsClass(category: CategoryKey): string {
   // mixed into Department/Exception just reads "Nxtwave" in this column,
   // same as any non-payroll instructor. Never wrong, just not usually the
   // interesting value there.
-  if (category === 'instructors' || category === 'mentors' || category === 'department' || category === 'exception') return 'grid-cols-[260px_190px_130px_280px_220px_150px_160px_170px_220px_140px_190px_190px_160px_130px_150px_190px_170px_140px]';
+  if (category === 'instructors' || category === 'mentors' || category === 'department' || category === 'exception') return 'grid-cols-[260px_190px_130px_280px_220px_150px_160px_170px_220px_140px_190px_190px_160px_130px_150px_190px_170px_140px_170px]';
   // Operations team keeps its own shape (2026-09-21: not part of the above
   // request) -- no Campus column (ops rows aren't deployed to a teaching
   // campus the way instructors and mentors are), a single Department
   // column instead of Subject+Department, and no Payroll either (same
   // reason it's never meaningful for Mentors: payroll_converted can't be
   // assigned to an ops row).
-  return 'grid-cols-[260px_190px_130px_280px_220px_150px_280px_140px_190px_190px_160px_150px_190px_170px_140px]';
+  return 'grid-cols-[260px_190px_130px_280px_220px_150px_280px_140px_190px_190px_160px_150px_190px_170px_140px_170px]';
 }
 
 // Manager (Darwin) (2026-09-22, per request: "in the overview table we have
@@ -847,6 +850,7 @@ function downloadInstructorsCsv(category: CategoryKey, people: InstructorSummary
   headers.push('Employee Status');
   headers.push('Enrolled Plan');
   headers.push('Product');
+  headers.push('Contribution');
 
   const rows = people.map((person) => {
     const row: string[] = [person.full_name, person.designation ?? '', person.employee_id ?? '', person.teachos_user_id ?? '', person.org_email ?? '', person.work_location ?? ''];
@@ -864,6 +868,7 @@ function downloadInstructorsCsv(category: CategoryKey, people: InstructorSummary
     row.push(person.exit_flag ? EXIT_VERIFICATION_LABELS[person.exit_verification ?? ''] ?? 'Not reviewed' : '');
     row.push(person.enrolled_plans ?? '');
     row.push(productLabel(person));
+    row.push(person.niat_cohorts?.join(', ') ?? '');
     return row;
   });
 
@@ -894,6 +899,7 @@ function CategoryTable({ category, people, backQuery }: { category: CategoryKey;
           <span>Employee Status</span>
           <span>Enrolled Plan</span>
           <span>Product</span>
+          <span>Contribution</span>
         </div>
         <div>{pager.pageRows.map((person) => <PersonRow key={person.id} category={category} person={person} columns={columns} backQuery={backQuery} />)}</div>
       </div>
@@ -949,6 +955,7 @@ function PersonRow({ category, person, columns, backQuery }: { category: Categor
     <ExitCell person={person} />
     <div className="truncate text-[12px] text-muted-foreground">{person.enrolled_plans || '—'}</div>
     <div className="truncate text-[12px] text-muted-foreground">{productLabel(person)}</div>
+    <div className="truncate text-[12px] text-muted-foreground">{person.niat_cohorts && person.niat_cohorts.length > 0 ? person.niat_cohorts.join(', ') : '—'}</div>
   </Link>;
 }
 
