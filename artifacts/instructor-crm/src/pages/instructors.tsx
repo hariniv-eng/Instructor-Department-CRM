@@ -772,8 +772,16 @@ function bifurcationLabel(classification: string | null): string {
 // derived read-only, same treatment as Bifurcation above: checked in a
 // fixed priority order (Academy, then IIT X DSA, then Intensive), with
 // NIAT as the default for everyone who matches none of the other three.
-//   - Academy: TeachOS Enrolled Plan is CCBP_ACADEMY_GENIUS_CAREER_PLUS
-//     (the "CCBP Academy Genius" plan).
+//   - Academy: TeachOS Enrolled Plans field (2026-09-29 finding: this field
+//     now holds a numbered, newline-separated list of EVERY plan a person is
+//     enrolled in, e.g. "1. CBA_ONBOARDING\n2. NIAT" -- it used to be a
+//     single flat plan code, which is why an exact-match check silently
+//     stopped matching anyone once the source format changed) contains the
+//     code CCBP_ACADEMY_GENIUS_CAREER_PLUS anywhere in that list (the "CCBP
+//     Academy Genius Career Plus" plan). Other Academy-adjacent codes exist
+//     in the live data (CCBP_ACADEMY_GENIUS without Career Plus,
+//     CCBP_ACADEMY_SMART) but are deliberately NOT included here, per
+//     explicit confirmation -- only CCBP_ACADEMY_GENIUS_CAREER_PLUS counts.
 //   - IIT X DSA: Darwin Designation contains "software developer" (matches
 //     "Software Developer and Instructor", "Software Developer & Instructor
 //     - DSA", "Senior Software Developer & Instructor", etc. -- but NOT the
@@ -806,7 +814,7 @@ function bifurcationLabel(classification: string | null): string {
 // new last column (matching how Enrolled Plan was added as the last column
 // on 2026-09-27).
 function productLabel(person: InstructorSummary): string {
-  if (person.enrolled_plans === 'CCBP_ACADEMY_GENIUS_CAREER_PLUS') return 'Academy';
+  if ((person.enrolled_plans ?? '').includes('CCBP_ACADEMY_GENIUS_CAREER_PLUS')) return 'Academy';
   const designation = (person.designation ?? '').toLowerCase();
   const location = (person.work_location ?? '').toLowerCase();
   if (designation.includes('software developer') && location.includes('kapil kavuri hub')) return 'IIT X DSA';
