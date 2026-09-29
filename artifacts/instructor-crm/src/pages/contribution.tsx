@@ -45,6 +45,14 @@ type ContributionRow = {
   // scoped to COMPLETED sessions, same as every other column here.
   all_batches: string[];
   recent_batches: string[];
+  // NIAT cohort year(s) (2026-09-29, per request) -- e.g. "NIAT 2025",
+  // "NIAT 2026" -- which real-world student intake(s) this person has
+  // taught, derived from all_batches server-side (see
+  // BATCH_NAME_TO_NIAT_COHORT in instructorContribution.ts). A batch this
+  // app hasn't been told the cohort for yet (or an out-of-scope one, like
+  // Training Institute or IIT Kharagpur) simply doesn't contribute a
+  // cohort here, so this can be shorter than all_batches.
+  niat_cohorts: string[];
 };
 
 type ContributionResponse = {
@@ -176,6 +184,7 @@ export default function ContributionPage() {
                 <th className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Other Hrs</th>
                 <th className="whitespace-nowrap border-l border-border px-4 py-3 text-right font-mono-ui text-[10px] font-bold uppercase tracking-[0.12em] text-foreground">Total Hrs</th>
                 <th className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Sessions</th>
+                <th className="whitespace-nowrap border-l border-border px-4 py-3 text-left font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Contribution</th>
                 <th className="whitespace-nowrap border-l border-border px-4 py-3 text-left font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">All Batches</th>
                 <th className="whitespace-nowrap px-4 py-3 text-left font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Batches (Last 30 Days)</th>
               </tr>
@@ -194,10 +203,11 @@ export default function ContributionPage() {
                     <td className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[12px] tabular-nums text-foreground">{formatHours(row.other_hours)}</td>
                     <td className="whitespace-nowrap border-l border-border px-4 py-3 text-right font-mono-ui text-[12px] font-bold tabular-nums text-foreground">{formatHours(row.total_hours)}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[12px] tabular-nums text-muted-foreground">{formatKpi(row.sessions_completed)}</td>
+                    <td className="whitespace-nowrap border-l border-border px-4 py-3 text-[12px] text-foreground">{row.niat_cohorts.length > 0 ? row.niat_cohorts.join(', ') : '—'}</td>
                     <td className="max-w-[280px] truncate border-l border-border px-4 py-3 text-[12px] text-muted-foreground" title={row.all_batches.join(', ')}>{row.all_batches.length > 0 ? row.all_batches.join(', ') : '—'}</td>
                     <td className="max-w-[280px] truncate px-4 py-3 text-[12px] text-muted-foreground" title={row.recent_batches.join(', ')}>{row.recent_batches.length > 0 ? row.recent_batches.join(', ') : '—'}</td>
                   </>
-                  : <td colSpan={7} className="whitespace-nowrap border-l border-border px-4 py-3 text-center text-[11px] italic text-muted-foreground">No data</td>}
+                  : <td colSpan={8} className="whitespace-nowrap border-l border-border px-4 py-3 text-center text-[11px] italic text-muted-foreground">No data</td>}
               </tr>)}
             </tbody>
           </table>
