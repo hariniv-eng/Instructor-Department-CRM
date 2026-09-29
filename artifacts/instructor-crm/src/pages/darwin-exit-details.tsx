@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { RefreshCw, Users, AlertTriangle } from 'lucide-react';
-import { PageIntro, EmptyState, QueryError, SkeletonBlock, TopStat, TablePager, TableSearchInput, DownloadCsvButton, usePagedRows, formatKpi } from '@/components/ui-pieces';
+import { PageIntro, EmptyState, QueryError, SkeletonBlock, TopStat, MiniStat, TablePager, TableSearchInput, DownloadCsvButton, usePagedRows, formatKpi } from '@/components/ui-pieces';
 import { toCsv, downloadCsv } from '@/lib/csv';
 
 // Full joined exit-record dump (2026-09-19, per request: "the darwin data
@@ -24,15 +24,27 @@ import { toCsv, downloadCsv } from '@/lib/csv';
 // scoped down to just the Instructor-team departments (and, before that,
 // diagnostic fields/a department_breakdown table existed purely to sanity-
 // check that scoping); both are gone now that there's no filter left to
-// diagnose. The only row still excluded is a "Revoked" status (the
-// separation request was cancelled -- the person never actually exited).
+// diagnose.
+//
+// Nothing excluded any more (2026-09-29, per request: "get all this data
+// ... right now we are not showing the data of revoked" / "i want all
+// data, revoked, rejected, approved, pending for approval" / "all
+// complete data i want") -- this route used to silently drop any row
+// whose Status was "Revoked". Every row is shown now; each one instead
+// carries an `exit_status_category` (revoked/rejected/pending/approved/
+// other) derived from that same Status field, so the four real business
+// categories are visible and filterable rather than one being hidden.
 type DarwinExitDetails = {
   count: number;
   columns: string[];
   rows: Record<string, unknown>[];
   synced_at: string | null;
   total_exit_records: number;
-  revoked_excluded: number;
+  revoked_count: number;
+  rejected_count: number;
+  pending_count: number;
+  approved_count: number;
+  other_count: number;
   // Exception filter (2026-09-27, per request: "can you keep this exception
   // filter in the darwin exit tab that will help get the records of
   // exceptions") -- `is_exception` on each row (not a displayed column,
@@ -43,6 +55,15 @@ type DarwinExitDetails = {
   // eligibility logic this mirrors.
   exception_count: number;
 };
+
+type ExitStatusCategory = 'revoked' | 'rejected' | 'pending' | 'approved' | 'other';
+const STATUS_FILTERS: { key: ExitStatusCategory; label: string }[] = [
+  { key: 'approved', label: 'Approved' },
+  { key: 'revoked', label: 'Revoked' },
+  { key: 'rejected', label: 'Rejected' },
+  { key: 'pending', label: 'Pending' },
+  { key: 'other', label: 'Other' },
+];
 
 const QUERY_KEY = ['reports', 'darwin-exit-details'];
 
@@ -85,15 +106,21 @@ export default function DarwinExitDetailsPage() {
   // apply together, same as any other filter+search combination elsewhere
   // in the app).
   const [exceptionOnly, setExceptionOnly] = useState(false);
+  // Status filter (2026-09-29, per request -- see the type comment above):
+  // empty selection means "show everything", same convention as every
+  // other multi-select filter in the app (Instructors tab's Gender/Payroll/
+  // etc filters) -- selecting one or more categories narrows to just those.
+  const [statusFilter, setStatusFilter] = useState<ExitStatusCategory[]>([]);
   const filteredRows = useMemo(() => {
     if (!data) return [];
     const query = search.trim().toLowerCase();
     return data.rows.filter((row) => {
       if (exceptionOnly && !row.is_exception) return false;
+      if (statusFilter.length > 0 && !statusFilter.includes(row.exit_status_category as ExitStatusCategory)) return false;
       if (!query) return true;
       return data.columns.some((column) => cellText(row[column]).toLowerCase().includes(query));
     });
-  }, [data, search, exceptionOnly]);
+  }, [data, search, exceptionOnly, statusFilter]);
   const pager = usePagedRows(filteredRows, 50);
 
   // CSV export (2026-09-27, per request: "also try to add the download-in-
@@ -114,7 +141,7 @@ export default function DarwinExitDetailsPage() {
     <PageIntro
       eyebrow="Darwinbox / exit report + enrichment reports, joined"
       title="Darwin Exit Details"
-      description="Every field on file for each exited employee, company-wide, every department -- the base exit report's Employee Id / Full Name / Exit Date / Reason / Status, plus whatever the enrichment reports (DBX_CHECK_ENRICH_REPORT_IDS) add on top. The only exclusion is a 'Revoked' status -- that separation request was cancelled, so the person never actually exited. Refresh via the Exits sync (Source uploads) to pull the latest."
+      description="Every separation record on file, company-wide, every department and every status -- Approved, Revoked, Rejected, and Pending -- nothing excluded. The base exit report's Employee Id / Full Name / Exit Date / Reason / Status, plus whatever the enrichment reports (DBX_CHECK_ENRICH_REPORT_IDS) add on top. Refresh via the Exits sync (Source uploads) to pull the latest."
       action={<button type="button" data-testid="button-refresh-darwin-exit-details" onClick={refresh} className="inline-flex items-center gap-2 self-start rounded-lg border border-border bg-card px-3.5 py-2.5 text-[12px] font-bold text-foreground transition-colors hover:bg-secondary lg:self-auto"><RefreshCw size={14} /> Refresh</button>}
     />
 
@@ -146,10 +173,31 @@ export default function DarwinExitDetailsPage() {
       </div>
     </div>}
 
-    {data && data.revoked_excluded > 0 && <p className="mb-6 max-w-3xl text-[12px] leading-relaxed text-muted-foreground">
-      Out of <strong className="font-semibold text-foreground">{formatKpi(data.total_exit_records)}</strong> exit records on file company-wide,{' '}
-      <strong className="font-semibold text-foreground">{formatKpi(data.revoked_excluded)}</strong> {data.revoked_excluded === 1 ? 'was' : 'were'} Revoked (the separation request was cancelled) and {data.revoked_excluded === 1 ? "isn't" : "aren't"} shown below.
-    </p>}
+    {data && data.count > 0 && <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      <MiniStat label="Approved" value={data.approved_count} meta={`${((data.approved_count / data.count) * 100).toFixed(0)}% of all records`} tone="green" />
+      <MiniStat label="Revoked" value={data.revoked_count} meta="Separation request cancelled/withdrawn" tone="amber" />
+      <MiniStat label="Rejected" value={data.rejected_count} meta="Separation request declined" tone="saffron" />
+      <MiniStat label="Pending" value={data.pending_count} meta="Still awaiting approval" tone="indigo" />
+      {data.other_count > 0 && <MiniStat label="Other" value={data.other_count} meta="Status not one of the above" tone="muted" />}
+    </div>}
+
+    {data && <div className="mb-6 flex flex-wrap items-center gap-2">
+      <span className="font-mono-ui text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Filter by status</span>
+      {STATUS_FILTERS.map((filter) => {
+        const isActive = statusFilter.includes(filter.key);
+        return <button
+          key={filter.key}
+          type="button"
+          data-testid={`button-filter-status-${filter.key}-darwin-exit-details`}
+          onClick={() => setStatusFilter((current) => isActive ? current.filter((key) => key !== filter.key) : [...current, filter.key])}
+          aria-pressed={isActive}
+          className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[11px] font-bold transition-colors ${isActive ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-card text-foreground hover:bg-secondary'}`}
+        >
+          {filter.label}
+        </button>;
+      })}
+      {statusFilter.length > 0 && <button type="button" data-testid="button-clear-status-filter-darwin-exit-details" onClick={() => setStatusFilter([])} className="text-[11px] font-semibold text-muted-foreground underline hover:text-foreground">Clear</button>}
+    </div>}
 
     {data && data.count === 0 && <EmptyState title="No exit records yet" description="Run the Exits sync (Source uploads) to pull the base exit report and its enrichment reports." />}
 
