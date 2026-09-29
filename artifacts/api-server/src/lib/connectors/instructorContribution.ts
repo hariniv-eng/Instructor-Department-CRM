@@ -311,9 +311,13 @@ export type ContributionRow = {
   // subset taught in the last 30 days (by session_start_datetime).
   all_batches: string[];
   recent_batches: string[];
-  // NIAT cohort year(s) (2026-09-29, per request) -- derived from all_batches
-  // via BATCH_NAME_TO_NIAT_COHORT above, so it reflects every cohort this
-  // instructor has ever taught, not just their most recent one.
+  // NIAT cohort year(s) (2026-09-29, per request, later revised same day
+  // to use recent_batches instead of all_batches -- "the contribution
+  // column value should be added on the basis of the last batch of the
+  // last 30 days only") -- derived from recent_batches via
+  // BATCH_NAME_TO_NIAT_COHORT above, so this reflects the cohort(s) this
+  // instructor is CURRENTLY teaching, not every cohort they've ever
+  // touched.
   niat_cohorts: string[];
 };
 
@@ -364,6 +368,7 @@ export async function fetchContributionRows(): Promise<ContributionRow[]> {
     return (rows as Array<Record<string, unknown>>)
       .map((r) => {
         const allBatches = Array.isArray(r.all_batches) ? r.all_batches.map((v) => String(v)) : [];
+        const recentBatches = Array.isArray(r.recent_batches) ? r.recent_batches.map((v) => String(v)) : [];
         return {
           instructor_user_id: String(r.instructor_user_id ?? ""),
           lecture_minutes: Number(r.lecture_minutes ?? 0),
@@ -371,11 +376,17 @@ export async function fetchContributionRows(): Promise<ContributionRow[]> {
           other_minutes: Number(r.other_minutes ?? 0),
           sessions_completed: Number(r.sessions_completed ?? 0),
           all_batches: allBatches,
-          recent_batches: Array.isArray(r.recent_batches) ? r.recent_batches.map((v) => String(v)) : [],
-          // Derived from all_batches (all-time), not recent_batches, so a
-          // person who switched cohorts still shows every cohort they've
-          // ever taught, not just their current one.
-          niat_cohorts: cohortsForBatches(allBatches),
+          recent_batches: recentBatches,
+          // Derived from recent_batches (last 30 days), not all_batches
+          // (2026-09-29, per request: "the contribution column value
+          // should be added on the basis of the last batch of the last 30
+          // days only, not the all batches column") -- so someone who
+          // taught Batch 1 last year but has since moved on shows only
+          // their CURRENT cohort, not every cohort they've ever touched.
+          // A person with zero COMPLETED sessions in the last 30 days
+          // gets an empty niat_cohorts, same as they'd get an empty
+          // recent_batches.
+          niat_cohorts: cohortsForBatches(recentBatches),
         };
       })
       .filter((r) => r.instructor_user_id);
