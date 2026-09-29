@@ -792,15 +792,37 @@ router.get("/reports/darwin-full-roster", requireAuth, requireRole("admin"), asy
 router.get("/reports/darwin-exit-details", requireAuth, requireRole("admin"), async (_req, res) => {
   const allStored = await db.select().from(darwinboxExitsTable).orderBy(darwinboxExitsTable.id);
 
-  // Revoked means the separation request itself was cancelled/withdrawn --
-  // the person never actually exited, so this row shouldn't show up as an
-  // "exit" at all, regardless of department. This is the only filter left
-  // on this route.
-  const stored = allStored.filter((r) => {
+  // Show every exit record, unfiltered (2026-09-29, per request: "get all
+  // this data ... in table -- right now we are not showing the data of
+  // revoked ... i what all the data, revoked, rejected, approved, pending
+  // for approval"). Previously this route silently dropped any row whose
+  // Status was "Revoked" (a resignation that was cancelled/withdrawn, so
+  // the person never actually exited) -- that's no longer the case; every
+  // row Darwinbox's exits report returned is shown, same "show everything"
+  // philosophy as darwin-full-roster. Instead, each row now carries an
+  // explicit exit_status_category derived from that same Status field, so
+  // the frontend can label/filter each category separately rather than one
+  // silently vanishing.
+  //
+  // Categorization confirmed against real live data (2026-09-29, via a
+  // one-off distinct-values check): the raw Status field's actual values
+  // are "Approved" (3368), "Revoked" (375), "Rejected" (71), "Pending With
+  // Approver" (26), "Admin Approved" (8), and "Revoked via Revoke Approval
+  // Flow" (3) -- six exact strings across what are really four business
+  // categories, matched by substring so a wording variant (e.g. "Admin
+  // Approved", "Revoked via Revoke Approval Flow") still lands in the
+  // right bucket. "other" is a deliberate catch-all for any future/unknown
+  // Status value so a new one is never silently dropped from the counts.
+  const stored = allStored;
+  const exitStatusCategory = (r: typeof allStored[number]): "revoked" | "rejected" | "pending" | "approved" | "other" => {
     const rawData = r.rawData as Record<string, unknown> | null;
-    const status = rawData ? cell(rawData, "Status") : null;
-    return status?.toLowerCase() !== "revoked";
-  });
+    const status = (rawData ? cell(rawData, "Status") : null)?.toLowerCase() ?? "";
+    if (status.includes("revoked")) return "revoked";
+    if (status.includes("rejected")) return "rejected";
+    if (status.includes("pending")) return "pending";
+    if (status.includes("approved")) return "approved";
+    return "other";
+  };
 
   // Exception flag (2026-09-27, per request: "can you keep this exception
   // filter in the darwin exit tab that will help get the records of
@@ -835,6 +857,7 @@ router.get("/reports/darwin-exit-details", requireAuth, requireRole("admin"), as
     const row: Record<string, unknown> = {};
     for (const key of columns) row[key] = data[key] ?? null;
     row.is_exception = !!(r.employeeId && exceptionEmployeeIds.has(r.employeeId));
+    row.exit_status_category = exitStatusCategory(r);
     return row;
   });
 
@@ -844,7 +867,11 @@ router.get("/reports/darwin-exit-details", requireAuth, requireRole("admin"), as
     rows,
     synced_at: stored[0]?.syncedAt ?? null,
     total_exit_records: allStored.length,
-    revoked_excluded: allStored.length - stored.length,
+    revoked_count: rows.filter((r) => r.exit_status_category === "revoked").length,
+    rejected_count: rows.filter((r) => r.exit_status_category === "rejected").length,
+    pending_count: rows.filter((r) => r.exit_status_category === "pending").length,
+    approved_count: rows.filter((r) => r.exit_status_category === "approved").length,
+    other_count: rows.filter((r) => r.exit_status_category === "other").length,
     exception_count: rows.filter((r) => r.is_exception).length,
   });
 });
