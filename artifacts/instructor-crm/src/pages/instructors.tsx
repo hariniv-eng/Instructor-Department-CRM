@@ -258,6 +258,45 @@ function parseFilters(queryString: string): Partial<FilterState> {
   return result;
 }
 
+// Faceted filtering (2026-10-05, per request: "when we choose one
+// particular filter and ... choose another filter, the numbers ... in that
+// particular filter should be changed according to the filter that we have
+// chosen at first" -- right now it isn't). Before this, every filter's own
+// option list and counts (genderCounts/subjectOptions/
+// capabilityManagerOptions/payrollCounts/campusOptions/productOptions
+// below) were all computed straight from allPeople, completely ignoring
+// whatever OTHER filters were currently active -- so picking Female in
+// Gender never changed what Subject's counts showed, for instance. Only
+// the final `people` list (the actual table rows) combined every filter
+// together correctly.
+//
+// This applies every filter EXCEPT the one named in `exclude` -- the
+// standard faceted-search pattern: a filter dimension's own displayed
+// counts should reflect every OTHER active filter, but not collapse down
+// to only its own already-selected value(s), so switching that dimension's
+// selection to something else still shows a real, comparable count instead
+// of a stale or self-narrowed one.
+type FilterDimension = 'gender' | 'subject' | 'capabilityManager' | 'payroll' | 'campus' | 'product';
+type ActiveFilters = {
+  genderFilter: GenderFilterKey[];
+  subjectFilter: string[];
+  capabilityManagerFilter: string[];
+  payrollFilter: PayrollFilterKey[];
+  campusFilter: string[];
+  productFilter: string[];
+};
+function facetedPeople(people: InstructorSummary[], exclude: FilterDimension, filters: ActiveFilters): InstructorSummary[] {
+  return people.filter((person) => {
+    if (exclude !== 'gender' && filters.genderFilter.length > 0 && !filters.genderFilter.includes(normalizeGender(person.gender))) return false;
+    if (exclude !== 'subject' && filters.subjectFilter.length > 0 && !filters.subjectFilter.includes(person.dept_area || UNSPECIFIED_SUBJECT)) return false;
+    if (exclude !== 'capabilityManager' && filters.capabilityManagerFilter.length > 0 && !filters.capabilityManagerFilter.includes(person.capability_manager || NO_CAPABILITY_MANAGER)) return false;
+    if (exclude !== 'payroll' && filters.payrollFilter.length > 0 && !filters.payrollFilter.includes(person.is_payroll ? 'payroll' : 'nxtwave')) return false;
+    if (exclude !== 'campus' && filters.campusFilter.length > 0 && !matchesCampus(person, filters.campusFilter)) return false;
+    if (exclude !== 'product' && filters.productFilter.length > 0 && !filters.productFilter.includes(productLabel(person))) return false;
+    return true;
+  });
+}
+
 export default function InstructorsPage() {
   const reportQuery = useGetReportsInstructors();
   const report = reportQuery.data;
@@ -332,11 +371,13 @@ export default function InstructorsPage() {
   // Manager coverage stats below, so switching category updates the counts
   // but the search box doesn't -- this is meant to answer "how many of this
   // category are Male/Female", not "how many of my search results are".
+  const activeFilters: ActiveFilters = { genderFilter, subjectFilter, capabilityManagerFilter, payrollFilter, campusFilter, productFilter };
+  const genderFacetPeople = useMemo(() => facetedPeople(allPeople, 'gender', activeFilters), [allPeople, subjectFilter, capabilityManagerFilter, payrollFilter, campusFilter, productFilter]);
   const genderCounts = useMemo(() => {
     const counts: Record<GenderFilterKey, number> = { male: 0, female: 0, unknown: 0 };
-    for (const person of allPeople) counts[normalizeGender(person.gender)] += 1;
+    for (const person of genderFacetPeople) counts[normalizeGender(person.gender)] += 1;
     return counts;
-  }, [allPeople]);
+  }, [genderFacetPeople]);
 
   // Cross-category breakdown (2026-09-09, per follow-up request): picking a
   // gender from the dropdown shouldn't just filter the table for whichever
@@ -358,9 +399,10 @@ export default function InstructorsPage() {
   // (2026-09-15, per request) -- same "same as gender" treatment as above,
   // but the option set itself is data-driven (see UNSPECIFIED_SUBJECT's
   // comment) rather than a fixed list.
+  const subjectFacetPeople = useMemo(() => facetedPeople(allPeople, 'subject', activeFilters), [allPeople, genderFilter, capabilityManagerFilter, payrollFilter, campusFilter, productFilter]);
   const subjectOptions = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const person of allPeople) {
+    for (const person of subjectFacetPeople) {
       const key = person.dept_area || UNSPECIFIED_SUBJECT;
       counts.set(key, (counts.get(key) ?? 0) + 1);
     }
@@ -368,7 +410,7 @@ export default function InstructorsPage() {
     const options = areas.map((area) => ({ key: area, label: area, count: counts.get(area)! }));
     if (counts.has(UNSPECIFIED_SUBJECT)) options.push({ key: UNSPECIFIED_SUBJECT, label: 'Not set', count: counts.get(UNSPECIFIED_SUBJECT)! });
     return options;
-  }, [allPeople]);
+  }, [subjectFacetPeople]);
 
   const subjectBreakdown = useMemo(() => {
     if (subjectFilter.length === 0 || !report?.access_breakdown) return null;
@@ -380,9 +422,10 @@ export default function InstructorsPage() {
 
   // Capability Manager filter options + counts, same pattern as Subject
   // above (2026-09-15, per request).
+  const capabilityManagerFacetPeople = useMemo(() => facetedPeople(allPeople, 'capabilityManager', activeFilters), [allPeople, genderFilter, subjectFilter, payrollFilter, campusFilter, productFilter]);
   const capabilityManagerOptions = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const person of allPeople) {
+    for (const person of capabilityManagerFacetPeople) {
       const key = person.capability_manager || NO_CAPABILITY_MANAGER;
       counts.set(key, (counts.get(key) ?? 0) + 1);
     }
@@ -390,7 +433,7 @@ export default function InstructorsPage() {
     const options = managers.map((manager) => ({ key: manager, label: manager, count: counts.get(manager)! }));
     if (counts.has(NO_CAPABILITY_MANAGER)) options.push({ key: NO_CAPABILITY_MANAGER, label: 'Not on file', count: counts.get(NO_CAPABILITY_MANAGER)! });
     return options;
-  }, [allPeople]);
+  }, [capabilityManagerFacetPeople]);
 
   const capabilityManagerBreakdown = useMemo(() => {
     if (capabilityManagerFilter.length === 0 || !report?.access_breakdown) return null;
@@ -402,11 +445,12 @@ export default function InstructorsPage() {
 
   // Payroll filter counts + breakdown, same pattern as Gender above
   // (2026-09-15, per request).
+  const payrollFacetPeople = useMemo(() => facetedPeople(allPeople, 'payroll', activeFilters), [allPeople, genderFilter, subjectFilter, capabilityManagerFilter, campusFilter, productFilter]);
   const payrollCounts = useMemo(() => {
     const counts: Record<PayrollFilterKey, number> = { payroll: 0, nxtwave: 0 };
-    for (const person of allPeople) counts[person.is_payroll ? 'payroll' : 'nxtwave'] += 1;
+    for (const person of payrollFacetPeople) counts[person.is_payroll ? 'payroll' : 'nxtwave'] += 1;
     return counts;
-  }, [allPeople]);
+  }, [payrollFacetPeople]);
 
   const payrollBreakdown = useMemo(() => {
     if (payrollFilter.length === 0 || !report?.access_breakdown) return null;
@@ -420,10 +464,11 @@ export default function InstructorsPage() {
   // (2026-09-15, per request), same pattern as Subject/Capability Manager
   // above -- except a person can count toward more than one option here
   // (see matchesCampus's comment), so these counts don't sum to allPeople.length.
+  const campusFacetPeople = useMemo(() => facetedPeople(allPeople, 'campus', activeFilters), [allPeople, genderFilter, subjectFilter, capabilityManagerFilter, payrollFilter, productFilter]);
   const campusOptions = useMemo(() => {
     const counts = new Map<string, number>();
     let unspecified = 0;
-    for (const person of allPeople) {
+    for (const person of campusFacetPeople) {
       const institutes = person.institutes ?? [];
       if (institutes.length === 0) { unspecified += 1; continue; }
       for (const institute of institutes) counts.set(institute, (counts.get(institute) ?? 0) + 1);
@@ -432,7 +477,7 @@ export default function InstructorsPage() {
     const options = campuses.map((campus) => ({ key: campus, label: campus, count: counts.get(campus)! }));
     if (unspecified > 0) options.push({ key: UNSPECIFIED_CAMPUS, label: 'Not set', count: unspecified });
     return options;
-  }, [allPeople]);
+  }, [campusFacetPeople]);
 
   const campusBreakdown = useMemo(() => {
     if (campusFilter.length === 0 || !report?.access_breakdown) return null;
@@ -447,15 +492,16 @@ export default function InstructorsPage() {
   // derived productLabel() rather than a raw field, and with no
   // "unspecified" bucket since productLabel() is total (always NIAT,
   // Academy, Intensive, or IIT X DSA).
+  const productFacetPeople = useMemo(() => facetedPeople(allPeople, 'product', activeFilters), [allPeople, genderFilter, subjectFilter, capabilityManagerFilter, payrollFilter, campusFilter]);
   const productOptions = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const person of allPeople) {
+    for (const person of productFacetPeople) {
       const key = productLabel(person);
       counts.set(key, (counts.get(key) ?? 0) + 1);
     }
     const products = [...counts.keys()].sort((a, b) => a.localeCompare(b));
     return products.map((product) => ({ key: product, label: product, count: counts.get(product)! }));
-  }, [allPeople]);
+  }, [productFacetPeople]);
 
   const productBreakdown = useMemo(() => {
     if (productFilter.length === 0 || !report?.access_breakdown) return null;
