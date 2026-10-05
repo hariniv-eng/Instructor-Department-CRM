@@ -1,9 +1,26 @@
 import { Router, type IRouter } from "express";
 import { db, instructorsTable, instructorArchiveTable, darwinboxFullRosterTable, darwinboxExitsTable, instructorTrainingStatusTable, instructorContributionTable } from "@workspace/db";
 import { requireAuth, requireRole } from "../middlewares/auth";
-import { cell } from "../lib/reconcile";
+import { cell, normalize } from "../lib/reconcile";
 import { TRAINING_COURSE_TAXONOMY } from "../data/trainingCourseTaxonomy";
 import { TECH_AREAS } from "../lib/departmentTaxonomy";
+import { CONFIRMED_INSTRUCTOR_DESPITE_FULL_ROSTER } from "../data/classificationOverrides";
+
+// Checked by both darwinInstructorsForCount (computeDepartmentAndExceptionRows
+// below) and the Instructor Archive route's own duplicate of that same
+// predicate -- see CONFIRMED_INSTRUCTOR_DESPITE_FULL_ROSTER's own comment in
+// classificationOverrides.ts for the full reasoning. Matching precedence
+// (teachosUserId, then employeeId, then normalized full name) mirrors
+// reconcile.ts's own findOverride() used for the other override lists in
+// that same file.
+function isConfirmedDespiteFullRoster(row: { teachosUserId: string | null; employeeId: string | null; fullName: string }): boolean {
+  const normalizedRowName = normalize(row.fullName);
+  return CONFIRMED_INSTRUCTOR_DESPITE_FULL_ROSTER.some((entry) => {
+    if (entry.teachosUserId) return entry.teachosUserId === row.teachosUserId;
+    if (entry.employeeId) return entry.employeeId === row.employeeId;
+    return normalize(entry.fullName) === normalizedRowName;
+  });
+}
 
 const router: IRouter = Router();
 
@@ -267,7 +284,7 @@ function computeDepartmentAndExceptionRows(allRows: InstructorRow[]) {
   // override classification) PLUS the TeachOS "Payroll" bucket (active in
   // TeachOS, never matched Darwin at all — folds in the former Needs-review
   // remainder).
-  const darwinInstructorsForCount = allRows.filter((r) => r.inDarwin && !r.inDarwinFullRoster && !r.classification && (r.deptBucket === "tech" || r.deptBucket === "non_tech"));
+  const darwinInstructorsForCount = allRows.filter((r) => r.inDarwin && (!r.inDarwinFullRoster || isConfirmedDespiteFullRoster(r)) && !r.classification && (r.deptBucket === "tech" || r.deptBucket === "non_tech"));
   const teachosOnlyForPayrollCount = allRows.filter((r) => r.inTeachos && !r.inDarwin);
   const payrollConvertedForCount = teachosOnlyForPayrollCount.filter((r) => r.classification === "payroll_converted");
   const needsReviewForCount = teachosOnlyForPayrollCount.filter((r) =>
@@ -1203,7 +1220,7 @@ router.get("/reports/instructor-contribution", requireAuth, requireRole("admin")
 router.get("/reports/instructor-archive", requireAuth, requireRole("admin"), async (_req, res) => {
   const allRows = await db.select().from(instructorArchiveTable);
 
-  const darwinInstructors = allRows.filter((r) => r.inDarwin && !r.inDarwinFullRoster && !r.classification && (r.deptBucket === "tech" || r.deptBucket === "non_tech"));
+  const darwinInstructors = allRows.filter((r) => r.inDarwin && (!r.inDarwinFullRoster || isConfirmedDespiteFullRoster(r)) && !r.classification && (r.deptBucket === "tech" || r.deptBucket === "non_tech"));
   const teachosOnly = allRows.filter((r) => r.inTeachos && !r.inDarwin);
   const payrollConverted = teachosOnly.filter((r) => r.classification === "payroll_converted");
   const needsReview = teachosOnly.filter((r) =>
