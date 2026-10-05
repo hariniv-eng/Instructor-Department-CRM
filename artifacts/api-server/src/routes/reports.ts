@@ -22,6 +22,24 @@ function isConfirmedDespiteFullRoster(row: { teachosUserId: string | null; emplo
   });
 }
 
+// Classifications that mean a row was never really part of the Instructor
+// Department to begin with -- a genuinely different team, reviewed and
+// filed elsewhere on purpose (see classificationOverrides.ts and
+// classifyDepartment()'s iit_kharagpur_team branch). Deliberately does NOT
+// include "excluded_ops_managers" (Ops team IS part of the department) or
+// "mentor" (Mentors IS part of the department too). Hoisted to module
+// scope (2026-10-05) so it's shared by exceptionRows below (the Exception
+// queue / Darwin Exit Details tab fix) and the Instructor Archive route
+// further down (the "Archive is missing 34 fully-exited people" fix) --
+// both need the exact same "is this row part of the department at all"
+// test, applied to allRows instead of the live-presence-gated
+// departmentRows, for the same underlying reason: a row that's fully
+// exited from Darwin AND TeachOS still has classification: null on most
+// genuine instructors, so it keeps passing this test and staying visible;
+// it only fails when the person was deliberately filed under a different
+// team from the start.
+const NOT_DEPARTMENT_CLASSIFICATIONS = new Set(["excluded_other_department", "excluded_non_department_team", "iit_kharagpur_team", "other_department_manual"]);
+
 const router: IRouter = Router();
 
 type InstructorRow = typeof instructorsTable.$inferSelect;
@@ -333,14 +351,9 @@ function computeDepartmentAndExceptionRows(allRows: InstructorRow[]) {
   // still requires the separate, deliberate Manual Status control on the
   // instructor detail page (see exitVerification's comment in the schema).
   const hasRevokedExitStatus = (r: InstructorRow) => (r.exitFlagStatus ?? "").trim().toLowerCase() === "revoked";
-  // Classifications that mean a row was never really part of the
-  // Instructor Department to begin with -- a genuinely different team,
-  // reviewed and filed elsewhere on purpose (see classificationOverrides.ts
-  // and classifyDepartment()'s iit_kharagpur_team branch). Deliberately
-  // does NOT include "excluded_ops_managers" (Ops team IS part of the
-  // department -- see opsTeamRows above) or "mentor" (Mentors IS part of
-  // the department too -- see mentors above).
-  const NOT_DEPARTMENT_CLASSIFICATIONS = new Set(["excluded_other_department", "excluded_non_department_team", "iit_kharagpur_team", "other_department_manual"]);
+  // NOT_DEPARTMENT_CLASSIFICATIONS is now a module-level constant (see its
+  // own comment above) -- shared with the Instructor Archive route's fix
+  // below.
   // Scoped to allRows instead of departmentRows (2026-10-05, per request:
   // "for exception if the person is exited then there details should be
   // visible in the exception but not removed from the exception table") --
@@ -1220,21 +1233,33 @@ router.get("/reports/instructor-contribution", requireAuth, requireRole("admin")
 router.get("/reports/instructor-archive", requireAuth, requireRole("admin"), async (_req, res) => {
   const allRows = await db.select().from(instructorArchiveTable);
 
-  const darwinInstructors = allRows.filter((r) => r.inDarwin && (!r.inDarwinFullRoster || isConfirmedDespiteFullRoster(r)) && !r.classification && (r.deptBucket === "tech" || r.deptBucket === "non_tech"));
-  const teachosOnly = allRows.filter((r) => r.inTeachos && !r.inDarwin);
-  const payrollConverted = teachosOnly.filter((r) => r.classification === "payroll_converted");
-  const needsReview = teachosOnly.filter((r) =>
-    r.classification !== "excluded_other_department"
-    && r.classification !== "excluded_non_department_team"
-    && r.classification !== "iit_kharagpur_team"
-    && r.classification !== "payroll_converted"
-  );
-  const mentors = allRows.filter((r) => r.inDarwin && !r.inDarwinFullRoster && r.classification === "mentor");
-  const opsTeamRows = allRows.filter((r) => r.classification === "excluded_ops_managers");
-
-  const departmentRows = [...darwinInstructors, ...payrollConverted, ...needsReview, ...mentors, ...opsTeamRows];
-
-  const people = departmentRows.map(toApiArchiveSummary).sort((a, b) => a.full_name.localeCompare(b.full_name));
+  // Rescoped from the live-presence-gated five-bucket filter to allRows
+  // (2026-10-05, diagnosed per report: "we have exits list as 27 but ...
+  // around 48 instructor have exit record"). The old filter required
+  // inDarwin (darwinInstructors/mentors) or inTeachos (payrollConverted/
+  // needsReview) to still be true -- but archiveInstructors() overwrites
+  // inDarwin/inTeachos on every sync to match each person's CURRENT live
+  // state (by design, so the archive always reflects reality). The moment
+  // someone fully exits everywhere -- gone from both Darwin and TeachOS --
+  // their archived row gets inDarwin=false AND inTeachos=false, which fails
+  // every one of those five buckets at once. Their row was never deleted
+  // (instructorArchiveTable never deletes), but it silently dropped out of
+  // the page entirely -- the exact same class of bug already fixed for
+  // exceptionRows above, just never applied here. Confirmed via diagnostic
+  // (_tmp_archive_exit_gap.ts, 2026-10-05): of 61 archived rows with a real
+  // exit signal, 34 were hidden this way, leaving only 27 visible.
+  //
+  // This mirrors exceptionRows exactly: keep every row that was ever
+  // genuinely part of the department, drop only rows filed under a
+  // different team from the start (NOT_DEPARTMENT_CLASSIFICATIONS).
+  // Darwin-full-roster-only unclassified rows (noise from the broad
+  // company-wide fallback match, never a real instructor) are still kept
+  // out unless explicitly confirmed via CONFIRMED_INSTRUCTOR_DESPITE_FULL_ROSTER,
+  // same safety gate as the live Instructors tab.
+  const people = allRows
+    .filter((r) => !NOT_DEPARTMENT_CLASSIFICATIONS.has(r.classification ?? "") && (!r.inDarwinFullRoster || !!r.classification || isConfirmedDespiteFullRoster(r)))
+    .map(toApiArchiveSummary)
+    .sort((a, b) => a.full_name.localeCompare(b.full_name));
 
   res.json({
     people,
