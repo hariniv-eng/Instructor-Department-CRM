@@ -44,23 +44,35 @@ type CategoryKey = 'department' | 'instructors' | 'mentors' | 'ops_team' | 'exce
 // edit the exit list... the count of exceptions has to be decreased...
 // only show the exceptions number when that manual entry is not
 // reviewed") is a review queue, not a fourth population alongside
-// Instructors/Mentors/Ops -- anyone shown here is already counted in
-// exactly one of those three (and in Department), and STAYS counted there
-// regardless of what's picked in the Exit column: picking any value never
-// changes the headcount -- actually removing someone from the active list
-// is a deliberate separate step (the Manual Status control on the
-// instructor detail page). This tab lists everyone with an exit record
-// that hasn't been reviewed at all yet (the Exit column is still blank) --
-// picking ANY value there (Serving Notice Period, Exited, Absconded, or
-// Payroll Converted) clears them from this queue, same as Darwinbox's own
-// live exit record already showing "Revoked". See reports.ts's
-// exceptionRows comment for the full rule.
+// Instructors/Mentors/Ops -- anyone still matched to Darwin or TeachOS is
+// already counted in exactly one of those three (and in Department), and
+// STAYS counted there regardless of what's picked in the Exit column:
+// picking any value never changes the headcount -- actually removing
+// someone from the active list is a deliberate separate step (the Manual
+// Status control on the instructor detail page). This tab lists everyone
+// with an exit record that hasn't been reviewed at all yet (the Exit
+// column is still blank) -- picking ANY value there (Serving Notice
+// Period, Exited, Absconded, or Payroll Converted) clears them from this
+// queue, same as Darwinbox's own live exit record already showing
+// "Revoked". See reports.ts's exceptionRows comment for the full rule.
+//
+// 2026-10-05, per request ("for exception if the person is exited then
+// there details should be visible in the exception but not removed from
+// the exception table"): someone who genuinely exits for good eventually
+// drops out of Darwin's own active roster (and may never have had a
+// TeachOS record at all) -- at that point they ARE NOT counted in
+// Instructors/Mentors/Ops/Department anymore (that part of the rule above
+// no longer applies to them), but their row still shows up here, with
+// their exit details intact, until a Capability Manager actually reviews
+// them. This is deliberate: the whole point of this queue is that an
+// unresolved exit gets looked at, and a person quietly vanishing from
+// Darwin's feed is exactly the case most likely to get missed otherwise.
 const CATEGORY_TABS: { key: CategoryKey; label: string; icon: typeof UsersRound; description: string }[] = [
   { key: 'department', label: 'Instructor Department', icon: Building2, description: 'Instructors + Mentors + Operations team, combined.' },
   { key: 'instructors', label: 'Instructors', icon: UsersRound, description: 'Everyone counted toward the TeachOS instructor count.' },
   { key: 'mentors', label: 'Mentors', icon: GraduationCap, description: 'Darwin — Mentors department.' },
   { key: 'ops_team', label: 'Operations team', icon: Briefcase, description: 'Darwin — Delivery Support (Ops), filed under Operations rather than Instructor or Mentor.' },
-  { key: 'exception', label: 'Exception', icon: AlertTriangle, description: 'Instructors, Mentors, and Ops team members with an exit record that has not been reviewed yet. Everyone here still counts normally; use the Exit column to record what actually happened -- picking any value there removes them from this queue.' },
+  { key: 'exception', label: 'Exception', icon: AlertTriangle, description: 'Instructors, Mentors, and Ops team members with an exit record that has not been reviewed yet -- including anyone who has since fully exited (no longer matched to Darwin or TeachOS), who stays listed here with their exit details even though they no longer count toward the other categories. Use the Exit column to record what actually happened -- picking any value there removes them from this queue.' },
 ];
 
 function formatCount(value: number | undefined) {
@@ -802,7 +814,14 @@ function bifurcationLabel(classification: string | null): string {
 //     inconsistently spaced Darwin data -- hence the loose, substring
 //     match on both sides rather than an exact one, and "any floor" rather
 //     than 5th-floor-only, per request).
-//   - Intensive: Campus (institutes) includes "Intensive Offline DC".
+//   - Intensive: Campus (institutes) has ANY entry containing "intensive"
+//     (case-insensitive substring match, 2026-10-05, per request: "if the
+//     campus column value contains the value intensive then they are
+//     considered as intensive product") -- replaces the earlier exact-match
+//     list ("Intensive Offline DC", then "Intensive Offline Kukatpally"
+//     added the same day) so a new Intensive Offline center added to the
+//     live data in the future (a new city/location) is picked up
+//     automatically, without needing another code change each time.
 //   - Everyone else: NIAT, further split in two (2026-09-28, per request,
 //     same day) --
 //       - NIAT (Training): Campus (institutes) includes the literal
@@ -821,7 +840,7 @@ function productLabel(person: InstructorSummary): string {
   const designation = (person.designation ?? '').toLowerCase();
   const location = (person.work_location ?? '').toLowerCase();
   if (designation.includes('software developer') && location.includes('kapil kavuri hub')) return 'IIT X DSA';
-  if ((person.institutes ?? []).includes('Intensive Offline DC')) return 'Intensive';
+  if ((person.institutes ?? []).some((i) => i.toLowerCase().includes('intensive'))) return 'Intensive';
   if ((person.institutes ?? []).includes('Training Institute')) return 'NIAT (Training)';
   return 'NIAT (Deployed)';
 }
