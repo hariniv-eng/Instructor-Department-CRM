@@ -316,7 +316,37 @@ function computeDepartmentAndExceptionRows(allRows: InstructorRow[]) {
   // still requires the separate, deliberate Manual Status control on the
   // instructor detail page (see exitVerification's comment in the schema).
   const hasRevokedExitStatus = (r: InstructorRow) => (r.exitFlagStatus ?? "").trim().toLowerCase() === "revoked";
-  const exceptionRows = departmentRows.filter((r) => r.exitFlag && !hasRevokedExitStatus(r) && !r.exitVerification);
+  // Classifications that mean a row was never really part of the
+  // Instructor Department to begin with -- a genuinely different team,
+  // reviewed and filed elsewhere on purpose (see classificationOverrides.ts
+  // and classifyDepartment()'s iit_kharagpur_team branch). Deliberately
+  // does NOT include "excluded_ops_managers" (Ops team IS part of the
+  // department -- see opsTeamRows above) or "mentor" (Mentors IS part of
+  // the department too -- see mentors above).
+  const NOT_DEPARTMENT_CLASSIFICATIONS = new Set(["excluded_other_department", "excluded_non_department_team", "iit_kharagpur_team", "other_department_manual"]);
+  // Scoped to allRows instead of departmentRows (2026-10-05, per request:
+  // "for exception if the person is exited then there details should be
+  // visible in the exception but not removed from the exception table") --
+  // departmentRows is correctly scoped to CURRENT Darwin/TeachOS presence
+  // for headcount purposes, but that's exactly the problem for this queue:
+  // the moment someone with an unresolved exit record genuinely leaves (no
+  // longer in the next Darwin sync, and never in TeachOS either),
+  // reconcileDarwin()'s blanket inDarwin=false reset (reconcile.ts) drops
+  // them out of departmentRows on the very next sync -- so they silently
+  // vanished from this review queue before any Capability Manager ever got
+  // to review them, even though their own exit record is WHY exitFlag is
+  // set in the first place. allRows is never row-deleted (same "flag,
+  // don't subtract" guarantee used everywhere else in this app), so basing
+  // the queue on allRows instead keeps their row -- and exit_flag/
+  // exit_flag_status/exit_flag_date -- visible here for as long as it takes
+  // someone to actually review it. The NOT_DEPARTMENT_CLASSIFICATIONS
+  // exclusion above keeps this from pulling in people who were deliberately
+  // filed under a different team entirely and were never in departmentRows
+  // to begin with, exit record or not. Deliberately does NOT feed back into
+  // departmentRows itself -- that stays a pure, current-headcount view;
+  // only this queue (a worklist, not a count) now outlives a person's live
+  // Darwin/TeachOS match.
+  const exceptionRows = allRows.filter((r) => r.exitFlag && !hasRevokedExitStatus(r) && !r.exitVerification && !NOT_DEPARTMENT_CLASSIFICATIONS.has(r.classification ?? ""));
 
   return { mentors, opsTeamRows, darwinInstructorsForCount, payrollConvertedForCount, needsReviewForCount, countedInstructorRows, departmentRows, exceptionRows };
 }
@@ -508,7 +538,27 @@ router.get("/reports/instructors", async (_req, res) => {
   const buildAccessSplit = (list: InstructorRow[]) => ({
     darwin_only: toAccessBucket(list.filter((r) => r.inDarwin && !r.inTeachos)),
     both: toAccessBucket(list.filter((r) => r.inDarwin && r.inTeachos)),
-    teachos_only: toAccessBucket(list.filter((r) => !r.inDarwin && r.inTeachos)),
+    // "!r.inDarwin" alone, not "!r.inDarwin && r.inTeachos" -- the latter
+    // used to be a safe, equivalent way to write "remainder" (darwin_only
+    // plus both already cover every row where inDarwin is true, so the only
+    // rows left for this bucket have inDarwin false, and until 2026-10-05
+    // every list passed in here had an invariant guaranteeing inTeachos
+    // true whenever inDarwin was false). exceptionRows just broke that
+    // invariant on purpose (its own comment above): it can now contain a
+    // row where BOTH inDarwin and inTeachos are false (someone who's fully
+    // exited with no TeachOS record either). Written as "!r.inDarwin &&
+    // r.inTeachos" that row would match none of these three buckets and
+    // silently disappear from this split (and, since the Instructors tab's
+    // whole table for a category is built by merging exactly these three
+    // buckets -- see mergedPeople() in instructors.tsx -- from the
+    // Exception tab's table too), even while still being counted in
+    // exception_count below -- a count/table mismatch that reintroduces
+    // the exact "disappears without being reviewed" bug this change set
+    // out to fix. The other four lists passed through here (departmentRows/
+    // countedInstructorRows/mentors/opsTeamRows) still can't ever produce a
+    // both-false row, so dropping the "&& r.inTeachos" conjunct is a no-op
+    // for them.
+    teachos_only: toAccessBucket(list.filter((r) => !r.inDarwin)),
   });
   // departmentRows (the 4th "Instructor Department" Overview card --
   // Instructors + Mentors + Operations team together) and exceptionRows (the
