@@ -47,6 +47,7 @@ type ArchiveRow = {
   work_location: string | null;
   gender: string | null;
   enrolled_plans: string | null;
+  is_payroll: boolean;
   exit_date: string | null;
   exit_status: string | null;
   status: 'Active' | 'Exited';
@@ -81,6 +82,12 @@ function bifurcationLabel(classification: string | null): string {
   if (classification === 'mentor') return 'Mentor';
   if (classification === 'excluded_ops_managers') return 'Delivery Support';
   return 'Instructor';
+}
+
+function PayrollBadge({ isPayroll }: { isPayroll: boolean }) {
+  return isPayroll
+    ? <span className="inline-flex rounded-full bg-[#e6e9fb] px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] text-[#4a4fb0]">Payroll</span>
+    : <span className="inline-flex rounded-full bg-secondary px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] text-muted-foreground">Nxtwave</span>;
 }
 
 function StatusBadge({ status }: { status: ArchiveRow['status'] }) {
@@ -184,6 +191,7 @@ export default function InstructorArchivePage() {
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Employee ID</th>
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Designation</th>
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Bifurcation</th>
+                <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Payroll</th>
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Subject</th>
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Department</th>
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Campus</th>
@@ -201,6 +209,7 @@ export default function InstructorArchivePage() {
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[11px] text-muted-foreground">{row.employee_id || '—'}</td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-muted-foreground">{row.designation || '—'}</td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-muted-foreground">{bifurcationLabel(row.classification)}</td>
+                <td className="whitespace-nowrap border-r border-border px-4 py-3"><PayrollBadge isPayroll={row.is_payroll} /></td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-muted-foreground">{row.dept_area || '—'}</td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-muted-foreground">{row.department || '—'}</td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-muted-foreground">{row.institutes.length > 0 ? row.institutes.join(', ') : '—'}</td>
