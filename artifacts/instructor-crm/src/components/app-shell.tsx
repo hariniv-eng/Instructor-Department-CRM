@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Bell, Building2, ChevronRight, Clock, Database, Eye, FileSearch, GitBranch, GraduationCap, LayoutDashboard, Layers, LogIn, LogOut, Menu, UploadCloud, UsersRound, X } from 'lucide-react';
+import { Archive, Bell, Building2, ChevronRight, Clock, Database, Eye, FileSearch, GitBranch, GraduationCap, LayoutDashboard, Layers, LogIn, LogOut, Menu, UploadCloud, UsersRound, X } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { useAuth, ROLE_LABELS } from '@/hooks/use-auth';
 import type { AppUser } from '@workspace/api-client-react';
@@ -14,6 +14,7 @@ const ALL_NAV_ITEMS = [
   { href: '/contribution', label: 'Contribution', icon: Clock },
   { href: '/uploads', label: 'Source uploads', icon: UploadCloud },
   { href: '/darwin-exit-details', label: 'Darwin Exit Details', icon: FileSearch },
+  { href: '/instructor-archive', label: 'Instructor Archive', icon: Archive },
 ];
 
 // "manager" only sees the Overview + Instructors headcount view — Darwin/
@@ -112,7 +113,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Menu size={18} />
             </button>
             <div className="hidden items-center gap-2 text-[12px] text-muted-foreground sm:flex">
-              <span>Instructor Department</span><ChevronRight size={13} /><span className="font-semibold text-foreground">{location === '/' ? 'Overview' : location.startsWith('/uploads') ? 'Source uploads' : location.startsWith('/teachos-breakdown') ? 'TeachOS Breakdown' : location.startsWith('/darwin-exit-details') ? 'Darwin Exit Details' : location.startsWith('/darwin-full-roster') ? 'Darwin Full Roster' : location.startsWith('/darwin-breakdown') ? 'Darwin Breakdown' : location.startsWith('/training-stats') ? 'Training Stats' : location.startsWith('/contribution') ? 'Contribution' : 'Instructors'}</span>
+              <span>Instructor Department</span><ChevronRight size={13} /><span className="font-semibold text-foreground">{location === '/' ? 'Overview' : location.startsWith('/uploads') ? 'Source uploads' : location.startsWith('/teachos-breakdown') ? 'TeachOS Breakdown' : location.startsWith('/darwin-exit-details') ? 'Darwin Exit Details' : location.startsWith('/darwin-full-roster') ? 'Darwin Full Roster' : location.startsWith('/darwin-breakdown') ? 'Darwin Breakdown' : location.startsWith('/training-stats') ? 'Training Stats' : location.startsWith('/contribution') ? 'Contribution' : location.startsWith('/instructor-archive') ? 'Instructor Archive' : 'Instructors'}</span>
             </div>
             <span className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-muted-foreground sm:hidden">ID / OPS</span>
           </div>

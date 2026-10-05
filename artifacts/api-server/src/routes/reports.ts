@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, instructorsTable, darwinboxFullRosterTable, darwinboxExitsTable, instructorTrainingStatusTable, instructorContributionTable } from "@workspace/db";
+import { db, instructorsTable, instructorArchiveTable, darwinboxFullRosterTable, darwinboxExitsTable, instructorTrainingStatusTable, instructorContributionTable } from "@workspace/db";
 import { requireAuth, requireRole } from "../middlewares/auth";
 import { cell } from "../lib/reconcile";
 import { TRAINING_COURSE_TAXONOMY } from "../data/trainingCourseTaxonomy";
@@ -8,6 +8,68 @@ import { TECH_AREAS } from "../lib/departmentTaxonomy";
 const router: IRouter = Router();
 
 type InstructorRow = typeof instructorsTable.$inferSelect;
+type ArchiveRow = typeof instructorArchiveTable.$inferSelect;
+
+// Per-person shape for GET /reports/instructor-archive below -- the
+// Instructor Archive tab (2026-10-05, made visible per request: "we will
+// create a data base of all the instructor department data ... new record
+// added to the darwin data ... should be added ... exit record created ...
+// should not remove there data but instead add there exit date"). This
+// data already existed before that request -- instructorArchiveTable,
+// populated by archiveInstructors() (lib/archiveInstructors.ts) at the end
+// of every recomputeStatuses() run, originally built 2026-09-28 for a
+// related but different request (payroll-converted instructors losing
+// their Darwin data). Nothing had ever read it back out until this route.
+const toApiArchiveSummary = (row: ArchiveRow) => {
+  // Exit date prefers exitFlagDate -- the Darwinbox-exit-record-driven
+  // field, auto-synced by recomputeStatuses() AND auto-CLEARED back to
+  // null the moment that record's most recent status is Revoked or
+  // Rejected (see loadLatestExitsByPerson() in reconcile.ts: a winning
+  // Revoked/Rejected record is filtered out of byEmployeeId entirely, so
+  // findExit() returns undefined and exitFlag/exitFlagStatus/exitFlagDate
+  // all go back to false/null/null) -- over the separate manually-set
+  // exitDate (the Manual Status control's own field, which never
+  // auto-clears once set, unlike exitFlagDate). exitFlag/exitFlagStatus/
+  // exitFlagDate are LIVE-STATUS fields in archiveInstructors() (always
+  // overwritten verbatim, null included), so a Revoked resignation
+  // correctly clears the exit date on THIS SAME archive row -- no new row
+  // is ever created for it, exactly per request: "if that is status is
+  // revoke no need to create another column, just remove the exit date".
+  // A later genuine rehire naturally gets a new row instead, the ordinary
+  // way archiveInstructors() creates one for anyone it's never matched
+  // before -- per request, Darwinbox always issues a new employee_id for a
+  // rehire, so the new live instructorsTable row never matches this old
+  // archived one by employee_id (teachos_user_id/name fallback matching in
+  // findArchiveMatch() could in principle still catch it, but that's the
+  // same fallback every other archived person already relies on).
+  const exitDate = row.exitFlagDate ?? row.exitDate ?? null;
+  return {
+    id: row.id,
+    employee_id: row.employeeId,
+    teachos_user_id: row.teachosUserId,
+    full_name: row.fullName,
+    designation: row.designation || row.exitDesignation || null,
+    department: row.department || row.exitDepartment || null,
+    dept_area: row.deptArea || row.manualDeptArea || null,
+    classification: row.classification,
+    institutes: row.institutes,
+    capability_manager: row.teachosManager || row.manualCapabilityManager || null,
+    darwin_manager: row.directManager || null,
+    date_of_joining: row.dateOfJoining,
+    org_email: row.orgEmail,
+    // workspace, not workLocation -- same Darwin source column the live
+    // Instructors tab's own work_location field uses (toApiInstructorSummary
+    // below), per its 2026-09-17 correction.
+    work_location: row.workspace,
+    gender: row.gender || row.exitGender || row.manualGender || null,
+    enrolled_plans: row.enrolledPlans,
+    exit_date: exitDate,
+    exit_status: row.exitFlagStatus,
+    status: exitDate ? "Exited" : "Active",
+    first_seen_at: row.firstSeenAt,
+    last_synced_at: row.lastSyncedAt,
+  };
+};
 
 const toApiPerson = (row: InstructorRow) => ({
   id: row.id,
@@ -1064,6 +1126,45 @@ router.get("/reports/instructor-contribution", requireAuth, requireRole("admin")
     count: rows.length,
     rows,
     synced_at: contributionRows[0]?.syncedAt ?? null,
+  });
+});
+
+// Instructor Archive (2026-10-05, made visible per request -- see
+// toApiArchiveSummary's comment above for the full backstory). Scoped to
+// the same Instructor Department population computeDepartmentAndExceptionRows()
+// uses for the live Instructors tab (Instructors + Mentors + Ops
+// team), applied here against the archive table's own mirrored
+// inDarwin/inDarwinFullRoster/inTeachos/classification/deptBucket columns
+// instead of the live instructorsTable's -- intentionally a SEPARATE copy
+// of that filter rather than a shared helper, since the two run against
+// different tables with different column types ($inferSelect differs
+// between instructorsTable and instructorArchiveTable even though the
+// column names line up). Admin-only, same gating as Darwin Exit Details
+// and Contribution -- this surfaces exit history, not just a live roster.
+router.get("/reports/instructor-archive", requireAuth, requireRole("admin"), async (_req, res) => {
+  const allRows = await db.select().from(instructorArchiveTable);
+
+  const darwinInstructors = allRows.filter((r) => r.inDarwin && !r.inDarwinFullRoster && !r.classification && (r.deptBucket === "tech" || r.deptBucket === "non_tech"));
+  const teachosOnly = allRows.filter((r) => r.inTeachos && !r.inDarwin);
+  const payrollConverted = teachosOnly.filter((r) => r.classification === "payroll_converted");
+  const needsReview = teachosOnly.filter((r) =>
+    r.classification !== "excluded_other_department"
+    && r.classification !== "excluded_non_department_team"
+    && r.classification !== "iit_kharagpur_team"
+    && r.classification !== "payroll_converted"
+  );
+  const mentors = allRows.filter((r) => r.inDarwin && !r.inDarwinFullRoster && r.classification === "mentor");
+  const opsTeamRows = allRows.filter((r) => r.classification === "excluded_ops_managers");
+
+  const departmentRows = [...darwinInstructors, ...payrollConverted, ...needsReview, ...mentors, ...opsTeamRows];
+
+  const people = departmentRows.map(toApiArchiveSummary).sort((a, b) => a.full_name.localeCompare(b.full_name));
+
+  res.json({
+    people,
+    total: people.length,
+    active_count: people.filter((p) => !p.exit_date).length,
+    exited_count: people.filter((p) => !!p.exit_date).length,
   });
 });
 
