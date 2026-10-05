@@ -63,6 +63,15 @@ const toApiArchiveSummary = (row: ArchiveRow) => {
     work_location: row.workspace,
     gender: row.gender || row.exitGender || row.manualGender || null,
     enrolled_plans: row.enrolledPlans,
+    // Whether this person was a payroll-converted instructor (never had a
+    // Darwin record of their own -- active in TeachOS only) rather than a
+    // regular Nxtwave-payroll Darwin instructor -- same classification
+    // check the live Instructors tab's own is_payroll uses
+    // (toApiInstructorSummary above). Added 2026-10-05, per request:
+    // "check for exit if they are payroll or not" -- lets the Archive
+    // table show, for an exited person, which payroll bucket they left
+    // from.
+    is_payroll: row.classification === "payroll_converted",
     exit_date: exitDate,
     exit_status: row.exitFlagStatus,
     status: exitDate ? "Exited" : "Active",
