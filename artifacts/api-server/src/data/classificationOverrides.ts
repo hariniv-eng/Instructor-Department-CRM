@@ -87,3 +87,37 @@ export interface OtherDepartmentOverride {
 // bucket on its own once nothing overrides it first. Left in place (empty)
 // for the next person who needs the "other department" treatment.
 export const OTHER_DEPARTMENT_EMPLOYEES: OtherDepartmentOverride[] = [];
+
+export interface ConfirmedInstructorOverride {
+  teachosUserId?: string;
+  employeeId?: string;
+  fullName: string;
+  reason: string;
+  decidedDate: string;
+}
+
+// Individually reviewed, the mirror-image case of EXCLUDED_EMPLOYEES above:
+// people whose ONLY Darwin match came through the full-roster fallback pass
+// (reconcileDarwinFullRosterFallback() in ../lib/reconcile.ts sets
+// inDarwinFullRoster=true for them) -- which normally means they're
+// deliberately NOT auto-counted as an ordinary Instructor or Mentor (see
+// isDarwinInstructor/isMentor in routes/reports.ts), since that broad
+// ~3000+ person company roster is noisy and is exactly how this app first
+// caught people like Chandil Gauthami above, who isn't really an instructor
+// at all despite a department name containing "Instructor". This list is
+// for the opposite case: a human has confirmed the person genuinely IS an
+// instructor, even though their current Darwin department string (often an
+// org-structure naming scheme the primary Instructors-department sync
+// doesn't cover yet, e.g. a "NIAT_"-prefixed department) kept them out of
+// that primary sync. Checked directly in routes/reports.ts's
+// darwinInstructorsForCount, bypassing just the inDarwinFullRoster gate for
+// these specific people -- every other classification check still has to
+// hold (classification null, deptBucket tech/non_tech). Expected to
+// self-resolve: once Darwin's own department field for this person is
+// corrected at the source, they'll start matching the primary sync
+// directly (inDarwinFullRoster flips back to false on the next sync) and
+// this entry becomes a harmless no-op -- safe to leave in place rather than
+// needing to remember to remove it later.
+export const CONFIRMED_INSTRUCTOR_DESPITE_FULL_ROSTER: ConfirmedInstructorOverride[] = [
+  { employeeId: "NW0005068", teachosUserId: "d6ea02b2433d498db44d2f0202f808c5", fullName: "Saumya Sunil Patil", reason: "Active TeachOS instructor (role INSTRUCTOR, category TECH); Darwin full-roster match shows a genuine Instructor designation (\"Software Development Instructor\") under a department using the newer \"NIAT_\" naming scheme the primary Instructors-department sync doesn't currently cover -- confirmed as a real instructor, 2026-10-05, per request (\"add her in the instructor department as an instructor\"; her department is expected to be corrected at the source later, at which point the primary sync will pick her up on its own and this override stops being needed).", decidedDate: "2026-10-05" },
+];
