@@ -364,7 +364,6 @@ function computeDepartmentAndExceptionRows(allRows: InstructorRow[]) {
   // actual counted category -- moving someone off the active headcount
   // still requires the separate, deliberate Manual Status control on the
   // instructor detail page (see exitVerification's comment in the schema).
-  const hasRevokedExitStatus = (r: InstructorRow) => (r.exitFlagStatus ?? "").trim().toLowerCase() === "revoked";
   // NOT_DEPARTMENT_CLASSIFICATIONS is now a module-level constant (see its
   // own comment above) -- shared with the Instructor Archive route's fix
   // below.
@@ -390,7 +389,25 @@ function computeDepartmentAndExceptionRows(allRows: InstructorRow[]) {
   // departmentRows itself -- that stays a pure, current-headcount view;
   // only this queue (a worklist, not a count) now outlives a person's live
   // Darwin/TeachOS match.
-  const exceptionRows = allRows.filter((r) => r.exitFlag && !hasRevokedExitStatus(r) && !r.exitVerification && !NOT_DEPARTMENT_CLASSIFICATIONS.has(r.classification ?? ""));
+  // Exception rule, restated 2026-10-06 (per request: "if their records are
+  // active in Darwin or TeachOS and they have a record in exit with status
+  // Approved or Pending For Approval, they should be visible in exception;
+  // if reviewed and marked payroll, remove from exception; if not reviewed,
+  // keep visible; if it is a serving-notice-period exit, keep visible until
+  // their data is removed from both TeachOS and Darwin"). So a row is in the
+  // queue when ALL of these hold:
+  //   1. still present in Darwin OR TeachOS (once both are gone it leaves the
+  //      queue and lives on only in the Instructor Archive);
+  //   2. its exit record (employee-ID match, latest record wins) is Approved
+  //      or Pending With Approver -- Revoked/Rejected never qualify;
+  //   3. not resolved as Payroll Converted on the review dropdown. Not
+  //      reviewed, Serving Notice Period, Exited and Absconded all stay
+  //      visible while the person is still in Darwin or TeachOS (this
+  //      supersedes the 2026-09-29 "any review clears the queue" rule);
+  //   4. not filed under a different team.
+  const exitStatusLower = (r: InstructorRow) => (r.exitFlagStatus ?? "").trim().toLowerCase();
+  const hasQueueExitStatus = (r: InstructorRow) => exitStatusLower(r) === "approved" || exitStatusLower(r).startsWith("pending");
+  const exceptionRows = allRows.filter((r) => r.exitFlag && (r.inDarwin || r.inTeachos) && hasQueueExitStatus(r) && r.exitVerification !== "payroll_converted" && !NOT_DEPARTMENT_CLASSIFICATIONS.has(r.classification ?? ""));
 
   return { mentors, opsTeamRows, darwinInstructorsForCount, payrollConvertedForCount, needsReviewForCount, countedInstructorRows, departmentRows, exceptionRows };
 }
