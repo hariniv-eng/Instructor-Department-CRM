@@ -77,9 +77,12 @@ export default function DashboardPage() {
   const reviewPeople = useMemo(() => [...(exceptionSplit?.darwin_only?.people ?? []), ...(exceptionSplit?.both?.people ?? []), ...(exceptionSplit?.teachos_only?.people ?? [])]
     .filter((p) => !p.exit_verification)
     .sort((a, b) => a.full_name.localeCompare(b.full_name)), [exceptionSplit]);
-  const removePeople = useMemo(() => [...(exceptionSplit?.both?.people ?? []), ...(exceptionSplit?.teachos_only?.people ?? [])]
-    .filter((p) => (p.exit_verification === 'exited' || p.exit_verification === 'absconded') && p.classification !== 'excluded_ops_managers')
-    .sort((a, b) => a.full_name.localeCompare(b.full_name)), [exceptionSplit]);
+  // Exception 2 comes from its own backend list (access_breakdown.exception_remove)
+  // because the Instructors tab's Exception view no longer contains people
+  // reviewed as Exited/Absconded -- see exceptionRemoveRows in reports.ts.
+  const removeSplit = (report?.access_breakdown as Record<string, AccessSplit | undefined> | undefined)?.exception_remove;
+  const removePeople = useMemo(() => [...(removeSplit?.both?.people ?? []), ...(removeSplit?.teachos_only?.people ?? [])]
+    .sort((a, b) => a.full_name.localeCompare(b.full_name)), [removeSplit]);
   const toggleAccessCard = (card: AccessCardKey) => {
     if (activeAccessCard === card) {
       setActiveAccessCard(null);

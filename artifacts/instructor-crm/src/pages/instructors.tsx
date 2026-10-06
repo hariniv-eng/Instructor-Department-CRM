@@ -73,7 +73,7 @@ const CATEGORY_TABS: { key: CategoryKey; label: string; icon: typeof UsersRound;
   { key: 'mentors', label: 'Mentors', icon: GraduationCap, description: 'Darwin — Mentors department.' },
   { key: 'instructors_mentors', label: 'Instructors + Mentors', icon: Users, description: 'Instructors and Mentors combined, without the Operations team.' },
   { key: 'ops_team', label: 'Operations team', icon: Briefcase, description: 'Darwin — Delivery Support (Ops), filed under Operations rather than Instructor or Mentor.' },
-  { key: 'exception', label: 'Exception', icon: AlertTriangle, description: 'People still in Darwin or TeachOS whose Darwinbox exit record is Approved or Pending With Approver. They stay here until a Capability Manager marks them Payroll Converted, or until they are gone from both Darwin and TeachOS (they then live on in the Instructor Archive).' },
+  { key: 'exception', label: 'Exception', icon: AlertTriangle, description: 'People still in Darwin or TeachOS with an Approved or Pending With Approver exit record that has not been reviewed yet, plus anyone reviewed as Serving Notice Period. Use the Exit column to record what happened -- marking someone Exited or Absconded moves them to the Overview tab (Exception 2) to be removed from TeachOS; Payroll Converted removes them from the queue.' },
 ];
 
 function formatCount(value: number | undefined) {
@@ -546,7 +546,6 @@ export default function InstructorsPage() {
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-4 border-t border-border/70 pt-3">
-        <div className="relative w-full sm:w-[300px]"><Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" /><input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search name, employee ID, or TeachOS user ID..." data-testid="input-search-instructors" className="h-10 w-full rounded-lg border border-border bg-background pl-9 pr-3 text-[12px] outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-primary focus:ring-2 focus:ring-ring/25" /></div>
         <MultiSelectFilter
           label="Gender"
           options={GENDER_FILTERS.map((filter) => ({ key: filter.key, label: filter.label, count: genderCounts[filter.key] }))}
@@ -571,6 +570,7 @@ export default function InstructorsPage() {
           <X size={13} /> Clear filters
         </button>}
         {anyFilterActive && <span className="font-mono-ui text-[10px] text-muted-foreground">Table below is filtered to {activeTab.label.toLowerCase()}; see the breakdown card(s) below for every category.</span>}
+        <div className="relative w-full sm:ml-auto sm:w-[300px]"><Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" /><input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search name, employee ID, or TeachOS user ID..." data-testid="input-search-instructors" className="h-10 w-full rounded-lg border border-border bg-background pl-9 pr-3 text-[12px] outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-primary focus:ring-2 focus:ring-ring/25" /></div>
       </div>
     </div>
 
