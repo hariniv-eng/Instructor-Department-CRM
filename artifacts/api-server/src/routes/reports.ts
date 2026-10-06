@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { db, instructorsTable, instructorArchiveTable, darwinboxFullRosterTable, darwinboxExitsTable, instructorTrainingStatusTable, instructorContributionTable } from "@workspace/db";
 import { requireAuth, requireRole } from "../middlewares/auth";
 import { cell, normalize } from "../lib/reconcile";
+import { archiveInstructors } from "../lib/archiveInstructors";
 import { TRAINING_COURSE_TAXONOMY } from "../data/trainingCourseTaxonomy";
 import { TECH_AREAS } from "../lib/departmentTaxonomy";
 import { CONFIRMED_INSTRUCTOR_DESPITE_FULL_ROSTER } from "../data/classificationOverrides";
@@ -1231,7 +1232,16 @@ router.get("/reports/instructor-contribution", requireAuth, requireRole("admin")
 // column names line up). Admin-only, same gating as Darwin Exit Details
 // and Contribution -- this surfaces exit history, not just a live roster.
 router.get("/reports/instructor-archive", requireAuth, requireRole("admin"), async (_req, res) => {
-  const allRows = await db.select().from(instructorArchiveTable);
+  let allRows = await db.select().from(instructorArchiveTable);
+  // Self-healing baseline (2026-10-06): if no row has the inArchiveScope
+  // marker yet (first load after the column was added, or a startup seed
+  // that failed before the column existed), take the baseline right now
+  // instead of showing an empty page until the next sync -- see
+  // archiveInstructors() and seedArchiveScopeIfEmpty() in lib/scheduler.ts.
+  if (!allRows.some((r) => r.inArchiveScope)) {
+    await archiveInstructors();
+    allRows = await db.select().from(instructorArchiveTable);
+  }
 
   // Scope = rows flagged inArchiveScope (2026-10-06, per request: "today
   // ~695 instructors are the baseline... new joiners get added, leavers
