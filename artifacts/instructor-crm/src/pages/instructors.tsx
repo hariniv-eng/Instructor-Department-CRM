@@ -80,9 +80,20 @@ function formatCount(value: number | undefined) {
   return typeof value === 'number' ? value.toLocaleString('en-IN') : '—';
 }
 
-function mergedPeople(split: AccessSplit | undefined): InstructorSummary[] {
+// Access column (2026-10-06, per request: "for every tab we have both / only
+// Darwin / only TeachOS ... get it into the Instructors tab in a column
+// format"): which system(s) hold this person's record -- the same three
+// buckets the Overview cards break down by. Each person comes out of the
+// report already placed in exactly one bucket (see reports.ts's
+// buildAccessSplit), so it is tagged here rather than re-derived.
+type AccessKind = 'both' | 'darwin_only' | 'teachos_only';
+type PersonWithAccess = InstructorSummary & { access: AccessKind };
+const ACCESS_LABELS: Record<AccessKind, string> = { both: 'Both', darwin_only: 'Only Darwin', teachos_only: 'Only TeachOS' };
+
+function mergedPeople(split: AccessSplit | undefined): PersonWithAccess[] {
   if (!split) return [];
-  const merged = [...(split.darwin_only?.people ?? []), ...(split.both?.people ?? []), ...(split.teachos_only?.people ?? [])];
+  const tag = (list: InstructorSummary[] | undefined, access: AccessKind): PersonWithAccess[] => (list ?? []).map((person) => ({ ...person, access }));
+  const merged = [...tag(split.darwin_only?.people, 'darwin_only'), ...tag(split.both?.people, 'both'), ...tag(split.teachos_only?.people, 'teachos_only')];
   return merged.sort((a, b) => a.full_name.localeCompare(b.full_name));
 }
 
@@ -788,14 +799,14 @@ function gridColsClass(category: CategoryKey): string {
   // mixed into Department/Exception just reads "Nxtwave" in this column,
   // same as any non-payroll instructor. Never wrong, just not usually the
   // interesting value there.
-  if (category === 'instructors' || category === 'mentors' || category === 'instructors_mentors' || category === 'department' || category === 'exception') return 'grid-cols-[260px_190px_130px_280px_220px_150px_160px_170px_220px_140px_190px_190px_160px_130px_150px_190px_170px_140px_170px]';
+  if (category === 'instructors' || category === 'mentors' || category === 'instructors_mentors' || category === 'department' || category === 'exception') return 'grid-cols-[260px_190px_130px_280px_220px_150px_160px_170px_220px_140px_190px_190px_160px_130px_130px_150px_190px_170px_140px_170px]';
   // Operations team keeps its own shape (2026-09-21: not part of the above
   // request) -- no Campus column (ops rows aren't deployed to a teaching
   // campus the way instructors and mentors are), a single Department
   // column instead of Subject+Department, and no Payroll either (same
   // reason it's never meaningful for Mentors: payroll_converted can't be
   // assigned to an ops row).
-  return 'grid-cols-[260px_190px_130px_280px_220px_150px_280px_140px_190px_190px_160px_150px_190px_170px_140px_170px]';
+  return 'grid-cols-[260px_190px_130px_280px_220px_150px_280px_140px_190px_190px_160px_130px_150px_190px_170px_140px_170px]';
 }
 
 // Manager (Darwin) (2026-09-22, per request: "in the overview table we have
@@ -903,7 +914,7 @@ function nameColumnLabel(category: CategoryKey): string {
 
 // Column set mirrors gridColsClass/CategoryTable below exactly, so the CSV
 // always matches what's on screen for the active category tab.
-function downloadInstructorsCsv(category: CategoryKey, people: InstructorSummary[]) {
+function downloadInstructorsCsv(category: CategoryKey, people: PersonWithAccess[]) {
   const headers = [nameColumnLabel(category), 'Designation', 'Employee ID', 'TeachOS User ID', 'Email', 'Location (Darwin)'];
   if (category === 'ops_team') headers.push('Department'); else headers.push('Subject', 'Department');
   if (category !== 'ops_team') headers.push('Campus');
@@ -911,6 +922,7 @@ function downloadInstructorsCsv(category: CategoryKey, people: InstructorSummary
   headers.push('Capability Manager');
   headers.push('Manager (Darwin)');
   headers.push('Bifurcation');
+  headers.push('Access');
   if (category !== 'ops_team') headers.push('Payroll');
   headers.push('Gender');
   headers.push('Employee Status');
@@ -926,6 +938,7 @@ function downloadInstructorsCsv(category: CategoryKey, people: InstructorSummary
     row.push(person.capability_manager ?? '');
     row.push(person.darwin_manager ?? '');
     row.push(bifurcationLabel(person.classification));
+    row.push(ACCESS_LABELS[person.access]);
     if (category !== 'ops_team') row.push(person.is_payroll ? 'Payroll' : 'Nxtwave');
     row.push(person.gender ?? '');
     // Blank when there's no exit record at all; "Not reviewed" when one
@@ -941,7 +954,7 @@ function downloadInstructorsCsv(category: CategoryKey, people: InstructorSummary
   downloadCsv(`${slugify(category)}.csv`, toCsv(headers, rows));
 }
 
-function CategoryTable({ category, people, backQuery }: { category: CategoryKey; people: InstructorSummary[]; backQuery: string }) {
+function CategoryTable({ category, people, backQuery }: { category: CategoryKey; people: PersonWithAccess[]; backQuery: string }) {
   const columns = gridColsClass(category);
   const pager = usePagedRows(people, 50);
   return <div className="overflow-hidden rounded-xl border border-border bg-card shadow-xs">
@@ -960,6 +973,7 @@ function CategoryTable({ category, people, backQuery }: { category: CategoryKey;
           <span>Capability Manager</span>
           <span>Manager (Darwin)</span>
           <span>Bifurcation</span>
+          <span>Access</span>
           {category !== 'ops_team' && <span>Payroll</span>}
           <span>Gender</span>
           <span>Employee Status</span>
@@ -983,7 +997,17 @@ function CategoryTable({ category, people, backQuery }: { category: CategoryKey;
   </div>;
 }
 
-function PersonRow({ category, person, columns, backQuery }: { category: CategoryKey; person: InstructorSummary; columns: string; backQuery: string }) {
+const ACCESS_PILL_CLASSES: Record<AccessKind, string> = {
+  both: 'bg-[#dff0eb] text-[#256e65]',
+  darwin_only: 'bg-[#e1eaf1] text-primary',
+  teachos_only: 'bg-[#f6e4de] text-[#9b4434]',
+};
+
+function AccessCell({ access }: { access: AccessKind }) {
+  return <div><span data-testid={`access-${access}`} className={`inline-flex rounded-full px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] ${ACCESS_PILL_CLASSES[access]}`}>{ACCESS_LABELS[access]}</span></div>;
+}
+
+function PersonRow({ category, person, columns, backQuery }: { category: CategoryKey; person: PersonWithAccess; columns: string; backQuery: string }) {
   const campus = person.institutes && person.institutes.length > 0 ? person.institutes.join(', ') : '—';
   // Carries the Instructors tab's current filters/search/category forward
   // to this profile page (2026-09-28, per request) so its back link can
@@ -1016,6 +1040,7 @@ function PersonRow({ category, person, columns, backQuery }: { category: Categor
     <CapabilityManagerCell person={person} />
     <div className="truncate text-[12px] text-muted-foreground">{person.darwin_manager || '—'}</div>
     <BifurcationCell person={person} />
+    <AccessCell access={person.access} />
     {category !== 'ops_team' && <div>{person.is_payroll ? <span className="inline-flex rounded-full bg-[#e6e9fb] px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] text-[#4a4fb0]">Payroll</span> : <span className="inline-flex rounded-full bg-secondary px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] text-muted-foreground">Nxtwave</span>}</div>}
     <GenderCell person={person} />
     <ExitCell person={person} />
