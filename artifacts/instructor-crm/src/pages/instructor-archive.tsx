@@ -191,13 +191,13 @@ export default function InstructorArchivePage() {
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Employee ID</th>
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Designation</th>
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Bifurcation</th>
-                <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Payroll</th>
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Subject</th>
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Department</th>
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Campus</th>
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Capability Manager</th>
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Manager (Darwin)</th>
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Date of joining</th>
+                <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Payroll</th>
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Status</th>
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Exit Date</th>
                 <th className="whitespace-nowrap px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Exit Status (Darwin)</th>
@@ -209,13 +209,13 @@ export default function InstructorArchivePage() {
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[11px] text-muted-foreground">{row.employee_id || '—'}</td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-muted-foreground">{row.designation || '—'}</td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-muted-foreground">{bifurcationLabel(row.classification)}</td>
-                <td className="whitespace-nowrap border-r border-border px-4 py-3"><PayrollBadge isPayroll={row.is_payroll} /></td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-muted-foreground">{row.dept_area || '—'}</td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-muted-foreground">{row.department || '—'}</td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-muted-foreground">{row.institutes.length > 0 ? row.institutes.join(', ') : '—'}</td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-muted-foreground">{row.capability_manager || '—'}</td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-muted-foreground">{row.darwin_manager || '—'}</td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[11px] text-muted-foreground">{formatDate(row.date_of_joining)}</td>
+                <td className="whitespace-nowrap border-r border-border px-4 py-3"><PayrollBadge isPayroll={row.is_payroll} /></td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3"><StatusBadge status={row.status} /></td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[11px] text-muted-foreground">{formatDate(row.exit_date)}</td>
                 <td className="whitespace-nowrap px-4 py-3 text-[12px] text-muted-foreground">{row.exit_status || '—'}</td>
