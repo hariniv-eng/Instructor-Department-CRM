@@ -1,4 +1,5 @@
-import { Briefcase, Building2, GraduationCap, RefreshCw, UsersRound, X } from 'lucide-react';
+import { AlertTriangle, Briefcase, Building2, Check, Copy, ExternalLink, GraduationCap, RefreshCw, Trash2, UsersRound, X } from 'lucide-react';
+import { Link } from 'wouter';
 import { useMemo, useState } from 'react';
 import { useGetReportsInstructors, getGetReportsInstructorsQueryKey, type AccessSplit, type InstructorSummary } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -58,6 +59,27 @@ export default function DashboardPage() {
   const report = reportQuery.data;
   const [activeAccessCard, setActiveAccessCard] = useState<AccessCardKey | null>(null);
   const [activeAccessTab, setActiveAccessTab] = useState<AccessTabKey>('both');
+  // Exceptions on the Overview (2026-10-06, per request) -- two read-only
+  // views of the same queue the Instructors tab's "Exception" tab shows
+  // (access_breakdown.exception; see reports.ts's exceptionRows):
+  //   Exception 1 ("review"): in the queue and NOT yet reviewed
+  //     (exit_verification empty) -- tells Capability Managers there is
+  //     something to act on; the acting itself still happens in the
+  //     Instructors tab, not here.
+  //   Exception 2 ("remove"): Instructors/Mentors a Capability Manager has
+  //     marked Exited or Absconded who are STILL in TeachOS (both or
+  //     teachos_only bucket) -- the list someone works through to remove
+  //     them from TeachOS. A person leaves it by itself once they are gone
+  //     from TeachOS, since the queue only holds people still present in
+  //     Darwin or TeachOS and this view additionally needs TeachOS presence.
+  const [activeException, setActiveException] = useState<'review' | 'remove' | null>(null);
+  const exceptionSplit = report?.access_breakdown?.exception;
+  const reviewPeople = useMemo(() => [...(exceptionSplit?.darwin_only?.people ?? []), ...(exceptionSplit?.both?.people ?? []), ...(exceptionSplit?.teachos_only?.people ?? [])]
+    .filter((p) => !p.exit_verification)
+    .sort((a, b) => a.full_name.localeCompare(b.full_name)), [exceptionSplit]);
+  const removePeople = useMemo(() => [...(exceptionSplit?.both?.people ?? []), ...(exceptionSplit?.teachos_only?.people ?? [])]
+    .filter((p) => (p.exit_verification === 'exited' || p.exit_verification === 'absconded') && p.classification !== 'excluded_ops_managers')
+    .sort((a, b) => a.full_name.localeCompare(b.full_name)), [exceptionSplit]);
   const toggleAccessCard = (card: AccessCardKey) => {
     if (activeAccessCard === card) {
       setActiveAccessCard(null);
@@ -83,6 +105,14 @@ export default function DashboardPage() {
       <KpiCard label="Mentors" value={formatKpi(report.kpis.mentors_count)} meta="Darwin — Mentors department" icon={<GraduationCap size={17} />} tone="teal" breakdown={report.access_breakdown?.mentors} active={activeAccessCard === 'mentors'} onClick={() => toggleAccessCard('mentors')} />
       <KpiCard label="Operations team" value={formatKpi(report.kpis.ops_team_count)} meta="Darwin — Delivery Support (Ops)" icon={<Briefcase size={17} />} tone="coral" breakdown={report.access_breakdown?.ops_team} active={activeAccessCard === 'ops_team'} onClick={() => toggleAccessCard('ops_team')} />
     </section>}
+
+    {report && <section className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 animate-rise" aria-label="Exceptions">
+      <KpiCard label="Exception 1 — Needs review" value={formatKpi(reviewPeople.length)} meta="Exit record, not reviewed yet" icon={<AlertTriangle size={17} />} tone="saffron" active={activeException === 'review'} onClick={() => setActiveException(activeException === 'review' ? null : 'review')} />
+      <KpiCard label="Exception 2 — Remove from TeachOS" value={formatKpi(removePeople.length)} meta="Marked exited, still in TeachOS" icon={<Trash2 size={17} />} tone="coral" active={activeException === 'remove'} onClick={() => setActiveException(activeException === 'remove' ? null : 'remove')} />
+    </section>}
+
+    {report && activeException === 'review' && <ExceptionReviewPanel people={reviewPeople} onClose={() => setActiveException(null)} />}
+    {report && activeException === 'remove' && <ExceptionRemovePanel people={removePeople} onClose={() => setActiveException(null)} />}
 
     {report && activeAccessCard && <AccessDrilldown
       label={ACCESS_CARD_LABELS[activeAccessCard]}
@@ -260,6 +290,149 @@ function AccessDrilldown({ label, category, split, tab, onTabChange, onClose }: 
             <td className="px-3 py-2 text-muted-foreground">{p.darwin_manager ?? '—'}</td>
           </tr>)}
           {filteredPeople.length === 0 && <tr><td colSpan={6 + (showDesignation ? 1 : 0) + (showDepartmentColumn ? 1 : 0)} className="px-3 py-8 text-center text-muted-foreground">{people.length === 0 ? 'No one in this bucket.' : 'No one matches this search.'}</td></tr>}
+        </tbody>
+      </table>
+    </div>
+  </section>;
+}
+
+
+// Copy-to-clipboard helpers for Exception 2 (2026-10-06, per request: the
+// user ID and Capability Manager details "should be shown in copyable state
+// so they can copy the user_id and remove their details" from TeachOS).
+async function copyText(value: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(value);
+    return true;
+  } catch {
+    try {
+      const area = document.createElement('textarea');
+      area.value = value;
+      area.style.position = 'fixed';
+      area.style.opacity = '0';
+      document.body.appendChild(area);
+      area.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(area);
+      return ok;
+    } catch {
+      return false;
+    }
+  }
+}
+
+function CopyValue({ value, mono = false, testId }: { value: string | null | undefined; mono?: boolean; testId: string }) {
+  const [copied, setCopied] = useState(false);
+  if (!value) return <span className="text-muted-foreground">—</span>;
+  const onCopy = async () => {
+    if (await copyText(value)) {
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1200);
+    }
+  };
+  return <span className="inline-flex items-center gap-1.5">
+    <span className={mono ? 'font-mono-ui' : ''}>{value}</span>
+    <button type="button" onClick={onCopy} data-testid={testId} aria-label={`Copy ${value}`} title={copied ? 'Copied' : 'Copy'} className="grid h-5 w-5 shrink-0 place-items-center rounded border border-border text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
+      {copied ? <Check size={11} className="text-[#256e65]" /> : <Copy size={11} />}
+    </button>
+  </span>;
+}
+
+function matchesSearch(p: InstructorSummary, query: string) {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  return p.full_name.toLowerCase().includes(q) || (p.employee_id ?? '').toLowerCase().includes(q) || (p.teachos_user_id ?? '').toLowerCase().includes(q);
+}
+
+// Exception 1: details only. Reviewing happens in the Instructors tab's
+// Exception view (that is where the Exit dropdown lives).
+function ExceptionReviewPanel({ people, onClose }: { people: InstructorSummary[]; onClose: () => void }) {
+  const [search, setSearch] = useState('');
+  const filtered = useMemo(() => people.filter((p) => matchesSearch(p, search)), [people, search]);
+  const handleDownload = () => downloadCsv('exception-1-needs-review.csv', toCsv(['Name', 'Employee ID', 'Capability Manager', 'Subject'], filtered.map((p) => [p.full_name, p.employee_id ?? '', p.capability_manager ?? '', p.dept_area ?? ''])));
+  return <section className="mt-5 rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6 animate-rise">
+    <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <p className="font-mono-ui text-[10px] uppercase tracking-[0.17em] text-muted-foreground">Exception 1 — for Capability Managers</p>
+        <h2 className="mt-1 text-[16px] font-extrabold tracking-[-0.03em]">Exit records waiting for review</h2>
+        <p className="mt-1 max-w-[640px] text-[12px] text-muted-foreground">These people have an Approved or Pending exit record and nobody has reviewed it yet. Reviewing is done in the Instructors tab, under Exception, not here.</p>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        {people.length > 0 && <TableSearchInput value={search} onChange={setSearch} testId="input-search-exception-review" />}
+        <DownloadCsvButton onClick={handleDownload} disabled={filtered.length === 0} testId="button-download-exception-review" />
+        <Link href="/instructors?category=exception" className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-[11px] font-bold text-foreground transition-colors hover:bg-secondary" data-testid="link-open-exception-instructors">
+          <ExternalLink size={13} /> Review in Instructors tab
+        </Link>
+        <button type="button" data-testid="button-close-exception-review" onClick={onClose} className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-[11px] font-bold text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
+          <X size={13} /> Close
+        </button>
+      </div>
+    </div>
+    <div className="max-h-[420px] overflow-auto rounded-lg border border-border">
+      <table className="w-full text-left text-[12px]">
+        <thead className="sticky top-0 bg-secondary font-mono-ui text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
+          <tr><th className="px-3 py-2">Name</th><th className="px-3 py-2">Employee ID</th><th className="px-3 py-2">Capability Manager</th><th className="px-3 py-2">Subject</th></tr>
+        </thead>
+        <tbody>
+          {filtered.map((p) => <tr key={p.id} className="border-t border-border/70">
+            <td className="px-3 py-2 font-semibold">{p.full_name}</td>
+            <td className="px-3 py-2 font-mono-ui text-muted-foreground">{p.employee_id ?? '—'}</td>
+            <td className="px-3 py-2 text-muted-foreground">{p.capability_manager ?? '—'}</td>
+            <td className="px-3 py-2 text-muted-foreground">{p.dept_area ?? '—'}</td>
+          </tr>)}
+          {filtered.length === 0 && <tr><td colSpan={4} className="px-3 py-8 text-center text-muted-foreground">{people.length === 0 ? 'Nothing is waiting for review.' : 'No one matches this search.'}</td></tr>}
+        </tbody>
+      </table>
+    </div>
+  </section>;
+}
+
+// Exception 2: the removal worklist. Everything a person needs to find and
+// remove the record in TeachOS is one click from the clipboard.
+function ExceptionRemovePanel({ people, onClose }: { people: InstructorSummary[]; onClose: () => void }) {
+  const [search, setSearch] = useState('');
+  const [copiedAll, setCopiedAll] = useState(false);
+  const filtered = useMemo(() => people.filter((p) => matchesSearch(p, search)), [people, search]);
+  const userIds = filtered.map((p) => p.teachos_user_id).filter((id): id is string => !!id);
+  const copyAllIds = async () => {
+    if (await copyText(userIds.join('\n'))) {
+      setCopiedAll(true);
+      window.setTimeout(() => setCopiedAll(false), 1500);
+    }
+  };
+  const handleDownload = () => downloadCsv('exception-2-remove-from-teachos.csv', toCsv(['Name', 'Employee ID', 'TeachOS User ID', 'Subject', 'Capability Manager'], filtered.map((p) => [p.full_name, p.employee_id ?? '', p.teachos_user_id ?? '', p.dept_area ?? '', p.capability_manager ?? ''])));
+  return <section className="mt-5 rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6 animate-rise">
+    <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <p className="font-mono-ui text-[10px] uppercase tracking-[0.17em] text-muted-foreground">Exception 2 — TeachOS clean-up</p>
+        <h2 className="mt-1 text-[16px] font-extrabold tracking-[-0.03em]">Marked as exited, still in TeachOS</h2>
+        <p className="mt-1 max-w-[640px] text-[12px] text-muted-foreground">Instructors and Mentors marked Exited or Absconded who still have a TeachOS record. Copy the user ID, remove the person in TeachOS, and they drop off this list after the next sync.</p>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        {people.length > 0 && <TableSearchInput value={search} onChange={setSearch} placeholder="Search name, employee ID or user ID..." testId="input-search-exception-remove" />}
+        <button type="button" onClick={copyAllIds} disabled={userIds.length === 0} data-testid="button-copy-all-user-ids" className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-[11px] font-bold text-foreground transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50">
+          {copiedAll ? <Check size={13} className="text-[#256e65]" /> : <Copy size={13} />} {copiedAll ? 'Copied' : `Copy all user IDs (${userIds.length})`}
+        </button>
+        <DownloadCsvButton onClick={handleDownload} disabled={filtered.length === 0} testId="button-download-exception-remove" />
+        <button type="button" data-testid="button-close-exception-remove" onClick={onClose} className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-[11px] font-bold text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
+          <X size={13} /> Close
+        </button>
+      </div>
+    </div>
+    <div className="max-h-[420px] overflow-auto rounded-lg border border-border">
+      <table className="w-full text-left text-[12px]">
+        <thead className="sticky top-0 bg-secondary font-mono-ui text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
+          <tr><th className="px-3 py-2">Name</th><th className="px-3 py-2">Employee ID</th><th className="px-3 py-2">TeachOS user ID</th><th className="px-3 py-2">Subject</th><th className="px-3 py-2">Capability Manager</th></tr>
+        </thead>
+        <tbody>
+          {filtered.map((p) => <tr key={p.id} className="border-t border-border/70">
+            <td className="px-3 py-2 font-semibold"><CopyValue value={p.full_name} testId={`button-copy-name-${p.id}`} /></td>
+            <td className="px-3 py-2 text-muted-foreground"><CopyValue value={p.employee_id} mono testId={`button-copy-employee-id-${p.id}`} /></td>
+            <td className="px-3 py-2 text-muted-foreground"><CopyValue value={p.teachos_user_id} mono testId={`button-copy-user-id-${p.id}`} /></td>
+            <td className="px-3 py-2 text-muted-foreground">{p.dept_area ?? '—'}</td>
+            <td className="px-3 py-2 text-muted-foreground"><CopyValue value={p.capability_manager} testId={`button-copy-capability-manager-${p.id}`} /></td>
+          </tr>)}
+          {filtered.length === 0 && <tr><td colSpan={5} className="px-3 py-8 text-center text-muted-foreground">{people.length === 0 ? 'No one is waiting to be removed from TeachOS.' : 'No one matches this search.'}</td></tr>}
         </tbody>
       </table>
     </div>
