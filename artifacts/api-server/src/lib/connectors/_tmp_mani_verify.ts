@@ -31,7 +31,6 @@ async function main() {
       inTeachos: r.inTeachos,
       teachosCategory: r.teachosCategory,
       teachosRole: r.teachosRole,
-      teachosStatus: r.teachosStatus,
       institutes: r.institutes,
       enrolledPlans: r.enrolledPlans,
       classification: r.classification,
