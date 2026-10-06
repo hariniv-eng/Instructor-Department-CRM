@@ -152,5 +152,22 @@ overrides:
   "@esbuild-kit/esm-loader": "npm:tsx@^4.21.0"
   esbuild: "0.27.3"
 
+  # Security patches for transitive dependencies flagged by Replit's
+  # dependency scan (2026-10-06): each pins the vulnerable range up to the
+  # first fixed release, staying inside the same major version so nothing
+  # that depends on them has to change. All target versions were published
+  # more than minimumReleaseAge (1 day) ago. Remove an entry once nothing in
+  # the lockfile resolves below its fixed version any more.
+  #   proxy-addr  2.0.7 -> 2.0.8   critical, IP spoofing via IPv4-mapped IPv6 trust subnet
+  #   js-yaml     4.3.0 -> 4.3.2   high, CPU exhaustion in !!omap / merge keys
+  #   fast-uri    3.1.4 -> 3.1.8   high, SSRF / host-confusion parsing bugs
+  #   source-map-js 1.2.1 -> 1.2.2 high, event-loop DoS via source-map offsets
+  #   brace-expansion 5.0.8 -> 5.0.12 high, DoS via recursion / unbounded arrays
+  "proxy-addr@<2.0.8": "^2.0.8"
+  "js-yaml@>=4.0.0 <4.3.2": "^4.3.2"
+  "fast-uri@<3.1.8": "^3.1.8"
+  "source-map-js@<1.2.2": "^1.2.2"
+  "brace-expansion@>=4.0.0 <5.0.12": "^5.0.12"
+
 allowBuilds:
   esbuild: true
