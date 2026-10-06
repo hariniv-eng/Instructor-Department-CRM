@@ -20,6 +20,8 @@
 // -- keep both in sync if this cron expression/timezone ever changes.
 
 import cron from "node-cron";
+import { desc, eq } from "drizzle-orm";
+import { db, uploadsTable } from "@workspace/db";
 import { logger } from "./logger";
 import { runDarwinboxSync, runDarwinboxExitsSync, runTeachosSync, runTrainingStatusSync, runContributionSync } from "../routes/sync";
 import { LAST_SYNC } from "./syncState";
@@ -27,7 +29,25 @@ import { LAST_SYNC } from "./syncState";
 const DAILY_SYNC_CRON_EXPRESSION = "0 5 * * *"; // 05:00, every day
 const DAILY_SYNC_TIMEZONE = "Asia/Kolkata"; // 5am IST
 
+// Guards against the cron tick and a catch-up check (below) overlapping in
+// the same process -- each run is a full replace of every source, so a
+// second concurrent run would just be wasted work (and hammer Darwin/BigQuery).
+let dailySyncRunning = false;
+
 async function runDailyAutoSync() {
+  if (dailySyncRunning) {
+    logger.info("Daily auto-sync already running -- skipping duplicate trigger");
+    return;
+  }
+  dailySyncRunning = true;
+  try {
+    await runDailyAutoSyncInner();
+  } finally {
+    dailySyncRunning = false;
+  }
+}
+
+async function runDailyAutoSyncInner() {
   logger.info("Daily 5am auto-sync starting");
 
   const darwinbox = await runDarwinboxSync();
@@ -53,7 +73,50 @@ async function runDailyAutoSync() {
   logger.info("Daily 5am auto-sync finished");
 }
 
+// Catch-up for missed 5am runs (2026-10-06, per report: "the sync didnt
+// happen in the morning"). The cron job above lives INSIDE this process, and
+// the Replit deployment is Autoscale (.replit: deploymentTarget =
+// "autoscale"), which shuts the server down while nobody is using it
+// overnight -- so at 5:00 AM IST there was no running process to fire the
+// timer, and the last recorded sync stayed at the previous afternoon's
+// manual run. Fix (no infrastructure/cost change): whenever the process
+// starts -- which on Autoscale is exactly what a first-visitor-of-the-day
+// wake-up is -- and then every 30 minutes while it stays up, compare the
+// newest recorded Darwin sync (uploads table, the same DB-backed history the
+// Uploads page's "Last synced" reads, so it survives restarts unlike
+// LAST_SYNC) against the most recent 5:00 AM IST that has already passed,
+// and run the full daily sync right away if it's older. Darwin is used as
+// the marker because the daily job always runs it first and only records an
+// uploads row when it succeeds -- so a failed run is retried at the next
+// check instead of being treated as done.
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000; // Asia/Kolkata has no DST
+const CATCH_UP_CHECK_INTERVAL_MS = 30 * 60 * 1000;
+const CATCH_UP_STARTUP_DELAY_MS = 30 * 1000; // let the server finish booting and serve its first request first
+
+// The most recent 05:00 IST at or before `now`, as a real UTC instant.
+function mostRecentScheduledRun(now: Date): Date {
+  const istNow = new Date(now.getTime() + IST_OFFSET_MS);
+  let candidateIst = Date.UTC(istNow.getUTCFullYear(), istNow.getUTCMonth(), istNow.getUTCDate(), 5, 0, 0);
+  if (candidateIst > istNow.getTime()) candidateIst -= 24 * 60 * 60 * 1000;
+  return new Date(candidateIst - IST_OFFSET_MS);
+}
+
+async function runCatchUpIfOverdue() {
+  try {
+    const [latest] = await db.select({ uploadedAt: uploadsTable.uploadedAt }).from(uploadsTable).where(eq(uploadsTable.source, "Darwin")).orderBy(desc(uploadsTable.uploadedAt)).limit(1);
+    const dueSince = mostRecentScheduledRun(new Date());
+    if (latest && latest.uploadedAt >= dueSince) return;
+    logger.info({ lastDarwinSync: latest?.uploadedAt ?? null, dueSince }, "Daily auto-sync overdue (missed the 5am run) -- running catch-up sync now");
+    await runDailyAutoSync();
+  } catch (err) {
+    logger.warn({ err }, "Auto-sync catch-up check failed");
+  }
+}
+
 export function startScheduler() {
   cron.schedule(DAILY_SYNC_CRON_EXPRESSION, runDailyAutoSync, { timezone: DAILY_SYNC_TIMEZONE });
   logger.info({ cron: DAILY_SYNC_CRON_EXPRESSION, timezone: DAILY_SYNC_TIMEZONE }, "Daily auto-sync scheduled (Darwin, Darwin Exits, TeachOS, Training Status, Contribution)");
+
+  setTimeout(runCatchUpIfOverdue, CATCH_UP_STARTUP_DELAY_MS);
+  setInterval(runCatchUpIfOverdue, CATCH_UP_CHECK_INTERVAL_MS);
 }
