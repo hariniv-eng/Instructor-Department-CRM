@@ -407,9 +407,18 @@ function computeDepartmentAndExceptionRows(allRows: InstructorRow[]) {
   //   4. not filed under a different team.
   const exitStatusLower = (r: InstructorRow) => (r.exitFlagStatus ?? "").trim().toLowerCase();
   const hasQueueExitStatus = (r: InstructorRow) => exitStatusLower(r) === "approved" || exitStatusLower(r).startsWith("pending");
-  const exceptionRows = allRows.filter((r) => r.exitFlag && (r.inDarwin || r.inTeachos) && hasQueueExitStatus(r) && r.exitVerification !== "payroll_converted" && !NOT_DEPARTMENT_CLASSIFICATIONS.has(r.classification ?? ""));
+  const exceptionQueueRows = allRows.filter((r) => r.exitFlag && (r.inDarwin || r.inTeachos) && hasQueueExitStatus(r) && r.exitVerification !== "payroll_converted" && !NOT_DEPARTMENT_CLASSIFICATIONS.has(r.classification ?? ""));
+  // Narrowed 2026-10-06 (per request: "in the exception, anyhow we will only be
+  // showing not reviewed data and serving notice period instructor data, in
+  // the Instructors tab"): the Instructors tab's Exception view shows only
+  // people nobody has reviewed yet, plus those reviewed as Serving Notice
+  // Period. Anyone reviewed as Exited or Absconded leaves this view -- if they
+  // are still in TeachOS they move to the Overview's Exception 2 list
+  // (exceptionRemoveRows below), the "remove them from TeachOS" worklist.
+  const exceptionRows = exceptionQueueRows.filter((r) => !r.exitVerification || r.exitVerification === "serving_notice_period");
+  const exceptionRemoveRows = exceptionQueueRows.filter((r) => (r.exitVerification === "exited" || r.exitVerification === "absconded") && r.inTeachos && r.classification !== "excluded_ops_managers");
 
-  return { mentors, opsTeamRows, darwinInstructorsForCount, payrollConvertedForCount, needsReviewForCount, countedInstructorRows, departmentRows, exceptionRows };
+  return { mentors, opsTeamRows, darwinInstructorsForCount, payrollConvertedForCount, needsReviewForCount, countedInstructorRows, departmentRows, exceptionRows, exceptionRemoveRows, exceptionQueueRows };
 }
 
 // This is the single reporting surface for the breakdowns requested on top
@@ -425,7 +434,7 @@ function computeDepartmentAndExceptionRows(allRows: InstructorRow[]) {
 // Breakdown and TeachOS Breakdown below stay Admin-only.
 router.get("/reports/instructors", async (_req, res) => {
   const allRows = await db.select().from(instructorsTable);
-  const { mentors, opsTeamRows, darwinInstructorsForCount, payrollConvertedForCount, needsReviewForCount, countedInstructorRows, departmentRows, exceptionRows } = computeDepartmentAndExceptionRows(allRows);
+  const { mentors, opsTeamRows, darwinInstructorsForCount, payrollConvertedForCount, needsReviewForCount, countedInstructorRows, departmentRows, exceptionRows, exceptionRemoveRows } = computeDepartmentAndExceptionRows(allRows);
 
   // NIAT cohort join (2026-09-29, per request -- see niat_cohorts' comment
   // on toApiInstructorSummary above): one extra query, keyed by
@@ -636,6 +645,8 @@ router.get("/reports/instructors", async (_req, res) => {
     instructors_mentors: buildAccessSplit([...countedInstructorRows, ...mentors]),
     ops_team: buildAccessSplit(opsTeamRows),
     exception: buildAccessSplit(exceptionRows),
+    // Overview "Exception 2" (2026-10-06): reviewed as Exited/Absconded and still in TeachOS.
+    exception_remove: buildAccessSplit(exceptionRemoveRows),
   };
 
   res.json({
@@ -656,6 +667,7 @@ router.get("/reports/instructors", async (_req, res) => {
       // total_instructor_count/mentors_count/ops_team_count/
       // department_total_count.
       exception_count: exceptionRows.length,
+      exception_remove_count: exceptionRemoveRows.length,
       iit_kharagpur_count: iitKharagpurRows.length,
       // New employee-ID-mapping pipeline breakdown (see comment above
       // countedInstructorRows): who's actually feeding the headline total,
@@ -1049,8 +1061,10 @@ router.get("/reports/darwin-exit-details", requireAuth, requireRole("admin"), as
   // same reason -- exitFlag itself is now employee-ID-only too, so this
   // route's join and the Instructors tab's Exception queue stay consistent
   // with each other, both keyed on employee ID alone.
-  const { exceptionRows } = computeDepartmentAndExceptionRows(await db.select().from(instructorsTable));
-  const exceptionEmployeeIds = new Set(exceptionRows.map((r) => r.employeeId).filter((id): id is string => !!id));
+  // Uses the full queue (including people reviewed as Exited/Absconded who still
+  // need removing), not just the narrowed Instructors-tab Exception view.
+  const { exceptionQueueRows } = computeDepartmentAndExceptionRows(await db.select().from(instructorsTable));
+  const exceptionEmployeeIds = new Set(exceptionQueueRows.map((r) => r.employeeId).filter((id): id is string => !!id));
 
   // "Current Department" dropped from this table's display (2026-09-26, per
   // request: "remove the current department table that we have") -- it's
