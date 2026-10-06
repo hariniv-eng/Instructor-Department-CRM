@@ -631,6 +631,9 @@ router.get("/reports/instructors", async (_req, res) => {
     department: buildAccessSplit(departmentRows),
     instructors: buildAccessSplit(countedInstructorRows),
     mentors: buildAccessSplit(mentors),
+    // Instructors + Mentors combined (2026-10-06, per request) -- same two
+    // lists the Instructor Department tab uses, minus the Operations team.
+    instructors_mentors: buildAccessSplit([...countedInstructorRows, ...mentors]),
     ops_team: buildAccessSplit(opsTeamRows),
     exception: buildAccessSplit(exceptionRows),
   };
@@ -644,6 +647,7 @@ router.get("/reports/instructors", async (_req, res) => {
       total_including_exited: instructorRows.length,
       exited_excluded_from_count: exitedInstructorRows.length,
       mentors_count: mentors.length,
+      instructors_mentors_count: countedInstructorRows.length + mentors.length,
       excluded_count: excludedRows.length,
       ops_team_count: opsTeamRows.length,
       // Unreviewed-exit review queue (2026-09-18, per request) -- see

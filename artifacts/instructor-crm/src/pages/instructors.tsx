@@ -28,7 +28,7 @@ function describeSaveError(error: unknown): string {
   return error instanceof Error ? error.message : 'Could not reach the server -- check your connection and try again.';
 }
 
-type CategoryKey = 'department' | 'instructors' | 'mentors' | 'ops_team' | 'exception';
+type CategoryKey = 'department' | 'instructors' | 'mentors' | 'instructors_mentors' | 'ops_team' | 'exception';
 
 // Each tab's people list is the same union of darwin_only + both + teachos_only
 // that backs the matching Overview KPI card's count -- so "165 Instructors" here
@@ -71,8 +71,9 @@ const CATEGORY_TABS: { key: CategoryKey; label: string; icon: typeof UsersRound;
   { key: 'department', label: 'Instructor Department', icon: Building2, description: 'Instructors + Mentors + Operations team, combined.' },
   { key: 'instructors', label: 'Instructors', icon: UsersRound, description: 'Everyone counted toward the TeachOS instructor count.' },
   { key: 'mentors', label: 'Mentors', icon: GraduationCap, description: 'Darwin — Mentors department.' },
+  { key: 'instructors_mentors', label: 'Instructors + Mentors', icon: Users, description: 'Instructors and Mentors combined, without the Operations team.' },
   { key: 'ops_team', label: 'Operations team', icon: Briefcase, description: 'Darwin — Delivery Support (Ops), filed under Operations rather than Instructor or Mentor.' },
-  { key: 'exception', label: 'Exception', icon: AlertTriangle, description: 'Instructors, Mentors, and Ops team members with an exit record that has not been reviewed yet -- including anyone who has since fully exited (no longer matched to Darwin or TeachOS), who stays listed here with their exit details even though they no longer count toward the other categories. Use the Exit column to record what actually happened -- picking any value there removes them from this queue.' },
+  { key: 'exception', label: 'Exception', icon: AlertTriangle, description: 'People still in Darwin or TeachOS whose Darwinbox exit record is Approved or Pending With Approver. They stay here until a Capability Manager marks them Payroll Converted, or until they are gone from both Darwin and TeachOS (they then live on in the Instructor Archive).'' },
 ];
 
 function formatCount(value: number | undefined) {
@@ -207,7 +208,7 @@ const SUBJECT_AREAS: string[] = [
 // value is simply omitted, so a plain "/instructors" with no filters
 // applied stays a clean bare URL, and an unrecognized value (a stale or
 // hand-edited URL) is dropped rather than trusted verbatim.
-const CATEGORY_KEYS: CategoryKey[] = ['department', 'instructors', 'mentors', 'ops_team', 'exception'];
+const CATEGORY_KEYS: CategoryKey[] = ['department', 'instructors', 'mentors', 'instructors_mentors', 'ops_team', 'exception'];
 const GENDER_KEYS: GenderFilterKey[] = ['male', 'female', 'unknown'];
 const PAYROLL_KEYS: PayrollFilterKey[] = ['payroll', 'nxtwave'];
 
@@ -528,7 +529,7 @@ export default function InstructorsPage() {
             const isActive = category === tab.key;
             return <button key={tab.key} type="button" data-testid={`button-category-${tab.key}`} onClick={() => setCategory(tab.key)} aria-pressed={isActive} className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-bold transition-colors ${isActive ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'}`}>
               <Icon size={14} /> {tab.label}
-              <span className="ml-1 font-mono-ui text-[10px] opacity-70">{formatCount(report?.kpis[tab.key === 'department' ? 'department_total_count' : tab.key === 'instructors' ? 'total_instructor_count' : tab.key === 'mentors' ? 'mentors_count' : tab.key === 'ops_team' ? 'ops_team_count' : 'exception_count'])}</span>
+              <span className="ml-1 font-mono-ui text-[10px] opacity-70">{formatCount(report?.kpis[tab.key === 'department' ? 'department_total_count' : tab.key === 'instructors' ? 'total_instructor_count' : tab.key === 'mentors' ? 'mentors_count' : tab.key === 'instructors_mentors' ? 'instructors_mentors_count' : tab.key === 'ops_team' ? 'ops_team_count' : 'exception_count'])}</span>
             </button>;
           })}
         </div>
@@ -787,7 +788,7 @@ function gridColsClass(category: CategoryKey): string {
   // mixed into Department/Exception just reads "Nxtwave" in this column,
   // same as any non-payroll instructor. Never wrong, just not usually the
   // interesting value there.
-  if (category === 'instructors' || category === 'mentors' || category === 'department' || category === 'exception') return 'grid-cols-[260px_190px_130px_280px_220px_150px_160px_170px_220px_140px_190px_190px_160px_130px_150px_190px_170px_140px_170px]';
+  if (category === 'instructors' || category === 'mentors' || category === 'instructors_mentors' || category === 'department' || category === 'exception') return 'grid-cols-[260px_190px_130px_280px_220px_150px_160px_170px_220px_140px_190px_190px_160px_130px_150px_190px_170px_140px_170px]';
   // Operations team keeps its own shape (2026-09-21: not part of the above
   // request) -- no Campus column (ops rows aren't deployed to a teaching
   // campus the way instructors and mentors are), a single Department
@@ -896,7 +897,7 @@ function productLabel(person: InstructorSummary): string {
 function nameColumnLabel(category: CategoryKey): string {
   if (category === 'ops_team') return 'Team member';
   if (category === 'mentors') return 'Mentor';
-  if (category === 'department' || category === 'exception') return 'Person';
+  if (category === 'department' || category === 'exception' || category === 'instructors_mentors') return 'Person';
   return 'Instructor';
 }
 
