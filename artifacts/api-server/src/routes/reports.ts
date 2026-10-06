@@ -56,14 +56,15 @@ type ArchiveRow = typeof instructorArchiveTable.$inferSelect;
 // of every recomputeStatuses() run, originally built 2026-09-28 for a
 // related but different request (payroll-converted instructors losing
 // their Darwin data). Nothing had ever read it back out until this route.
-// Archive-only exit fallback for payroll-converted people (2026-10-06, per
-// request: "yes, archive page only"). The live exit flag drops anyone whose
-// MOST RECENT Darwinbox exit record is Revoked/Rejected (see
-// loadLatestExitsByPerson in reconcile.ts), which is right for the
-// Exception queue -- but for payroll-converted instructors (TeachOS-only,
-// who really did leave under an earlier Approved resignation) it leaves the
-// Archive showing "Active". Only the Archive page applies this fallback; the
-// live flag, Exception queue, Darwin Exit Details and sync are untouched.
+// Archive exit rule (2026-10-06, per request: "whoever data that we have
+// recorded in the exit, get their data only if status was approved"). On the
+// Archive page a person counts as Exited ONLY from a Darwinbox exit record
+// whose Status is Approved (latest Approved record per employee_id wins).
+// Pending With Approver / Revoked / Rejected records never make anyone
+// Exited here, and an older Approved record still counts even when a newer
+// Revoked/Rejected one exists. A manually set exit date (Manual Status
+// control) is kept for people with no Approved record. Archive page only: the
+// live exit flag, Exception queue, Darwin Exit Details and sync are untouched.
 type ApprovedExitFallback = { status: string; date: string };
 
 const toApiArchiveSummary = (row: ArchiveRow, approvedExit?: ApprovedExitFallback) => {
@@ -88,9 +89,9 @@ const toApiArchiveSummary = (row: ArchiveRow, approvedExit?: ApprovedExitFallbac
   // archived one by employee_id (teachos_user_id/name fallback matching in
   // findArchiveMatch() could in principle still catch it, but that's the
   // same fallback every other archived person already relies on).
-  const liveExitDate = row.exitFlagDate ?? row.exitDate ?? null;
-  const useFallback = !liveExitDate && !!approvedExit && row.classification === "payroll_converted";
-  const exitDate = useFallback ? approvedExit!.date : liveExitDate;
+  // NOTE (2026-10-06): the exitFlagDate-first logic described above is
+  // superseded by the Approved-only rule at the top of this block.
+  const exitDate = approvedExit?.date ?? row.exitDate ?? null;
   return {
     id: row.id,
     employee_id: row.employeeId,
@@ -121,7 +122,7 @@ const toApiArchiveSummary = (row: ArchiveRow, approvedExit?: ApprovedExitFallbac
     // from.
     is_payroll: row.classification === "payroll_converted",
     exit_date: exitDate,
-    exit_status: useFallback ? approvedExit!.status : row.exitFlagStatus,
+    exit_status: approvedExit ? approvedExit.status : null,
     status: exitDate ? "Exited" : "Active",
     first_seen_at: row.firstSeenAt,
     last_synced_at: row.lastSyncedAt,
@@ -1269,9 +1270,8 @@ router.get("/reports/instructor-archive", requireAuth, requireRole("admin"), asy
   // + 7 with no exit record) and inflated the total to 727. The
   // NOT_DEPARTMENT_CLASSIFICATIONS check still applies on top, so someone
   // later reclassified into a different team drops out.
-  // Latest Approved Darwinbox exit record per employee_id, used only as a
-  // fallback for payroll-converted rows with no live exit date (see
-  // ApprovedExitFallback above).
+  // Latest Approved Darwinbox exit record per employee_id (see the Archive
+  // exit rule above ApprovedExitFallback).
   const exitRows = await db.select().from(darwinboxExitsTable);
   const approvedByEmployee = new Map<string, { rank: number; id: number; value: ApprovedExitFallback }>();
   for (const exit of exitRows) {
