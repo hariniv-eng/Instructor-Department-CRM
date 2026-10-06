@@ -74,6 +74,11 @@ function isConfirmedDespiteFullRoster(row: LiveRow): boolean {
   });
 }
 
+// Exit date of a live row whose Darwinbox exit record is Approved, else null.
+function approvedExitDate(row: LiveRow): string | null {
+  return (row.exitFlagStatus ?? "").trim().toLowerCase() === "approved" ? row.exitFlagDate ?? null : null;
+}
+
 function isDepartmentMember(row: LiveRow): boolean {
   const darwinInstructor = row.inDarwin && (!row.inDarwinFullRoster || isConfirmedDespiteFullRoster(row)) && !row.classification && (row.deptBucket === "tech" || row.deptBucket === "non_tech");
   const teachosOnly = row.inTeachos && !row.inDarwin;
@@ -143,7 +148,7 @@ export async function archiveInstructors(): Promise<{ created: number; updated: 
         institutes: row.institutes,
         computedStatus: row.computedStatus,
         manualStatus: row.manualStatus,
-        exitDate: row.exitDate,
+        exitDate: row.exitDate ?? approvedExitDate(row),
         convertedUniversityName: row.convertedUniversityName,
         notes: row.notes,
         classification: row.classification,
@@ -193,7 +198,12 @@ export async function archiveInstructors(): Promise<{ created: number; updated: 
       manualCapabilityManager: keep(row.manualCapabilityManager, match.manualCapabilityManager),
       institutes: keep(row.institutes, match.institutes),
       manualStatus: keep(row.manualStatus, match.manualStatus),
-      exitDate: keep(row.exitDate, match.exitDate),
+      // Remember Approved exits (2026-10-06, per request: "whoever exit data
+      // is approved, get their data"): Darwinbox's exits report is replaced
+      // wholesale on every sync, so a record it later drops would otherwise
+      // turn an exited person back to Active. The first time a live row
+      // carries an Approved exit, stamp its date into this sticky field.
+      exitDate: keep(row.exitDate, match.exitDate) ?? approvedExitDate(row),
       convertedUniversityName: keep(row.convertedUniversityName, match.convertedUniversityName),
       notes: keep(row.notes, match.notes),
       exitVerification: keep(row.exitVerification, match.exitVerification),
