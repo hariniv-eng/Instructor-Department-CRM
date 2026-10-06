@@ -21,7 +21,8 @@
 
 import cron from "node-cron";
 import { desc, eq } from "drizzle-orm";
-import { db, uploadsTable } from "@workspace/db";
+import { db, uploadsTable, instructorArchiveTable } from "@workspace/db";
+import { archiveInstructors } from "./archiveInstructors";
 import { logger } from "./logger";
 import { runDarwinboxSync, runDarwinboxExitsSync, runTeachosSync, runTrainingStatusSync, runContributionSync } from "../routes/sync";
 import { LAST_SYNC } from "./syncState";
@@ -113,10 +114,30 @@ async function runCatchUpIfOverdue() {
   }
 }
 
+// One-time baseline for the Instructor Archive's inArchiveScope marker
+// (2026-10-06). The column starts out false for every existing row, and the
+// Archive page shows only flagged rows -- so right after this ships the page
+// would be empty until the next sync happened to run archiveInstructors().
+// archiveInstructors() only touches the database (no Darwin/BigQuery calls),
+// so when NO archive row is flagged yet, just run it once at startup to take
+// today's snapshot of who is in the department. After that at least one row
+// is always flagged, and this check is a cheap no-op.
+async function seedArchiveScopeIfEmpty() {
+  try {
+    const [flagged] = await db.select({ id: instructorArchiveTable.id }).from(instructorArchiveTable).where(eq(instructorArchiveTable.inArchiveScope, true)).limit(1);
+    if (flagged) return;
+    const result = await archiveInstructors();
+    logger.info(result, "Instructor Archive baseline taken (inArchiveScope seeded from today's department)");
+  } catch (err) {
+    logger.warn({ err }, "Instructor Archive baseline seeding failed");
+  }
+}
+
 export function startScheduler() {
   cron.schedule(DAILY_SYNC_CRON_EXPRESSION, runDailyAutoSync, { timezone: DAILY_SYNC_TIMEZONE });
   logger.info({ cron: DAILY_SYNC_CRON_EXPRESSION, timezone: DAILY_SYNC_TIMEZONE }, "Daily auto-sync scheduled (Darwin, Darwin Exits, TeachOS, Training Status, Contribution)");
 
+  setTimeout(seedArchiveScopeIfEmpty, 5 * 1000);
   setTimeout(runCatchUpIfOverdue, CATCH_UP_STARTUP_DELAY_MS);
   setInterval(runCatchUpIfOverdue, CATCH_UP_CHECK_INTERVAL_MS);
 }
