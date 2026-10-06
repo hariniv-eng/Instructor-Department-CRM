@@ -57,12 +57,12 @@ type ArchiveRow = typeof instructorArchiveTable.$inferSelect;
 // related but different request (payroll-converted instructors losing
 // their Darwin data). Nothing had ever read it back out until this route.
 // Archive exit rule (2026-10-06, per request: "whoever data that we have
-// recorded in the exit, get their data only if status was approved"). On the
-// Archive page a person counts as Exited ONLY from a Darwinbox exit record
-// whose Status is Approved (latest Approved record per employee_id wins).
-// Pending With Approver / Revoked / Rejected records never make anyone
-// Exited here, and an older Approved record still counts even when a newer
-// Revoked/Rejected one exists. A manually set exit date (Manual Status
+// recorded in the exit, get their data only if status was approved ... and
+// also pending for approval"). On the Archive page a person counts as Exited
+// ONLY from a Darwinbox exit record that is Approved or Pending With Approver
+// (their most recent record wins). When the most recent record is
+// Revoked/Rejected, their latest Approved record still counts if they have
+// one; a Revoked/Rejected request or a cancelled pending one never does. A manually set exit date (Manual Status
 // control) is kept for people with no Approved record. Archive page only: the
 // live exit flag, Exception queue, Darwin Exit Details and sync are untouched.
 type ApprovedExitFallback = { status: string; date: string };
@@ -1270,26 +1270,40 @@ router.get("/reports/instructor-archive", requireAuth, requireRole("admin"), asy
   // + 7 with no exit record) and inflated the total to 727. The
   // NOT_DEPARTMENT_CLASSIFICATIONS check still applies on top, so someone
   // later reclassified into a different team drops out.
-  // Latest Approved Darwinbox exit record per employee_id (see the Archive
-  // exit rule above ApprovedExitFallback).
+  // Archive exit lookup per employee_id (see the Archive exit rule above
+  // ApprovedExitFallback): the person's most recent exit record counts when
+  // it is Approved or Pending With Approver; when the most recent record is
+  // Revoked/Rejected/anything else, fall back to their latest Approved
+  // record (a cancelled pending request never counts).
   const exitRows = await db.select().from(darwinboxExitsTable);
-  const approvedByEmployee = new Map<string, { rank: number; id: number; value: ApprovedExitFallback }>();
+  type Seen = { rank: number; id: number; status: string; iso: string | null };
+  const newer = (a: Seen, existing?: Seen) => !existing || a.rank > existing.rank || (a.rank === existing.rank && a.id > existing.id);
+  const latestByEmployee = new Map<string, Seen>();
+  const approvedByEmployee = new Map<string, Seen>();
   for (const exit of exitRows) {
     if (!exit.employeeId) continue;
-    const status = cell(exit.rawData, "Status", "status");
-    if ((status ?? "").trim().toLowerCase() !== "approved") continue;
+    const status = (cell(exit.rawData, "Status", "status") ?? "").trim();
     const iso = toISODate(cell(exit.rawData, "Exit Date", "exit_date"));
-    if (!iso) continue;
-    const rank = parseLooseDate(iso);
-    const existing = approvedByEmployee.get(exit.employeeId);
-    if (!existing || rank > existing.rank || (rank === existing.rank && exit.id > existing.id)) {
-      approvedByEmployee.set(exit.employeeId, { rank, id: exit.id, value: { status: "Approved", date: iso } });
+    const seen: Seen = { rank: iso ? parseLooseDate(iso) : -Infinity, id: exit.id, status, iso };
+    if (newer(seen, latestByEmployee.get(exit.employeeId))) latestByEmployee.set(exit.employeeId, seen);
+    if (status.toLowerCase() === "approved" && iso && newer(seen, approvedByEmployee.get(exit.employeeId))) approvedByEmployee.set(exit.employeeId, seen);
+  }
+  const archiveExitByEmployee = new Map<string, ApprovedExitFallback>();
+  for (const [employeeId, latest] of latestByEmployee) {
+    const lower = latest.status.toLowerCase();
+    if (lower === "approved" && latest.iso) {
+      archiveExitByEmployee.set(employeeId, { status: "Approved", date: latest.iso });
+    } else if (lower.startsWith("pending") && latest.iso) {
+      archiveExitByEmployee.set(employeeId, { status: latest.status, date: latest.iso });
+    } else {
+      const approved = approvedByEmployee.get(employeeId);
+      if (approved?.iso) archiveExitByEmployee.set(employeeId, { status: "Approved", date: approved.iso });
     }
   }
 
   const people = allRows
     .filter((r) => r.inArchiveScope && !NOT_DEPARTMENT_CLASSIFICATIONS.has(r.classification ?? ""))
-    .map((r) => toApiArchiveSummary(r, r.employeeId ? approvedByEmployee.get(r.employeeId)?.value : undefined))
+    .map((r) => toApiArchiveSummary(r, r.employeeId ? archiveExitByEmployee.get(r.employeeId) : undefined))
     .sort((a, b) => a.full_name.localeCompare(b.full_name));
 
   res.json({
