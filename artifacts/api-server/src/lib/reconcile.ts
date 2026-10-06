@@ -86,7 +86,7 @@ interface ExitInfo {
 // more than one comes back (e.g. a resignation that was Approved and later
 // Rejected, or Revoked and later re-Approved) — falls back to whichever
 // record was inserted last (highest id) when dates can't be compared.
-function parseLooseDate(value: string | null): number {
+export function parseLooseDate(value: string | null): number {
   if (!value) return -Infinity;
   const iso = Date.parse(value);
   if (!Number.isNaN(iso)) return iso;
@@ -106,7 +106,7 @@ function parseLooseDate(value: string | null): number {
 // default month-first date parser rejects once the day exceeds 12 — exactly
 // the failure the live exits sync hit. Returns null for anything that isn't
 // a recognizable calendar date, so a bad value is dropped, not crashed on.
-function toISODate(value: string | null): string | null {
+export function toISODate(value: string | null): string | null {
   if (!value) return null;
   const trimmed = value.trim();
   if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) return trimmed.slice(0, 10);

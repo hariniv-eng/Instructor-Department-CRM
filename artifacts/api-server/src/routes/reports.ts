@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db, instructorsTable, instructorArchiveTable, darwinboxFullRosterTable, darwinboxExitsTable, instructorTrainingStatusTable, instructorContributionTable } from "@workspace/db";
 import { requireAuth, requireRole } from "../middlewares/auth";
-import { cell, normalize } from "../lib/reconcile";
+import { cell, normalize, parseLooseDate, toISODate } from "../lib/reconcile";
 import { archiveInstructors } from "../lib/archiveInstructors";
 import { TRAINING_COURSE_TAXONOMY } from "../data/trainingCourseTaxonomy";
 import { TECH_AREAS } from "../lib/departmentTaxonomy";
@@ -56,7 +56,17 @@ type ArchiveRow = typeof instructorArchiveTable.$inferSelect;
 // of every recomputeStatuses() run, originally built 2026-09-28 for a
 // related but different request (payroll-converted instructors losing
 // their Darwin data). Nothing had ever read it back out until this route.
-const toApiArchiveSummary = (row: ArchiveRow) => {
+// Archive-only exit fallback for payroll-converted people (2026-10-06, per
+// request: "yes, archive page only"). The live exit flag drops anyone whose
+// MOST RECENT Darwinbox exit record is Revoked/Rejected (see
+// loadLatestExitsByPerson in reconcile.ts), which is right for the
+// Exception queue -- but for payroll-converted instructors (TeachOS-only,
+// who really did leave under an earlier Approved resignation) it leaves the
+// Archive showing "Active". Only the Archive page applies this fallback; the
+// live flag, Exception queue, Darwin Exit Details and sync are untouched.
+type ApprovedExitFallback = { status: string; date: string };
+
+const toApiArchiveSummary = (row: ArchiveRow, approvedExit?: ApprovedExitFallback) => {
   // Exit date prefers exitFlagDate -- the Darwinbox-exit-record-driven
   // field, auto-synced by recomputeStatuses() AND auto-CLEARED back to
   // null the moment that record's most recent status is Revoked or
@@ -78,7 +88,9 @@ const toApiArchiveSummary = (row: ArchiveRow) => {
   // archived one by employee_id (teachos_user_id/name fallback matching in
   // findArchiveMatch() could in principle still catch it, but that's the
   // same fallback every other archived person already relies on).
-  const exitDate = row.exitFlagDate ?? row.exitDate ?? null;
+  const liveExitDate = row.exitFlagDate ?? row.exitDate ?? null;
+  const useFallback = !liveExitDate && !!approvedExit && row.classification === "payroll_converted";
+  const exitDate = useFallback ? approvedExit!.date : liveExitDate;
   return {
     id: row.id,
     employee_id: row.employeeId,
@@ -109,7 +121,7 @@ const toApiArchiveSummary = (row: ArchiveRow) => {
     // from.
     is_payroll: row.classification === "payroll_converted",
     exit_date: exitDate,
-    exit_status: row.exitFlagStatus,
+    exit_status: useFallback ? approvedExit!.status : row.exitFlagStatus,
     status: exitDate ? "Exited" : "Active",
     first_seen_at: row.firstSeenAt,
     last_synced_at: row.lastSyncedAt,
@@ -1257,9 +1269,27 @@ router.get("/reports/instructor-archive", requireAuth, requireRole("admin"), asy
   // + 7 with no exit record) and inflated the total to 727. The
   // NOT_DEPARTMENT_CLASSIFICATIONS check still applies on top, so someone
   // later reclassified into a different team drops out.
+  // Latest Approved Darwinbox exit record per employee_id, used only as a
+  // fallback for payroll-converted rows with no live exit date (see
+  // ApprovedExitFallback above).
+  const exitRows = await db.select().from(darwinboxExitsTable);
+  const approvedByEmployee = new Map<string, { rank: number; id: number; value: ApprovedExitFallback }>();
+  for (const exit of exitRows) {
+    if (!exit.employeeId) continue;
+    const status = cell(exit.rawData, "Status", "status");
+    if ((status ?? "").trim().toLowerCase() !== "approved") continue;
+    const iso = toISODate(cell(exit.rawData, "Exit Date", "exit_date"));
+    if (!iso) continue;
+    const rank = parseLooseDate(iso);
+    const existing = approvedByEmployee.get(exit.employeeId);
+    if (!existing || rank > existing.rank || (rank === existing.rank && exit.id > existing.id)) {
+      approvedByEmployee.set(exit.employeeId, { rank, id: exit.id, value: { status: "Approved", date: iso } });
+    }
+  }
+
   const people = allRows
     .filter((r) => r.inArchiveScope && !NOT_DEPARTMENT_CLASSIFICATIONS.has(r.classification ?? ""))
-    .map(toApiArchiveSummary)
+    .map((r) => toApiArchiveSummary(r, r.employeeId ? approvedByEmployee.get(r.employeeId)?.value : undefined))
     .sort((a, b) => a.full_name.localeCompare(b.full_name));
 
   res.json({
