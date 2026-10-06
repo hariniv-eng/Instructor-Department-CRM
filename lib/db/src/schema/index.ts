@@ -317,6 +317,17 @@ export const instructorArchiveTable = pgTable("instructor_archive", {
   // you spot a person only ever matched by fuzzy name if that ever needs
   // auditing.
   archiveMatchedBy: text("archive_matched_by"),
+  // Permanent "belongs in the Instructor Archive" marker (2026-10-06, per
+  // request: "today ~695 instructors... if five leave and ten join the
+  // total is 705, not 5... we're not going to get the exit data of
+  // previous instructors... we'll only concentrate from today"). Flipped
+  // to true -- and never back to false -- the first time a person passes
+  // the live department-membership check during an archiveInstructors()
+  // run (see isDepartmentMember() in lib/archiveInstructors.ts). The
+  // Archive page shows only rows with this set, so today's department is
+  // the baseline, new joiners are added on first sight, leavers stay, and
+  // people who had already left before the baseline never appear.
+  inArchiveScope: boolean("in_archive_scope").notNull().default(false),
   firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull().defaultNow(),
   lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }).notNull().defaultNow(),
 });

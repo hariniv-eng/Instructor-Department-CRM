@@ -31,6 +31,7 @@
 import { eq } from "drizzle-orm";
 import { db, instructorArchiveTable, instructorsTable } from "@workspace/db";
 import { normalize } from "./reconcile";
+import { CONFIRMED_INSTRUCTOR_DESPITE_FULL_ROSTER } from "../data/classificationOverrides";
 
 type LiveRow = typeof instructorsTable.$inferSelect;
 type ArchiveRow = typeof instructorArchiveTable.$inferSelect;
@@ -50,6 +51,41 @@ function isAbsent(value: unknown): boolean {
 // whatever's already archived.
 function keep<T>(liveValue: T, archivedValue: T): T {
   return isAbsent(liveValue) ? archivedValue : liveValue;
+}
+
+// Archive scope (2026-10-06, per request: today's department is the
+// baseline, new joiners get added, leavers stay, and anyone who left before
+// the baseline is never brought in). A person is "in scope" the first time
+// this returns true for their LIVE row, and archiveInstructors() below then
+// sets instructorArchiveTable.inArchiveScope permanently. This is the same
+// five-way department-membership test the live Instructors tab's
+// departmentRows uses (computeDepartmentAndExceptionRows in
+// routes/reports.ts): Darwin instructors, TeachOS-only payroll-converted,
+// TeachOS-only needs-review, mentors, ops team. Kept as a separate copy
+// here because lib/ can't import from routes/ (reconcile.ts -> this file ->
+// routes/reports.ts -> reconcile.ts would be a cycle) -- if that test ever
+// changes there, change it here too.
+function isConfirmedDespiteFullRoster(row: LiveRow): boolean {
+  const normalizedName = normalize(row.fullName);
+  return CONFIRMED_INSTRUCTOR_DESPITE_FULL_ROSTER.some((entry) => {
+    if (entry.teachosUserId) return entry.teachosUserId === row.teachosUserId;
+    if (entry.employeeId) return entry.employeeId === row.employeeId;
+    return normalize(entry.fullName) === normalizedName;
+  });
+}
+
+function isDepartmentMember(row: LiveRow): boolean {
+  const darwinInstructor = row.inDarwin && (!row.inDarwinFullRoster || isConfirmedDespiteFullRoster(row)) && !row.classification && (row.deptBucket === "tech" || row.deptBucket === "non_tech");
+  const teachosOnly = row.inTeachos && !row.inDarwin;
+  const payrollConverted = teachosOnly && row.classification === "payroll_converted";
+  const needsReview = teachosOnly
+    && row.classification !== "excluded_other_department"
+    && row.classification !== "excluded_non_department_team"
+    && row.classification !== "iit_kharagpur_team"
+    && row.classification !== "payroll_converted";
+  const mentor = row.inDarwin && !row.inDarwinFullRoster && row.classification === "mentor";
+  const opsTeam = row.classification === "excluded_ops_managers";
+  return darwinInstructor || payrollConverted || needsReview || mentor || opsTeam;
 }
 
 function findArchiveMatch(archived: ArchiveRow[], row: LiveRow): { match: ArchiveRow | undefined; matchedBy: string | null } {
@@ -75,8 +111,11 @@ export async function archiveInstructors(): Promise<{ created: number; updated: 
   for (const row of liveRows) {
     const { match, matchedBy } = findArchiveMatch(archivedRows, row);
 
+    const inScopeNow = isDepartmentMember(row);
+
     if (!match) {
       const [inserted] = await db.insert(instructorArchiveTable).values({
+        inArchiveScope: inScopeNow,
         employeeId: row.employeeId,
         teachosUserId: row.teachosUserId,
         fullName: row.fullName,
@@ -179,6 +218,10 @@ export async function archiveInstructors(): Promise<{ created: number; updated: 
       deploymentStatus: row.deploymentStatus,
       payrollCandidateMatched: row.payrollCandidateMatched,
       // -- archive bookkeeping --
+      // Sticky: once true, never flipped back (a person who leaves the
+      // department stays in the archive, per the "nobody is ever removed"
+      // rule).
+      inArchiveScope: match.inArchiveScope || inScopeNow,
       archiveMatchedBy: matchedBy,
       lastSyncedAt: new Date(),
     }).where(eq(instructorArchiveTable.id, match.id));

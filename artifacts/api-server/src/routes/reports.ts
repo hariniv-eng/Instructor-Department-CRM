@@ -1233,31 +1233,22 @@ router.get("/reports/instructor-contribution", requireAuth, requireRole("admin")
 router.get("/reports/instructor-archive", requireAuth, requireRole("admin"), async (_req, res) => {
   const allRows = await db.select().from(instructorArchiveTable);
 
-  // Rescoped from the live-presence-gated five-bucket filter to allRows
-  // (2026-10-05, diagnosed per report: "we have exits list as 27 but ...
-  // around 48 instructor have exit record"). The old filter required
-  // inDarwin (darwinInstructors/mentors) or inTeachos (payrollConverted/
-  // needsReview) to still be true -- but archiveInstructors() overwrites
-  // inDarwin/inTeachos on every sync to match each person's CURRENT live
-  // state (by design, so the archive always reflects reality). The moment
-  // someone fully exits everywhere -- gone from both Darwin and TeachOS --
-  // their archived row gets inDarwin=false AND inTeachos=false, which fails
-  // every one of those five buckets at once. Their row was never deleted
-  // (instructorArchiveTable never deletes), but it silently dropped out of
-  // the page entirely -- the exact same class of bug already fixed for
-  // exceptionRows above, just never applied here. Confirmed via diagnostic
-  // (_tmp_archive_exit_gap.ts, 2026-10-05): of 61 archived rows with a real
-  // exit signal, 34 were hidden this way, leaving only 27 visible.
-  //
-  // This mirrors exceptionRows exactly: keep every row that was ever
-  // genuinely part of the department, drop only rows filed under a
-  // different team from the start (NOT_DEPARTMENT_CLASSIFICATIONS).
-  // Darwin-full-roster-only unclassified rows (noise from the broad
-  // company-wide fallback match, never a real instructor) are still kept
-  // out unless explicitly confirmed via CONFIRMED_INSTRUCTOR_DESPITE_FULL_ROSTER,
-  // same safety gate as the live Instructors tab.
+  // Scope = rows flagged inArchiveScope (2026-10-06, per request: "today
+  // ~695 instructors are the baseline... new joiners get added, leavers
+  // stay, we're not going to get the exit data of previous instructors,
+  // we'll only concentrate from today"). archiveInstructors() sets that
+  // flag the first time a person passes the live department-membership
+  // test and never clears it, so: today's department members are in, anyone
+  // who joins later is added on first sight, someone who leaves (even once
+  // gone from both Darwin and TeachOS) stays visible with an Exited status,
+  // and people who had already left before the baseline were never flagged
+  // and never appear. This replaces the 2026-10-05 allRows-minus-exclusions
+  // scope, which wrongly pulled in 40 pre-baseline people (33 earlier exits
+  // + 7 with no exit record) and inflated the total to 727. The
+  // NOT_DEPARTMENT_CLASSIFICATIONS check still applies on top, so someone
+  // later reclassified into a different team drops out.
   const people = allRows
-    .filter((r) => !NOT_DEPARTMENT_CLASSIFICATIONS.has(r.classification ?? "") && (!r.inDarwinFullRoster || !!r.classification || isConfirmedDespiteFullRoster(r)))
+    .filter((r) => r.inArchiveScope && !NOT_DEPARTMENT_CLASSIFICATIONS.has(r.classification ?? ""))
     .map(toApiArchiveSummary)
     .sort((a, b) => a.full_name.localeCompare(b.full_name));
 
