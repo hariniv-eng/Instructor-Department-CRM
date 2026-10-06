@@ -73,7 +73,7 @@ const CATEGORY_TABS: { key: CategoryKey; label: string; icon: typeof UsersRound;
   { key: 'mentors', label: 'Mentors', icon: GraduationCap, description: 'Darwin — Mentors department.' },
   { key: 'instructors_mentors', label: 'Instructors + Mentors', icon: Users, description: 'Instructors and Mentors combined, without the Operations team.' },
   { key: 'ops_team', label: 'Operations team', icon: Briefcase, description: 'Darwin — Delivery Support (Ops), filed under Operations rather than Instructor or Mentor.' },
-  { key: 'exception', label: 'Exception', icon: AlertTriangle, description: 'People still in Darwin or TeachOS whose Darwinbox exit record is Approved or Pending With Approver. They stay here until a Capability Manager marks them Payroll Converted, or until they are gone from both Darwin and TeachOS (they then live on in the Instructor Archive).'' },
+  { key: 'exception', label: 'Exception', icon: AlertTriangle, description: 'People still in Darwin or TeachOS whose Darwinbox exit record is Approved or Pending With Approver. They stay here until a Capability Manager marks them Payroll Converted, or until they are gone from both Darwin and TeachOS (they then live on in the Instructor Archive).' },
 ];
 
 function formatCount(value: number | undefined) {
