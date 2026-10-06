@@ -89,3 +89,20 @@ export function regionLabelForInstitutes(institutes: string[] | null | undefined
   }
   return labels.join('; ');
 }
+
+// Same lookup, split into the two values the Instructors tab shows as separate
+// columns (campus_city / campus_state, 2026-10-06, per request). Each is the
+// distinct list across the person's campuses, joined with "; ", so a
+// two-campus person reads e.g. "Vizag; Hyderabad" / "AP; TS". Empty strings
+// when none of their campuses is on the sheet.
+export function campusCityAndState(institutes: string[] | null | undefined): { city: string; state: string } {
+  const cities: string[] = [];
+  const states: string[] = [];
+  for (const institute of institutes ?? []) {
+    const region = regionForInstitute(institute);
+    if (!region) continue;
+    if (!cities.includes(region.city)) cities.push(region.city);
+    if (!states.includes(region.state)) states.push(region.state);
+  }
+  return { city: cities.join('; '), state: states.join('; ') };
+}

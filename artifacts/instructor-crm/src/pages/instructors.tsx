@@ -4,7 +4,7 @@ import { useGetReportsInstructors, useUpdateInstructorGender, useUpdateInstructo
 import type { AccessSplit, InstructorSummary } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link } from 'wouter';
-import { regionLabelForInstitutes } from '@/lib/campusRegions';
+import { campusCityAndState } from '@/lib/campusRegions';
 import { PageIntro, EmptyState, QueryError, SkeletonBlock, DownloadCsvButton, MiniStat, pct, usePagedRows, TablePager } from '@/components/ui-pieces';
 import { downloadCsv, slugify, toCsv } from '@/lib/csv';
 import { toast } from '@/hooks/use-toast';
@@ -800,7 +800,7 @@ function gridColsClass(category: CategoryKey): string {
   // mixed into Department/Exception just reads "Nxtwave" in this column,
   // same as any non-payroll instructor. Never wrong, just not usually the
   // interesting value there.
-  if (category === 'instructors' || category === 'mentors' || category === 'instructors_mentors' || category === 'department' || category === 'exception') return 'grid-cols-[260px_190px_130px_280px_220px_150px_160px_170px_220px_160px_140px_190px_190px_160px_130px_130px_150px_190px_170px_140px_170px]';
+  if (category === 'instructors' || category === 'mentors' || category === 'instructors_mentors' || category === 'department' || category === 'exception') return 'grid-cols-[260px_190px_130px_280px_220px_150px_160px_170px_220px_160px_110px_140px_190px_190px_160px_130px_130px_150px_190px_170px_140px_170px]';
   // Operations team keeps its own shape (2026-09-21: not part of the above
   // request) -- no Campus column (ops rows aren't deployed to a teaching
   // campus the way instructors and mentors are), a single Department
@@ -918,7 +918,7 @@ function nameColumnLabel(category: CategoryKey): string {
 function downloadInstructorsCsv(category: CategoryKey, people: PersonWithAccess[]) {
   const headers = [nameColumnLabel(category), 'Designation', 'Employee ID', 'TeachOS User ID', 'Email', 'Location (Darwin)'];
   if (category === 'ops_team') headers.push('Department'); else headers.push('Subject', 'Department');
-  if (category !== 'ops_team') headers.push('Campus', 'campus_Region');
+  if (category !== 'ops_team') headers.push('Campus', 'campus_city', 'campus_state');
   headers.push('Date of joining');
   headers.push('Capability Manager');
   headers.push('Manager (Darwin)');
@@ -934,7 +934,7 @@ function downloadInstructorsCsv(category: CategoryKey, people: PersonWithAccess[
   const rows = people.map((person) => {
     const row: string[] = [person.full_name, person.designation ?? '', person.employee_id ?? '', person.teachos_user_id ?? '', person.org_email ?? '', person.work_location ?? ''];
     if (category === 'ops_team') row.push(person.department ?? ''); else row.push(person.dept_area ?? '', person.department ?? '');
-    if (category !== 'ops_team') row.push(person.institutes?.join(', ') ?? '', regionLabelForInstitutes(person.institutes));
+    if (category !== 'ops_team') { const place = campusCityAndState(person.institutes); row.push(person.institutes?.join(', ') ?? '', place.city, place.state); }
     row.push(person.date_of_joining ?? '');
     row.push(person.capability_manager ?? '');
     row.push(person.darwin_manager ?? '');
@@ -969,7 +969,7 @@ function CategoryTable({ category, people, backQuery }: { category: CategoryKey;
           <span>Email</span>
           <span>Location (Darwin)</span>
           {category === 'ops_team' ? <span>Department</span> : <><span>Subject</span><span>Department</span></>}
-          {category !== 'ops_team' && <><span>Campus</span><span>campus_Region</span></>}
+          {category !== 'ops_team' && <><span>Campus</span><span>campus_city</span><span>campus_state</span></>}
           <span>Date of joining</span>
           <span>Capability Manager</span>
           <span>Manager (Darwin)</span>
@@ -1033,7 +1033,7 @@ function PersonRow({ category, person, columns, backQuery }: { category: Categor
       <SubjectCell person={person} />
       <div className="truncate text-[12px] text-muted-foreground">{person.department || '—'}</div>
     </>}
-    {category !== 'ops_team' && <><div className="truncate text-[12px] text-muted-foreground">{campus}</div><div className="truncate text-[12px] text-muted-foreground">{regionLabelForInstitutes(person.institutes) || '—'}</div></>}
+    {category !== 'ops_team' && <><div className="truncate text-[12px] text-muted-foreground">{campus}</div><div className="truncate text-[12px] text-muted-foreground">{campusCityAndState(person.institutes).city || '—'}</div><div className="truncate text-[12px] text-muted-foreground">{campusCityAndState(person.institutes).state || '—'}</div></>}
     {/* No Darwin access right now -> blank (not "--"), per request: this
         column is specifically Darwin's date of joining, not a general
         "unknown" placeholder. See date_of_joining's gating in reports.ts. */}
