@@ -1,7 +1,8 @@
 import { Router, type IRouter } from "express";
 import { db, instructorsTable, instructorArchiveTable, darwinboxFullRosterTable, darwinboxExitsTable, instructorTrainingStatusTable, instructorContributionTable } from "@workspace/db";
 import { requireAuth, requireRole } from "../middlewares/auth";
-import { cell, normalize } from "../lib/reconcile";
+import { cell, normalize, parseLooseDate, toISODate } from "../lib/reconcile";
+import { archiveInstructors } from "../lib/archiveInstructors";
 import { TRAINING_COURSE_TAXONOMY } from "../data/trainingCourseTaxonomy";
 import { TECH_AREAS } from "../lib/departmentTaxonomy";
 import { CONFIRMED_INSTRUCTOR_DESPITE_FULL_ROSTER } from "../data/classificationOverrides";
@@ -55,7 +56,18 @@ type ArchiveRow = typeof instructorArchiveTable.$inferSelect;
 // of every recomputeStatuses() run, originally built 2026-09-28 for a
 // related but different request (payroll-converted instructors losing
 // their Darwin data). Nothing had ever read it back out until this route.
-const toApiArchiveSummary = (row: ArchiveRow) => {
+// Archive exit rule (2026-10-06, per request: "whoever data that we have
+// recorded in the exit, get their data only if status was approved ... and
+// also pending for approval"). On the Archive page a person counts as Exited
+// ONLY from a Darwinbox exit record that is Approved or Pending With Approver
+// (their most recent record wins). When the most recent record is
+// Revoked/Rejected, their latest Approved record still counts if they have
+// one; a Revoked/Rejected request or a cancelled pending one never does. A manually set exit date (Manual Status
+// control) is kept for people with no Approved record. Archive page only: the
+// live exit flag, Exception queue, Darwin Exit Details and sync are untouched.
+type ApprovedExitFallback = { status: string; date: string };
+
+const toApiArchiveSummary = (row: ArchiveRow, approvedExit?: ApprovedExitFallback) => {
   // Exit date prefers exitFlagDate -- the Darwinbox-exit-record-driven
   // field, auto-synced by recomputeStatuses() AND auto-CLEARED back to
   // null the moment that record's most recent status is Revoked or
@@ -77,7 +89,9 @@ const toApiArchiveSummary = (row: ArchiveRow) => {
   // archived one by employee_id (teachos_user_id/name fallback matching in
   // findArchiveMatch() could in principle still catch it, but that's the
   // same fallback every other archived person already relies on).
-  const exitDate = row.exitFlagDate ?? row.exitDate ?? null;
+  // NOTE (2026-10-06): the exitFlagDate-first logic described above is
+  // superseded by the Approved-only rule at the top of this block.
+  const exitDate = approvedExit?.date ?? row.exitDate ?? null;
   return {
     id: row.id,
     employee_id: row.employeeId,
@@ -108,7 +122,7 @@ const toApiArchiveSummary = (row: ArchiveRow) => {
     // from.
     is_payroll: row.classification === "payroll_converted",
     exit_date: exitDate,
-    exit_status: row.exitFlagStatus,
+    exit_status: approvedExit ? approvedExit.status : null,
     status: exitDate ? "Exited" : "Active",
     first_seen_at: row.firstSeenAt,
     last_synced_at: row.lastSyncedAt,
@@ -1231,7 +1245,16 @@ router.get("/reports/instructor-contribution", requireAuth, requireRole("admin")
 // column names line up). Admin-only, same gating as Darwin Exit Details
 // and Contribution -- this surfaces exit history, not just a live roster.
 router.get("/reports/instructor-archive", requireAuth, requireRole("admin"), async (_req, res) => {
-  const allRows = await db.select().from(instructorArchiveTable);
+  let allRows = await db.select().from(instructorArchiveTable);
+  // Self-healing baseline (2026-10-06): if no row has the inArchiveScope
+  // marker yet (first load after the column was added, or a startup seed
+  // that failed before the column existed), take the baseline right now
+  // instead of showing an empty page until the next sync -- see
+  // archiveInstructors() and seedArchiveScopeIfEmpty() in lib/scheduler.ts.
+  if (!allRows.some((r) => r.inArchiveScope)) {
+    await archiveInstructors();
+    allRows = await db.select().from(instructorArchiveTable);
+  }
 
   // Scope = rows flagged inArchiveScope (2026-10-06, per request: "today
   // ~695 instructors are the baseline... new joiners get added, leavers
@@ -1247,9 +1270,40 @@ router.get("/reports/instructor-archive", requireAuth, requireRole("admin"), asy
   // + 7 with no exit record) and inflated the total to 727. The
   // NOT_DEPARTMENT_CLASSIFICATIONS check still applies on top, so someone
   // later reclassified into a different team drops out.
+  // Archive exit lookup per employee_id (see the Archive exit rule above
+  // ApprovedExitFallback): the person's most recent exit record counts when
+  // it is Approved or Pending With Approver; when the most recent record is
+  // Revoked/Rejected/anything else, fall back to their latest Approved
+  // record (a cancelled pending request never counts).
+  const exitRows = await db.select().from(darwinboxExitsTable);
+  type Seen = { rank: number; id: number; status: string; iso: string | null };
+  const newer = (a: Seen, existing?: Seen) => !existing || a.rank > existing.rank || (a.rank === existing.rank && a.id > existing.id);
+  const latestByEmployee = new Map<string, Seen>();
+  const approvedByEmployee = new Map<string, Seen>();
+  for (const exit of exitRows) {
+    if (!exit.employeeId) continue;
+    const status = (cell(exit.rawData, "Status", "status") ?? "").trim();
+    const iso = toISODate(cell(exit.rawData, "Exit Date", "exit_date"));
+    const seen: Seen = { rank: iso ? parseLooseDate(iso) : -Infinity, id: exit.id, status, iso };
+    if (newer(seen, latestByEmployee.get(exit.employeeId))) latestByEmployee.set(exit.employeeId, seen);
+    if (status.toLowerCase() === "approved" && iso && newer(seen, approvedByEmployee.get(exit.employeeId))) approvedByEmployee.set(exit.employeeId, seen);
+  }
+  const archiveExitByEmployee = new Map<string, ApprovedExitFallback>();
+  for (const [employeeId, latest] of latestByEmployee) {
+    const lower = latest.status.toLowerCase();
+    if (lower === "approved" && latest.iso) {
+      archiveExitByEmployee.set(employeeId, { status: "Approved", date: latest.iso });
+    } else if (lower.startsWith("pending") && latest.iso) {
+      archiveExitByEmployee.set(employeeId, { status: latest.status, date: latest.iso });
+    } else {
+      const approved = approvedByEmployee.get(employeeId);
+      if (approved?.iso) archiveExitByEmployee.set(employeeId, { status: "Approved", date: approved.iso });
+    }
+  }
+
   const people = allRows
     .filter((r) => r.inArchiveScope && !NOT_DEPARTMENT_CLASSIFICATIONS.has(r.classification ?? ""))
-    .map(toApiArchiveSummary)
+    .map((r) => toApiArchiveSummary(r, r.employeeId ? archiveExitByEmployee.get(r.employeeId) : undefined))
     .sort((a, b) => a.full_name.localeCompare(b.full_name));
 
   res.json({

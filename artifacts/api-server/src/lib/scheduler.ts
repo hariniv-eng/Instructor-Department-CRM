@@ -140,4 +140,5 @@ export function startScheduler() {
   setTimeout(seedArchiveScopeIfEmpty, 5 * 1000);
   setTimeout(runCatchUpIfOverdue, CATCH_UP_STARTUP_DELAY_MS);
   setInterval(runCatchUpIfOverdue, CATCH_UP_CHECK_INTERVAL_MS);
+  setInterval(seedArchiveScopeIfEmpty, CATCH_UP_CHECK_INTERVAL_MS);
 }
