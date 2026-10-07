@@ -1,27 +1,16 @@
 import { Router, type IRouter } from "express";
 import { db, instructorsTable, instructorArchiveTable, darwinboxActiveTable, darwinboxFullRosterTable, darwinboxExitsTable, instructorTrainingStatusTable, instructorContributionTable } from "@workspace/db";
 import { requireAuth, requireRole } from "../middlewares/auth";
-import { cell, normalize, parseLooseDate, toISODate } from "../lib/reconcile";
+import { cell, parseLooseDate, toISODate } from "../lib/reconcile";
 import { archiveInstructors } from "../lib/archiveInstructors";
 import { TRAINING_COURSE_TAXONOMY } from "../data/trainingCourseTaxonomy";
 import { TECH_AREAS } from "../lib/departmentTaxonomy";
-import { CONFIRMED_INSTRUCTOR_DESPITE_FULL_ROSTER } from "../data/classificationOverrides";
+import { isPinnedConfirmedInstructor } from "../data/classificationOverrides";
 
-// Checked by both darwinInstructorsForCount (computeDepartmentAndExceptionRows
-// below) and the Instructor Archive route's own duplicate of that same
-// predicate -- see CONFIRMED_INSTRUCTOR_DESPITE_FULL_ROSTER's own comment in
-// classificationOverrides.ts for the full reasoning. Matching precedence
-// (teachosUserId, then employeeId, then normalized full name) mirrors
-// reconcile.ts's own findOverride() used for the other override lists in
-// that same file.
-function isConfirmedDespiteFullRoster(row: { teachosUserId: string | null; employeeId: string | null; fullName: string }): boolean {
-  const normalizedRowName = normalize(row.fullName);
-  return CONFIRMED_INSTRUCTOR_DESPITE_FULL_ROSTER.some((entry) => {
-    if (entry.teachosUserId) return entry.teachosUserId === row.teachosUserId;
-    if (entry.employeeId) return entry.employeeId === row.employeeId;
-    return normalize(entry.fullName) === normalizedRowName;
-  });
-}
+// Pinned edge-case instructors (NW0005068): see isPinnedConfirmedInstructor() in
+// data/classificationOverrides.ts. Kept counted on every sync until their Darwin
+// department actually changes.
+const isConfirmedDespiteFullRoster = isPinnedConfirmedInstructor;
 
 // Classifications that mean a row was never really part of the Instructor
 // Department to begin with -- a genuinely different team, reviewed and
@@ -311,7 +300,7 @@ function computeDepartmentAndExceptionRows(rawRows: InstructorRow[]) {
   // can't be trusted for her. Her row is treated here as an unclassified
   // Tech instructor (department bucket kept if it already is tech/non_tech).
   const allRows = rawRows.map((r) => (isConfirmedDespiteFullRoster(r)
-    ? { ...r, classification: null, deptBucket: r.deptBucket === "non_tech" ? "non_tech" : "tech" }
+    ? { ...r, inDarwin: true, inDarwinFullRoster: true, classification: null, deptBucket: r.deptBucket === "non_tech" ? "non_tech" : "tech" }
     : r));
   // Mentors count (2026-09-04, per request): sourced from Darwin directly,
   // not scoped to TeachOS — same population /reports/darwin-breakdown's
@@ -676,38 +665,20 @@ router.get("/reports/instructors", async (_req, res) => {
   // comment for the full "who counts as an Exception" reasoning.
 
   // Exception 2 (Overview), 2026-10-07 -- two lists, plus the "date_of_exit"
-  // column. date_of_exit is Darwinbox's own "Date Of Exit" field on the
-  // employee master record (the actual exit date, not the resignation
-  // request date exit_flag_date carries), looked up by employee ID in the
-  // Instructors-department pull first, then the full company roster.
+  // column. date_of_exit comes ONLY from the Darwinbox exit data (the "Exit
+  // Date" on the Darwin Exit Details tab, stored on the row as exitFlagDate) --
+  // 2026-10-07, per request, not from the employee-master "Date Of Exit".
   //   * Exit list: reviewed Exited/Absconded and still in TeachOS -- their
   //     TeachOS access should be removed -- PLUS anyone reviewed as Serving
-  //     Notice Period whose Date Of Exit is before today (IST), i.e. the
-  //     notice period finished yesterday or earlier ("once the date of exit is
-  //     done, the next day all the serving notice instructors move to the
-  //     exit list"). They only join it while still in TeachOS.
+  //     Notice Period whose exit date is before today (IST), i.e. the notice
+  //     period finished yesterday or earlier ("once the date of exit is done,
+  //     the next day all the serving notice instructors move to the exit
+  //     list"). They only join it while still in TeachOS.
   //   * Serving notice list: everyone reviewed as Serving Notice Period whose
-  //     Date Of Exit has not passed yet (or Darwin has no Date Of Exit for
-  //     them, so there is nothing to move them on).
-  const noticeIds = new Set([...exceptionRemoveRows, ...servingNoticeRows].map((r) => r.employeeId).filter((id): id is string => !!id));
-  const dateOfExitById = new Map<string, string>();
-  if (noticeIds.size > 0) {
-    for (const table of [darwinboxActiveTable, darwinboxFullRosterTable]) {
-      const stored = await db.select({ employeeId: table.employeeId, rawData: table.rawData }).from(table);
-      for (const r of stored) {
-        if (!r.employeeId || !noticeIds.has(r.employeeId) || dateOfExitById.has(r.employeeId)) continue;
-        const iso = toISODate(cell(r.rawData as Record<string, unknown>, "Date Of Exit", "date_of_exit"));
-        if (iso) dateOfExitById.set(r.employeeId, iso);
-      }
-    }
-  }
+  //     exit date has not passed yet (or the exit data has none for them, so
+  //     there is nothing to move them on).
   const todayIst = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
-  // Darwin's employee-master Date Of Exit first, else the exit record's own Exit
-  // Date (what the Darwin Exit Details tab shows for every exit candidate) --
-  // 2026-10-07, per report: the master field is blank for most people who have
-  // already left Darwin's roster, so the column was empty for them.
-  const exitDateOf = (r: InstructorRow) => (r.employeeId ? dateOfExitById.get(r.employeeId) ?? null : null) ?? r.exitFlagDate ?? null;
-  const noticeEnded = (r: InstructorRow) => { const d = exitDateOf(r); return !!d && d < todayIst; };
+  const noticeEnded = (r: InstructorRow) => !!r.exitFlagDate && r.exitFlagDate < todayIst;
   const exitListRows = [...exceptionRemoveRows, ...servingNoticeRows.filter((r) => r.inTeachos && noticeEnded(r))];
   const noticeListRows = servingNoticeRows.filter((r) => !noticeEnded(r));
 
@@ -728,7 +699,7 @@ router.get("/reports/instructors", async (_req, res) => {
   for (const split of [accessBreakdown.exception_remove, accessBreakdown.exception_notice]) {
     for (const bucket of [split.darwin_only, split.both, split.teachos_only]) {
       for (const person of bucket.people as Array<Record<string, unknown>>) {
-        person.date_of_exit = (typeof person.employee_id === "string" && dateOfExitById.get(person.employee_id)) || (typeof person.exit_flag_date === "string" ? person.exit_flag_date : null) || null;
+        person.date_of_exit = typeof person.exit_flag_date === "string" ? person.exit_flag_date : null;
       }
     }
   }

@@ -6,7 +6,7 @@
 
 import { and, eq } from "drizzle-orm";
 import { db, instructorsTable, darwinboxExitsTable, teachosIdReferenceTable } from "@workspace/db";
-import { EXCLUDED_EMPLOYEES, type ExcludedOverride, OTHER_DEPARTMENT_EMPLOYEES, type OtherDepartmentOverride } from "../data/classificationOverrides";
+import { hasConfirmedInstructorDesignation, EXCLUDED_EMPLOYEES, type ExcludedOverride, OTHER_DEPARTMENT_EMPLOYEES, type OtherDepartmentOverride } from "../data/classificationOverrides";
 import { VALID_CAPABILITY_MANAGERS, CAPABILITY_MANAGER_ALIASES } from "../data/validCapabilityManagers";
 import { classifyDepartment, classifyDeployment } from "./departmentTaxonomy";
 import { archiveInstructors } from "./archiveInstructors";
@@ -632,7 +632,50 @@ export async function reconcileDarwinFullRosterFallback(fullRosterRows: SheetRow
     matchedCount += 1;
   }
 
-  return { candidates: candidates.length, matched: matchedCount };
+  // Confirmed-designation pass (2026-10-07): anyone whose Darwin designation
+  // is on CONFIRMED_INSTRUCTOR_DESIGNATIONS ("Software Development Instructor
+  // (NWD_NIAT_AC_I&M_SD_IN)") is an instructor, even when they aren't in
+  // TeachOS at all -- so they must exist as a live row to be counted. Active
+  // people only (exits go through the exit data). Existing rows are only
+  // switched on if the sync left them out of Darwin; missing ones are created.
+  let designationAdded = 0;
+  const everyone = await db.select().from(instructorsTable);
+  for (const match of fullRosterRows) {
+    if (!hasConfirmedInstructorDesignation(cell(match, "Designation", "designation"))) continue;
+    const status = cell(match, "Employee Status", "darwin_employee_status") ?? "Active";
+    if (status.trim().toLowerCase() !== "active") continue;
+    const employeeId = cell(match, "Employee Id", "employee_id");
+    const fullName = cell(match, "Full Name", "full_name");
+    if (!fullName) continue;
+    const existing = everyone.find((p) => (employeeId && p.employeeId === employeeId) || normalize(p.fullName) === normalize(fullName));
+    if (existing && existing.inDarwin) continue;
+    const values = {
+      inDarwin: true,
+      inDarwinFullRoster: true,
+      employeeId: employeeId ?? existing?.employeeId ?? null,
+      orgEmail: cell(match, "Org Email Id", "org_email") ?? existing?.orgEmail ?? null,
+      mobile: cell(match, "Primary Mobile Number", "mobile") ?? existing?.mobile ?? null,
+      dateOfJoining: cell(match, "Date Of Joining", "date_of_joining") ?? existing?.dateOfJoining ?? null,
+      department: cell(match, "Department", "department") ?? existing?.department ?? null,
+      designation: cell(match, "Designation", "designation"),
+      directManager: cell(match, "Direct Manager", "direct_manager") ?? existing?.directManager ?? null,
+      workLocation: cell(match, "Work Location", "work_location") ?? existing?.workLocation ?? null,
+      workspace: cell(match, "Workspace", "workspace") ?? existing?.workspace ?? null,
+      gender: cell(match, "Gender", "gender") ?? existing?.gender ?? null,
+      currentState: cell(match, "Current State", "current_state") ?? existing?.currentState ?? null,
+      currentCity: cell(match, "Current City", "current_city") ?? existing?.currentCity ?? null,
+      darwinEmployeeStatus: status,
+    };
+    if (existing) {
+      await db.update(instructorsTable).set(values).where(eq(instructorsTable.id, existing.id));
+    } else {
+      const [created] = await db.insert(instructorsTable).values({ ...values, fullName, inTeachos: false, institutes: [], computedStatus: "pending_deployment", notes: null }).returning();
+      everyone.push(created);
+    }
+    designationAdded += 1;
+  }
+
+  return { candidates: candidates.length, matched: matchedCount, designationAdded };
 }
 
 export async function reconcileExits(rows: SheetRow[]) {

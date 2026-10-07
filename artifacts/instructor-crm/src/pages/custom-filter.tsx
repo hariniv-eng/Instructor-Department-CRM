@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { useLocation } from 'wouter';
+import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'wouter';
 import { ArrowLeft, ChevronDown, ChevronRight, SlidersHorizontal, X } from 'lucide-react';
 import { useGetReportsInstructors } from '@workspace/api-client-react';
 import { campusCityAndState } from '@/lib/campusRegions';
@@ -80,21 +80,49 @@ function matches(person: PersonWithAccess, selection: Selection, exceptKey?: str
   });
 }
 
+function serializeQuery(selection: Selection, from: string): string {
+  const params = new URLSearchParams();
+  const compact: Selection = {};
+  for (const [key, list] of Object.entries(selection)) if (list.length > 0) compact[key] = list;
+  if (Object.keys(compact).length > 0) params.set('f', JSON.stringify(compact));
+  if (from) params.set('from', from);
+  return params.toString();
+}
+
+function parseQuery(search: string): { selection: Selection; from: string } {
+  const params = new URLSearchParams(search);
+  const selection: Selection = {};
+  try {
+    const raw = JSON.parse(params.get('f') ?? '{}') as Record<string, unknown>;
+    for (const facet of FACETS) {
+      const list = raw[facet.key];
+      if (Array.isArray(list)) selection[facet.key] = list.filter((value): value is string => typeof value === 'string');
+    }
+  } catch {
+    // A stale or hand-edited URL just starts with no filters.
+  }
+  return { selection, from: params.get('from') ?? '' };
+}
+
 export default function CustomFilterPage() {
   const reportQuery = useGetReportsInstructors();
   const report = reportQuery.data;
   const everyone = useMemo(() => mergedPeople(report?.access_breakdown?.department), [report]);
-  const [selection, setSelection] = useState<Selection>({});
+  // Filters live in the URL (?f=...) so opening a person's profile and coming
+  // back -- or a reload, or the browser's back button -- keeps every pick.
+  // `from` is the Instructors tab's own filter query, carried through so "Back
+  // to Instructors" can restore that tab exactly as it was left.
+  const initialQuery = useMemo(() => parseQuery(typeof window !== 'undefined' ? window.location.search : ''), []);
+  const [selection, setSelection] = useState<Selection>(initialQuery.selection);
   const [openFacet, setOpenFacet] = useState<string | null>('bifurcation');
-  const [, setLocation] = useLocation();
-  // "Back to Instructors" returns to the page you came from (normally the
-  // Instructors tab, with its filters still applied); opened directly in a new
-  // tab it falls back to /instructors.
-  const goBack = () => {
-    if (typeof window !== 'undefined' && window.history.length > 1) window.history.back();
-    else setLocation('/instructors');
-  };
-
+  const from = initialQuery.from;
+  const cfQuery = serializeQuery(selection, from);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const next = cfQuery ? `/instructors/custom-filter?${cfQuery}` : '/instructors/custom-filter';
+    if (window.location.pathname + window.location.search !== next) window.history.replaceState(window.history.state, '', next);
+  }, [cfQuery]);
+  const backHref = from ? `/instructors?${from}` : '/instructors';
   const filtered = useMemo(() => everyone.filter((person) => matches(person, selection)), [everyone, selection]);
   const activeCount = Object.values(selection).reduce((sum, list) => sum + list.length, 0);
 
@@ -130,7 +158,7 @@ export default function CustomFilterPage() {
   // Back button, heading and table. It stays in view under the sticky header.
   return <div className="flex w-full flex-col gap-5 lg:flex-row lg:items-start">
     <div className="min-w-0 flex-1">
-      <button type="button" onClick={goBack} data-testid="button-custom-filter-back" className="mb-4 inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3.5 py-2 text-[12px] font-bold text-foreground transition-colors hover:bg-secondary"><ArrowLeft size={14} /> Back to Instructors</button>
+      <Link href={backHref} data-testid="button-custom-filter-back" className="mb-4 inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3.5 py-2 text-[12px] font-bold text-foreground transition-colors hover:bg-secondary"><ArrowLeft size={14} /> Back to Instructors</Link>
 
       <PageIntro
         eyebrow="Instructors / Custom filter"
@@ -162,7 +190,7 @@ export default function CustomFilterPage() {
 
       {filtered.length === 0
         ? <EmptyState title="No one matches these filters" description="Remove a filter chip or clear everything to see people again." />
-        : <CategoryTable category="department" people={filtered} backQuery="" />}
+        : <CategoryTable category="department" people={filtered} backQuery={cfQuery} backPrefix="cf:" linkMode="name" />}
       </section>}
     </div>
 
