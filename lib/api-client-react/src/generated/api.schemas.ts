@@ -443,6 +443,8 @@ export interface InstructorSummary {
   /** @nullable */
   exit_flag_date?: string | null;
   /** @nullable */
+  date_of_exit?: string | null;
+  /** @nullable */
   exit_verification: InstructorSummaryExitVerification;
   /** @nullable */
   enrolled_plans: string | null;

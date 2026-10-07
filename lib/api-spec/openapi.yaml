@@ -878,6 +878,9 @@ components:
         # Exception 2 exit_date column).
         exit_flag_status: { type: ["string", "null"] }
         exit_flag_date: { type: ["string", "null"], format: date }
+        # Darwinbox "Date Of Exit" (employee master record) -- only filled on
+        # the Exception 2 (access_breakdown.exception_remove) people.
+        date_of_exit: { type: ["string", "null"], format: date }
         # Capability Manager's manual read on an exit-flagged record,
         # settable via PATCH /instructors/{id}/exit-verification by either
         # Admin or Manager -- see that endpoint's description for why this
