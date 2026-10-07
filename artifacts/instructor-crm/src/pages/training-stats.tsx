@@ -81,7 +81,7 @@ const QUERY_KEY = ['reports', 'training-stats'];
 // than an error.
 const SUB_TABS: { key: string; label: string; trackGroups: string[]; subjectAreas: string[] | 'TECH' }[] = [
   { key: 'tech', label: 'Tech', trackGroups: ['Frontend Development', 'Backend Development', 'DSA', 'Gen AI', 'DSML'], subjectAreas: 'TECH' },
-  { key: 'math_aptitude', label: 'Math and Aptitude', trackGroups: ['Aptitude', 'Math'], subjectAreas: ['Aptitude', 'Math'] },
+  { key: 'math_aptitude', label: 'Maths and Aptitude', trackGroups: ['Aptitude', 'Maths'], subjectAreas: ['Aptitude', 'Maths'] },
   { key: 'english', label: 'English', trackGroups: ['English'], subjectAreas: ['English'] },
 ];
 

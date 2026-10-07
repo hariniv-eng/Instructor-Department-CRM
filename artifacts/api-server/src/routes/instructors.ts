@@ -3,7 +3,7 @@ import { and, arrayContains, asc, eq, ilike, or } from "drizzle-orm";
 import { db, instructorsTable } from "@workspace/db";
 import { requireAuth, requireRole } from "../middlewares/auth";
 import { VALID_CAPABILITY_MANAGERS } from "../data/validCapabilityManagers";
-import { SUBJECT_AREAS } from "../lib/departmentTaxonomy";
+import { SUBJECT_AREAS, normalizeSubjectArea } from "../lib/departmentTaxonomy";
 
 const router: IRouter = Router();
 const toApiInstructor = (row: typeof instructorsTable.$inferSelect) => ({
@@ -49,8 +49,8 @@ const toApiInstructor = (row: typeof instructorsTable.$inferSelect) => ({
   // Department taxonomy + deployment status — see
   // artifacts/api-server/src/lib/departmentTaxonomy.ts.
   dept_bucket: row.deptBucket,
-  dept_area: row.deptArea,
-  manual_dept_area: row.manualDeptArea,
+  dept_area: normalizeSubjectArea(row.deptArea),
+  manual_dept_area: normalizeSubjectArea(row.manualDeptArea),
   deployment_status: row.deploymentStatus,
   in_darwin_full_roster: row.inDarwinFullRoster,
 });
