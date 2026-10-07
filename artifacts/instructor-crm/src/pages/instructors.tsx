@@ -201,7 +201,7 @@ const SUBJECT_AREAS: string[] = [
   'Interdisciplinary & Applied Sciences',
   'English',
   'Aptitude',
-  'Math',
+  'Maths',
 ];
 
 // URL <-> filter-state sync (2026-09-28, per request: "whenever we go back

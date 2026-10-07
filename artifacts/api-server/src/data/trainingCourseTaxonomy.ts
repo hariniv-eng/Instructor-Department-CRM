@@ -21,7 +21,7 @@
 // why each pending one is unresolved. Per request (2026-09-23): "Build now,
 // mark pending" -- ship with what's confirmed, fill in the rest once
 // answered.
-export type TrainingTrackGroup = "Frontend Development" | "Backend Development" | "DSA" | "Gen AI" | "DSML" | "Aptitude" | "Math";
+export type TrainingTrackGroup = "Frontend Development" | "Backend Development" | "DSA" | "Gen AI" | "DSML" | "Aptitude" | "Maths";
 
 export type TrainingCourseDef = {
   key: string;
@@ -138,9 +138,9 @@ export const TRAINING_COURSE_TAXONOMY: TrainingCourseDef[] = [
   // to Ankush, included for now, easy to split out if it turns out wrong.
   // "Probability and Statistics" similarly combines 3 spelling/punctuation
   // variants ("(P&S)" suffix, "&" vs "and").
-  { key: "math_for_cs", label: "Mathematics for Computer Science", trackGroup: "Math", courseTitles: ["Math For Computer Science", "Mathematics For Computer Science - AU", "Math for CSE", "Mathematics for Computer Science"] },
-  { key: "probability_statistics", label: "Probability and Statistics", trackGroup: "Math", courseTitles: ["Probability and Statistics(P&S)", "Probability and Statistics", "Probability & Statistics"] },
-  { key: "linear_algebra_calculus", label: "Linear Algebra and Calculus", trackGroup: "Math", courseTitles: ["Linear Algebra and Calculus"] },
+  { key: "math_for_cs", label: "Mathematics for Computer Science", trackGroup: "Maths", courseTitles: ["Math For Computer Science", "Mathematics For Computer Science - AU", "Math for CSE", "Mathematics for Computer Science"] },
+  { key: "probability_statistics", label: "Probability and Statistics", trackGroup: "Maths", courseTitles: ["Probability and Statistics(P&S)", "Probability and Statistics", "Probability & Statistics"] },
+  { key: "linear_algebra_calculus", label: "Linear Algebra and Calculus", trackGroup: "Maths", courseTitles: ["Linear Algebra and Calculus"] },
 ];
 
 export function resolvedCourseDefs(): TrainingCourseDef[] {

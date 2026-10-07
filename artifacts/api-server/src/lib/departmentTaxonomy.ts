@@ -63,7 +63,7 @@ const RULES: Rule[] = [
     bucket: "non_tech",
     area: "Aptitude",
   },
-  { match: /mathematical sciences/i, bucket: "non_tech", area: "Math" },
+  { match: /mathematical sciences/i, bucket: "non_tech", area: "Maths" },
 ];
 
 // Every distinct area name RULES above can produce (2026-09-15, per
@@ -71,6 +71,13 @@ const RULES: Rule[] = [
 // manual Subject override against (see routes/instructors.ts), so that
 // list can never drift out of sync with what this taxonomy actually
 // recognizes. Derived rather than hand-duplicated on purpose.
+// Subject spelling (2026-10-07, per request: "Math" -> "Maths"). Values saved
+// before the rename (a manual Subject, an archived row) still say "Math", so
+// everything shown to the user passes through this.
+export function normalizeSubjectArea<T extends string | null | undefined>(area: T): T | string {
+  return typeof area === "string" && area.trim().toLowerCase() === "math" ? "Maths" : area;
+}
+
 export const SUBJECT_AREAS: string[] = [...new Set(RULES.map((rule) => rule.area).filter((area): area is string => !!area))];
 
 // Same idea, narrowed to just the "tech" bucket's areas (2026-09-24, added
@@ -103,7 +110,7 @@ const CATEGORY_FALLBACK: Record<string, { bucket: Exclude<DeptBucket, null>; are
   TECH: { bucket: "tech", area: null },
   ENGLISH: { bucket: "non_tech", area: "English" },
   APTITUDE: { bucket: "non_tech", area: "Aptitude" },
-  MATH: { bucket: "non_tech", area: "Math" },
+  MATH: { bucket: "non_tech", area: "Maths" },
 };
 
 export function classifyDepartment(
