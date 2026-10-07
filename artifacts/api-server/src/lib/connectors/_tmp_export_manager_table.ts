@@ -33,7 +33,7 @@ async function main() {
     ? new BigQuery({ projectId, credentials: JSON.parse(config.BIGQUERY_CREDENTIALS_JSON) })
     : new BigQuery({ projectId });
 
-  const [tables] = await bq.dataset(dataset).getTables();
+  const [tables] = await bq.dataset(dataset!).getTables();
   const managerTables = tables.map((t) => t.id ?? "").filter((id) => /manager/i.test(id));
   console.log(`Tables in ${projectId}.${dataset} with "manager" in the name:`);
   for (const id of managerTables) console.log(`  ${id}`);

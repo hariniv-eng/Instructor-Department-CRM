@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Archive, RefreshCw } from 'lucide-react';
-import { PageIntro, EmptyState, QueryError, SkeletonBlock, TopStat, TablePager, TableSearchInput, usePagedRows, formatKpi } from '@/components/ui-pieces';
+import { PageIntro, EmptyState, QueryError, SkeletonBlock, TopStat, TablePager, TableSearchInput, DownloadCsvButton, usePagedRows, formatKpi } from '@/components/ui-pieces';
+import { downloadCsv, toCsv } from '@/lib/csv';
 
 // Instructor Archive (2026-10-05, made visible per request: "we will
 // create a data base of all the instructor department data ... from now
@@ -122,6 +123,19 @@ export default function InstructorArchivePage() {
   }, [data, search, statusFilter]);
   const pager = usePagedRows(filteredRows, 50);
 
+  // Downloads EVERYTHING the current search + status filter matches (all
+  // pages, not just the one on screen), same columns as the table.
+  const handleDownload = () => {
+    const headers = ['Name', 'Employee ID', 'Designation', 'Bifurcation', 'Subject', 'Department', 'Campus', 'Capability Manager', 'Manager (Darwin)', 'Date of joining', 'Payroll', 'Status', 'Exit Date', 'Exit Status (Darwin)'];
+    const rows = filteredRows.map((row) => [
+      row.full_name, row.employee_id ?? '', row.designation ?? '', bifurcationLabel(row.classification), row.dept_area ?? '', row.department ?? '',
+      row.institutes.join(', '), row.capability_manager ?? '', row.darwin_manager ?? '', row.date_of_joining ?? '', row.is_payroll ? 'Payroll' : 'Nxtwave',
+      row.status, row.exit_date ?? '', row.exit_status ?? '',
+    ]);
+    const suffix = statusFilter === 'all' ? '' : `-${statusFilter}`;
+    downloadCsv(`instructor-archive${suffix}.csv`, toCsv(headers, rows));
+  };
+
   const filterButtons: { key: typeof statusFilter; label: string }[] = [
     { key: 'all', label: 'All' },
     { key: 'active', label: 'Active' },
@@ -164,7 +178,10 @@ export default function InstructorArchivePage() {
         />
       </div>
       {data.total > 0 && <div className="flex flex-col items-end gap-2">
-        <TableSearchInput value={search} onChange={setSearch} testId="input-search-archive" />
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <TableSearchInput value={search} onChange={setSearch} testId="input-search-archive" />
+          <DownloadCsvButton onClick={handleDownload} disabled={filteredRows.length === 0} label={`Download CSV (${filteredRows.length})`} testId="button-download-archive-csv" />
+        </div>
         <div className="flex gap-1.5">
           {filterButtons.map((btn) => <button
             key={btn.key}

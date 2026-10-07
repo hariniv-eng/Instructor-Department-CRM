@@ -390,6 +390,12 @@ function ExceptionReviewPanel({ people, onClose }: { people: InstructorSummary[]
   </section>;
 }
 
+function formatExitDate(value?: string | null) {
+  if (!value) return '—';
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
 // Exception 2: the removal worklist. Everything a person needs to find and
 // remove the record in TeachOS is one click from the clipboard.
 function ExceptionRemovePanel({ people, onClose }: { people: InstructorSummary[]; onClose: () => void }) {
@@ -403,7 +409,7 @@ function ExceptionRemovePanel({ people, onClose }: { people: InstructorSummary[]
       window.setTimeout(() => setCopiedAll(false), 1500);
     }
   };
-  const handleDownload = () => downloadCsv('exception-2-remove-from-teachos.csv', toCsv(['Name', 'Employee ID', 'TeachOS User ID', 'Subject', 'Capability Manager'], filtered.map((p) => [p.full_name, p.employee_id ?? '', p.teachos_user_id ?? '', p.dept_area ?? '', p.capability_manager ?? ''])));
+  const handleDownload = () => downloadCsv('exception-2-remove-from-teachos.csv', toCsv(['Name', 'Employee ID', 'TeachOS User ID', 'Subject', 'Capability Manager', 'exit_date'], filtered.map((p) => [p.full_name, p.employee_id ?? '', p.teachos_user_id ?? '', p.dept_area ?? '', p.capability_manager ?? '', p.exit_flag_date ?? ''])));
   return <section className="mt-5 rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6 animate-rise">
     <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
       <div>
@@ -425,7 +431,7 @@ function ExceptionRemovePanel({ people, onClose }: { people: InstructorSummary[]
     <div className="max-h-[420px] overflow-auto rounded-lg border border-border">
       <table className="w-full text-left text-[12px]">
         <thead className="sticky top-0 bg-secondary font-mono-ui text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
-          <tr><th className="px-3 py-2">Name</th><th className="px-3 py-2">Employee ID</th><th className="px-3 py-2">TeachOS user ID</th><th className="px-3 py-2">Subject</th><th className="px-3 py-2">Capability Manager</th></tr>
+          <tr><th className="px-3 py-2">Name</th><th className="px-3 py-2">Employee ID</th><th className="px-3 py-2">TeachOS user ID</th><th className="px-3 py-2">Subject</th><th className="px-3 py-2">Capability Manager</th><th className="px-3 py-2">exit_date</th></tr>
         </thead>
         <tbody>
           {filtered.map((p) => <tr key={p.id} className="border-t border-border/70">
@@ -434,8 +440,9 @@ function ExceptionRemovePanel({ people, onClose }: { people: InstructorSummary[]
             <td className="px-3 py-2 text-muted-foreground"><CopyValue value={p.teachos_user_id} mono testId={`button-copy-user-id-${p.id}`} /></td>
             <td className="px-3 py-2 text-muted-foreground">{p.dept_area ?? '—'}</td>
             <td className="px-3 py-2 text-muted-foreground"><CopyValue value={p.capability_manager} testId={`button-copy-capability-manager-${p.id}`} /></td>
+            <td className="whitespace-nowrap px-3 py-2 text-muted-foreground" data-testid={`text-exit-date-${p.id}`}>{formatExitDate(p.exit_flag_date)}</td>
           </tr>)}
-          {filtered.length === 0 && <tr><td colSpan={5} className="px-3 py-8 text-center text-muted-foreground">{people.length === 0 ? 'No one is waiting to be removed from TeachOS.' : 'No one matches this search.'}</td></tr>}
+          {filtered.length === 0 && <tr><td colSpan={6} className="px-3 py-8 text-center text-muted-foreground">{people.length === 0 ? 'No one is waiting to be removed from TeachOS.' : 'No one matches this search.'}</td></tr>}
         </tbody>
       </table>
     </div>
