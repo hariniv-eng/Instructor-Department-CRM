@@ -92,6 +92,12 @@ export interface ConfirmedInstructorOverride {
   teachosUserId?: string;
   employeeId?: string;
   fullName: string;
+  // Pin (2026-10-07): the override holds on EVERY sync, even a day the
+  // Darwin/TeachOS match drops her, for as long as her Darwin department is
+  // this value (or is blank because the sync didn't return one). Once
+  // Darwin shows a DIFFERENT department, the override stops applying and the
+  // normal automatic classification takes over.
+  whileDepartment?: string;
   reason: string;
   decidedDate: string;
 }
@@ -119,5 +125,40 @@ export interface ConfirmedInstructorOverride {
 // this entry becomes a harmless no-op -- safe to leave in place rather than
 // needing to remember to remove it later.
 export const CONFIRMED_INSTRUCTOR_DESPITE_FULL_ROSTER: ConfirmedInstructorOverride[] = [
-  { employeeId: "NW0005068", teachosUserId: "d6ea02b2433d498db44d2f0202f808c5", fullName: "Saumya Sunil Patil", reason: "Active TeachOS instructor (role INSTRUCTOR, category TECH); Darwin full-roster match shows a genuine Instructor designation (\"Software Development Instructor\") under a department using the newer \"NIAT_\" naming scheme the primary Instructors-department sync doesn't currently cover -- confirmed as a real instructor, 2026-10-05, per request (\"add her in the instructor department as an instructor\"; her department is expected to be corrected at the source later, at which point the primary sync will pick her up on its own and this override stops being needed).", decidedDate: "2026-10-05" },
+  { employeeId: "NW0005068", teachosUserId: "ffb204601a7f4e0d881d3e937407744f", fullName: "Saumya Sunil P", whileDepartment: "NIAT_Instructors & Mentors (NWD_NIAT_AC_I&M)", reason: "Active TeachOS instructor (role INSTRUCTOR, category TECH); Darwin full-roster match shows a genuine Instructor designation (\"Software Development Instructor\") under a department using the newer \"NIAT_\" naming scheme the primary Instructors-department sync doesn't currently cover -- confirmed as a real instructor, 2026-10-05, per request (\"add her in the instructor department as an instructor\"; her department is expected to be corrected at the source later, at which point the primary sync will pick her up on its own and this override stops being needed).", decidedDate: "2026-10-05" },
 ];
+
+function normalizeKey(value: string | null | undefined): string {
+  return (value ?? "").toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+// Designations that ALWAYS mean "instructor" (2026-10-07, per request: anyone
+// whose Darwin designation is "Software Development Instructor
+// (NWD_NIAT_AC_I&M_SD_IN)" is counted as an instructor, whatever department
+// string Darwin files them under). Compared case/space-insensitively against
+// the live row's Darwin designation.
+export const CONFIRMED_INSTRUCTOR_DESIGNATIONS: string[] = [
+  "Software Development Instructor (NWD_NIAT_AC_I&M_SD_IN)",
+];
+
+export function hasConfirmedInstructorDesignation(designation: string | null | undefined): boolean {
+  const key = normalizeKey(designation);
+  return !!key && CONFIRMED_INSTRUCTOR_DESIGNATIONS.some((d) => normalizeKey(d) === key);
+}
+
+// True when this live row is pinned as a confirmed instructor: it matches an
+// entry (employee ID or TeachOS user ID first, name only for an entry with
+// neither) AND the entry's pinned department still holds. Shared by the
+// Instructors count (routes/reports.ts) and the Instructor Archive
+// (lib/archiveInstructors.ts) so the two can never drift apart.
+export function isPinnedConfirmedInstructor(row: { teachosUserId: string | null; employeeId: string | null; fullName: string; department?: string | null; designation?: string | null }): boolean {
+  if (hasConfirmedInstructorDesignation(row.designation)) return true;
+  return CONFIRMED_INSTRUCTOR_DESPITE_FULL_ROSTER.some((entry) => {
+    const matches = (entry.employeeId && entry.employeeId === row.employeeId)
+      || (entry.teachosUserId && entry.teachosUserId === row.teachosUserId)
+      || (!entry.employeeId && !entry.teachosUserId && normalizeKey(entry.fullName) === normalizeKey(row.fullName));
+    if (!matches) return false;
+    const current = normalizeKey(row.department);
+    return !entry.whileDepartment || !current || current === normalizeKey(entry.whileDepartment);
+  });
+}

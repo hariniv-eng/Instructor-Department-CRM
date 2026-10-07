@@ -21,7 +21,14 @@ export default function InstructorDetailPage() {
   // it and hand it straight back to /instructors instead of always
   // resetting to the bare, filter-less URL.
   const backParam = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('back') : null;
-  const backHref = backParam ? `/instructors?${backParam}` : '/instructors';
+  // `cf:` prefix = opened from the Custom filter page (2026-10-07): go back
+  // there with its filters (kept in that query string) restored.
+  const fromCustomFilter = !!backParam && backParam.startsWith('cf:');
+  const customFilterQuery = fromCustomFilter ? backParam!.slice(3) : '';
+  const backHref = fromCustomFilter
+    ? `/instructors/custom-filter${customFilterQuery ? `?${customFilterQuery}` : ''}`
+    : backParam ? `/instructors?${backParam}` : '/instructors';
+  const backLabel = fromCustomFilter ? 'Custom filter' : 'Instructor register';
   const queryClient = useQueryClient();
   const instructorQuery = useGetInstructor(id, { query: { queryKey: getGetInstructorQueryKey(id), enabled: Number.isFinite(id) } });
   const updateInstructor = useUpdateInstructor();
@@ -50,7 +57,7 @@ export default function InstructorDetailPage() {
 
   const status = instructor.manual_status || instructor.computed_status || 'Pending';
   return <div className="mx-auto max-w-[1200px]">
-    <Link href={backHref} data-testid="link-back-instructors" className="mb-6 inline-flex items-center gap-2 text-[12px] font-bold text-muted-foreground transition-colors hover:text-foreground"><ArrowLeft size={14} /> Instructor register</Link>
+    <Link href={backHref} data-testid="link-back-instructors" className="mb-6 inline-flex items-center gap-2 text-[12px] font-bold text-muted-foreground transition-colors hover:text-foreground"><ArrowLeft size={14} /> {backLabel}</Link>
     <PageIntro eyebrow={`Record / ${instructor.employee_id || `ID-${instructor.id}`}`} title={instructor.full_name} description={`${instructor.designation || 'Instructor'}${instructor.sub_department ? ` · ${instructor.sub_department}` : ''}`} action={<span data-testid="status-detail-record" className={`inline-flex w-fit rounded-full px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.08em] ${statusTone(status)}`}>{status}</span>} />
     {instructor.classification && <div data-testid="banner-classification" className="mb-5 flex items-start gap-2.5 rounded-lg border border-[#d8dce4] bg-[#f4f5fa] px-4 py-3 text-[12px] leading-5 text-[#4a4fb0]"><ShieldOff size={16} className="mt-0.5 shrink-0" /><span><strong className="font-extrabold">{classificationLabel(instructor.classification)}.</strong> {instructor.classification_reason ? ` ${instructor.classification_reason}` : ''} This is a maintained classification decision — update classificationOverrides.ts to change it.</span></div>}
     {instructor.exit_flag && <div data-testid="banner-exit-flag" className="mb-5 flex items-start gap-2.5 rounded-lg border border-[#f0dca0] bg-[#fff7db] px-4 py-3 text-[12px] leading-5 text-[#79601a]"><AlertTriangle size={16} className="mt-0.5 shrink-0" /><span><strong className="font-extrabold">Darwinbox exit record on file{instructor.exit_flag_status ? ` — ${instructor.exit_flag_status}` : ''}.</strong> Flagged for review, not automatically removed from the instructor count. Mark the record's manual status Exited below if this should be excluded.</span></div>}

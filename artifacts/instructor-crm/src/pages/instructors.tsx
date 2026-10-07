@@ -660,7 +660,7 @@ export default function InstructorsPage() {
       </div>
       <div className="flex flex-wrap items-center gap-2">
         {/* Custom filter (2026-10-07): opens the full-column filter page. */}
-        <Link href="/instructors/custom-filter" data-testid="button-custom-filter" className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-[11px] font-bold text-foreground transition-colors hover:bg-secondary">
+        <Link href={filterQueryString ? `/instructors/custom-filter?from=${encodeURIComponent(filterQueryString)}` : '/instructors/custom-filter'} data-testid="button-custom-filter" className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-[11px] font-bold text-foreground transition-colors hover:bg-secondary">
           <SlidersHorizontal size={13} /> Custom filter
         </Link>
         <DownloadCsvButton onClick={() => downloadInstructorsCsv(category, people)} disabled={people.length === 0} testId="button-download-instructors-csv" />
@@ -961,7 +961,7 @@ export function downloadInstructorsCsv(category: CategoryKey, people: PersonWith
   downloadCsv(fileName ?? `${slugify(category)}.csv`, toCsv(headers, rows));
 }
 
-export function CategoryTable({ category, people, backQuery }: { category: CategoryKey; people: PersonWithAccess[]; backQuery: string }) {
+export function CategoryTable({ category, people, backQuery, linkMode = 'row', backPrefix = '' }: { category: CategoryKey; people: PersonWithAccess[]; backQuery: string; linkMode?: 'row' | 'name'; backPrefix?: string }) {
   const columns = gridColsClass(category);
   const pager = usePagedRows(people, 50);
   return <div className="overflow-hidden rounded-xl border border-border bg-card shadow-xs">
@@ -988,7 +988,7 @@ export function CategoryTable({ category, people, backQuery }: { category: Categ
           <span>Product</span>
           <span>Contribution</span>
         </div>
-        <div>{pager.pageRows.map((person) => <PersonRow key={person.id} category={category} person={person} columns={columns} backQuery={backQuery} />)}</div>
+        <div>{pager.pageRows.map((person) => <PersonRow key={person.id} category={category} person={person} columns={columns} backQuery={backQuery} linkMode={linkMode} backPrefix={backPrefix} />)}</div>
       </div>
     </div>
     <TablePager
@@ -1014,20 +1014,29 @@ function AccessCell({ access }: { access: AccessKind }) {
   return <div><span data-testid={`access-${access}`} className={`inline-flex rounded-full px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] ${ACCESS_PILL_CLASSES[access]}`}>{ACCESS_LABELS[access]}</span></div>;
 }
 
-function PersonRow({ category, person, columns, backQuery }: { category: CategoryKey; person: PersonWithAccess; columns: string; backQuery: string }) {
+// linkMode 'row' (the Instructors tab): the whole row is a link to the profile.
+// linkMode 'name' (Custom filter page, 2026-10-07, per request: scrolling/dragging
+// through the long table kept jumping into a profile): only the person's name
+// is a link, everything else is plain, so clicking or dragging elsewhere in a
+// row never navigates. backPrefix tags where the profile's back link should
+// return to (see instructor-detail.tsx).
+function PersonRow({ category, person, columns, backQuery, linkMode = 'row', backPrefix = '' }: { category: CategoryKey; person: PersonWithAccess; columns: string; backQuery: string; linkMode?: 'row' | 'name'; backPrefix?: string }) {
   const campus = person.institutes && person.institutes.length > 0 ? person.institutes.join(', ') : '—';
   // Carries the Instructors tab's current filters/search/category forward
   // to this profile page (2026-09-28, per request) so its back link can
   // restore exactly this view -- see instructor-detail.tsx's backHref,
   // which decodes this same `back` param.
-  const href = backQuery ? `/instructors/${person.id}?back=${encodeURIComponent(backQuery)}` : `/instructors/${person.id}`;
-  return <Link href={href} data-testid={`link-instructor-${person.id}`} className={`group grid items-center gap-4 border-b border-border/70 px-5 py-4 transition-colors last:border-0 hover:bg-[#f8fafb] ${columns}`}>
-    <div className="flex min-w-0 items-center gap-3">
-      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#e1eaf1] text-[11px] font-extrabold text-primary">{initials(person.full_name)}</span>
-      <span className="min-w-0">
-        <span className="block truncate text-[13px] font-bold text-foreground">{person.full_name}</span>
-      </span>
-    </div>
+  const href = backQuery || backPrefix ? `/instructors/${person.id}?back=${encodeURIComponent(backPrefix + backQuery)}` : `/instructors/${person.id}`;
+  const nameBlock = <>
+    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#e1eaf1] text-[11px] font-extrabold text-primary">{initials(person.full_name)}</span>
+    <span className="min-w-0">
+      <span className={`block truncate text-[13px] font-bold text-foreground ${linkMode === 'name' ? 'group-hover/name:text-primary group-hover/name:underline' : ''}`}>{person.full_name}</span>
+    </span>
+  </>;
+  const inner = <>
+    {linkMode === 'name'
+      ? <Link href={href} data-testid={`link-instructor-${person.id}`} className="group/name flex min-w-0 items-center gap-3">{nameBlock}</Link>
+      : <div className="flex min-w-0 items-center gap-3">{nameBlock}</div>}
     <div className="truncate text-[12px] text-muted-foreground">{person.designation || '—'}</div>
     <div className="truncate font-mono-ui text-[11px] text-muted-foreground">{person.employee_id || '—'}</div>
     <div className="truncate font-mono-ui text-[11px] text-muted-foreground">{person.teachos_user_id || ''}</div>
@@ -1054,7 +1063,10 @@ function PersonRow({ category, person, columns, backQuery }: { category: Categor
     <div className="truncate text-[12px] text-muted-foreground">{person.enrolled_plans || '—'}</div>
     <div className="truncate text-[12px] text-muted-foreground">{productLabel(person)}</div>
     <div className="truncate text-[12px] text-muted-foreground">{person.niat_cohorts && person.niat_cohorts.length > 0 ? person.niat_cohorts.join(', ') : '—'}</div>
-  </Link>;
+  </>;
+  const rowClass = `group grid items-center gap-4 border-b border-border/70 px-5 py-4 transition-colors last:border-0 hover:bg-[#f8fafb] ${columns}`;
+  if (linkMode === 'name') return <div data-testid={`row-instructor-${person.id}`} className={rowClass}>{inner}</div>;
+  return <Link href={href} data-testid={`link-instructor-${person.id}`} className={rowClass}>{inner}</Link>;
 }
 
 // Gender is read-only text when Darwin supplied it (person.gender_source ===

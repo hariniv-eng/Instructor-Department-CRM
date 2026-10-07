@@ -31,7 +31,7 @@
 import { eq } from "drizzle-orm";
 import { db, instructorArchiveTable, instructorsTable } from "@workspace/db";
 import { normalize } from "./reconcile";
-import { CONFIRMED_INSTRUCTOR_DESPITE_FULL_ROSTER } from "../data/classificationOverrides";
+import { isPinnedConfirmedInstructor } from "../data/classificationOverrides";
 
 type LiveRow = typeof instructorsTable.$inferSelect;
 type ArchiveRow = typeof instructorArchiveTable.$inferSelect;
@@ -65,21 +65,19 @@ function keep<T>(liveValue: T, archivedValue: T): T {
 // here because lib/ can't import from routes/ (reconcile.ts -> this file ->
 // routes/reports.ts -> reconcile.ts would be a cycle) -- if that test ever
 // changes there, change it here too.
-function isConfirmedDespiteFullRoster(row: LiveRow): boolean {
-  const normalizedName = normalize(row.fullName);
-  return CONFIRMED_INSTRUCTOR_DESPITE_FULL_ROSTER.some((entry) => {
-    if (entry.teachosUserId) return entry.teachosUserId === row.teachosUserId;
-    if (entry.employeeId) return entry.employeeId === row.employeeId;
-    return normalize(entry.fullName) === normalizedName;
-  });
-}
+const isConfirmedDespiteFullRoster = (row: LiveRow): boolean => isPinnedConfirmedInstructor(row);
 
 // Exit date of a live row whose Darwinbox exit record is Approved, else null.
 function approvedExitDate(row: LiveRow): string | null {
   return (row.exitFlagStatus ?? "").trim().toLowerCase() === "approved" ? row.exitFlagDate ?? null : null;
 }
 
-function isDepartmentMember(row: LiveRow): boolean {
+function isDepartmentMember(liveRow: LiveRow): boolean {
+  // Pinned edge case (NW0005068): treated as an ordinary tech instructor on
+  // every sync, even if today's Darwin/TeachOS match dropped her.
+  const row: LiveRow = isConfirmedDespiteFullRoster(liveRow)
+    ? { ...liveRow, inDarwin: true, inDarwinFullRoster: true, classification: null, deptBucket: liveRow.deptBucket === "non_tech" ? "non_tech" : "tech" }
+    : liveRow;
   const darwinInstructor = row.inDarwin && (!row.inDarwinFullRoster || isConfirmedDespiteFullRoster(row)) && !row.classification && (row.deptBucket === "tech" || row.deptBucket === "non_tech");
   const teachosOnly = row.inTeachos && !row.inDarwin;
   const payrollConverted = teachosOnly && row.classification === "payroll_converted";
