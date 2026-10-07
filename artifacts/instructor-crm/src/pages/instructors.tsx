@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, Briefcase, BookOpen, Building2, ChevronDown, GraduationCap, Layers, MapPin, Search, UserCheck, Users, UsersRound, Wallet, X } from 'lucide-react';
+import { AlertTriangle, Briefcase, BookOpen, Building2, ChevronDown, GraduationCap, Layers, MapPin, Search, SlidersHorizontal, UserCheck, Users, UsersRound, Wallet, X } from 'lucide-react';
 import { useGetReportsInstructors, useUpdateInstructorGender, useUpdateInstructorSubject, useUpdateInstructorExitVerification, getGetReportsInstructorsQueryKey, ApiError } from '@workspace/api-client-react';
 import type { AccessSplit, InstructorSummary } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -29,7 +29,7 @@ function describeSaveError(error: unknown): string {
   return error instanceof Error ? error.message : 'Could not reach the server -- check your connection and try again.';
 }
 
-type CategoryKey = 'department' | 'instructors' | 'mentors' | 'instructors_mentors' | 'ops_team' | 'exception';
+export type CategoryKey = 'department' | 'instructors' | 'mentors' | 'instructors_mentors' | 'ops_team' | 'exception';
 
 // Each tab's people list is the same union of darwin_only + both + teachos_only
 // that backs the matching Overview KPI card's count -- so "165 Instructors" here
@@ -88,10 +88,10 @@ function formatCount(value: number | undefined) {
 // report already placed in exactly one bucket (see reports.ts's
 // buildAccessSplit), so it is tagged here rather than re-derived.
 type AccessKind = 'both' | 'darwin_only' | 'teachos_only';
-type PersonWithAccess = InstructorSummary & { access: AccessKind };
-const ACCESS_LABELS: Record<AccessKind, string> = { both: 'Both', darwin_only: 'Only Darwin', teachos_only: 'Only TeachOS' };
+export type PersonWithAccess = InstructorSummary & { access: AccessKind };
+export const ACCESS_LABELS: Record<AccessKind, string> = { both: 'Both', darwin_only: 'Only Darwin', teachos_only: 'Only TeachOS' };
 
-function mergedPeople(split: AccessSplit | undefined): PersonWithAccess[] {
+export function mergedPeople(split: AccessSplit | undefined): PersonWithAccess[] {
   if (!split) return [];
   const tag = (list: InstructorSummary[] | undefined, access: AccessKind): PersonWithAccess[] => (list ?? []).map((person) => ({ ...person, access }));
   const merged = [...tag(split.darwin_only?.people, 'darwin_only'), ...tag(split.both?.people, 'both'), ...tag(split.teachos_only?.people, 'teachos_only')];
@@ -121,7 +121,7 @@ const GENDER_FILTERS: { key: GenderFilterKey; label: string }[] = [
   { key: 'female', label: 'Female' },
   { key: 'unknown', label: 'Not on file' },
 ];
-function normalizeGender(raw: string | null | undefined): 'male' | 'female' | 'unknown' {
+export function normalizeGender(raw: string | null | undefined): 'male' | 'female' | 'unknown' {
   const value = (raw ?? '').trim().toLowerCase();
   if (value === 'male' || value === 'm') return 'male';
   if (value === 'female' || value === 'f') return 'female';
@@ -658,7 +658,13 @@ export default function InstructorsPage() {
         <p className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-muted-foreground"><span data-testid="text-instructor-count">{people.length}</span> {activeTab.label.toLowerCase()} in view</p>
         <p className="text-[11px] text-muted-foreground">{activeTab.description}</p>
       </div>
-      <DownloadCsvButton onClick={() => downloadInstructorsCsv(category, people)} disabled={people.length === 0} testId="button-download-instructors-csv" />
+      <div className="flex flex-wrap items-center gap-2">
+        {/* Custom filter (2026-10-07): opens the full-column filter page. */}
+        <Link href="/instructors/custom-filter" data-testid="button-custom-filter" className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-[11px] font-bold text-foreground transition-colors hover:bg-secondary">
+          <SlidersHorizontal size={13} /> Custom filter
+        </Link>
+        <DownloadCsvButton onClick={() => downloadInstructorsCsv(category, people)} disabled={people.length === 0} testId="button-download-instructors-csv" />
+      </div>
     </div>
 
     {reportQuery.isLoading && <div className="overflow-hidden rounded-xl border border-border bg-card"><div className="space-y-3 p-4">{[1, 2, 3, 4, 5].map((item) => <SkeletonBlock key={item} className="h-12" />)}</div></div>}
@@ -828,7 +834,7 @@ function gridColsClass(category: CategoryKey): string {
 // views. classification is never nulled that way, so it's the reliable
 // source -- see bifurcationLabel below. 160px, added to both grid templates
 // above and every list below, right after the new Manager (Darwin) column.
-function bifurcationLabel(classification: string | null): string {
+export function bifurcationLabel(classification: string | null): string {
   if (classification === 'mentor') return 'Mentor';
   if (classification === 'excluded_ops_managers') return 'Delivery Support';
   // "instructor_ops" is declared in departmentTaxonomy.ts's DeptBucket type
@@ -894,7 +900,7 @@ function bifurcationLabel(classification: string | null): string {
 // 140px, added to both grid templates below and every list below, as the
 // new last column (matching how Enrolled Plan was added as the last column
 // on 2026-09-27).
-function productLabel(person: InstructorSummary): string {
+export function productLabel(person: InstructorSummary): string {
   if ((person.enrolled_plans ?? '').includes('CCBP_ACADEMY_GENIUS_CAREER_PLUS')) return 'Academy';
   const designation = (person.designation ?? '').toLowerCase();
   const location = (person.work_location ?? '').toLowerCase();
@@ -915,7 +921,7 @@ function nameColumnLabel(category: CategoryKey): string {
 
 // Column set mirrors gridColsClass/CategoryTable below exactly, so the CSV
 // always matches what's on screen for the active category tab.
-function downloadInstructorsCsv(category: CategoryKey, people: PersonWithAccess[]) {
+export function downloadInstructorsCsv(category: CategoryKey, people: PersonWithAccess[], fileName?: string) {
   const headers = [nameColumnLabel(category), 'Designation', 'Employee ID', 'TeachOS User ID', 'Email', 'Location (Darwin)'];
   if (category === 'ops_team') headers.push('Department'); else headers.push('Subject', 'Department');
   if (category !== 'ops_team') headers.push('Campus', 'campus_city', 'campus_state');
@@ -952,10 +958,10 @@ function downloadInstructorsCsv(category: CategoryKey, people: PersonWithAccess[
     return row;
   });
 
-  downloadCsv(`${slugify(category)}.csv`, toCsv(headers, rows));
+  downloadCsv(fileName ?? `${slugify(category)}.csv`, toCsv(headers, rows));
 }
 
-function CategoryTable({ category, people, backQuery }: { category: CategoryKey; people: PersonWithAccess[]; backQuery: string }) {
+export function CategoryTable({ category, people, backQuery }: { category: CategoryKey; people: PersonWithAccess[]; backQuery: string }) {
   const columns = gridColsClass(category);
   const pager = usePagedRows(people, 50);
   return <div className="overflow-hidden rounded-xl border border-border bg-card shadow-xs">
@@ -1106,7 +1112,7 @@ function GenderCell({ person }: { person: InstructorSummary }) {
   </div>;
 }
 
-const EXIT_VERIFICATION_LABELS: Record<string, string> = {
+export const EXIT_VERIFICATION_LABELS: Record<string, string> = {
   exited: 'Exited',
   serving_notice_period: 'Serving Notice Period',
   payroll_converted: 'Payroll Converted',
