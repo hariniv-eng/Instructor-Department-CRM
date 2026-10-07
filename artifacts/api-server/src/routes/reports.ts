@@ -256,6 +256,13 @@ const toApiInstructorSummary = (row: InstructorRow, contributionByTeachosId: Map
   // instructor endpoint (routes/instructors.ts) already returns.
   exit_flag_status: row.exitFlagStatus,
   exit_flag_date: row.exitFlagDate,
+  // Date of exit column (2026-10-07, per request): the Darwinbox exit
+  // record's "Date Of Exit" = last working day, NOT its "Exit Date" (the day
+  // the request was raised, still shown as exit_flag_date). Blank until an
+  // exit record exists. Payroll instructors always have
+  // an exit record without having left, so theirs is the manual date their
+  // Capability Manager enters instead.
+  date_of_exit: row.classification === "payroll_converted" ? row.manualExitDate ?? null : row.exitLastWorkingDate ?? null,
   // Capability Manager's manual read on an exit-flagged record -- "exited" |
   // "serving_notice_period" | "payroll_converted" | null. Purely a tracking
   // label; see exitVerification's comment in the schema for why it never
@@ -665,9 +672,10 @@ router.get("/reports/instructors", async (_req, res) => {
   // comment for the full "who counts as an Exception" reasoning.
 
   // Exception 2 (Overview), 2026-10-07 -- two lists, plus the "date_of_exit"
-  // column. date_of_exit comes ONLY from the Darwinbox exit data (the "Exit
-  // Date" on the Darwin Exit Details tab, stored on the row as exitFlagDate) --
-  // 2026-10-07, per request, not from the employee-master "Date Of Exit".
+  // column. date_of_exit comes ONLY from the Darwinbox exit data's "Date Of
+  // Exit" (last working day, stored on the row as exitLastWorkingDate) --
+  // 2026-10-07, per request. The separate "Exit Date" (when the request was
+  // raised) stays in the exit_date column.
   //   * Exit list: reviewed Exited/Absconded and still in TeachOS -- their
   //     TeachOS access should be removed -- PLUS anyone reviewed as Serving
   //     Notice Period whose exit date is before today (IST), i.e. the notice
@@ -678,7 +686,8 @@ router.get("/reports/instructors", async (_req, res) => {
   //     exit date has not passed yet (or the exit data has none for them, so
   //     there is nothing to move them on).
   const todayIst = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
-  const noticeEnded = (r: InstructorRow) => !!r.exitFlagDate && r.exitFlagDate < todayIst;
+  const exitDateOf = (r: InstructorRow) => (r.classification === "payroll_converted" ? r.manualExitDate : r.exitLastWorkingDate) ?? null;
+  const noticeEnded = (r: InstructorRow) => { const d = exitDateOf(r); return !!d && d < todayIst; };
   const exitListRows = [...exceptionRemoveRows, ...servingNoticeRows.filter((r) => r.inTeachos && noticeEnded(r))];
   const noticeListRows = servingNoticeRows.filter((r) => !noticeEnded(r));
 
@@ -696,14 +705,6 @@ router.get("/reports/instructors", async (_req, res) => {
     // Overview "Exception 2" Serving notice period list (2026-10-07).
     exception_notice: buildAccessSplit(noticeListRows),
   };
-  for (const split of [accessBreakdown.exception_remove, accessBreakdown.exception_notice]) {
-    for (const bucket of [split.darwin_only, split.both, split.teachos_only]) {
-      for (const person of bucket.people as Array<Record<string, unknown>>) {
-        person.date_of_exit = typeof person.exit_flag_date === "string" ? person.exit_flag_date : null;
-      }
-    }
-  }
-
   res.json({
     kpis: {
       // Instructors + Mentors + Operations team combined -- backs the

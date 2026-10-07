@@ -332,6 +332,35 @@ paths:
               schema: { $ref: "#/components/schemas/Instructor" }
         "400": { description: "exit_verification must be \"exited\", \"serving_notice_period\", \"payroll_converted\", \"absconded\", or null" }
         "404": { description: Not found }
+  /instructors/{id}/exit-date:
+    patch:
+      operationId: updateInstructorExitDate
+      tags: [instructors]
+      summary: Set or clear the manual date of exit for a payroll instructor (Admin or Manager)
+      description: >-
+        Payroll instructors carry a Darwinbox exit record (their conversion to
+        payroll) but have not actually left, so their date_of_exit column is
+        entered by hand: when one of them exits, their Capability Manager
+        records the date here. Everyone else's date_of_exit comes from the
+        Darwinbox exit data. Send null to clear it.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: number }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/InstructorExitDateUpdate" }
+      responses:
+        "200":
+          description: Updated instructor
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Instructor" }
+        "400": { description: "exit_date must be a YYYY-MM-DD date, or null" }
+        "404": { description: Not found }
   /dashboard:
     get:
       operationId: getDashboard
@@ -551,6 +580,11 @@ components:
         # allows "revoked" since a row set that way before this change may
         # still carry it.
         exit_verification: { type: ["string", "null"], enum: ["exited", "serving_notice_period", "payroll_converted", "absconded", null] }
+    InstructorExitDateUpdate:
+      type: object
+      required: [exit_date]
+      properties:
+        exit_date: { type: ["string", "null"], format: date }
     Dashboard:
       type: object
       required: [kpis, monthly_trend, sub_departments, designations]
@@ -879,8 +913,9 @@ components:
         # Exception 2 exit_date column).
         exit_flag_status: { type: ["string", "null"] }
         exit_flag_date: { type: ["string", "null"], format: date }
-        # Darwinbox "Date Of Exit" (employee master record) -- only filled on
-        # the Exception 2 (access_breakdown.exception_remove) people.
+        # Date of exit column (2026-10-07): the Darwinbox exit data's Exit Date
+        # (blank until an exit record exists); for PAYROLL instructors the
+        # manual date their Capability Manager entered instead.
         date_of_exit: { type: ["string", "null"], format: date }
         # Capability Manager's manual read on an exit-flagged record,
         # settable via PATCH /instructors/{id}/exit-verification by either

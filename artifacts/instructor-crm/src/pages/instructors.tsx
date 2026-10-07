@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, Briefcase, BookOpen, Building2, ChevronDown, GraduationCap, Layers, MapPin, Search, SlidersHorizontal, UserCheck, Users, UsersRound, Wallet, X } from 'lucide-react';
-import { useGetReportsInstructors, useUpdateInstructorGender, useUpdateInstructorSubject, useUpdateInstructorExitVerification, getGetReportsInstructorsQueryKey, ApiError } from '@workspace/api-client-react';
+import { useGetReportsInstructors, useUpdateInstructorGender, useUpdateInstructorSubject, useUpdateInstructorExitVerification, useUpdateInstructorExitDate, getGetReportsInstructorsQueryKey, ApiError } from '@workspace/api-client-react';
 import type { AccessSplit, InstructorSummary } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link } from 'wouter';
@@ -806,14 +806,14 @@ function gridColsClass(category: CategoryKey): string {
   // mixed into Department/Exception just reads "Nxtwave" in this column,
   // same as any non-payroll instructor. Never wrong, just not usually the
   // interesting value there.
-  if (category === 'instructors' || category === 'mentors' || category === 'instructors_mentors' || category === 'department' || category === 'exception') return 'grid-cols-[260px_190px_130px_280px_220px_150px_160px_170px_220px_160px_110px_140px_190px_190px_160px_130px_130px_150px_190px_170px_140px_170px]';
+  if (category === 'instructors' || category === 'mentors' || category === 'instructors_mentors' || category === 'department' || category === 'exception') return 'grid-cols-[260px_190px_130px_280px_220px_150px_160px_170px_220px_160px_110px_140px_190px_190px_160px_130px_130px_150px_190px_150px_170px_140px_170px]';
   // Operations team keeps its own shape (2026-09-21: not part of the above
   // request) -- no Campus column (ops rows aren't deployed to a teaching
   // campus the way instructors and mentors are), a single Department
   // column instead of Subject+Department, and no Payroll either (same
   // reason it's never meaningful for Mentors: payroll_converted can't be
   // assigned to an ops row).
-  return 'grid-cols-[260px_190px_130px_280px_220px_150px_280px_140px_190px_190px_160px_130px_150px_190px_170px_140px_170px]';
+  return 'grid-cols-[260px_190px_130px_280px_220px_150px_280px_140px_190px_190px_160px_130px_150px_190px_150px_170px_140px_170px]';
 }
 
 // Manager (Darwin) (2026-09-22, per request: "in the overview table we have
@@ -933,6 +933,7 @@ export function downloadInstructorsCsv(category: CategoryKey, people: PersonWith
   if (category !== 'ops_team') headers.push('Payroll');
   headers.push('Gender');
   headers.push('Employee Status');
+  headers.push('date_of_exit');
   headers.push('Enrolled Plan');
   headers.push('Product');
   headers.push('Contribution');
@@ -952,6 +953,7 @@ export function downloadInstructorsCsv(category: CategoryKey, people: PersonWith
     // exists but no Capability Manager has verified it yet; otherwise the
     // reviewed label -- mirrors ExitCell's dash-vs-dropdown split below.
     row.push(person.exit_flag ? EXIT_VERIFICATION_LABELS[person.exit_verification ?? ''] ?? 'Not reviewed' : '');
+    row.push(person.date_of_exit ?? '');
     row.push(person.enrolled_plans ?? '');
     row.push(productLabel(person));
     row.push(person.niat_cohorts?.join(', ') ?? '');
@@ -984,6 +986,7 @@ export function CategoryTable({ category, people, backQuery, linkMode = 'row', b
           {category !== 'ops_team' && <span>Payroll</span>}
           <span>Gender</span>
           <span>Employee Status</span>
+          <span>date_of_exit</span>
           <span>Enrolled Plan</span>
           <span>Product</span>
           <span>Contribution</span>
@@ -1060,6 +1063,7 @@ function PersonRow({ category, person, columns, backQuery, linkMode = 'row', bac
     {category !== 'ops_team' && <div>{person.is_payroll ? <span className="inline-flex rounded-full bg-[#e6e9fb] px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] text-[#4a4fb0]">Payroll</span> : <span className="inline-flex rounded-full bg-secondary px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] text-muted-foreground">Nxtwave</span>}</div>}
     <GenderCell person={person} />
     <ExitCell person={person} />
+    <DateOfExitCell person={person} />
     <div className="truncate text-[12px] text-muted-foreground">{person.enrolled_plans || '—'}</div>
     <div className="truncate text-[12px] text-muted-foreground">{productLabel(person)}</div>
     <div className="truncate text-[12px] text-muted-foreground">{person.niat_cohorts && person.niat_cohorts.length > 0 ? person.niat_cohorts.join(', ') : '—'}</div>
@@ -1192,6 +1196,49 @@ function ExitCell({ person }: { person: InstructorSummary }) {
       <option value="payroll_converted">{EXIT_VERIFICATION_LABELS.payroll_converted}</option>
       <option value="absconded">{EXIT_VERIFICATION_LABELS.absconded}</option>
     </select>
+  </div>;
+}
+
+// date_of_exit column (2026-10-07, per request). Active instructors have no
+// exit record, so it is blank; once a Darwinbox exit record exists it shows
+// that record's Exit Date (read-only). PAYROLL instructors always carry an
+// exit record without having left, so for them it is a manual date input:
+// their Capability Manager (Admin or Manager) enters the date when they
+// actually exit, and can clear it again. Same preventDefault +
+// stopPropagation wrapper as GenderCell/ExitCell (the whole row is a link).
+function DateOfExitCell({ person }: { person: InstructorSummary }) {
+  const queryClient = useQueryClient();
+  const [value, setValue] = useState(person.date_of_exit ?? '');
+  useEffect(() => { setValue(person.date_of_exit ?? ''); }, [person.date_of_exit]);
+  const updateExitDate = useUpdateInstructorExitDate({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetReportsInstructorsQueryKey() });
+      },
+      onError: (error) => {
+        setValue(person.date_of_exit ?? '');
+        toast({ variant: 'destructive', title: "Couldn't save date of exit", description: describeSaveError(error) });
+      },
+    },
+  });
+
+  if (!person.is_payroll) {
+    return <div className="truncate font-mono-ui text-[11px] text-muted-foreground">{person.date_of_exit || ''}</div>;
+  }
+  return <div onClick={(event) => { event.preventDefault(); event.stopPropagation(); }} className="text-[12px]">
+    <input
+      type="date"
+      value={value}
+      onChange={(event) => {
+        const next = event.target.value;
+        setValue(next);
+        updateExitDate.mutate({ id: person.id, data: { exit_date: next === '' ? null : next } });
+      }}
+      disabled={updateExitDate.isPending}
+      data-testid={`input-exit-date-${person.id}`}
+      title="Payroll instructor -- the Capability Manager enters the date of exit here when they actually exit"
+      className="h-8 w-full rounded-md border border-border bg-background px-1.5 text-[11px] font-semibold text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-ring/25 disabled:opacity-60"
+    />
   </div>;
 }
 

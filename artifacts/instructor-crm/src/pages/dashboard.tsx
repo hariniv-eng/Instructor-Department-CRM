@@ -358,7 +358,7 @@ function matchesSearch(p: InstructorSummary, query: string) {
 function ExceptionReviewPanel({ people, onClose }: { people: InstructorSummary[]; onClose: () => void }) {
   const [search, setSearch] = useState('');
   const filtered = useMemo(() => people.filter((p) => matchesSearch(p, search)), [people, search]);
-  const handleDownload = () => downloadCsv('exception-1-needs-review.csv', toCsv(['Name', 'Employee ID', 'Capability Manager', 'Subject', 'Payroll / Nxtwave'], filtered.map((p) => [p.full_name, p.employee_id ?? '', p.capability_manager ?? '', p.dept_area ?? '', payrollLabel(p)])));
+  const handleDownload = () => downloadCsv('exception-1-needs-review.csv', toCsv(['Name', 'Employee ID', 'Capability Manager', 'Subject', 'Payroll / Nxtwave', 'date_of_exit'], filtered.map((p) => [p.full_name, p.employee_id ?? '', p.capability_manager ?? '', p.dept_area ?? '', payrollLabel(p), p.date_of_exit ?? ''])));
   return <section className="mt-5 rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6 animate-rise">
     <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
       <div>
@@ -380,7 +380,7 @@ function ExceptionReviewPanel({ people, onClose }: { people: InstructorSummary[]
     <div className="max-h-[420px] overflow-auto rounded-lg border border-border">
       <table className="w-full text-left text-[12px]">
         <thead className="sticky top-0 bg-secondary font-mono-ui text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
-          <tr><th className="px-3 py-2">Name</th><th className="px-3 py-2">Employee ID</th><th className="px-3 py-2">Capability Manager</th><th className="px-3 py-2">Subject</th><th className="px-3 py-2">Payroll / Nxtwave</th></tr>
+          <tr><th className="px-3 py-2">Name</th><th className="px-3 py-2">Employee ID</th><th className="px-3 py-2">Capability Manager</th><th className="px-3 py-2">Subject</th><th className="px-3 py-2">Payroll / Nxtwave</th><th className="px-3 py-2">date_of_exit</th></tr>
         </thead>
         <tbody>
           {filtered.map((p) => <tr key={p.id} className="border-t border-border/70">
@@ -389,8 +389,9 @@ function ExceptionReviewPanel({ people, onClose }: { people: InstructorSummary[]
             <td className="px-3 py-2 text-muted-foreground">{p.capability_manager ?? '—'}</td>
             <td className="px-3 py-2 text-muted-foreground">{p.dept_area ?? '—'}</td>
             <td className="px-3 py-2"><PayrollBadge person={p} /></td>
+            <td className="whitespace-nowrap px-3 py-2 text-muted-foreground" data-testid={`text-exception1-date-of-exit-${p.id}`}>{formatExitDate(p.date_of_exit)}</td>
           </tr>)}
-          {filtered.length === 0 && <tr><td colSpan={5} className="px-3 py-8 text-center text-muted-foreground">{people.length === 0 ? 'Nothing is waiting for review.' : 'No one matches this search.'}</td></tr>}
+          {filtered.length === 0 && <tr><td colSpan={6} className="px-3 py-8 text-center text-muted-foreground">{people.length === 0 ? 'Nothing is waiting for review.' : 'No one matches this search.'}</td></tr>}
         </tbody>
       </table>
     </div>

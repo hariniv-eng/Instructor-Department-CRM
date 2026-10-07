@@ -138,6 +138,16 @@ export const instructorsTable = pgTable("instructors", {
   // for rows where exitFlag is true (see toApiInstructorSummary in
   // reports.ts) -- not enforced server-side.
   exitVerification: text("exit_verification"),
+  // Manual date of exit (2026-10-07, per request) -- only used for PAYROLL
+  // instructors, who carry a Darwin exit record (their conversion to payroll)
+  // but haven't actually left. Their Capability Manager enters the real exit
+  // date here when they do exit (PATCH .../exit-date). Never written by a sync.
+  manualExitDate: date("manual_exit_date"),
+  // The exit record's own "Date Of Exit" (the person's LAST WORKING DAY) --
+  // 2026-10-07, per request. Distinct from exitFlagDate above, which is the
+  // record's "Exit Date" (the day the exit request was raised). Computed from
+  // darwinbox_exits by recomputeStatuses() every reconcile; never hand-edited.
+  exitLastWorkingDate: date("exit_last_working_date"),
   // True when this person was NOT found in the Instructors-department-
   // filtered Darwin data (darwinbox_active) but WAS found via the fallback
   // match against Darwin's full/unfiltered company roster
