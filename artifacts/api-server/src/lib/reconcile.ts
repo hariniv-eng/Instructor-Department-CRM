@@ -63,6 +63,9 @@ function findOverride<T extends { teachosUserId?: string; employeeId?: string; f
 interface ExitInfo {
   status: string | null;
   exitDate: string | null;
+  // The exit record's "Date Of Exit" = last working day (exitDate above is the
+  // day the request was raised).
+  lastWorkingDate: string | null;
   // Department/Designation/Gender straight off the exit record itself
   // (2026-09-21, per request: "get missing data of payroll converted
   // instructors ... get that data from the exit, map the payroll instructors
@@ -161,7 +164,8 @@ async function loadLatestExitsByPerson(): Promise<{ byEmployeeId: Map<string, Ex
     const department = cell(exit.rawData, "Current Department", "Department", "Top Department", "department");
     const designation = cell(exit.rawData, "Current Designation", "Designation", "designation");
     const gender = cell(exit.rawData, "Gender", "gender");
-    const info: ExitInfo = { status, exitDate, department, designation, gender };
+    const lastWorkingDate = cell(exit.rawData, "Date Of Exit", "date_of_exit", "Last Working Day", "last_working_day", "LWD", "Relieving Date");
+    const info: ExitInfo = { status, exitDate, lastWorkingDate, department, designation, gender };
     const rank = parseLooseDate(exitDate);
     const candidate = { info, rank, id: exit.id };
     // "Most recent record wins" is decided across EVERY status here,
@@ -343,6 +347,7 @@ export const recomputeStatuses = async () => {
       exitFlag: !!exit,
       exitFlagStatus: exit?.status ?? null,
       exitFlagDate: toISODate(exit?.exitDate ?? null),
+      exitLastWorkingDate: toISODate(exit?.lastWorkingDate ?? null),
       // Every payroll-converted instructor carries a manual Exit entry
       // (2026-10-07, per request): anyone with no entry yet is marked
       // "payroll_converted" here, and an entry that already exists -- payroll

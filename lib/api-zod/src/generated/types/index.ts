@@ -22,6 +22,7 @@ export * from './groupedInstructors';
 export * from './healthStatus';
 export * from './instructor';
 export * from './instructorCapabilityManagerUpdate';
+export * from './instructorExitDateUpdate';
 export * from './instructorExitVerification';
 export * from './instructorExitVerificationUpdate';
 export * from './instructorExitVerificationUpdateExitVerification';

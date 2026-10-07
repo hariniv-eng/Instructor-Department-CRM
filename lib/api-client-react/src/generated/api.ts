@@ -26,6 +26,7 @@ import type {
   HealthStatus,
   Instructor,
   InstructorCapabilityManagerUpdate,
+  InstructorExitDateUpdate,
   InstructorExitVerificationUpdate,
   InstructorGenderUpdate,
   InstructorInput,
@@ -1029,6 +1030,79 @@ export const useUpdateInstructorExitVerification = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getUpdateInstructorExitVerificationMutationOptions(options));
+    }
+
+export const getUpdateInstructorExitDateUrl = (id: number,) => {
+
+
+
+
+  return `/api/instructors/${id}/exit-date`
+}
+
+/**
+ * Payroll instructors carry a Darwinbox exit record (their conversion to payroll) but have not actually left, so their date_of_exit column is entered by hand: when one of them exits, their Capability Manager records the date here. Everyone else's date_of_exit comes from the Darwinbox exit data. Send null to clear it.
+ * @summary Set or clear the manual date of exit for a payroll instructor (Admin or Manager)
+ */
+export const updateInstructorExitDate = async (id: number,
+    instructorExitDateUpdate: InstructorExitDateUpdate, options?: Parameters<typeof customFetch>[1]): Promise<Instructor> => {
+
+  return customFetch<Instructor>(getUpdateInstructorExitDateUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(instructorExitDateUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateInstructorExitDateMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateInstructorExitDate>>, TError,{id: number;data: BodyType<InstructorExitDateUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateInstructorExitDate>>, TError,{id: number;data: BodyType<InstructorExitDateUpdate>}, TContext> => {
+
+const mutationKey = ['updateInstructorExitDate'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateInstructorExitDate>>, {id: number;data: BodyType<InstructorExitDateUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateInstructorExitDate(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateInstructorExitDateMutationResult = NonNullable<Awaited<ReturnType<typeof updateInstructorExitDate>>>
+    export type UpdateInstructorExitDateMutationBody = BodyType<InstructorExitDateUpdate>
+    export type UpdateInstructorExitDateMutationError = ErrorType<void>
+
+    /**
+ * @summary Set or clear the manual date of exit for a payroll instructor (Admin or Manager)
+ */
+export const useUpdateInstructorExitDate = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateInstructorExitDate>>, TError,{id: number;data: BodyType<InstructorExitDateUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateInstructorExitDate>>,
+        TError,
+        {id: number;data: BodyType<InstructorExitDateUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateInstructorExitDateMutationOptions(options));
     }
 
 export const getGetDashboardUrl = () => {

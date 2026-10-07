@@ -203,6 +203,11 @@ export interface InstructorExitVerificationUpdate {
   exit_verification: InstructorExitVerificationUpdateExitVerification;
 }
 
+export interface InstructorExitDateUpdate {
+  /** @nullable */
+  exit_date: string | null;
+}
+
 export type DashboardKpis = {[key: string]: number};
 
 export type DashboardMonthlyTrendItem = {

@@ -523,6 +523,63 @@ export const UpdateInstructorExitVerificationResponse = zod.object({
 
 
 /**
+ * Payroll instructors carry a Darwinbox exit record (their conversion to payroll) but have not actually left, so their date_of_exit column is entered by hand: when one of them exits, their Capability Manager records the date here. Everyone else's date_of_exit comes from the Darwinbox exit data. Send null to clear it.
+ * @summary Set or clear the manual date of exit for a payroll instructor (Admin or Manager)
+ */
+export const UpdateInstructorExitDateParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateInstructorExitDateBody = zod.object({
+  "exit_date": zod.coerce.date().nullable()
+})
+
+export const UpdateInstructorExitDateResponse = zod.object({
+  "id": zod.number(),
+  "employee_id": zod.string().nullish(),
+  "teachos_user_id": zod.string().nullish(),
+  "full_name": zod.string(),
+  "org_email": zod.string().nullish(),
+  "mobile": zod.string().nullish(),
+  "date_of_joining": zod.coerce.date().nullish(),
+  "department": zod.string().nullish(),
+  "sub_department": zod.string().nullish(),
+  "designation": zod.string().nullish(),
+  "direct_manager": zod.string().nullish(),
+  "work_location": zod.string().nullish(),
+  "workspace": zod.string().nullish(),
+  "gender": zod.string().nullish(),
+  "current_state": zod.string().nullish(),
+  "current_city": zod.string().nullish(),
+  "darwin_employee_status": zod.string().nullish(),
+  "in_darwin": zod.boolean(),
+  "in_teachos": zod.boolean(),
+  "teachos_role": zod.string().nullish(),
+  "teachos_category": zod.string().nullish(),
+  "teachos_manager": zod.string().nullish(),
+  "manual_capability_manager": zod.string().nullish().describe('Manual fallback for the Capability Manager, settable via PATCH \/instructors\/{id}\/capability-manager (Admin only). Only used when TeachOS\'s own candidate rows didn\'t resolve to anyone on the maintained roster for this person. Must be one of that maintained roster\'s names, or null.'),
+  "institutes": zod.array(zod.string()),
+  "computed_status": zod.string(),
+  "manual_status": zod.string().nullish(),
+  "manual_gender": zod.string().nullish().describe('Manual fallback for gender, settable via PATCH \/instructors\/{id}\/gender by either Admin or Manager. Only used when Darwin has no gender on file for this person.'),
+  "exit_date": zod.coerce.date().nullish(),
+  "converted_university_name": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "classification": zod.string().nullish().describe('TeachOS instructor-count classification override match — one of excluded_other_department, excluded_non_department_team, payroll_converted, or null. See classificationOverrides.ts \/ TEACHOS_INSTRUCTOR_COUNT_RULES.md.'),
+  "classification_reason": zod.string().nullish(),
+  "exit_flag": zod.boolean().optional().describe('True when a live Darwinbox exit\/resignation record was found for this person. Flagged only — NOT subtracted from the standing instructor count.'),
+  "exit_flag_status": zod.string().nullish().describe('Darwinbox resignation status as of the most recent exit sync, e.g. Approved, Pending With Approver, Rejected, Revoked.'),
+  "exit_flag_date": zod.coerce.date().nullish(),
+  "exit_verification": zod.union([zod.literal('exited'),zod.literal('serving_notice_period'),zod.literal('payroll_converted'),zod.literal('absconded'),zod.literal('revoked'),zod.literal(null)]).nullish().describe('Capability Manager\'s manual read on an exit-flagged record, settable via PATCH \/instructors\/{id}\/exit-verification by either Admin or Manager. Tracking label only — never affects computed_status\/manual_status or the headcount.'),
+  "dept_bucket": zod.string().nullish().describe('tech | non_tech | null. See departmentTaxonomy.ts. Null for excluded\/mentor rows (see classification).'),
+  "dept_area": zod.string().nullish().describe('Sub-area within dept_bucket, e.g. Frontend, Backend, DSA, GenAI, English, Aptitude, Math.'),
+  "manual_dept_area": zod.string().nullish().describe('Manual fallback for Subject\/dept_area, settable via PATCH \/instructors\/{id}\/subject (Admin only). Only used when classifyDepartment() left this person unclassified. Must be one of departmentTaxonomy.ts\'s recognized area names, or null.'),
+  "deployment_status": zod.string().nullish().describe('deployed | in_training | null, derived from TeachOS institutes (institute_name \"Training Institute\" = in_training).'),
+  "in_darwin_full_roster": zod.boolean().optional().describe('True when this person\'s Darwin match came from the full\/unfiltered company roster fallback rather than the primary Instructors-department sync — see reconcileDarwinFullRosterFallback().')
+})
+
+
+/**
  * @summary Get headcount and attrition dashboard
  */
 export const GetDashboardResponse = zod.object({

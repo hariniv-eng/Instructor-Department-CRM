@@ -270,4 +270,23 @@ router.patch("/instructors/:id/exit-verification", async (req, res): Promise<voi
   res.json(toApiInstructor(row));
 });
 
+// Manual date of exit (2026-10-07, per request) -- for payroll instructors
+// only in the UI (they have a Darwin exit record but haven't actually left, so
+// their Capability Manager enters the real date when they do). Reachable by
+// Admin or Manager like the exit-verification route above. null clears it.
+router.patch("/instructors/:id/exit-date", async (req, res): Promise<void> => {
+  const raw = (req.body as { exit_date?: string | null }).exit_date;
+  const valid = raw === null || (typeof raw === "string" && /^\d{4}-\d{2}-\d{2}$/.test(raw) && !Number.isNaN(Date.parse(raw)));
+  if (!valid) {
+    res.status(400).json({ error: "exit_date must be a YYYY-MM-DD date, or null" });
+    return;
+  }
+  const [row] = await db.update(instructorsTable).set({ manualExitDate: raw }).where(eq(instructorsTable.id, Number(req.params.id))).returning();
+  if (!row) {
+    res.status(404).json({ error: "Instructor not found" });
+    return;
+  }
+  res.json(toApiInstructor(row));
+});
+
 export default router;
