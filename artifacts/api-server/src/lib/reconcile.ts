@@ -343,6 +343,13 @@ export const recomputeStatuses = async () => {
       exitFlag: !!exit,
       exitFlagStatus: exit?.status ?? null,
       exitFlagDate: toISODate(exit?.exitDate ?? null),
+      // Every payroll-converted instructor carries a manual Exit entry
+      // (2026-10-07, per request): anyone with no entry yet is marked
+      // "payroll_converted" here, and an entry that already exists -- payroll
+      // or anything a Capability Manager set later (Exited, Serving Notice
+      // Period, Absconded) -- is never overwritten. They stay Payroll
+      // Converted until someone changes it in the FCC.
+      ...(classification === "payroll_converted" && !row.exitVerification ? { exitVerification: "payroll_converted" } : {}),
       exitDepartment: isTeachosOnlyLeftover ? (exit?.department ?? null) : null,
       exitDesignation: isTeachosOnlyLeftover ? (exit?.designation ?? null) : null,
       exitGender: isTeachosOnlyLeftover ? (exit?.gender ?? null) : null,

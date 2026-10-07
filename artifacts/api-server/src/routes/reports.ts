@@ -420,14 +420,32 @@ function computeDepartmentAndExceptionRows(allRows: InstructorRow[]) {
   // Period. Anyone reviewed as Exited or Absconded leaves this view -- if they
   // are still in TeachOS they move to the Overview's Exception 2 list
   // (exceptionRemoveRows below), the "remove them from TeachOS" worklist.
-  const exceptionRows = exceptionQueueRows.filter((r) => !r.exitVerification || r.exitVerification === "serving_notice_period");
-  const exceptionRemoveRows = exceptionQueueRows.filter((r) => (r.exitVerification === "exited" || r.exitVerification === "absconded") && r.inTeachos && r.classification !== "excluded_ops_managers");
+  // Narrowed again 2026-10-07 (per request: "in the Instructors tab we're only
+  // going to show the not reviewed candidates"): Serving Notice Period people
+  // now live only on the Overview's Exception 2 "Serving notice period" list
+  // (servingNoticeRows below) and move to its Exit list after their date of
+  // exit passes.
+  const exceptionRows = exceptionQueueRows.filter((r) => !r.exitVerification);
+  // Payroll-converted instructors (2026-10-07): they carry a manual Exit entry
+  // (default Payroll Converted) and usually have no Darwin exit record at all,
+  // so when a Capability Manager later marks one Exited/Absconded/Serving
+  // Notice Period it is the manual entry alone that puts them on the Exception 2
+  // lists -- they are added here on top of the exit-record-driven queue.
+  const manualPayrollRows = (statuses: string[]) => allRows.filter((r) => r.classification === "payroll_converted" && (r.inDarwin || r.inTeachos) && statuses.includes(r.exitVerification ?? ""));
+  const mergeById = (a: InstructorRow[], b: InstructorRow[]) => { const seen = new Set(a.map((r) => r.id)); return [...a, ...b.filter((r) => !seen.has(r.id))]; };
+  const exceptionRemoveRows = mergeById(
+    exceptionQueueRows.filter((r) => (r.exitVerification === "exited" || r.exitVerification === "absconded") && r.inTeachos && r.classification !== "excluded_ops_managers"),
+    manualPayrollRows(["exited", "absconded"]).filter((r) => r.inTeachos),
+  );
 
   // Everyone in the queue reviewed as Serving Notice Period (still in Darwin
   // and/or TeachOS). The Overview's Exception 2 "Serving notice period" list
   // is built from this; once a person's Darwin Date Of Exit has passed they
   // move to the Exit list instead (see the /reports/instructors route).
-  const servingNoticeRows = exceptionQueueRows.filter((r) => r.exitVerification === "serving_notice_period" && r.classification !== "excluded_ops_managers");
+  const servingNoticeRows = mergeById(
+    exceptionQueueRows.filter((r) => r.exitVerification === "serving_notice_period" && r.classification !== "excluded_ops_managers"),
+    manualPayrollRows(["serving_notice_period"]),
+  );
 
   return { mentors, opsTeamRows, darwinInstructorsForCount, payrollConvertedForCount, needsReviewForCount, countedInstructorRows, departmentRows, exceptionRows, exceptionRemoveRows, servingNoticeRows, exceptionQueueRows };
 }

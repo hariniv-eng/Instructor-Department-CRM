@@ -74,7 +74,7 @@ const CATEGORY_TABS: { key: CategoryKey; label: string; icon: typeof UsersRound;
   { key: 'mentors', label: 'Mentors', icon: GraduationCap, description: 'Darwin — Mentors department.' },
   { key: 'instructors_mentors', label: 'Instructors + Mentors', icon: Users, description: 'Instructors and Mentors combined, without the Operations team.' },
   { key: 'ops_team', label: 'Operations team', icon: Briefcase, description: 'Darwin — Delivery Support (Ops), filed under Operations rather than Instructor or Mentor.' },
-  { key: 'exception', label: 'Exception', icon: AlertTriangle, description: 'People still in Darwin or TeachOS with an Approved or Pending With Approver exit record that has not been reviewed yet, plus anyone reviewed as Serving Notice Period. Use the Exit column to record what happened -- marking someone Exited or Absconded moves them to the Overview tab (Exception 2) to be removed from TeachOS; Payroll Converted removes them from the queue.' },
+  { key: 'exception', label: 'Exception', icon: AlertTriangle, description: 'People still in Darwin or TeachOS with an Approved or Pending With Approver exit record that has not been reviewed yet. Use the Exit column to record what happened -- marking someone Serving Notice Period, Exited or Absconded moves them to the Overview tab (Exception 2: Serving notice period / Exit lists); Payroll Converted removes them from the queue.' },
 ];
 
 function formatCount(value: number | undefined) {
@@ -1148,7 +1148,10 @@ function ExitCell({ person }: { person: InstructorSummary }) {
     },
   });
 
-  if (!person.exit_flag) {
+  // Dropdown for anyone with a Darwin exit record AND for every payroll
+  // instructor (2026-10-07: payroll people have no exit record but carry a
+  // manual entry, default Payroll Converted, that managers can change later).
+  if (!person.exit_flag && !person.is_payroll) {
     return <div className="truncate text-[12px] text-muted-foreground">—</div>;
   }
 
