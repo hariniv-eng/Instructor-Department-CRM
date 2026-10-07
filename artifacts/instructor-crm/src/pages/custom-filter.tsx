@@ -117,7 +117,7 @@ export default function CustomFilterPage() {
   };
   const clearFacet = (key: string) => setSelection((current) => ({ ...current, [key]: [] }));
 
-  return <div className="mx-auto max-w-[1700px]">
+  return <div className="w-full">
     <PageIntro
       eyebrow="Instructors / Custom filter"
       title="Custom filter"
