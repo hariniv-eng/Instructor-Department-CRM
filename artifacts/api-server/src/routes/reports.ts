@@ -4,7 +4,7 @@ import { requireAuth, requireRole } from "../middlewares/auth";
 import { cell, parseLooseDate, toISODate } from "../lib/reconcile";
 import { archiveInstructors } from "../lib/archiveInstructors";
 import { TRAINING_COURSE_TAXONOMY } from "../data/trainingCourseTaxonomy";
-import { TECH_AREAS } from "../lib/departmentTaxonomy";
+import { TECH_AREAS, normalizeSubjectArea } from "../lib/departmentTaxonomy";
 import { isPinnedConfirmedInstructor } from "../data/classificationOverrides";
 
 // Pinned edge-case instructors (NW0005068): see isPinnedConfirmedInstructor() in
@@ -88,7 +88,7 @@ const toApiArchiveSummary = (row: ArchiveRow, approvedExit?: ApprovedExitFallbac
     full_name: row.fullName,
     designation: row.designation || row.exitDesignation || null,
     department: row.department || row.exitDepartment || null,
-    dept_area: row.deptArea || row.manualDeptArea || null,
+    dept_area: normalizeSubjectArea(row.deptArea || row.manualDeptArea || null),
     classification: row.classification,
     institutes: row.institutes,
     capability_manager: row.teachosManager || row.manualCapabilityManager || null,
@@ -170,7 +170,7 @@ const toApiInstructorSummary = (row: InstructorRow, contributionByTeachosId: Map
   // frontend whether to render plain text (computed) or the manual-entry
   // dropdown (manual/none) -- deliberately not offered at all for
   // Operations team rows, whose null dept_area is intentional, not a gap.
-  dept_area: row.deptArea || row.manualDeptArea || null,
+  dept_area: normalizeSubjectArea(row.deptArea || row.manualDeptArea || null),
   dept_area_source: row.deptArea ? "computed" : row.manualDeptArea ? "manual" : null,
   is_payroll: row.classification === "payroll_converted",
   deployment_status: row.deploymentStatus,
@@ -688,8 +688,19 @@ router.get("/reports/instructors", async (_req, res) => {
   const todayIst = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
   const exitDateOf = (r: InstructorRow) => (r.classification === "payroll_converted" ? r.manualExitDate : r.exitLastWorkingDate) ?? null;
   const noticeEnded = (r: InstructorRow) => { const d = exitDateOf(r); return !!d && d < todayIst; };
-  const exitListRows = [...exceptionRemoveRows, ...servingNoticeRows.filter((r) => r.inTeachos && noticeEnded(r))];
-  const noticeListRows = servingNoticeRows.filter((r) => !noticeEnded(r));
+  // A resignation still "Pending With Approver" with NO date of exit yet is not
+  // an exit -- it stays in the Serving notice list only and is never added to
+  // the Exit list (2026-10-07, per request), whatever its review label says.
+  // (Payroll instructors are judged by their manual date alone.)
+  const pendingWithoutExitDate = (r: InstructorRow) =>
+    r.classification !== "payroll_converted" && (r.exitFlagStatus ?? "").trim().toLowerCase().startsWith("pending") && !exitDateOf(r);
+  const exitListRows = [
+    ...exceptionRemoveRows.filter((r) => !pendingWithoutExitDate(r)),
+    ...servingNoticeRows.filter((r) => r.inTeachos && noticeEnded(r)),
+  ];
+  const noticeBase = servingNoticeRows.filter((r) => !noticeEnded(r));
+  const noticeIds = new Set(noticeBase.map((r) => r.id));
+  const noticeListRows = [...noticeBase, ...exceptionRemoveRows.filter((r) => pendingWithoutExitDate(r) && !noticeIds.has(r.id))];
 
   const accessBreakdown = {
     department: buildAccessSplit(departmentRows),
@@ -803,7 +814,7 @@ const toApiCandidate = (row: InstructorRow) => ({
   department: row.department,
   designation: row.designation,
   dept_bucket: row.deptBucket,
-  dept_area: row.deptArea,
+  dept_area: normalizeSubjectArea(row.deptArea),
   classification: row.classification,
   classification_reason: row.classificationReason,
   notes: row.notes,
@@ -1234,7 +1245,7 @@ router.get("/reports/training-stats", requireAuth, requireRole("admin"), async (
       // won't appear on any of the 3 subject tabs until a human fills in
       // Manual Subject for them (same PATCH /instructors/:id/subject path
       // the Instructors tab already uses).
-      subject_area: p.deptArea || p.manualDeptArea || null,
+      subject_area: normalizeSubjectArea(p.deptArea || p.manualDeptArea || null),
       has_training_data: hasTrainingData,
       courses,
     };
