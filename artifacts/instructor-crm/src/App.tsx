@@ -8,6 +8,7 @@ import { AppShell } from '@/components/app-shell';
 import DashboardPage from '@/pages/dashboard';
 import InstructorDetailPage from '@/pages/instructor-detail';
 import InstructorsPage from '@/pages/instructors';
+import CustomFilterPage from '@/pages/custom-filter';
 import UploadsPage from '@/pages/uploads';
 import TeachosBreakdownPage from '@/pages/teachos-breakdown';
 import DarwinBreakdownPage from '@/pages/darwin-breakdown';
@@ -88,6 +89,7 @@ function Router() {
               <Switch>
                 <Route path="/" component={DashboardPage} />
                 <Route path="/instructors" component={InstructorsPage} />
+                <Route path="/instructors/custom-filter" component={CustomFilterPage} />
                 <Route path="/instructors/:id" component={InstructorDetailPage} />
                 <Route path="/teachos-breakdown" component={TeachosBreakdownPage} />
                 <Route path="/darwin-breakdown" component={DarwinBreakdownPage} />
