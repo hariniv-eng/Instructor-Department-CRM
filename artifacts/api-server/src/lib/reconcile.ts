@@ -127,22 +127,13 @@ export function toISODate(value: string | null): string | null {
 
 // The exit record's "Date Of Exit" = the person's last working day. It comes
 // from one of the Darwinbox enrichment reports (DBX_CHECK_ENRICH_REPORT_IDS in
-// connectors/darwinboxExits.ts), merged onto the record under whatever header
-// that report uses, so the exact names are tried first and then any header
-// that reads like "date of exit"/"last working day" (never "Exit Date" -- that
-// one is the day the request was raised, a different column).
+// connectors/darwinboxExits.ts), merged onto the record under that report's own
+// header. ONLY that exact column is read (2026-10-07, per request: "if it is
+// blank in the data, take it as blank only"). An earlier version also accepted
+// look-alike headers (Last Working Day, LWD, ...) and returned the request date
+// for pending resignations -- never "Exit Date" or any other fallback.
 function lastWorkingDateOf(rawData: Record<string, unknown>): string | null {
-  const exact = cell(rawData, "Date Of Exit", "date_of_exit", "Last Working Day", "last_working_day", "Last Working Date", "LWD", "Relieving Date");
-  if (exact) return exact;
-  for (const [key, value] of Object.entries(rawData)) {
-    const k = key.trim().toLowerCase().replace(/[_\s]+/g, " ");
-    if (k === "exit date") continue;
-    if (/date of (exit|leaving|separation)|last working|\blwd\b|relieving/.test(k)) {
-      const text = value === null || value === undefined ? "" : String(value).trim();
-      if (text) return text;
-    }
-  }
-  return null;
+  return cell(rawData, "Date Of Exit", "date_of_exit");
 }
 
 // Builds a lookup of the single most-recent exit record per person, by
