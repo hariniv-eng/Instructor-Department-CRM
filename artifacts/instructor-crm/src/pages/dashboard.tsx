@@ -358,7 +358,7 @@ function matchesSearch(p: InstructorSummary, query: string) {
 function ExceptionReviewPanel({ people, onClose }: { people: InstructorSummary[]; onClose: () => void }) {
   const [search, setSearch] = useState('');
   const filtered = useMemo(() => people.filter((p) => matchesSearch(p, search)), [people, search]);
-  const handleDownload = () => downloadCsv('exception-1-needs-review.csv', toCsv(['Name', 'Employee ID', 'Capability Manager', 'Subject'], filtered.map((p) => [p.full_name, p.employee_id ?? '', p.capability_manager ?? '', p.dept_area ?? ''])));
+  const handleDownload = () => downloadCsv('exception-1-needs-review.csv', toCsv(['Name', 'Employee ID', 'Capability Manager', 'Subject', 'Payroll / Nxtwave'], filtered.map((p) => [p.full_name, p.employee_id ?? '', p.capability_manager ?? '', p.dept_area ?? '', payrollLabel(p)])));
   return <section className="mt-5 rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6 animate-rise">
     <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
       <div>
@@ -380,7 +380,7 @@ function ExceptionReviewPanel({ people, onClose }: { people: InstructorSummary[]
     <div className="max-h-[420px] overflow-auto rounded-lg border border-border">
       <table className="w-full text-left text-[12px]">
         <thead className="sticky top-0 bg-secondary font-mono-ui text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
-          <tr><th className="px-3 py-2">Name</th><th className="px-3 py-2">Employee ID</th><th className="px-3 py-2">Capability Manager</th><th className="px-3 py-2">Subject</th></tr>
+          <tr><th className="px-3 py-2">Name</th><th className="px-3 py-2">Employee ID</th><th className="px-3 py-2">Capability Manager</th><th className="px-3 py-2">Subject</th><th className="px-3 py-2">Payroll / Nxtwave</th></tr>
         </thead>
         <tbody>
           {filtered.map((p) => <tr key={p.id} className="border-t border-border/70">
@@ -388,12 +388,21 @@ function ExceptionReviewPanel({ people, onClose }: { people: InstructorSummary[]
             <td className="px-3 py-2 font-mono-ui text-muted-foreground">{p.employee_id ?? '—'}</td>
             <td className="px-3 py-2 text-muted-foreground">{p.capability_manager ?? '—'}</td>
             <td className="px-3 py-2 text-muted-foreground">{p.dept_area ?? '—'}</td>
+            <td className="px-3 py-2"><PayrollBadge person={p} /></td>
           </tr>)}
-          {filtered.length === 0 && <tr><td colSpan={4} className="px-3 py-8 text-center text-muted-foreground">{people.length === 0 ? 'Nothing is waiting for review.' : 'No one matches this search.'}</td></tr>}
+          {filtered.length === 0 && <tr><td colSpan={5} className="px-3 py-8 text-center text-muted-foreground">{people.length === 0 ? 'Nothing is waiting for review.' : 'No one matches this search.'}</td></tr>}
         </tbody>
       </table>
     </div>
   </section>;
+}
+
+// Payroll / Nxtwave bifurcation (2026-10-07, per request) for the Exception lists.
+const payrollLabel = (p: InstructorSummary) => (p.is_payroll ? 'Payroll' : 'Nxtwave');
+function PayrollBadge({ person }: { person: InstructorSummary }) {
+  return person.is_payroll
+    ? <span className="inline-flex rounded-full bg-[#e6e9fb] px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] text-[#4a4fb0]">Payroll</span>
+    : <span className="inline-flex rounded-full bg-secondary px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] text-muted-foreground">Nxtwave</span>;
 }
 
 function formatExitDate(value?: string | null) {
@@ -417,7 +426,7 @@ function ExceptionRemovePanel({ exitPeople, noticePeople, onClose }: { exitPeopl
       window.setTimeout(() => setCopiedAll(false), 1500);
     }
   };
-  const handleDownload = () => downloadCsv(view === 'exit' ? 'exception-2-exit-remove-from-teachos.csv' : 'exception-2-serving-notice-period.csv', toCsv(['Name', 'Employee ID', 'TeachOS User ID', 'Subject', 'Capability Manager', 'date_of_exit', 'exit_status', 'exit_date'], filtered.map((p) => [p.full_name, p.employee_id ?? '', p.teachos_user_id ?? '', p.dept_area ?? '', p.capability_manager ?? '', p.date_of_exit ?? '', p.exit_flag_status ?? '', p.exit_flag_date ?? ''])));
+  const handleDownload = () => downloadCsv(view === 'exit' ? 'exception-2-exit-remove-from-teachos.csv' : 'exception-2-serving-notice-period.csv', toCsv(['Name', 'Employee ID', 'TeachOS User ID', 'Subject', 'Capability Manager', 'Payroll / Nxtwave', 'date_of_exit', 'exit_status', 'exit_date'], filtered.map((p) => [p.full_name, p.employee_id ?? '', p.teachos_user_id ?? '', p.dept_area ?? '', p.capability_manager ?? '', payrollLabel(p), p.date_of_exit ?? '', p.exit_flag_status ?? '', p.exit_flag_date ?? ''])));
   const views: { key: 'exit' | 'notice'; label: string; count: number }[] = [
     { key: 'exit', label: 'Exit', count: exitPeople.length },
     { key: 'notice', label: 'Serving notice period', count: noticePeople.length },
@@ -448,7 +457,7 @@ function ExceptionRemovePanel({ exitPeople, noticePeople, onClose }: { exitPeopl
     <div className="max-h-[420px] overflow-auto rounded-lg border border-border">
       <table className="w-full text-left text-[12px]">
         <thead className="sticky top-0 bg-secondary font-mono-ui text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
-          <tr><th className="px-3 py-2">Name</th><th className="px-3 py-2">Employee ID</th><th className="px-3 py-2">TeachOS user ID</th><th className="px-3 py-2">Subject</th><th className="px-3 py-2">Capability Manager</th><th className="px-3 py-2">date_of_exit</th><th className="px-3 py-2">exit_status</th><th className="px-3 py-2">exit_date</th></tr>
+          <tr><th className="px-3 py-2">Name</th><th className="px-3 py-2">Employee ID</th><th className="px-3 py-2">TeachOS user ID</th><th className="px-3 py-2">Subject</th><th className="px-3 py-2">Capability Manager</th><th className="px-3 py-2">Payroll / Nxtwave</th><th className="px-3 py-2">date_of_exit</th><th className="px-3 py-2">exit_status</th><th className="px-3 py-2">exit_date</th></tr>
         </thead>
         <tbody>
           {filtered.map((p) => <tr key={p.id} className="border-t border-border/70">
@@ -457,11 +466,12 @@ function ExceptionRemovePanel({ exitPeople, noticePeople, onClose }: { exitPeopl
             <td className="px-3 py-2 text-muted-foreground"><CopyValue value={p.teachos_user_id} mono testId={`button-copy-user-id-${p.id}`} /></td>
             <td className="px-3 py-2 text-muted-foreground">{p.dept_area ?? '—'}</td>
             <td className="px-3 py-2 text-muted-foreground"><CopyValue value={p.capability_manager} testId={`button-copy-capability-manager-${p.id}`} /></td>
+            <td className="px-3 py-2" data-testid={`text-payroll-${p.id}`}><PayrollBadge person={p} /></td>
             <td className="whitespace-nowrap px-3 py-2 text-muted-foreground" data-testid={`text-date-of-exit-${p.id}`}>{formatExitDate(p.date_of_exit)}</td>
             <td className="whitespace-nowrap px-3 py-2 text-muted-foreground" data-testid={`text-exit-status-${p.id}`}>{p.exit_flag_status || '—'}</td>
             <td className="whitespace-nowrap px-3 py-2 text-muted-foreground" data-testid={`text-exit-record-date-${p.id}`}>{formatExitDate(p.exit_flag_date)}</td>
           </tr>)}
-          {filtered.length === 0 && <tr><td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">{people.length === 0 ? (view === 'exit' ? 'No one is waiting to be removed from TeachOS.' : 'No one is serving a notice period.') : 'No one matches this search.'}</td></tr>}
+          {filtered.length === 0 && <tr><td colSpan={9} className="px-3 py-8 text-center text-muted-foreground">{people.length === 0 ? (view === 'exit' ? 'No one is waiting to be removed from TeachOS.' : 'No one is serving a notice period.') : 'No one matches this search.'}</td></tr>}
         </tbody>
       </table>
     </div>
