@@ -125,74 +125,77 @@ export default function CustomFilterPage() {
   };
   const clearFacet = (key: string) => setSelection((current) => ({ ...current, [key]: [] }));
 
-  return <div className="w-full">
-    <button type="button" onClick={goBack} data-testid="button-custom-filter-back" className="mb-4 inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3.5 py-2 text-[12px] font-bold text-foreground transition-colors hover:bg-secondary"><ArrowLeft size={14} /> Back to Instructors</button>
+  // Layout: the filter sidebar runs down the right-hand side from the very top of
+  // the page (level with the Back button and title); the left column holds the
+  // Back button, heading and table. It stays in view under the sticky header.
+  return <div className="flex w-full flex-col gap-5 lg:flex-row lg:items-start">
+    <div className="min-w-0 flex-1">
+      <button type="button" onClick={goBack} data-testid="button-custom-filter-back" className="mb-4 inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3.5 py-2 text-[12px] font-bold text-foreground transition-colors hover:bg-secondary"><ArrowLeft size={14} /> Back to Instructors</button>
 
-    <PageIntro
-      eyebrow="Instructors / Custom filter"
-      title="Custom filter"
-      description="Pick values from any column in the sidebar on the right to build your own view of the Instructor Department. Values within a column are OR'd; different columns are AND'd."
-    />
+      <PageIntro
+        eyebrow="Instructors / Custom filter"
+        title="Custom filter"
+        description="Pick values from any column in the sidebar on the right to build your own view of the Instructor Department. Values within a column are OR'd; different columns are AND'd."
+      />
 
-    {reportQuery.isLoading && <SkeletonBlock className="h-[520px]" />}
-    {reportQuery.isError && <QueryError message="The instructor register could not be loaded." />}
+      {reportQuery.isLoading && <SkeletonBlock className="h-[520px]" />}
+      {reportQuery.isError && <QueryError message="The instructor register could not be loaded." />}
 
-    {report && <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
-      <aside className="w-full shrink-0 rounded-xl border border-border bg-card shadow-xs lg:order-last lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:w-[300px] lg:overflow-y-auto" data-testid="sidebar-custom-filter">
-        <div className="flex items-center justify-between border-b border-border px-4 py-3">
-          <p className="flex items-center gap-2 font-mono-ui text-[10px] uppercase tracking-[0.16em] text-muted-foreground"><SlidersHorizontal size={13} /> Columns</p>
-          <button type="button" onClick={() => setSelection({})} disabled={activeCount === 0} data-testid="button-clear-custom-filters" className="text-[11px] font-bold text-primary hover:underline disabled:cursor-not-allowed disabled:text-muted-foreground disabled:no-underline">Clear all{activeCount > 0 ? ` (${activeCount})` : ''}</button>
+      {report && <section className="min-w-0">
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+        <div className="flex flex-col gap-1">
+          <p className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-muted-foreground"><span data-testid="text-custom-filter-count">{filtered.length}</span> of {everyone.length} people in view</p>
+          {activeCount === 0 && <p className="text-[11px] text-muted-foreground">No filters picked yet -- showing everyone in the Instructor Department.</p>}
         </div>
-        {FACETS.map((facet) => {
-          const options = facetOptions[facet.key] ?? [];
-          const chosen = selection[facet.key] ?? [];
-          const open = openFacet === facet.key;
-          return <div key={facet.key} className="border-b border-border/70 last:border-0">
-            <button type="button" onClick={() => setOpenFacet(open ? null : facet.key)} data-testid={`button-facet-${facet.key}`} aria-expanded={open} className="flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left transition-colors hover:bg-secondary/60">
-              <span className="flex min-w-0 items-center gap-2">
-                {open ? <ChevronDown size={14} className="shrink-0 text-muted-foreground" /> : <ChevronRight size={14} className="shrink-0 text-muted-foreground" />}
-                <span className="truncate text-[12px] font-bold text-foreground">{facet.label}</span>
-              </span>
-              <span className="flex shrink-0 items-center gap-2">
-                {chosen.length > 0 && <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-extrabold text-primary-foreground">{chosen.length}</span>}
-                <span className="text-[10px] text-muted-foreground">{options.length}</span>
-              </span>
-            </button>
-            {open && <FacetOptions
-              facetKey={facet.key}
-              options={options}
-              chosen={chosen}
-              onToggle={(value) => toggleValue(facet.key, value)}
-              onClear={() => clearFacet(facet.key)}
-            />}
-          </div>;
-        })}
-      </aside>
+        <DownloadCsvButton onClick={() => downloadInstructorsCsv('department', filtered, 'custom-filter.csv')} disabled={filtered.length === 0} testId="button-download-custom-filter-csv" />
+      </div>
 
-      <section className="min-w-0 flex-1">
-        <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-          <div className="flex flex-col gap-1">
-            <p className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-muted-foreground"><span data-testid="text-custom-filter-count">{filtered.length}</span> of {everyone.length} people in view</p>
-            {activeCount === 0 && <p className="text-[11px] text-muted-foreground">No filters picked yet -- showing everyone in the Instructor Department.</p>}
-          </div>
-          <DownloadCsvButton onClick={() => downloadInstructorsCsv('department', filtered, 'custom-filter.csv')} disabled={filtered.length === 0} testId="button-download-custom-filter-csv" />
-        </div>
+      {activeCount > 0 && <div className="mb-4 flex flex-wrap gap-1.5" data-testid="custom-filter-chips">
+        {FACETS.flatMap((facet) => (selection[facet.key] ?? []).map((value) => <button
+          key={`${facet.key}:${value}`}
+          type="button"
+          onClick={() => toggleValue(facet.key, value)}
+          title="Remove this filter"
+          className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-secondary px-2.5 py-1 text-[11px] font-semibold text-foreground transition-colors hover:bg-secondary/70"
+        ><span className="text-muted-foreground">{facet.label}:</span><span className="truncate">{value}</span><X size={12} className="shrink-0 text-muted-foreground" /></button>))}
+      </div>}
 
-        {activeCount > 0 && <div className="mb-4 flex flex-wrap gap-1.5" data-testid="custom-filter-chips">
-          {FACETS.flatMap((facet) => (selection[facet.key] ?? []).map((value) => <button
-            key={`${facet.key}:${value}`}
-            type="button"
-            onClick={() => toggleValue(facet.key, value)}
-            title="Remove this filter"
-            className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-secondary px-2.5 py-1 text-[11px] font-semibold text-foreground transition-colors hover:bg-secondary/70"
-          ><span className="text-muted-foreground">{facet.label}:</span><span className="truncate">{value}</span><X size={12} className="shrink-0 text-muted-foreground" /></button>))}
-        </div>}
+      {filtered.length === 0
+        ? <EmptyState title="No one matches these filters" description="Remove a filter chip or clear everything to see people again." />
+        : <CategoryTable category="department" people={filtered} backQuery="" />}
+      </section>}
+    </div>
 
-        {filtered.length === 0
-          ? <EmptyState title="No one matches these filters" description="Remove a filter chip or clear everything to see people again." />
-          : <CategoryTable category="department" people={filtered} backQuery="" />}
-      </section>
-    </div>}
+    {report && <aside className="w-full shrink-0 rounded-xl border border-border bg-card shadow-xs lg:sticky lg:top-[92px] lg:max-h-[calc(100dvh-108px)] lg:w-[300px] lg:overflow-y-auto" data-testid="sidebar-custom-filter">
+      <div className="flex items-center justify-between border-b border-border px-4 py-3">
+        <p className="flex items-center gap-2 font-mono-ui text-[10px] uppercase tracking-[0.16em] text-muted-foreground"><SlidersHorizontal size={13} /> Columns</p>
+        <button type="button" onClick={() => setSelection({})} disabled={activeCount === 0} data-testid="button-clear-custom-filters" className="text-[11px] font-bold text-primary hover:underline disabled:cursor-not-allowed disabled:text-muted-foreground disabled:no-underline">Clear all{activeCount > 0 ? ` (${activeCount})` : ''}</button>
+      </div>
+      {FACETS.map((facet) => {
+        const options = facetOptions[facet.key] ?? [];
+        const chosen = selection[facet.key] ?? [];
+        const open = openFacet === facet.key;
+        return <div key={facet.key} className="border-b border-border/70 last:border-0">
+          <button type="button" onClick={() => setOpenFacet(open ? null : facet.key)} data-testid={`button-facet-${facet.key}`} aria-expanded={open} className="flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left transition-colors hover:bg-secondary/60">
+            <span className="flex min-w-0 items-center gap-2">
+              {open ? <ChevronDown size={14} className="shrink-0 text-muted-foreground" /> : <ChevronRight size={14} className="shrink-0 text-muted-foreground" />}
+              <span className="truncate text-[12px] font-bold text-foreground">{facet.label}</span>
+            </span>
+            <span className="flex shrink-0 items-center gap-2">
+              {chosen.length > 0 && <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-extrabold text-primary-foreground">{chosen.length}</span>}
+              <span className="text-[10px] text-muted-foreground">{options.length}</span>
+            </span>
+          </button>
+          {open && <FacetOptions
+            facetKey={facet.key}
+            options={options}
+            chosen={chosen}
+            onToggle={(value) => toggleValue(facet.key, value)}
+            onClear={() => clearFacet(facet.key)}
+          />}
+        </div>;
+      })}
+    </aside>}
   </div>;
 }
 
