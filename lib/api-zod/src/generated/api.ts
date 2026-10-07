@@ -1450,6 +1450,107 @@ export const GetReportsInstructorsResponse = zod.object({
   "niat_cohorts": zod.array(zod.string())
 })).optional()
 }).optional().describe('One darwin_only\/both\/teachos_only bucket -- a count plus the actual people in it, for the click-to-drill-down view.')
+}).optional().describe('How a category\'s total splits by data source -- Darwin record only, TeachOS record only, or both -- each with its own people list.'),
+  "exception_notice": zod.object({
+  "darwin_only": zod.object({
+  "count": zod.number().optional(),
+  "people": zod.array(zod.object({
+  "id": zod.number(),
+  "full_name": zod.string(),
+  "employee_id": zod.string().nullable(),
+  "teachos_user_id": zod.string().nullable(),
+  "designation": zod.string().nullable(),
+  "department": zod.string().nullable(),
+  "dept_bucket": zod.string().nullable(),
+  "classification": zod.string().nullable(),
+  "dept_area": zod.string().nullable(),
+  "dept_area_source": zod.union([zod.literal('computed'),zod.literal('manual'),zod.literal(null)]).nullable(),
+  "is_payroll": zod.boolean(),
+  "deployment_status": zod.string().nullable(),
+  "institutes": zod.array(zod.string()),
+  "capability_manager": zod.string().nullable(),
+  "capability_manager_source": zod.union([zod.literal('teachos'),zod.literal('manual'),zod.literal(null)]).nullable(),
+  "darwin_manager": zod.string().nullable(),
+  "date_of_joining": zod.string().nullable(),
+  "org_email": zod.string().nullable(),
+  "work_location": zod.string().nullable(),
+  "gender": zod.string().nullable(),
+  "gender_source": zod.union([zod.literal('darwin'),zod.literal('exit'),zod.literal('manual'),zod.literal(null)]).nullable(),
+  "exit_flag": zod.boolean(),
+  "exit_flag_status": zod.string().nullish(),
+  "exit_flag_date": zod.coerce.date().nullish(),
+  "date_of_exit": zod.coerce.date().nullish(),
+  "exit_verification": zod.union([zod.literal('exited'),zod.literal('serving_notice_period'),zod.literal('payroll_converted'),zod.literal('absconded'),zod.literal('revoked'),zod.literal(null)]).nullable(),
+  "enrolled_plans": zod.string().nullable(),
+  "niat_cohorts": zod.array(zod.string())
+})).optional()
+}).optional().describe('One darwin_only\/both\/teachos_only bucket -- a count plus the actual people in it, for the click-to-drill-down view.'),
+  "both": zod.object({
+  "count": zod.number().optional(),
+  "people": zod.array(zod.object({
+  "id": zod.number(),
+  "full_name": zod.string(),
+  "employee_id": zod.string().nullable(),
+  "teachos_user_id": zod.string().nullable(),
+  "designation": zod.string().nullable(),
+  "department": zod.string().nullable(),
+  "dept_bucket": zod.string().nullable(),
+  "classification": zod.string().nullable(),
+  "dept_area": zod.string().nullable(),
+  "dept_area_source": zod.union([zod.literal('computed'),zod.literal('manual'),zod.literal(null)]).nullable(),
+  "is_payroll": zod.boolean(),
+  "deployment_status": zod.string().nullable(),
+  "institutes": zod.array(zod.string()),
+  "capability_manager": zod.string().nullable(),
+  "capability_manager_source": zod.union([zod.literal('teachos'),zod.literal('manual'),zod.literal(null)]).nullable(),
+  "darwin_manager": zod.string().nullable(),
+  "date_of_joining": zod.string().nullable(),
+  "org_email": zod.string().nullable(),
+  "work_location": zod.string().nullable(),
+  "gender": zod.string().nullable(),
+  "gender_source": zod.union([zod.literal('darwin'),zod.literal('exit'),zod.literal('manual'),zod.literal(null)]).nullable(),
+  "exit_flag": zod.boolean(),
+  "exit_flag_status": zod.string().nullish(),
+  "exit_flag_date": zod.coerce.date().nullish(),
+  "date_of_exit": zod.coerce.date().nullish(),
+  "exit_verification": zod.union([zod.literal('exited'),zod.literal('serving_notice_period'),zod.literal('payroll_converted'),zod.literal('absconded'),zod.literal('revoked'),zod.literal(null)]).nullable(),
+  "enrolled_plans": zod.string().nullable(),
+  "niat_cohorts": zod.array(zod.string())
+})).optional()
+}).optional().describe('One darwin_only\/both\/teachos_only bucket -- a count plus the actual people in it, for the click-to-drill-down view.'),
+  "teachos_only": zod.object({
+  "count": zod.number().optional(),
+  "people": zod.array(zod.object({
+  "id": zod.number(),
+  "full_name": zod.string(),
+  "employee_id": zod.string().nullable(),
+  "teachos_user_id": zod.string().nullable(),
+  "designation": zod.string().nullable(),
+  "department": zod.string().nullable(),
+  "dept_bucket": zod.string().nullable(),
+  "classification": zod.string().nullable(),
+  "dept_area": zod.string().nullable(),
+  "dept_area_source": zod.union([zod.literal('computed'),zod.literal('manual'),zod.literal(null)]).nullable(),
+  "is_payroll": zod.boolean(),
+  "deployment_status": zod.string().nullable(),
+  "institutes": zod.array(zod.string()),
+  "capability_manager": zod.string().nullable(),
+  "capability_manager_source": zod.union([zod.literal('teachos'),zod.literal('manual'),zod.literal(null)]).nullable(),
+  "darwin_manager": zod.string().nullable(),
+  "date_of_joining": zod.string().nullable(),
+  "org_email": zod.string().nullable(),
+  "work_location": zod.string().nullable(),
+  "gender": zod.string().nullable(),
+  "gender_source": zod.union([zod.literal('darwin'),zod.literal('exit'),zod.literal('manual'),zod.literal(null)]).nullable(),
+  "exit_flag": zod.boolean(),
+  "exit_flag_status": zod.string().nullish(),
+  "exit_flag_date": zod.coerce.date().nullish(),
+  "date_of_exit": zod.coerce.date().nullish(),
+  "exit_verification": zod.union([zod.literal('exited'),zod.literal('serving_notice_period'),zod.literal('payroll_converted'),zod.literal('absconded'),zod.literal('revoked'),zod.literal(null)]).nullable(),
+  "enrolled_plans": zod.string().nullable(),
+  "niat_cohorts": zod.array(zod.string())
+})).optional()
+}).optional().describe('One darwin_only\/both\/teachos_only bucket -- a count plus the actual people in it, for the click-to-drill-down view.')
 }).optional().describe('How a category\'s total splits by data source -- Darwin record only, TeachOS record only, or both -- each with its own people list.')
 }).optional().describe('Darwin-only \/ TeachOS-only \/ both-access split for the Instructor Department, Instructors, Mentors, Operations team, and Exception KPI cards (2026-09-04; department card added 2026-09-07; exception added 2026-09-18). \"department\" is the union of instructors + mentors + ops_team (mutually exclusive populations, safe to sum). \"exception\" is a review-queue overlay on top of those three, not a fourth population to add in -- see reports.ts\'s exceptionRows comment.')
 })

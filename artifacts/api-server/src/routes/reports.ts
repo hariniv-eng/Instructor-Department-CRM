@@ -423,7 +423,13 @@ function computeDepartmentAndExceptionRows(allRows: InstructorRow[]) {
   const exceptionRows = exceptionQueueRows.filter((r) => !r.exitVerification || r.exitVerification === "serving_notice_period");
   const exceptionRemoveRows = exceptionQueueRows.filter((r) => (r.exitVerification === "exited" || r.exitVerification === "absconded") && r.inTeachos && r.classification !== "excluded_ops_managers");
 
-  return { mentors, opsTeamRows, darwinInstructorsForCount, payrollConvertedForCount, needsReviewForCount, countedInstructorRows, departmentRows, exceptionRows, exceptionRemoveRows, exceptionQueueRows };
+  // Everyone in the queue reviewed as Serving Notice Period (still in Darwin
+  // and/or TeachOS). The Overview's Exception 2 "Serving notice period" list
+  // is built from this; once a person's Darwin Date Of Exit has passed they
+  // move to the Exit list instead (see the /reports/instructors route).
+  const servingNoticeRows = exceptionQueueRows.filter((r) => r.exitVerification === "serving_notice_period" && r.classification !== "excluded_ops_managers");
+
+  return { mentors, opsTeamRows, darwinInstructorsForCount, payrollConvertedForCount, needsReviewForCount, countedInstructorRows, departmentRows, exceptionRows, exceptionRemoveRows, servingNoticeRows, exceptionQueueRows };
 }
 
 // This is the single reporting surface for the breakdowns requested on top
@@ -439,7 +445,7 @@ function computeDepartmentAndExceptionRows(allRows: InstructorRow[]) {
 // Breakdown and TeachOS Breakdown below stay Admin-only.
 router.get("/reports/instructors", async (_req, res) => {
   const allRows = await db.select().from(instructorsTable);
-  const { mentors, opsTeamRows, darwinInstructorsForCount, payrollConvertedForCount, needsReviewForCount, countedInstructorRows, departmentRows, exceptionRows, exceptionRemoveRows } = computeDepartmentAndExceptionRows(allRows);
+  const { mentors, opsTeamRows, darwinInstructorsForCount, payrollConvertedForCount, needsReviewForCount, countedInstructorRows, departmentRows, exceptionRows, exceptionRemoveRows, servingNoticeRows } = computeDepartmentAndExceptionRows(allRows);
 
   // NIAT cohort join (2026-09-29, per request -- see niat_cohorts' comment
   // on toApiInstructorSummary above): one extra query, keyed by
@@ -641,6 +647,38 @@ router.get("/reports/instructors", async (_req, res) => {
   // above via computeDepartmentAndExceptionRows() -- see that function's own
   // comment for the full "who counts as an Exception" reasoning.
 
+  // Exception 2 (Overview), 2026-10-07 -- two lists, plus the "date_of_exit"
+  // column. date_of_exit is Darwinbox's own "Date Of Exit" field on the
+  // employee master record (the actual exit date, not the resignation
+  // request date exit_flag_date carries), looked up by employee ID in the
+  // Instructors-department pull first, then the full company roster.
+  //   * Exit list: reviewed Exited/Absconded and still in TeachOS -- their
+  //     TeachOS access should be removed -- PLUS anyone reviewed as Serving
+  //     Notice Period whose Date Of Exit is before today (IST), i.e. the
+  //     notice period finished yesterday or earlier ("once the date of exit is
+  //     done, the next day all the serving notice instructors move to the
+  //     exit list"). They only join it while still in TeachOS.
+  //   * Serving notice list: everyone reviewed as Serving Notice Period whose
+  //     Date Of Exit has not passed yet (or Darwin has no Date Of Exit for
+  //     them, so there is nothing to move them on).
+  const noticeIds = new Set([...exceptionRemoveRows, ...servingNoticeRows].map((r) => r.employeeId).filter((id): id is string => !!id));
+  const dateOfExitById = new Map<string, string>();
+  if (noticeIds.size > 0) {
+    for (const table of [darwinboxActiveTable, darwinboxFullRosterTable]) {
+      const stored = await db.select({ employeeId: table.employeeId, rawData: table.rawData }).from(table);
+      for (const r of stored) {
+        if (!r.employeeId || !noticeIds.has(r.employeeId) || dateOfExitById.has(r.employeeId)) continue;
+        const iso = toISODate(cell(r.rawData as Record<string, unknown>, "Date Of Exit", "date_of_exit"));
+        if (iso) dateOfExitById.set(r.employeeId, iso);
+      }
+    }
+  }
+  const todayIst = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  const exitDateOf = (r: InstructorRow) => (r.employeeId ? dateOfExitById.get(r.employeeId) ?? null : null);
+  const noticeEnded = (r: InstructorRow) => { const d = exitDateOf(r); return !!d && d < todayIst; };
+  const exitListRows = [...exceptionRemoveRows, ...servingNoticeRows.filter((r) => r.inTeachos && noticeEnded(r))];
+  const noticeListRows = servingNoticeRows.filter((r) => !noticeEnded(r));
+
   const accessBreakdown = {
     department: buildAccessSplit(departmentRows),
     instructors: buildAccessSplit(countedInstructorRows),
@@ -651,28 +689,12 @@ router.get("/reports/instructors", async (_req, res) => {
     ops_team: buildAccessSplit(opsTeamRows),
     exception: buildAccessSplit(exceptionRows),
     // Overview "Exception 2" (2026-10-06): reviewed as Exited/Absconded and still in TeachOS.
-    exception_remove: buildAccessSplit(exceptionRemoveRows),
+    exception_remove: buildAccessSplit(exitListRows),
+    // Overview "Exception 2" Serving notice period list (2026-10-07).
+    exception_notice: buildAccessSplit(noticeListRows),
   };
-
-  // Exception 2's "date_of_exit" column (2026-10-07, per request): Darwinbox's
-  // own "Date Of Exit" field on the employee master record (the actual exit
-  // date, not the resignation request date exit_flag_date carries), looked
-  // up by employee ID in the Instructors-department pull first, then the
-  // full company roster. Null when Darwin has no Date Of Exit for them.
-  {
-    const wantedIds = new Set(exceptionRemoveRows.map((r) => r.employeeId).filter((id): id is string => !!id));
-    const dateOfExitById = new Map<string, string>();
-    if (wantedIds.size > 0) {
-      for (const table of [darwinboxActiveTable, darwinboxFullRosterTable]) {
-        const stored = await db.select({ employeeId: table.employeeId, rawData: table.rawData }).from(table);
-        for (const r of stored) {
-          if (!r.employeeId || !wantedIds.has(r.employeeId) || dateOfExitById.has(r.employeeId)) continue;
-          const iso = toISODate(cell(r.rawData as Record<string, unknown>, "Date Of Exit", "date_of_exit"));
-          if (iso) dateOfExitById.set(r.employeeId, iso);
-        }
-      }
-    }
-    for (const bucket of [accessBreakdown.exception_remove.both, accessBreakdown.exception_remove.teachos_only, accessBreakdown.exception_remove.darwin_only]) {
+  for (const split of [accessBreakdown.exception_remove, accessBreakdown.exception_notice]) {
+    for (const bucket of [split.darwin_only, split.both, split.teachos_only]) {
       for (const person of bucket.people as Array<Record<string, unknown>>) {
         person.date_of_exit = (typeof person.employee_id === "string" && dateOfExitById.get(person.employee_id)) || null;
       }
@@ -697,7 +719,8 @@ router.get("/reports/instructors", async (_req, res) => {
       // total_instructor_count/mentors_count/ops_team_count/
       // department_total_count.
       exception_count: exceptionRows.length,
-      exception_remove_count: exceptionRemoveRows.length,
+      exception_remove_count: exitListRows.length,
+      exception_notice_count: noticeListRows.length,
       iit_kharagpur_count: iitKharagpurRows.length,
       // New employee-ID-mapping pipeline breakdown (see comment above
       // countedInstructorRows): who's actually feeding the headline total,

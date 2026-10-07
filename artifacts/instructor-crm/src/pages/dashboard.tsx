@@ -83,6 +83,12 @@ export default function DashboardPage() {
   const removeSplit = (report?.access_breakdown as Record<string, AccessSplit | undefined> | undefined)?.exception_remove;
   const removePeople = useMemo(() => [...(removeSplit?.both?.people ?? []), ...(removeSplit?.teachos_only?.people ?? [])]
     .sort((a, b) => a.full_name.localeCompare(b.full_name)), [removeSplit]);
+  // Serving notice period list (access_breakdown.exception_notice): reviewed as
+  // Serving Notice Period and their Darwin Date Of Exit hasn't passed yet. The
+  // day after that date they move to the Exit list above (see reports.ts).
+  const noticeSplit = (report?.access_breakdown as Record<string, AccessSplit | undefined> | undefined)?.exception_notice;
+  const noticePeople = useMemo(() => [...(noticeSplit?.darwin_only?.people ?? []), ...(noticeSplit?.both?.people ?? []), ...(noticeSplit?.teachos_only?.people ?? [])]
+    .sort((a, b) => a.full_name.localeCompare(b.full_name)), [noticeSplit]);
   const toggleAccessCard = (card: AccessCardKey) => {
     if (activeAccessCard === card) {
       setActiveAccessCard(null);
@@ -111,11 +117,11 @@ export default function DashboardPage() {
 
     {report && <section className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 animate-rise" aria-label="Exceptions">
       <KpiCard label="Exception 1 — Needs review" value={formatKpi(reviewPeople.length)} meta="Exit record, not reviewed yet" icon={<AlertTriangle size={17} />} tone="saffron" active={activeException === 'review'} onClick={() => setActiveException(activeException === 'review' ? null : 'review')} />
-      <KpiCard label="Exception 2 — Remove from TeachOS" value={formatKpi(removePeople.length)} meta="Marked exited, still in TeachOS" icon={<Trash2 size={17} />} tone="coral" active={activeException === 'remove'} onClick={() => setActiveException(activeException === 'remove' ? null : 'remove')} />
+      <KpiCard label="Exception 2 — Remove from TeachOS" value={formatKpi(removePeople.length)} meta={`Exit list · ${noticePeople.length} serving notice`} icon={<Trash2 size={17} />} tone="coral" active={activeException === 'remove'} onClick={() => setActiveException(activeException === 'remove' ? null : 'remove')} />
     </section>}
 
     {report && activeException === 'review' && <ExceptionReviewPanel people={reviewPeople} onClose={() => setActiveException(null)} />}
-    {report && activeException === 'remove' && <ExceptionRemovePanel people={removePeople} onClose={() => setActiveException(null)} />}
+    {report && activeException === 'remove' && <ExceptionRemovePanel exitPeople={removePeople} noticePeople={noticePeople} onClose={() => setActiveException(null)} />}
 
     {report && activeAccessCard && <AccessDrilldown
       label={ACCESS_CARD_LABELS[activeAccessCard]}
@@ -398,9 +404,11 @@ function formatExitDate(value?: string | null) {
 
 // Exception 2: the removal worklist. Everything a person needs to find and
 // remove the record in TeachOS is one click from the clipboard.
-function ExceptionRemovePanel({ people, onClose }: { people: InstructorSummary[]; onClose: () => void }) {
+function ExceptionRemovePanel({ exitPeople, noticePeople, onClose }: { exitPeople: InstructorSummary[]; noticePeople: InstructorSummary[]; onClose: () => void }) {
+  const [view, setView] = useState<'exit' | 'notice'>('exit');
   const [search, setSearch] = useState('');
   const [copiedAll, setCopiedAll] = useState(false);
+  const people = view === 'exit' ? exitPeople : noticePeople;
   const filtered = useMemo(() => people.filter((p) => matchesSearch(p, search)), [people, search]);
   const userIds = filtered.map((p) => p.teachos_user_id).filter((id): id is string => !!id);
   const copyAllIds = async () => {
@@ -409,13 +417,22 @@ function ExceptionRemovePanel({ people, onClose }: { people: InstructorSummary[]
       window.setTimeout(() => setCopiedAll(false), 1500);
     }
   };
-  const handleDownload = () => downloadCsv('exception-2-remove-from-teachos.csv', toCsv(['Name', 'Employee ID', 'TeachOS User ID', 'Subject', 'Capability Manager', 'date_of_exit'], filtered.map((p) => [p.full_name, p.employee_id ?? '', p.teachos_user_id ?? '', p.dept_area ?? '', p.capability_manager ?? '', p.date_of_exit ?? ''])));
+  const handleDownload = () => downloadCsv(view === 'exit' ? 'exception-2-exit-remove-from-teachos.csv' : 'exception-2-serving-notice-period.csv', toCsv(['Name', 'Employee ID', 'TeachOS User ID', 'Subject', 'Capability Manager', 'date_of_exit'], filtered.map((p) => [p.full_name, p.employee_id ?? '', p.teachos_user_id ?? '', p.dept_area ?? '', p.capability_manager ?? '', p.date_of_exit ?? ''])));
+  const views: { key: 'exit' | 'notice'; label: string; count: number }[] = [
+    { key: 'exit', label: 'Exit', count: exitPeople.length },
+    { key: 'notice', label: 'Serving notice period', count: noticePeople.length },
+  ];
   return <section className="mt-5 rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6 animate-rise">
     <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
       <div>
         <p className="font-mono-ui text-[10px] uppercase tracking-[0.17em] text-muted-foreground">Exception 2 — TeachOS clean-up</p>
-        <h2 className="mt-1 text-[16px] font-extrabold tracking-[-0.03em]">Marked as exited, still in TeachOS</h2>
-        <p className="mt-1 max-w-[640px] text-[12px] text-muted-foreground">Instructors and Mentors marked Exited or Absconded who still have a TeachOS record. Copy the user ID, remove the person in TeachOS, and they drop off this list after the next sync.</p>
+        <h2 className="mt-1 text-[16px] font-extrabold tracking-[-0.03em]">{view === 'exit' ? 'Exited — remove TeachOS access' : 'Serving notice period'}</h2>
+        <p className="mt-1 max-w-[640px] text-[12px] text-muted-foreground">{view === 'exit'
+          ? 'Instructors and Mentors who have exited (or whose notice period has ended) and still have a TeachOS record. Copy the user ID, remove the person in TeachOS, and they drop off this list after the next sync.'
+          : 'Instructors and Mentors serving their notice period. The day after their date of exit passes, they move to the Exit list automatically.'}</p>
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {views.map((v) => <button key={v.key} type="button" data-testid={`button-exception-view-${v.key}`} onClick={() => setView(v.key)} className={`rounded-full px-3 py-1 text-[11px] font-bold transition-colors ${view === v.key ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground hover:bg-secondary/70'}`}>{v.label} ({v.count})</button>)}
+        </div>
       </div>
       <div className="flex flex-wrap items-center gap-2">
         {people.length > 0 && <TableSearchInput value={search} onChange={setSearch} placeholder="Search name, employee ID or user ID..." testId="input-search-exception-remove" />}
@@ -442,7 +459,7 @@ function ExceptionRemovePanel({ people, onClose }: { people: InstructorSummary[]
             <td className="px-3 py-2 text-muted-foreground"><CopyValue value={p.capability_manager} testId={`button-copy-capability-manager-${p.id}`} /></td>
             <td className="whitespace-nowrap px-3 py-2 text-muted-foreground" data-testid={`text-date-of-exit-${p.id}`}>{formatExitDate(p.date_of_exit)}</td>
           </tr>)}
-          {filtered.length === 0 && <tr><td colSpan={6} className="px-3 py-8 text-center text-muted-foreground">{people.length === 0 ? 'No one is waiting to be removed from TeachOS.' : 'No one matches this search.'}</td></tr>}
+          {filtered.length === 0 && <tr><td colSpan={6} className="px-3 py-8 text-center text-muted-foreground">{people.length === 0 ? (view === 'exit' ? 'No one is waiting to be removed from TeachOS.' : 'No one is serving a notice period.') : 'No one matches this search.'}</td></tr>}
         </tbody>
       </table>
     </div>
