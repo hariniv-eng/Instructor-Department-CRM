@@ -262,6 +262,11 @@ const toApiInstructorSummary = (row: InstructorRow, contributionByTeachosId: Map
   // by the Instructors tab table to decide whether to render the Exit
   // column's manual-verification dropdown (exit_flag true) or a plain dash.
   exit_flag: row.exitFlag,
+  // Darwinbox exit record's status/date (added 2026-10-07 for the Overview's
+  // Exception 2 "exit_date" column) -- same live-status fields the single-
+  // instructor endpoint (routes/instructors.ts) already returns.
+  exit_flag_status: row.exitFlagStatus,
+  exit_flag_date: row.exitFlagDate,
   // Capability Manager's manual read on an exit-flagged record -- "exited" |
   // "serving_notice_period" | "payroll_converted" | null. Purely a tracking
   // label; see exitVerification's comment in the schema for why it never

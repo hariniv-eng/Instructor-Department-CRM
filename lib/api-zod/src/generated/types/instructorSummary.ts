@@ -51,6 +51,10 @@ export interface InstructorSummary {
   gender_source: InstructorSummaryGenderSource;
   exit_flag: boolean;
   /** @nullable */
+  exit_flag_status?: string | null;
+  /** @nullable */
+  exit_flag_date?: Date | null;
+  /** @nullable */
   exit_verification: InstructorSummaryExitVerification;
   /** @nullable */
   enrolled_plans: string | null;

@@ -710,6 +710,8 @@ components:
             mentors: { $ref: "#/components/schemas/AccessSplit" }
             ops_team: { $ref: "#/components/schemas/AccessSplit" }
             exception: { $ref: "#/components/schemas/AccessSplit" }
+            instructors_mentors: { $ref: "#/components/schemas/AccessSplit" }
+            exception_remove: { $ref: "#/components/schemas/AccessSplit" }
     AccessBucket:
       type: object
       description: One darwin_only/both/teachos_only bucket -- a count plus the actual people in it, for the click-to-drill-down view.
@@ -872,6 +874,10 @@ components:
         # subtract" philosophy as elsewhere -- never subtracted from the
         # standing instructor count by itself.
         exit_flag: { type: boolean }
+        # Darwinbox exit record's status/date (2026-10-07, for the Overview's
+        # Exception 2 exit_date column).
+        exit_flag_status: { type: ["string", "null"] }
+        exit_flag_date: { type: ["string", "null"], format: date }
         # Capability Manager's manual read on an exit-flagged record,
         # settable via PATCH /instructors/{id}/exit-verification by either
         # Admin or Manager -- see that endpoint's description for why this
