@@ -125,6 +125,26 @@ export function toISODate(value: string | null): string | null {
   return parsed.toISOString().slice(0, 10);
 }
 
+// The exit record's "Date Of Exit" = the person's last working day. It comes
+// from one of the Darwinbox enrichment reports (DBX_CHECK_ENRICH_REPORT_IDS in
+// connectors/darwinboxExits.ts), merged onto the record under whatever header
+// that report uses, so the exact names are tried first and then any header
+// that reads like "date of exit"/"last working day" (never "Exit Date" -- that
+// one is the day the request was raised, a different column).
+function lastWorkingDateOf(rawData: Record<string, unknown>): string | null {
+  const exact = cell(rawData, "Date Of Exit", "date_of_exit", "Last Working Day", "last_working_day", "Last Working Date", "LWD", "Relieving Date");
+  if (exact) return exact;
+  for (const [key, value] of Object.entries(rawData)) {
+    const k = key.trim().toLowerCase().replace(/[_\s]+/g, " ");
+    if (k === "exit date") continue;
+    if (/date of (exit|leaving|separation)|last working|\blwd\b|relieving/.test(k)) {
+      const text = value === null || value === undefined ? "" : String(value).trim();
+      if (text) return text;
+    }
+  }
+  return null;
+}
+
 // Builds a lookup of the single most-recent exit record per person, by
 // employeeId ONLY, from whatever's currently in darwinboxExitsTable (fully
 // replaced on every live exits sync — see storeRaw.ts). Any hit here means
@@ -164,7 +184,7 @@ async function loadLatestExitsByPerson(): Promise<{ byEmployeeId: Map<string, Ex
     const department = cell(exit.rawData, "Current Department", "Department", "Top Department", "department");
     const designation = cell(exit.rawData, "Current Designation", "Designation", "designation");
     const gender = cell(exit.rawData, "Gender", "gender");
-    const lastWorkingDate = cell(exit.rawData, "Date Of Exit", "date_of_exit", "Last Working Day", "last_working_day", "LWD", "Relieving Date");
+    const lastWorkingDate = lastWorkingDateOf(exit.rawData);
     const info: ExitInfo = { status, exitDate, lastWorkingDate, department, designation, gender };
     const rank = parseLooseDate(exitDate);
     const candidate = { info, rank, id: exit.id };
