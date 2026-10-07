@@ -738,6 +738,7 @@ export const GetReportsInstructorsResponse = zod.object({
   "exit_flag": zod.boolean(),
   "exit_flag_status": zod.string().nullish(),
   "exit_flag_date": zod.coerce.date().nullish(),
+  "date_of_exit": zod.coerce.date().nullish(),
   "exit_verification": zod.union([zod.literal('exited'),zod.literal('serving_notice_period'),zod.literal('payroll_converted'),zod.literal('absconded'),zod.literal('revoked'),zod.literal(null)]).nullable(),
   "enrolled_plans": zod.string().nullable(),
   "niat_cohorts": zod.array(zod.string())
@@ -771,6 +772,7 @@ export const GetReportsInstructorsResponse = zod.object({
   "exit_flag": zod.boolean(),
   "exit_flag_status": zod.string().nullish(),
   "exit_flag_date": zod.coerce.date().nullish(),
+  "date_of_exit": zod.coerce.date().nullish(),
   "exit_verification": zod.union([zod.literal('exited'),zod.literal('serving_notice_period'),zod.literal('payroll_converted'),zod.literal('absconded'),zod.literal('revoked'),zod.literal(null)]).nullable(),
   "enrolled_plans": zod.string().nullable(),
   "niat_cohorts": zod.array(zod.string())
@@ -803,6 +805,7 @@ export const GetReportsInstructorsResponse = zod.object({
   "exit_flag": zod.boolean(),
   "exit_flag_status": zod.string().nullish(),
   "exit_flag_date": zod.coerce.date().nullish(),
+  "date_of_exit": zod.coerce.date().nullish(),
   "exit_verification": zod.union([zod.literal('exited'),zod.literal('serving_notice_period'),zod.literal('payroll_converted'),zod.literal('absconded'),zod.literal('revoked'),zod.literal(null)]).nullable(),
   "enrolled_plans": zod.string().nullable(),
   "niat_cohorts": zod.array(zod.string())
@@ -835,6 +838,7 @@ export const GetReportsInstructorsResponse = zod.object({
   "exit_flag": zod.boolean(),
   "exit_flag_status": zod.string().nullish(),
   "exit_flag_date": zod.coerce.date().nullish(),
+  "date_of_exit": zod.coerce.date().nullish(),
   "exit_verification": zod.union([zod.literal('exited'),zod.literal('serving_notice_period'),zod.literal('payroll_converted'),zod.literal('absconded'),zod.literal('revoked'),zod.literal(null)]).nullable(),
   "enrolled_plans": zod.string().nullable(),
   "niat_cohorts": zod.array(zod.string())
@@ -869,6 +873,7 @@ export const GetReportsInstructorsResponse = zod.object({
   "exit_flag": zod.boolean(),
   "exit_flag_status": zod.string().nullish(),
   "exit_flag_date": zod.coerce.date().nullish(),
+  "date_of_exit": zod.coerce.date().nullish(),
   "exit_verification": zod.union([zod.literal('exited'),zod.literal('serving_notice_period'),zod.literal('payroll_converted'),zod.literal('absconded'),zod.literal('revoked'),zod.literal(null)]).nullable(),
   "enrolled_plans": zod.string().nullable(),
   "niat_cohorts": zod.array(zod.string())
@@ -901,6 +906,7 @@ export const GetReportsInstructorsResponse = zod.object({
   "exit_flag": zod.boolean(),
   "exit_flag_status": zod.string().nullish(),
   "exit_flag_date": zod.coerce.date().nullish(),
+  "date_of_exit": zod.coerce.date().nullish(),
   "exit_verification": zod.union([zod.literal('exited'),zod.literal('serving_notice_period'),zod.literal('payroll_converted'),zod.literal('absconded'),zod.literal('revoked'),zod.literal(null)]).nullable(),
   "enrolled_plans": zod.string().nullable(),
   "niat_cohorts": zod.array(zod.string())
@@ -933,6 +939,7 @@ export const GetReportsInstructorsResponse = zod.object({
   "exit_flag": zod.boolean(),
   "exit_flag_status": zod.string().nullish(),
   "exit_flag_date": zod.coerce.date().nullish(),
+  "date_of_exit": zod.coerce.date().nullish(),
   "exit_verification": zod.union([zod.literal('exited'),zod.literal('serving_notice_period'),zod.literal('payroll_converted'),zod.literal('absconded'),zod.literal('revoked'),zod.literal(null)]).nullable(),
   "enrolled_plans": zod.string().nullable(),
   "niat_cohorts": zod.array(zod.string())
@@ -967,6 +974,7 @@ export const GetReportsInstructorsResponse = zod.object({
   "exit_flag": zod.boolean(),
   "exit_flag_status": zod.string().nullish(),
   "exit_flag_date": zod.coerce.date().nullish(),
+  "date_of_exit": zod.coerce.date().nullish(),
   "exit_verification": zod.union([zod.literal('exited'),zod.literal('serving_notice_period'),zod.literal('payroll_converted'),zod.literal('absconded'),zod.literal('revoked'),zod.literal(null)]).nullable(),
   "enrolled_plans": zod.string().nullable(),
   "niat_cohorts": zod.array(zod.string())
@@ -999,6 +1007,7 @@ export const GetReportsInstructorsResponse = zod.object({
   "exit_flag": zod.boolean(),
   "exit_flag_status": zod.string().nullish(),
   "exit_flag_date": zod.coerce.date().nullish(),
+  "date_of_exit": zod.coerce.date().nullish(),
   "exit_verification": zod.union([zod.literal('exited'),zod.literal('serving_notice_period'),zod.literal('payroll_converted'),zod.literal('absconded'),zod.literal('revoked'),zod.literal(null)]).nullable(),
   "enrolled_plans": zod.string().nullable(),
   "niat_cohorts": zod.array(zod.string())
@@ -1031,6 +1040,7 @@ export const GetReportsInstructorsResponse = zod.object({
   "exit_flag": zod.boolean(),
   "exit_flag_status": zod.string().nullish(),
   "exit_flag_date": zod.coerce.date().nullish(),
+  "date_of_exit": zod.coerce.date().nullish(),
   "exit_verification": zod.union([zod.literal('exited'),zod.literal('serving_notice_period'),zod.literal('payroll_converted'),zod.literal('absconded'),zod.literal('revoked'),zod.literal(null)]).nullable(),
   "enrolled_plans": zod.string().nullable(),
   "niat_cohorts": zod.array(zod.string())
@@ -1065,6 +1075,7 @@ export const GetReportsInstructorsResponse = zod.object({
   "exit_flag": zod.boolean(),
   "exit_flag_status": zod.string().nullish(),
   "exit_flag_date": zod.coerce.date().nullish(),
+  "date_of_exit": zod.coerce.date().nullish(),
   "exit_verification": zod.union([zod.literal('exited'),zod.literal('serving_notice_period'),zod.literal('payroll_converted'),zod.literal('absconded'),zod.literal('revoked'),zod.literal(null)]).nullable(),
   "enrolled_plans": zod.string().nullable(),
   "niat_cohorts": zod.array(zod.string())
@@ -1097,6 +1108,7 @@ export const GetReportsInstructorsResponse = zod.object({
   "exit_flag": zod.boolean(),
   "exit_flag_status": zod.string().nullish(),
   "exit_flag_date": zod.coerce.date().nullish(),
+  "date_of_exit": zod.coerce.date().nullish(),
   "exit_verification": zod.union([zod.literal('exited'),zod.literal('serving_notice_period'),zod.literal('payroll_converted'),zod.literal('absconded'),zod.literal('revoked'),zod.literal(null)]).nullable(),
   "enrolled_plans": zod.string().nullable(),
   "niat_cohorts": zod.array(zod.string())
@@ -1129,6 +1141,7 @@ export const GetReportsInstructorsResponse = zod.object({
   "exit_flag": zod.boolean(),
   "exit_flag_status": zod.string().nullish(),
   "exit_flag_date": zod.coerce.date().nullish(),
+  "date_of_exit": zod.coerce.date().nullish(),
   "exit_verification": zod.union([zod.literal('exited'),zod.literal('serving_notice_period'),zod.literal('payroll_converted'),zod.literal('absconded'),zod.literal('revoked'),zod.literal(null)]).nullable(),
   "enrolled_plans": zod.string().nullable(),
   "niat_cohorts": zod.array(zod.string())
@@ -1163,6 +1176,7 @@ export const GetReportsInstructorsResponse = zod.object({
   "exit_flag": zod.boolean(),
   "exit_flag_status": zod.string().nullish(),
   "exit_flag_date": zod.coerce.date().nullish(),
+  "date_of_exit": zod.coerce.date().nullish(),
   "exit_verification": zod.union([zod.literal('exited'),zod.literal('serving_notice_period'),zod.literal('payroll_converted'),zod.literal('absconded'),zod.literal('revoked'),zod.literal(null)]).nullable(),
   "enrolled_plans": zod.string().nullable(),
   "niat_cohorts": zod.array(zod.string())
@@ -1195,6 +1209,7 @@ export const GetReportsInstructorsResponse = zod.object({
   "exit_flag": zod.boolean(),
   "exit_flag_status": zod.string().nullish(),
   "exit_flag_date": zod.coerce.date().nullish(),
+  "date_of_exit": zod.coerce.date().nullish(),
   "exit_verification": zod.union([zod.literal('exited'),zod.literal('serving_notice_period'),zod.literal('payroll_converted'),zod.literal('absconded'),zod.literal('revoked'),zod.literal(null)]).nullable(),
   "enrolled_plans": zod.string().nullable(),
   "niat_cohorts": zod.array(zod.string())
@@ -1227,6 +1242,7 @@ export const GetReportsInstructorsResponse = zod.object({
   "exit_flag": zod.boolean(),
   "exit_flag_status": zod.string().nullish(),
   "exit_flag_date": zod.coerce.date().nullish(),
+  "date_of_exit": zod.coerce.date().nullish(),
   "exit_verification": zod.union([zod.literal('exited'),zod.literal('serving_notice_period'),zod.literal('payroll_converted'),zod.literal('absconded'),zod.literal('revoked'),zod.literal(null)]).nullable(),
   "enrolled_plans": zod.string().nullable(),
   "niat_cohorts": zod.array(zod.string())
@@ -1261,6 +1277,7 @@ export const GetReportsInstructorsResponse = zod.object({
   "exit_flag": zod.boolean(),
   "exit_flag_status": zod.string().nullish(),
   "exit_flag_date": zod.coerce.date().nullish(),
+  "date_of_exit": zod.coerce.date().nullish(),
   "exit_verification": zod.union([zod.literal('exited'),zod.literal('serving_notice_period'),zod.literal('payroll_converted'),zod.literal('absconded'),zod.literal('revoked'),zod.literal(null)]).nullable(),
   "enrolled_plans": zod.string().nullable(),
   "niat_cohorts": zod.array(zod.string())
@@ -1293,6 +1310,7 @@ export const GetReportsInstructorsResponse = zod.object({
   "exit_flag": zod.boolean(),
   "exit_flag_status": zod.string().nullish(),
   "exit_flag_date": zod.coerce.date().nullish(),
+  "date_of_exit": zod.coerce.date().nullish(),
   "exit_verification": zod.union([zod.literal('exited'),zod.literal('serving_notice_period'),zod.literal('payroll_converted'),zod.literal('absconded'),zod.literal('revoked'),zod.literal(null)]).nullable(),
   "enrolled_plans": zod.string().nullable(),
   "niat_cohorts": zod.array(zod.string())
@@ -1325,6 +1343,7 @@ export const GetReportsInstructorsResponse = zod.object({
   "exit_flag": zod.boolean(),
   "exit_flag_status": zod.string().nullish(),
   "exit_flag_date": zod.coerce.date().nullish(),
+  "date_of_exit": zod.coerce.date().nullish(),
   "exit_verification": zod.union([zod.literal('exited'),zod.literal('serving_notice_period'),zod.literal('payroll_converted'),zod.literal('absconded'),zod.literal('revoked'),zod.literal(null)]).nullable(),
   "enrolled_plans": zod.string().nullable(),
   "niat_cohorts": zod.array(zod.string())
@@ -1359,6 +1378,7 @@ export const GetReportsInstructorsResponse = zod.object({
   "exit_flag": zod.boolean(),
   "exit_flag_status": zod.string().nullish(),
   "exit_flag_date": zod.coerce.date().nullish(),
+  "date_of_exit": zod.coerce.date().nullish(),
   "exit_verification": zod.union([zod.literal('exited'),zod.literal('serving_notice_period'),zod.literal('payroll_converted'),zod.literal('absconded'),zod.literal('revoked'),zod.literal(null)]).nullable(),
   "enrolled_plans": zod.string().nullable(),
   "niat_cohorts": zod.array(zod.string())
@@ -1391,6 +1411,7 @@ export const GetReportsInstructorsResponse = zod.object({
   "exit_flag": zod.boolean(),
   "exit_flag_status": zod.string().nullish(),
   "exit_flag_date": zod.coerce.date().nullish(),
+  "date_of_exit": zod.coerce.date().nullish(),
   "exit_verification": zod.union([zod.literal('exited'),zod.literal('serving_notice_period'),zod.literal('payroll_converted'),zod.literal('absconded'),zod.literal('revoked'),zod.literal(null)]).nullable(),
   "enrolled_plans": zod.string().nullable(),
   "niat_cohorts": zod.array(zod.string())
@@ -1423,6 +1444,7 @@ export const GetReportsInstructorsResponse = zod.object({
   "exit_flag": zod.boolean(),
   "exit_flag_status": zod.string().nullish(),
   "exit_flag_date": zod.coerce.date().nullish(),
+  "date_of_exit": zod.coerce.date().nullish(),
   "exit_verification": zod.union([zod.literal('exited'),zod.literal('serving_notice_period'),zod.literal('payroll_converted'),zod.literal('absconded'),zod.literal('revoked'),zod.literal(null)]).nullable(),
   "enrolled_plans": zod.string().nullable(),
   "niat_cohorts": zod.array(zod.string())

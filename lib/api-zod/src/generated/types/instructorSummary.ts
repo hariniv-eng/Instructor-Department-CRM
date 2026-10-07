@@ -55,6 +55,8 @@ export interface InstructorSummary {
   /** @nullable */
   exit_flag_date?: Date | null;
   /** @nullable */
+  date_of_exit?: Date | null;
+  /** @nullable */
   exit_verification: InstructorSummaryExitVerification;
   /** @nullable */
   enrolled_plans: string | null;

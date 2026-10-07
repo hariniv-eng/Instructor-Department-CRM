@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, instructorsTable, instructorArchiveTable, darwinboxFullRosterTable, darwinboxExitsTable, instructorTrainingStatusTable, instructorContributionTable } from "@workspace/db";
+import { db, instructorsTable, instructorArchiveTable, darwinboxActiveTable, darwinboxFullRosterTable, darwinboxExitsTable, instructorTrainingStatusTable, instructorContributionTable } from "@workspace/db";
 import { requireAuth, requireRole } from "../middlewares/auth";
 import { cell, normalize, parseLooseDate, toISODate } from "../lib/reconcile";
 import { archiveInstructors } from "../lib/archiveInstructors";
@@ -653,6 +653,31 @@ router.get("/reports/instructors", async (_req, res) => {
     // Overview "Exception 2" (2026-10-06): reviewed as Exited/Absconded and still in TeachOS.
     exception_remove: buildAccessSplit(exceptionRemoveRows),
   };
+
+  // Exception 2's "date_of_exit" column (2026-10-07, per request): Darwinbox's
+  // own "Date Of Exit" field on the employee master record (the actual exit
+  // date, not the resignation request date exit_flag_date carries), looked
+  // up by employee ID in the Instructors-department pull first, then the
+  // full company roster. Null when Darwin has no Date Of Exit for them.
+  {
+    const wantedIds = new Set(exceptionRemoveRows.map((r) => r.employeeId).filter((id): id is string => !!id));
+    const dateOfExitById = new Map<string, string>();
+    if (wantedIds.size > 0) {
+      for (const table of [darwinboxActiveTable, darwinboxFullRosterTable]) {
+        const stored = await db.select({ employeeId: table.employeeId, rawData: table.rawData }).from(table);
+        for (const r of stored) {
+          if (!r.employeeId || !wantedIds.has(r.employeeId) || dateOfExitById.has(r.employeeId)) continue;
+          const iso = toISODate(cell(r.rawData as Record<string, unknown>, "Date Of Exit", "date_of_exit"));
+          if (iso) dateOfExitById.set(r.employeeId, iso);
+        }
+      }
+    }
+    for (const bucket of [accessBreakdown.exception_remove.both, accessBreakdown.exception_remove.teachos_only, accessBreakdown.exception_remove.darwin_only]) {
+      for (const person of bucket.people as Array<Record<string, unknown>>) {
+        person.date_of_exit = (typeof person.employee_id === "string" && dateOfExitById.get(person.employee_id)) || null;
+      }
+    }
+  }
 
   res.json({
     kpis: {
