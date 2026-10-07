@@ -302,7 +302,17 @@ const toApiInstructorSummary = (row: InstructorRow, contributionByTeachosId: Map
 // definition below for the full "who counts as an Exception" reasoning
 // (unresolved exit-flagged people within the Instructor Department
 // population only — a review queue, not a headcount bucket).
-function computeDepartmentAndExceptionRows(allRows: InstructorRow[]) {
+function computeDepartmentAndExceptionRows(rawRows: InstructorRow[]) {
+  // Edge case (2026-10-07, per request: "she should be considered as an edge
+  // case"): anyone on CONFIRMED_INSTRUCTOR_DESPITE_FULL_ROSTER (NW0005068,
+  // Saumya Sunil Patil) is ALWAYS counted as an ordinary Instructor, whatever
+  // the sync's classification/department bucket currently says about her --
+  // her Darwin department doesn't match the taxonomy, so the automatic rules
+  // can't be trusted for her. Her row is treated here as an unclassified
+  // Tech instructor (department bucket kept if it already is tech/non_tech).
+  const allRows = rawRows.map((r) => (isConfirmedDespiteFullRoster(r)
+    ? { ...r, classification: null, deptBucket: r.deptBucket === "non_tech" ? "non_tech" : "tech" }
+    : r));
   // Mentors count (2026-09-04, per request): sourced from Darwin directly,
   // not scoped to TeachOS — same population /reports/darwin-breakdown's
   // mentors bucket uses (matched Darwin's Instructors department primary
@@ -692,7 +702,11 @@ router.get("/reports/instructors", async (_req, res) => {
     }
   }
   const todayIst = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
-  const exitDateOf = (r: InstructorRow) => (r.employeeId ? dateOfExitById.get(r.employeeId) ?? null : null);
+  // Darwin's employee-master Date Of Exit first, else the exit record's own Exit
+  // Date (what the Darwin Exit Details tab shows for every exit candidate) --
+  // 2026-10-07, per report: the master field is blank for most people who have
+  // already left Darwin's roster, so the column was empty for them.
+  const exitDateOf = (r: InstructorRow) => (r.employeeId ? dateOfExitById.get(r.employeeId) ?? null : null) ?? r.exitFlagDate ?? null;
   const noticeEnded = (r: InstructorRow) => { const d = exitDateOf(r); return !!d && d < todayIst; };
   const exitListRows = [...exceptionRemoveRows, ...servingNoticeRows.filter((r) => r.inTeachos && noticeEnded(r))];
   const noticeListRows = servingNoticeRows.filter((r) => !noticeEnded(r));
@@ -714,7 +728,7 @@ router.get("/reports/instructors", async (_req, res) => {
   for (const split of [accessBreakdown.exception_remove, accessBreakdown.exception_notice]) {
     for (const bucket of [split.darwin_only, split.both, split.teachos_only]) {
       for (const person of bucket.people as Array<Record<string, unknown>>) {
-        person.date_of_exit = (typeof person.employee_id === "string" && dateOfExitById.get(person.employee_id)) || null;
+        person.date_of_exit = (typeof person.employee_id === "string" && dateOfExitById.get(person.employee_id)) || (typeof person.exit_flag_date === "string" ? person.exit_flag_date : null) || null;
       }
     }
   }
