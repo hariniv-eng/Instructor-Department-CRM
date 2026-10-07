@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'wouter';
+import { useLocation } from 'wouter';
 import { ArrowLeft, ChevronDown, ChevronRight, SlidersHorizontal, X } from 'lucide-react';
 import { useGetReportsInstructors } from '@workspace/api-client-react';
 import { campusCityAndState } from '@/lib/campusRegions';
@@ -86,6 +86,14 @@ export default function CustomFilterPage() {
   const everyone = useMemo(() => mergedPeople(report?.access_breakdown?.department), [report]);
   const [selection, setSelection] = useState<Selection>({});
   const [openFacet, setOpenFacet] = useState<string | null>('bifurcation');
+  const [, setLocation] = useLocation();
+  // "Back to Instructors" returns to the page you came from (normally the
+  // Instructors tab, with its filters still applied); opened directly in a new
+  // tab it falls back to /instructors.
+  const goBack = () => {
+    if (typeof window !== 'undefined' && window.history.length > 1) window.history.back();
+    else setLocation('/instructors');
+  };
 
   const filtered = useMemo(() => everyone.filter((person) => matches(person, selection)), [everyone, selection]);
   const activeCount = Object.values(selection).reduce((sum, list) => sum + list.length, 0);
@@ -118,18 +126,19 @@ export default function CustomFilterPage() {
   const clearFacet = (key: string) => setSelection((current) => ({ ...current, [key]: [] }));
 
   return <div className="w-full">
+    <button type="button" onClick={goBack} data-testid="button-custom-filter-back" className="mb-4 inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3.5 py-2 text-[12px] font-bold text-foreground transition-colors hover:bg-secondary"><ArrowLeft size={14} /> Back to Instructors</button>
+
     <PageIntro
       eyebrow="Instructors / Custom filter"
       title="Custom filter"
-      description="Pick values from any column in the sidebar to build your own view of the Instructor Department. Values within a column are OR'd; different columns are AND'd."
-      action={<Link href="/instructors" data-testid="link-back-to-instructors" className="inline-flex items-center gap-2 self-start rounded-lg border border-border bg-card px-3.5 py-2.5 text-[12px] font-bold text-foreground transition-colors hover:bg-secondary lg:self-auto"><ArrowLeft size={14} /> Back to Instructors</Link>}
+      description="Pick values from any column in the sidebar on the right to build your own view of the Instructor Department. Values within a column are OR'd; different columns are AND'd."
     />
 
     {reportQuery.isLoading && <SkeletonBlock className="h-[520px]" />}
     {reportQuery.isError && <QueryError message="The instructor register could not be loaded." />}
 
     {report && <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
-      <aside className="w-full shrink-0 rounded-xl border border-border bg-card shadow-xs lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:w-[300px] lg:overflow-y-auto" data-testid="sidebar-custom-filter">
+      <aside className="w-full shrink-0 rounded-xl border border-border bg-card shadow-xs lg:order-last lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:w-[300px] lg:overflow-y-auto" data-testid="sidebar-custom-filter">
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
           <p className="flex items-center gap-2 font-mono-ui text-[10px] uppercase tracking-[0.16em] text-muted-foreground"><SlidersHorizontal size={13} /> Columns</p>
           <button type="button" onClick={() => setSelection({})} disabled={activeCount === 0} data-testid="button-clear-custom-filters" className="text-[11px] font-bold text-primary hover:underline disabled:cursor-not-allowed disabled:text-muted-foreground disabled:no-underline">Clear all{activeCount > 0 ? ` (${activeCount})` : ''}</button>
