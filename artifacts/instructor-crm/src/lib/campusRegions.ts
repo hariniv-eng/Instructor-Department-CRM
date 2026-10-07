@@ -7,9 +7,10 @@
 // Name" (e.g. "Chaitanya Deemed-to-be University" is "CDU" there), so each
 // rule below matches a normalised TeachOS institute name (lower case, every
 // non-alphanumeric run turned into one space) and names the sheet row it maps
-// to. Institutes with no row in the sheet ("Training Institute", "Intensive
-// Offline DC", "IIT kharagpur", "Nxtwave Institute of Advanced Technologies")
-// deliberately map to nothing and show a dash.
+// to. "Training Institute" and "Nxtwave Institute of Advanced Technologies"
+// aren't on the sheet but are set to Hyderabad / TS (2026-10-07, per request).
+// Institutes still with no row ("Intensive Offline DC", "Intensive Offline
+// Kukatpally", "IIT kharagpur") deliberately map to nothing and show a dash.
 //
 // Rules marked CONFIRM are best guesses -- check them against the sheet.
 
@@ -20,17 +21,22 @@ const has = (...words: RegExp[]) => (name: string) => words.every((word) => word
 const R = (city: string, state: string, university: string): Region => ({ city, state, university });
 
 const RULES: Rule[] = [
+  { test: has(/training institute/), region: R('Hyderabad', 'TS', 'Training Institute') },
+  { test: has(/nxtwave institute of (advanced )?technolog/), region: R('Hyderabad', 'TS', 'Nxtwave Institute of Advanced Technologies') },
   { test: has(/chevella|\bbits\b/), region: R('Hyderabad', 'TS', 'BITS - NIAT Chevella') },
   { test: has(/aurora/), region: R('Hyderabad', 'TS', 'Aurora') },
   { test: has(/chaitanya|\bcdu\b/), region: R('Hyderabad', 'TS', 'CDU') },
   { test: has(/st mary/), region: R('Hyderabad', 'TS', "St. Mary's Rehabilitation University") },
-  // CONFIRM: TeachOS has "Malla Reddy University", "Malla Reddy Vishwavidyapeeth"
-  // and "SMR University"; the first two are taken as MR University (Hyderabad)
-  // and "SMR University" as MR University - Tirupati.
-  { test: has(/smr university|mr university tirupati|mr tirupati/), region: R('Tirupati', 'AP', 'MR University - Tirupati') },
+  // TeachOS has "Malla Reddy University", "Malla Reddy Vishwavidyapeeth",
+  // "Malla Reddy Tirupati" and "SMR University": Tirupati is MR University -
+  // Tirupati (AP), SMR University is Hyderabad (TS), the others MR University
+  // (Hyderabad).
+  { test: has(/mr university tirupati|mr tirupati|malla reddy tirupati/), region: R('Tirupati', 'AP', 'MR University - Tirupati') },
+  // SMR University is Hyderabad / TS (2026-10-07, per request).
+  { test: has(/smr university|\bsmru\b/), region: R('Hyderabad', 'TS', 'SMR University') },
   { test: has(/malla reddy|^mr university$|\bmru\b/), region: R('Hyderabad', 'TS', 'MR University') },
   { test: has(/s vyasa|svyasa/), region: R('Bangalore', 'KA', 'S-Vyasa') },
-  { test: has(/spiher|st peter/, /bangalore|banglore|\bb$/), region: R('Bangalore', 'KA', 'St. Peter’s Institute of Higher Education and Research - B') },
+  { test: has(/spiher|st peter/, /bangalore|banglore|bengaluru|bengalore|\bb$/), region: R('Bangalore', 'KA', 'St. Peter’s Institute of Higher Education and Research - B') },
   { test: has(/spiher|st peter/), region: R('Chennai', 'TN', 'St. Peter’s Institute of Higher Education and Research - C') },
   { test: has(/yenapoya|yenepoya/, /bangalore|banglore/), region: R('Bangalore', 'KA', 'Yenepoya University - Bangalore') },
   { test: has(/yenapoya|yenepoya/), region: R('Mangalore', 'KA', 'Yenepoya University - Manglore') },
