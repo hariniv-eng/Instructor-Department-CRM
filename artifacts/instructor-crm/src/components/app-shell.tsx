@@ -38,6 +38,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const { user, logout } = useAuth();
   const navItems = navItemsForRole(user?.role);
+  // Custom filter page (2026-10-07, per request): no left navigation there, so
+  // the filter sidebar and the wide table get the whole width.
+  const hideNav = location.startsWith('/instructors/custom-filter');
   // No session at all means "Manager view" (2026-09: Manager has no login
   // of its own anymore, see App.tsx's Guard) -- there's no name to show and
   // nothing to sign out of, just a way back into /login for Admin.
@@ -46,7 +49,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-[100dvh] bg-background">
-      <aside className={`fixed inset-y-0 left-0 z-40 flex w-[252px] flex-col bg-sidebar text-sidebar-foreground transition-transform duration-300 md:translate-x-0 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <aside className={`${hideNav ? 'hidden' : ''} fixed inset-y-0 left-0 z-40 flex w-[252px] flex-col bg-sidebar text-sidebar-foreground transition-transform duration-300 md:translate-x-0 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="flex h-[76px] items-center justify-between border-b border-sidebar-border px-6">
           <Link href="/" data-testid="link-brand" className="flex items-center gap-3" onClick={() => setMobileOpen(false)}>
             <span className="grid h-9 w-9 place-items-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground shadow-sm">
@@ -104,12 +107,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      {mobileOpen && <button type="button" aria-label="Close navigation overlay" data-testid="button-navigation-overlay" onClick={() => setMobileOpen(false)} className="fixed inset-0 z-30 bg-[#142238]/45 md:hidden" />}
+      {mobileOpen && !hideNav && <button type="button" aria-label="Close navigation overlay" data-testid="button-navigation-overlay" onClick={() => setMobileOpen(false)} className="fixed inset-0 z-30 bg-[#142238]/45 md:hidden" />}
 
-      <div className="md:pl-[252px]">
+      <div className={hideNav ? '' : 'md:pl-[252px]'}>
         <header className="sticky top-0 z-20 flex h-[76px] items-center justify-between border-b border-border/80 bg-background/90 px-5 backdrop-blur-md sm:px-8">
           <div className="flex items-center gap-3">
-            <button type="button" aria-label="Open navigation" data-testid="button-open-navigation" onClick={() => setMobileOpen(true)} className="rounded-lg border border-border bg-card p-2 text-muted-foreground hover:text-foreground md:hidden">
+            <button type="button" aria-label="Open navigation" data-testid="button-open-navigation" onClick={() => setMobileOpen(true)} className={`${hideNav ? 'hidden' : ''} rounded-lg border border-border bg-card p-2 text-muted-foreground hover:text-foreground md:hidden`}>
               <Menu size={18} />
             </button>
             <div className="hidden items-center gap-2 text-[12px] text-muted-foreground sm:flex">
@@ -140,7 +143,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 </Link>}
           </div>
         </header>
-        <main className="min-h-[calc(100dvh-76px)] px-5 py-7 sm:px-8 lg:px-10">{children}</main>
+        <main className={`min-h-[calc(100dvh-76px)] py-7 ${hideNav ? 'px-4 sm:px-5' : 'px-5 sm:px-8 lg:px-10'}`}>{children}</main>
       </div>
     </div>
   );
