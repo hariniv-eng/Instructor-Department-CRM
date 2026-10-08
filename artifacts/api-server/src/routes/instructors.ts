@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { and, arrayContains, asc, eq, ilike, or } from "drizzle-orm";
-import { db, instructorsTable } from "@workspace/db";
+import { db, instructorsTable, instructorArchiveTable } from "@workspace/db";
 import { requireAuth, requireRole } from "../middlewares/auth";
 import { VALID_CAPABILITY_MANAGERS } from "../data/validCapabilityManagers";
 import { SUBJECT_AREAS, normalizeSubjectArea } from "../lib/departmentTaxonomy";
@@ -267,6 +267,13 @@ router.patch("/instructors/:id/exit-verification", async (req, res): Promise<voi
     res.status(404).json({ error: "Instructor not found" });
     return;
   }
+  // Mirror straight onto the Instructor Archive row (2026-10-08): the
+  // archive's Status (Active / SNP / Exited) follows this dropdown, and
+  // should change now, not at the next sync.
+  const archiveKey = row.employeeId
+    ? eq(instructorArchiveTable.employeeId, row.employeeId)
+    : row.teachosUserId ? eq(instructorArchiveTable.teachosUserId, row.teachosUserId) : null;
+  if (archiveKey) await db.update(instructorArchiveTable).set({ exitVerification: raw }).where(archiveKey);
   res.json(toApiInstructor(row));
 });
 

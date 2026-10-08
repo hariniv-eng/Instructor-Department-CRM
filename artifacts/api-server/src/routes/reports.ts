@@ -54,7 +54,8 @@ type ArchiveRow = typeof instructorArchiveTable.$inferSelect;
 // one; a Revoked/Rejected request or a cancelled pending one never does. A manually set exit date (Manual Status
 // control) is kept for people with no Approved record. Archive page only: the
 // live exit flag, Exception queue, Darwin Exit Details and sync are untouched.
-type ApprovedExitFallback = { status: string; date: string };
+// `lastWorkingDate` (2026-10-08): the exit record's own "Date Of Exit" column (last working day) -- the archive's Date of Exit column. `date` stays the request date ("Exit Date"), used only to rank records and decide Exited.
+type ApprovedExitFallback = { status: string; date: string; lastWorkingDate: string | null };
 
 const toApiArchiveSummary = (row: ArchiveRow, approvedExit?: ApprovedExitFallback) => {
   // Exit date prefers exitFlagDate -- the Darwinbox-exit-record-driven
@@ -80,7 +81,15 @@ const toApiArchiveSummary = (row: ArchiveRow, approvedExit?: ApprovedExitFallbac
   // same fallback every other archived person already relies on).
   // NOTE (2026-10-06): the exitFlagDate-first logic described above is
   // superseded by the Approved-only rule at the top of this block.
-  const exitDate = approvedExit?.date ?? row.exitDate ?? null;
+  // Status follows the manual Employee Status (exit_verification) dropdown
+  // (2026-10-08, per request): "payroll" -> still working, so Active with no
+  // exit shown (a payroll instructor has a Darwin exit record only because
+  // they moved off Darwin payroll, they are not leaving); "serving notice
+  // period" -> SNP. Otherwise it is Exited once an exit date exists, else Active.
+  const manualPayroll = row.exitVerification === "payroll_converted";
+  const manualSnp = row.exitVerification === "serving_notice_period";
+  const exitDate = manualPayroll ? null : (approvedExit?.date ?? row.exitDate ?? null);
+  const status: "Active" | "Exited" | "SNP" = manualPayroll ? "Active" : manualSnp ? "SNP" : exitDate ? "Exited" : "Active";
   return {
     id: row.id,
     employee_id: row.employeeId,
@@ -111,8 +120,11 @@ const toApiArchiveSummary = (row: ArchiveRow, approvedExit?: ApprovedExitFallbac
     // from.
     is_payroll: row.classification === "payroll_converted",
     exit_date: exitDate,
-    exit_status: approvedExit ? approvedExit.status : null,
-    status: exitDate ? "Exited" : "Active",
+    // Date of Exit column: ONLY the Darwin exit data's "Date Of Exit" (last working day); blank when the record has none, never the request date. Payroll people are Active, so blank.
+    // Enforced explicitly (2026-10-08): an Active person never shows a Date of Exit, payroll or not.
+    date_of_exit: status === "Active" ? null : approvedExit?.lastWorkingDate ?? null,
+    exit_status: approvedExit && !manualPayroll ? approvedExit.status : null,
+    status,
     first_seen_at: row.firstSeenAt,
     last_synced_at: row.lastSyncedAt,
   };
@@ -1382,7 +1394,7 @@ router.get("/reports/instructor-archive", requireAuth, requireRole("admin"), asy
   // Revoked/Rejected/anything else, fall back to their latest Approved
   // record (a cancelled pending request never counts).
   const exitRows = await db.select().from(darwinboxExitsTable);
-  type Seen = { rank: number; id: number; status: string; iso: string | null };
+  type Seen = { rank: number; id: number; status: string; iso: string | null; lwd: string | null };
   const newer = (a: Seen, existing?: Seen) => !existing || a.rank > existing.rank || (a.rank === existing.rank && a.id > existing.id);
   const latestByEmployee = new Map<string, Seen>();
   const approvedByEmployee = new Map<string, Seen>();
@@ -1390,7 +1402,7 @@ router.get("/reports/instructor-archive", requireAuth, requireRole("admin"), asy
     if (!exit.employeeId) continue;
     const status = (cell(exit.rawData, "Status", "status") ?? "").trim();
     const iso = toISODate(cell(exit.rawData, "Exit Date", "exit_date"));
-    const seen: Seen = { rank: iso ? parseLooseDate(iso) : -Infinity, id: exit.id, status, iso };
+    const seen: Seen = { rank: iso ? parseLooseDate(iso) : -Infinity, id: exit.id, status, iso, lwd: toISODate(cell(exit.rawData, "Date Of Exit", "date_of_exit")) };
     if (newer(seen, latestByEmployee.get(exit.employeeId))) latestByEmployee.set(exit.employeeId, seen);
     if (status.toLowerCase() === "approved" && iso && newer(seen, approvedByEmployee.get(exit.employeeId))) approvedByEmployee.set(exit.employeeId, seen);
   }
@@ -1398,12 +1410,12 @@ router.get("/reports/instructor-archive", requireAuth, requireRole("admin"), asy
   for (const [employeeId, latest] of latestByEmployee) {
     const lower = latest.status.toLowerCase();
     if (lower === "approved" && latest.iso) {
-      archiveExitByEmployee.set(employeeId, { status: "Approved", date: latest.iso });
+      archiveExitByEmployee.set(employeeId, { status: "Approved", date: latest.iso, lastWorkingDate: latest.lwd });
     } else if (lower.startsWith("pending") && latest.iso) {
-      archiveExitByEmployee.set(employeeId, { status: latest.status, date: latest.iso });
+      archiveExitByEmployee.set(employeeId, { status: latest.status, date: latest.iso, lastWorkingDate: latest.lwd });
     } else {
       const approved = approvedByEmployee.get(employeeId);
-      if (approved?.iso) archiveExitByEmployee.set(employeeId, { status: "Approved", date: approved.iso });
+      if (approved?.iso) archiveExitByEmployee.set(employeeId, { status: "Approved", date: approved.iso, lastWorkingDate: approved.lwd });
     }
   }
 
@@ -1415,8 +1427,9 @@ router.get("/reports/instructor-archive", requireAuth, requireRole("admin"), asy
   res.json({
     people,
     total: people.length,
-    active_count: people.filter((p) => !p.exit_date).length,
-    exited_count: people.filter((p) => !!p.exit_date).length,
+    active_count: people.filter((p) => p.status === "Active").length,
+    exited_count: people.filter((p) => p.status === "Exited").length,
+    snp_count: people.filter((p) => p.status === "SNP").length,
   });
 });
 
