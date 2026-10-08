@@ -6,6 +6,7 @@ import dashboardRouter from "./dashboard";
 import uploadRouter from "./uploads";
 import syncRouter from "./sync";
 import reportsRouter from "./reports";
+import cronRouter from "./cron";
 import { requireAuth, requireRole } from "../middlewares/auth";
 
 const router: IRouter = Router();
@@ -23,6 +24,9 @@ router.use(healthRouter);
 router.use(authRouter);
 router.use(instructorRouter);
 router.use(reportsRouter);
+// Token-protected (not session-protected) trigger for the 5am daily sync --
+// see routes/cron.ts. Must stay above the admin-only routers below.
+router.use(cronRouter);
 
 // Admin-only: Darwin/TeachOS breakdown detail, source uploads, live syncs.
 router.use(requireAuth, requireRole("admin"), dashboardRouter);

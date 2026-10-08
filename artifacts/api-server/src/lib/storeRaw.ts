@@ -11,7 +11,6 @@
 // uploads on the Upload page — that path is unrelated to this one).
 
 import {
-  db,
   darwinboxActiveTable,
   darwinboxExitsTable,
   darwinboxFullRosterTable,
@@ -19,6 +18,7 @@ import {
   instructorTrainingStatusTable,
   instructorContributionTable,
 } from "@workspace/db";
+import { sdb as db } from "./syncContext";
 import { cell, type SheetRow } from "./reconcile";
 import type { CourseStatusRow } from "./connectors/instructorLearningStatus";
 import type { ContributionRow } from "./connectors/instructorContribution";

@@ -5,7 +5,8 @@
 // behavior stays identical regardless of where the rows came from.
 
 import { and, eq } from "drizzle-orm";
-import { db, instructorsTable, darwinboxExitsTable, teachosIdReferenceTable } from "@workspace/db";
+import { instructorsTable, darwinboxExitsTable, teachosIdReferenceTable } from "@workspace/db";
+import { sdb as db } from "./syncContext";
 import { hasConfirmedInstructorDesignation, EXCLUDED_EMPLOYEES, type ExcludedOverride, OTHER_DEPARTMENT_EMPLOYEES, type OtherDepartmentOverride } from "../data/classificationOverrides";
 import { VALID_CAPABILITY_MANAGERS, CAPABILITY_MANAGER_ALIASES } from "../data/validCapabilityManagers";
 import { classifyDepartment, classifyDeployment } from "./departmentTaxonomy";

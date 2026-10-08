@@ -29,7 +29,8 @@
 // No code path here (or anywhere else in the app) ever deletes a row from
 // this table -- its row count can only grow.
 import { eq } from "drizzle-orm";
-import { db, instructorArchiveTable, instructorsTable } from "@workspace/db";
+import { instructorArchiveTable, instructorsTable } from "@workspace/db";
+import { sdb as db } from "./syncContext";
 import { normalize } from "./reconcile";
 import { isPinnedConfirmedInstructor } from "../data/classificationOverrides";
 
