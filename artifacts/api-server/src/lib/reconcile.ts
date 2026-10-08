@@ -554,6 +554,29 @@ export async function reconcileTeachos(rows: SheetRow[]) {
       // unhandled-500 failure mode this replaces.
       const cause = (e as { cause?: { constraint?: string; detail?: string } })?.cause;
       const signal = `${cause?.constraint ?? ""} ${cause?.detail ?? ""}`;
+      // The TeachOS ID already sits on a DIFFERENT row (2026-10-08, per report: three
+      // Darwin instructors showed "Both" but had no TeachOS ID). That other row is
+      // normally a stale leftover -- a name-only record created before this person's
+      // employee ID was known, now in neither Darwin nor TeachOS. The ID belongs to the
+      // real person (TeachOS itself lists their employee ID), so move it over instead of
+      // dropping it. Only a leftover with no live presence is ever touched; a row that is
+      // still in Darwin or TeachOS keeps the ID and the old "needs manual review" flag
+      // below still applies. Own savepoint: if the retry fails, nothing here sticks.
+      if (match && teachosUserId && signal.includes("teachos_user_id")) {
+        try {
+          await inSavepoint(async () => {
+            const [holder] = await db.select().from(instructorsTable).where(eq(instructorsTable.teachosUserId, teachosUserId));
+            if (!holder || holder.id === match.id || holder.inTeachos || holder.inDarwin) throw new Error("teachos_user_id holder is not a stale leftover");
+            await db.update(instructorsTable).set({ teachosUserId: null }).where(eq(instructorsTable.id, holder.id));
+            const hadOurNote = (match.notes ?? "").startsWith("TeachOS lists teachos_user_id");
+            await write(values);
+            if (hadOurNote) await db.update(instructorsTable).set({ notes: null }).where(eq(instructorsTable.id, match.id));
+          });
+          continue;
+        } catch {
+          // fall through to the original drop-and-flag handling below
+        }
+      }
       const droppedFields: string[] = [];
       let safeValues = { ...values };
       if (signal.includes("employee_id") || signal.trim() === "") {

@@ -127,6 +127,16 @@ export async function archiveInstructors(options: { grantTeachosOnlyScope?: bool
 
   for (const row of liveRows) {
     const { match, matchedBy } = findArchiveMatch(archivedRows, row);
+    // teachos_user_id is unique in the archive too. If a different archive row still
+    // holds this person's TeachOS ID (an old name-only twin), release it so the real
+    // row can take it -- otherwise the whole sync would fail on the duplicate.
+    if (row.teachosUserId) {
+      const holder = archivedRows.find((item) => item.teachosUserId === row.teachosUserId && item.id !== match?.id);
+      if (holder) {
+        await db.update(instructorArchiveTable).set({ teachosUserId: null }).where(eq(instructorArchiveTable.id, holder.id));
+        holder.teachosUserId = null;
+      }
+    }
 
     const inScopeNow = isDepartmentMember(row, grantTeachosOnlyScope);
 
