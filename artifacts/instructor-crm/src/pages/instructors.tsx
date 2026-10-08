@@ -862,23 +862,16 @@ export function bifurcationLabel(classification: string | null): string {
 //     in the live data (CCBP_ACADEMY_GENIUS without Career Plus,
 //     CCBP_ACADEMY_SMART) but are deliberately NOT included here, per
 //     explicit confirmation -- only CCBP_ACADEMY_GENIUS_CAREER_PLUS counts.
-//   - IIT X DSA: Darwin Designation contains "software developer" (matches
-//     "Software Developer and Instructor", "Software Developer & Instructor
-//     - DSA", "Senior Software Developer & Instructor", etc. -- but NOT the
-//     differently-worded "Software Development Instructor" role, which is
-//     a real, different designation in the live data) AND Darwin Location
-//     (work_location -- itself sourced from Darwin's Workspace field, see
-//     reports.ts's toApiInstructorSummary) contains "Kapil Kavuri Hub", any
-//     floor (2026-09-28, per request/investigation -- see git history for
-//     the _tmp_product_check.ts diagnostic that found this: the live data
-//     has no designation exactly "Software Developer Instructor" and no
-//     work_location exactly "Kapil Kavuri Hub (KKH) - 5th Floor" -- real
-//     values are e.g. "Software Developer and Instructor
-//     (NWD_ID_DS&A_SDI_D)" and "Kapil Kavuri Hub (KKH) - 5th Floor" /
-//     "-5th Floor" / "- 5thFloor" / "(KKH)- 5th Floor" / "- 1st Floor",
-//     inconsistently spaced Darwin data -- hence the loose, substring
-//     match on both sides rather than an exact one, and "any floor" rather
-//     than 5th-floor-only, per request).
+//   - IIT X DSA (rule changed 2026-10-08, per request -- the old
+//     "software developer" designation test is gone): Darwin Location
+//     (work_location -- sourced from Darwin's Workspace field, see
+//     reports.ts's toApiInstructorSummary) contains "Kapil Kavuri Hub" or
+//     "KKH" (any floor; the live values are inconsistently spaced, hence
+//     the loose substring match), AND either
+//       - the TeachOS Capability Manager is empty, or
+//       - the Darwin manager is Jashwanth Dandu (NW0005864) -- so a KKH
+//         person who HAS a Capability Manager only counts when they report
+//         to him in Darwin.
 //   - Intensive: Campus (institutes) has ANY entry containing "intensive"
 //     (case-insensitive substring match, 2026-10-05, per request: "if the
 //     campus column value contains the value intensive then they are
@@ -901,9 +894,15 @@ export function bifurcationLabel(classification: string | null): string {
 // on 2026-09-27).
 export function productLabel(person: InstructorSummary): string {
   if ((person.enrolled_plans ?? '').includes('CCBP_ACADEMY_GENIUS_CAREER_PLUS')) return 'Academy';
-  const designation = (person.designation ?? '').toLowerCase();
+  // IIT X DSA (rule changed 2026-10-08, per request -- designation no longer matters): Darwin
+  // location is KKH AND either the TeachOS Capability Manager is empty, or the Darwin manager
+  // is Jashwanth Dandu (NW0005864).
   const location = (person.work_location ?? '').toLowerCase();
-  if (designation.includes('software developer') && location.includes('kapil kavuri hub')) return 'IIT X DSA';
+  const atKkh = location.includes('kapil kavuri hub') || location.includes('kkh');
+  const noCapabilityManager = !(person.capability_manager ?? '').trim();
+  const darwinManager = (person.darwin_manager ?? '').toLowerCase();
+  const reportsToJashwanth = darwinManager.includes('nw0005864') || darwinManager.includes('jashwanth dandu');
+  if (atKkh && (noCapabilityManager || reportsToJashwanth)) return 'IIT X DSA';
   if ((person.institutes ?? []).some((i) => i.toLowerCase().includes('intensive'))) return 'Intensive';
   if ((person.institutes ?? []).includes('Training Institute')) return 'NIAT (Training)';
   // Blank campus = NIAT training instructor (2026-10-08, per request: "if the campus
