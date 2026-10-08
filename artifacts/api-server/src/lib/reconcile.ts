@@ -6,7 +6,7 @@
 
 import { and, eq } from "drizzle-orm";
 import { instructorsTable, darwinboxExitsTable, teachosIdReferenceTable } from "@workspace/db";
-import { sdb as db } from "./syncContext";
+import { sdb as db, inSavepoint } from "./syncContext";
 import { hasConfirmedInstructorDesignation, EXCLUDED_EMPLOYEES, type ExcludedOverride, OTHER_DEPARTMENT_EMPLOYEES, type OtherDepartmentOverride } from "../data/classificationOverrides";
 import { VALID_CAPABILITY_MANAGERS, CAPABILITY_MANAGER_ALIASES } from "../data/validCapabilityManagers";
 import { classifyDepartment, classifyDeployment } from "./departmentTaxonomy";
@@ -539,8 +539,13 @@ export async function reconcileTeachos(rows: SheetRow[]) {
         newCount += 1;
       }
     };
+    // Each attempt runs in its own savepoint (2026-10-08): inside a sync's single
+    // transaction, Postgres refuses every later command once one statement has
+    // failed ("current transaction is aborted"), so a unique-constraint
+    // conflict that this code is MEANT to catch and work around would otherwise
+    // kill the whole sync. The savepoint rolls back just the failed write.
     try {
-      await write(values);
+      await inSavepoint(() => write(values));
     } catch (e) {
       // node-postgres populates .constraint on a unique_violation (23505),
       // but check .detail too (e.g. 'Key (teachos_user_id)=(...) already
@@ -562,7 +567,7 @@ export async function reconcileTeachos(rows: SheetRow[]) {
         droppedFields.push(`teachos_user_id ${teachosUserId}`);
       }
       try {
-        await write(safeValues);
+        await inSavepoint(() => write(safeValues));
       } catch {
         // Still conflicting even with both unique fields dropped — give up
         // on this row rather than crashing the whole upload/sync; it'll show
@@ -759,7 +764,10 @@ export async function reconcileTeachosEmployeeIdReference(rows: SheetRow[]) {
       continue;
     }
     try {
-      await db.update(instructorsTable).set({ employeeId }).where(eq(instructorsTable.id, match.id));
+      // Own savepoint: a unique-constraint failure here must not abort the sync's transaction.
+      await inSavepoint(async () => {
+        await db.update(instructorsTable).set({ employeeId }).where(eq(instructorsTable.id, match.id));
+      });
       match.employeeId = employeeId;
       matchedCount += 1;
     } catch {
