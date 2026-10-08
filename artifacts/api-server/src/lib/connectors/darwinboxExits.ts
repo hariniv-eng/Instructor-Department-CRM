@@ -148,14 +148,14 @@ export async function fetchExitRecords(): Promise<Record<string, unknown>[]> {
 // renders whatever columns show up, the same "don't hardcode the shape"
 // approach darwin-full-roster.tsx already uses for the full company roster.
 
-function parseEnrichReportIds(): string[] {
+export function parseEnrichReportIds(): string[] {
   return (config.DBX_CHECK_ENRICH_REPORT_IDS ?? "")
     .split(",")
     .map((id) => id.trim())
     .filter(Boolean);
 }
 
-function employeeIdKey(record: Record<string, unknown>): string | null {
+export function employeeIdKey(record: Record<string, unknown>): string | null {
   const value = firstPresent(record, ALIASES["Employee Id"]);
   if (value === null || value === undefined) return null;
   const normalized = String(value).trim().toLowerCase();
@@ -172,7 +172,7 @@ function employeeIdKey(record: Record<string, unknown>): string | null {
 // why). Now it throws with the raw response included, same as the base
 // report, so the catch in fetchExitRows()/inspectDarwinboxExits() actually
 // surfaces what Darwinbox said.
-async function fetchEnrichmentRecords(reportId: string): Promise<Record<string, unknown>[]> {
+export async function fetchEnrichmentRecords(reportId: string): Promise<Record<string, unknown>[]> {
   const raw = await fetchRaw(reportId);
   const found = findRecordsArray(raw);
   if (found) return found;
@@ -275,6 +275,18 @@ export async function fetchExitRows(): Promise<SheetRow[]> {
     );
   }
 
+  // Resignations the base report does not list (2026-10-08, per request: "get
+  // their data live"). The base report stops at 2026-10-01 -- everything
+  // raised after that (2 Oct onward: 79 people company-wide, 4 of them
+  // instructors, e.g. NW2000681) is missing from it, while Darwin's own
+  // "Offboarding tracking" report already lists them. Any employee found
+  // there but absent from the base rows gets an exit row of their own so the
+  // rest of the app (Darwin Exit Details, serving notice, archive) sees them.
+  // The details are filled from the enrichment reports below, and the row is
+  // finalised after that loop (finishFallbackRows). Once the base report
+  // includes the person, this stops adding them.
+  const fallbackRows = await addOffboardingFallbackRows(rows);
+
   // Enrichment is best-effort: one bad/renamed/inaccessible report id
   // shouldn't take down the whole exits sync (the base report above is what
   // actually drives exitFlag/exitFlagStatus). Log and move on to the next
@@ -302,7 +314,78 @@ export async function fetchExitRows(): Promise<SheetRow[]> {
     }
   }
 
+  finishFallbackRows(rows, fallbackRows);
   return rows;
+}
+
+// --- Offboarding-tracking fallback (2026-10-08) ------------------------------
+
+const OFFBOARDING_TRACKING_REPORT_ID = "9feb118d44726a";
+const FALLBACK_SOURCE_LABEL = "Offboarding tracking (missing from the base exit report)";
+
+async function addOffboardingFallbackRows(rows: SheetRow[]): Promise<SheetRow[]> {
+  if (!parseEnrichReportIds().includes(OFFBOARDING_TRACKING_REPORT_ID)) return [];
+  try {
+    const records = await fetchEnrichmentRecords(OFFBOARDING_TRACKING_REPORT_ID);
+    const known = new Set<string>();
+    for (const r of rows) {
+      const k = r["Employee Id"] == null ? null : String(r["Employee Id"]).trim().toLowerCase();
+      if (k) known.add(k);
+    }
+    const added: SheetRow[] = [];
+    for (const rec of records) {
+      const key = employeeIdKey(rec);
+      if (!key || known.has(key)) continue;
+      known.add(key);
+      const row: SheetRow = {
+        "Employee Id": String(firstPresent(rec, ALIASES["Employee Id"]) ?? key).trim(),
+        "Full Name": firstPresent(rec, ALIASES["Full Name"]),
+        "Exit Date": null,
+        "Reason": null,
+        "Status": null,
+        "Exit Source": FALLBACK_SOURCE_LABEL,
+      };
+      rows.push(row);
+      added.push(row);
+    }
+    return added;
+  } catch (e) {
+    console.warn(`[darwinboxExits] Offboarding-tracking fallback skipped: ${(e as Error).message}`);
+    return [];
+  }
+}
+
+// Runs AFTER the enrichment reports have been merged onto the fallback rows
+// (TA Employee Master supplies Date Of Resignation / Separation Request
+// Raised On / Employment Status / Date Of Exit). A fallback row needs a
+// request date, so a person with none anywhere is dropped (and counted in
+// the log) rather than stored half-empty. Status is inferred, because
+// Offboarding tracking carries none: an Active employee with a resignation is
+// "Pending With Approver" (the same label the base report uses for requests
+// still in flight); someone already Inactive with a Date Of Exit is "Approved".
+function finishFallbackRows(rows: SheetRow[], fallbackRows: SheetRow[]) {
+  if (!fallbackRows.length) return;
+  const clean = (v: unknown) => (v === null || v === undefined ? "" : String(v).trim());
+  let kept = 0;
+  for (const row of fallbackRows) {
+    const requestDate = clean(row["Date Of Resignation"]) || clean(row["Separation Request Raised On"]);
+    const employment = clean(row["Employment Status"]).toLowerCase();
+    const exitDate = clean(row["Date Of Exit"]);
+    let status: string | null = null;
+    if (requestDate) {
+      if (employment === "inactive") status = exitDate ? "Approved" : null;
+      else status = "Pending With Approver";
+    }
+    if (!requestDate || !status) {
+      const at = rows.indexOf(row);
+      if (at >= 0) rows.splice(at, 1);
+      continue;
+    }
+    row["Exit Date"] = requestDate;
+    row["Status"] = status;
+    kept += 1;
+  }
+  console.log(`[darwinboxExits] Offboarding-tracking fallback: ${kept} resignation(s) missing from the base exit report added, ${fallbackRows.length - kept} skipped (no request date).`);
 }
 
 // Targeted check (2026-09-22, per request: "not just 5 fields i also need
