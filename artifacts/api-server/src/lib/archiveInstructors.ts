@@ -218,7 +218,10 @@ export async function archiveInstructors(options: { grantTeachosOnlyScope?: bool
       exitDate: keep(row.exitDate, match.exitDate) ?? approvedExitDate(row),
       convertedUniversityName: keep(row.convertedUniversityName, match.convertedUniversityName),
       notes: keep(row.notes, match.notes),
-      exitVerification: keep(row.exitVerification, match.exitVerification),
+      // Live-status field (2026-10-08): mirrored verbatim, null included, so the
+      // archive's Status (Active / SNP / Exited) follows the Capability Manager's
+      // current Employee Status entry instead of a stale one.
+      exitVerification: row.exitVerification,
       deptBucket: keep(row.deptBucket, match.deptBucket),
       deptArea: keep(row.deptArea, match.deptArea),
       manualDeptArea: keep(row.manualDeptArea, match.manualDeptArea),

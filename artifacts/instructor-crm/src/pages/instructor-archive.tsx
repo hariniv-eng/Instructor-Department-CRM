@@ -50,8 +50,9 @@ type ArchiveRow = {
   enrolled_plans: string | null;
   is_payroll: boolean;
   exit_date: string | null;
+  date_of_exit: string | null;
   exit_status: string | null;
-  status: 'Active' | 'Exited';
+  status: 'Active' | 'Exited' | 'SNP';
   first_seen_at: string;
   last_synced_at: string;
 };
@@ -61,6 +62,7 @@ type ArchiveResponse = {
   total: number;
   active_count: number;
   exited_count: number;
+  snp_count: number;
 };
 
 const QUERY_KEY = ['reports', 'instructor-archive'];
@@ -92,7 +94,7 @@ function PayrollBadge({ isPayroll }: { isPayroll: boolean }) {
 }
 
 function StatusBadge({ status }: { status: ArchiveRow['status'] }) {
-  const toneClass = status === 'Active' ? 'bg-[#e5f3ed] text-[#287469]' : 'bg-[#fdeeea] text-[#b45436]';
+  const toneClass = status === 'Active' ? 'bg-[#e5f3ed] text-[#287469]' : status === 'SNP' ? 'bg-[#fff4dc] text-[#9a6b0c]' : 'bg-[#fdeeea] text-[#b45436]';
   return <span className={`inline-flex rounded-full px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] ${toneClass}`}>{status}</span>;
 }
 
@@ -108,7 +110,7 @@ export default function InstructorArchivePage() {
   const query = useArchive();
   const data = query.data;
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'exited'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'snp' | 'exited'>('all');
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: QUERY_KEY });
 
@@ -116,6 +118,7 @@ export default function InstructorArchivePage() {
     if (!data) return [];
     let rows = data.people;
     if (statusFilter === 'active') rows = rows.filter((row) => row.status === 'Active');
+    if (statusFilter === 'snp') rows = rows.filter((row) => row.status === 'SNP');
     if (statusFilter === 'exited') rows = rows.filter((row) => row.status === 'Exited');
     const q = search.trim().toLowerCase();
     if (!q) return rows;
@@ -126,11 +129,11 @@ export default function InstructorArchivePage() {
   // Downloads EVERYTHING the current search + status filter matches (all
   // pages, not just the one on screen), same columns as the table.
   const handleDownload = () => {
-    const headers = ['Name', 'Employee ID', 'Designation', 'Bifurcation', 'Subject', 'Department', 'Campus', 'Capability Manager', 'Manager (Darwin)', 'Date of joining', 'Payroll', 'Status', 'Exit Date', 'Exit Status (Darwin)'];
+    const headers = ['Name', 'Employee ID', 'Designation', 'Bifurcation', 'Subject', 'Department', 'Campus', 'Capability Manager', 'Manager (Darwin)', 'Date of joining', 'Payroll', 'Status', 'Date of Exit', 'Exit Status (Darwin)'];
     const rows = filteredRows.map((row) => [
       row.full_name, row.employee_id ?? '', row.designation ?? '', bifurcationLabel(row.classification), row.dept_area ?? '', row.department ?? '',
       row.institutes.join(', '), row.capability_manager ?? '', row.darwin_manager ?? '', row.date_of_joining ?? '', row.is_payroll ? 'Payroll' : 'Nxtwave',
-      row.status, row.exit_date ?? '', row.exit_status ?? '',
+      row.status, row.date_of_exit ?? '', row.exit_status ?? '',
     ]);
     const suffix = statusFilter === 'all' ? '' : `-${statusFilter}`;
     downloadCsv(`instructor-archive${suffix}.csv`, toCsv(headers, rows));
@@ -139,6 +142,7 @@ export default function InstructorArchivePage() {
   const filterButtons: { key: typeof statusFilter; label: string }[] = [
     { key: 'all', label: 'All' },
     { key: 'active', label: 'Active' },
+    { key: 'snp', label: 'SNP' },
     { key: 'exited', label: 'Exited' },
   ];
 
@@ -146,7 +150,7 @@ export default function InstructorArchivePage() {
     <PageIntro
       eyebrow="instructor_archive — additive-only, grows with every Darwin/TeachOS sync"
       title="Instructor Archive"
-      description="The permanent record of everyone who's ever been part of the Instructor Department. Nobody is ever removed from this list -- someone who exits keeps their row here, with an Exit Date filled in instead."
+      description="The permanent record of everyone who's ever been part of the Instructor Department. Nobody is ever removed from this list -- someone who exits keeps their row here, with their Date of Exit filled in."
       action={<button type="button" data-testid="button-refresh-archive" onClick={refresh} className="inline-flex items-center gap-2 self-start rounded-lg border border-border bg-card px-3.5 py-2.5 text-[12px] font-bold text-foreground transition-colors hover:bg-secondary lg:self-auto"><RefreshCw size={14} /> Refresh</button>}
     />
 
@@ -154,7 +158,7 @@ export default function InstructorArchivePage() {
     {query.isError && <QueryError message="Instructor Archive is unavailable right now." />}
 
     {data && <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-      <div className="grid max-w-xl grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="grid max-w-3xl grid-cols-1 gap-3 sm:grid-cols-4">
         <TopStat
           label="Total ever recorded"
           value={formatKpi(data.total)}
@@ -170,9 +174,16 @@ export default function InstructorArchivePage() {
           tone="teal"
         />
         <TopStat
+          label="Serving notice (SNP)"
+          value={formatKpi(data.snp_count)}
+          meta="Marked Serving Notice Period"
+          icon={<Archive size={16} />}
+          tone="amber"
+        />
+        <TopStat
           label="Exited"
           value={formatKpi(data.exited_count)}
-          meta="Kept on record, with an exit date"
+          meta="Kept on record, with a date of exit"
           icon={<Archive size={16} />}
           tone="amber"
         />
@@ -216,7 +227,7 @@ export default function InstructorArchivePage() {
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Date of joining</th>
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Payroll</th>
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Status</th>
-                <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Exit Date</th>
+                <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Date of Exit</th>
                 <th className="whitespace-nowrap px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Exit Status (Darwin)</th>
               </tr>
             </thead>
@@ -234,7 +245,7 @@ export default function InstructorArchivePage() {
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[11px] text-muted-foreground">{formatDate(row.date_of_joining)}</td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3"><PayrollBadge isPayroll={row.is_payroll} /></td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3"><StatusBadge status={row.status} /></td>
-                <td className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[11px] text-muted-foreground">{formatDate(row.exit_date)}</td>
+                <td className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[11px] text-muted-foreground">{formatDate(row.date_of_exit)}</td>
                 <td className="whitespace-nowrap px-4 py-3 text-[12px] text-muted-foreground">{row.exit_status || '—'}</td>
               </tr>)}
             </tbody>
