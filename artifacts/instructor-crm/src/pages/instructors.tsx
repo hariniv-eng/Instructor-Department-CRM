@@ -512,6 +512,11 @@ export default function InstructorsPage() {
       const key = productLabel(person);
       counts.set(key, (counts.get(key) ?? 0) + 1);
     }
+    // Every product is always offered, even with nobody in the current view (2026-10-08, per
+    // request: "add Support as a value in the Product filter") -- previously a product only
+    // appeared when the active tab happened to contain someone with it, so Support was
+    // invisible everywhere except the tabs that include the Operations team.
+    for (const product of ALL_PRODUCTS) if (!counts.has(product)) counts.set(product, 0);
     const products = [...counts.keys()].sort((a, b) => a.localeCompare(b));
     return products.map((product) => ({ key: product, label: product, count: counts.get(product)! }));
   }, [productFacetPeople]);
@@ -894,6 +899,8 @@ export function bifurcationLabel(classification: string | null): string {
 // 140px, added to both grid templates below and every list below, as the
 // new last column (matching how Enrolled Plan was added as the last column
 // on 2026-09-27).
+export const ALL_PRODUCTS = ['NIAT (Deployed)', 'NIAT (Training)', 'Academy', 'Intensive', 'IIT X DSA', 'Support'];
+
 export function productLabel(person: InstructorSummary): string {
   // Every Operations team row is the "Support" product (2026-10-08, per request) -- checked
   // first so none of the instructor rules below (IIT X DSA, Training, ...) ever apply to them.

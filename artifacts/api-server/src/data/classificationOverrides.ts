@@ -47,6 +47,11 @@ export const EXCLUDED_EMPLOYEES: ExcludedOverride[] = [
   { employeeId: "NW0003135", fullName: "Uday Kiran Palepu", classification: "excluded_other_department", reason: "Center Head (Student Success) — center management role, not a teaching/instructor designation", decidedDate: "2026-08-27" },
   { employeeId: "NW0001135", fullName: "Sireesha Maddikari", classification: "excluded_non_department_team", reason: "User-directed: classified as non-department team despite an Instructor designation (Learning Outcomes Academy)", decidedDate: "2026-08-27" },
   { teachosUserId: "657a9e364eaa4241a013f6483fdd2b6e", employeeId: "NW0006137", fullName: "Chandil Gauthami", classification: "excluded_other_department", reason: "Product Manager (Instructor Platform, NWD_P_IP) — a platform/engineering role, not a teaching/instructor designation, despite the department name containing \"Instructor\". Found via full-roster cross-check (2026-09-03): not in the Instructors department at all, but does exist elsewhere in Darwin.", decidedDate: "2026-09-03" },
+  // 2026-10-08, per request: these two are TeachOS-only accounts with placeholder employee IDs
+  // ("Aurora Director" / "Aurora Dean") and no Darwin record at all -- file them under Other
+  // department instead of payroll-converted instructors. Matched by TeachOS user ID.
+  { teachosUserId: "9eabf5b3011349218ad2dfd31e007b7a", fullName: "Chandrasekhar", classification: "excluded_other_department", reason: "User-directed (2026-10-08): TeachOS-only account (employee ID shown as \"Aurora Director\", Aurora University) — filed under Other department, not counted as an instructor.", decidedDate: "2026-10-08" },
+  { teachosUserId: "67793c28a0794d439d6f31acda4d3225", fullName: "Pradosh Chandra", classification: "excluded_other_department", reason: "User-directed (2026-10-08): TeachOS-only account (employee ID shown as \"Aurora Dean\", Aurora University) — filed under Other department, not counted as an instructor.", decidedDate: "2026-10-08" },
 ];
 
 // PAYROLL_CONVERTED_EMPLOYEES was retired 2026-09-03 — payroll-converted
