@@ -17,6 +17,7 @@ import { fetchContributionRows, InstructorContributionError } from "../lib/conne
 import { resolvedCourseDefs } from "../data/trainingCourseTaxonomy";
 import { storeDarwinboxActive, storeDarwinboxExits, storeDarwinboxFullRoster, storeTeachosDeployment, storeTrainingStatus, storeContribution } from "../lib/storeRaw";
 import { reconcileDarwin, reconcileDarwinFullRosterFallback, reconcileTeachos, reconcileTeachosEmployeeIdReference, reconcileCapabilityManager, recomputeStatuses } from "../lib/reconcile";
+import { sdb, inSyncTransaction, inSavepoint, withSyncLock } from "../lib/syncContext";
 import { LAST_SYNC, LAST_CAPABILITY_MANAGER_SYNC, setLastCapabilityManagerSync, DAILY_AUTO_SYNC_INTERVAL_HOURS, type SyncResult } from "../lib/syncState";
 
 const router: IRouter = Router();
@@ -71,12 +72,18 @@ async function runDarwinboxSync(): Promise<SyncResult> {
     // Darwin record isn't filed under "Instructors" at all — see
     // reconcileDarwinFullRosterFallback() in lib/reconcile.ts).
     const { instructorRows, fullRosterRows } = await fetchDarwinRowsBoth();
-    const stored = await storeDarwinboxActive(instructorRows);
-    await storeDarwinboxFullRoster(fullRosterRows);
-    await reconcileDarwin(instructorRows);
-    await reconcileDarwinFullRosterFallback(fullRosterRows);
-    await recomputeStatuses();
-    await db.insert(uploadsTable).values({ source: "Darwin", filename: "Darwinbox API sync (raw + full roster + reconciled)", rowCount: stored });
+    // Store + reconcile + record happen in ONE transaction (see
+    // lib/syncContext.ts): other requests keep seeing the previous complete
+    // data until this commits, instead of a half-rebuilt table.
+    const stored = await inSyncTransaction(async () => {
+      const n = await storeDarwinboxActive(instructorRows);
+      await storeDarwinboxFullRoster(fullRosterRows);
+      await reconcileDarwin(instructorRows);
+      await reconcileDarwinFullRosterFallback(fullRosterRows);
+      await recomputeStatuses();
+      await sdb.insert(uploadsTable).values({ source: "Darwin", filename: "Darwinbox API sync (raw + full roster + reconciled)", rowCount: n });
+      return n;
+    });
     return { ok: true, source: "darwinbox_live", stored, synced_at: new Date().toISOString() };
   } catch (e) {
     const message = e instanceof DarwinboxError ? e.message : describeUnexpectedError(e);
@@ -87,9 +94,12 @@ async function runDarwinboxSync(): Promise<SyncResult> {
 async function runDarwinboxExitsSync(): Promise<SyncResult> {
   try {
     const rows = await fetchExitRows();
-    const stored = await storeDarwinboxExits(rows);
-    await recomputeStatuses(); // re-derives exit flags for existing instructors from the freshly replaced raw exits table — see comment above
-    await db.insert(uploadsTable).values({ source: "Exit List", filename: "Darwinbox reports-API sync (raw, flagged only)", rowCount: stored });
+    const stored = await inSyncTransaction(async () => {
+      const n = await storeDarwinboxExits(rows);
+      await recomputeStatuses(); // re-derives exit flags for existing instructors from the freshly replaced raw exits table — see comment above
+      await sdb.insert(uploadsTable).values({ source: "Exit List", filename: "Darwinbox reports-API sync (raw, flagged only)", rowCount: n });
+      return n;
+    });
     return { ok: true, source: "darwinbox_exits_live", stored, synced_at: new Date().toISOString() };
   } catch (e) {
     const message = e instanceof DarwinboxExitsError ? e.message : describeUnexpectedError(e);
@@ -113,29 +123,44 @@ async function runTeachosSync(): Promise<SyncResult> {
     // reconcileCapabilityManager() call below, which patches it back on
     // from the older table as a second, non-fatal step.
     const rows = await fetchNiatInstructorDetailsRows();
-    const stored = await storeTeachosDeployment(rows);
-    await reconcileTeachos(rows);
-
-    // Capability Manager enrichment (2026-09-07, per request): a separate
-    // query against the older niat_instructor_managers_and_instructors_details
-    // table, which still carries instructor_manager -- patched onto the
-    // rows just matched above via teachos_user_id (see
-    // reconcileCapabilityManager()). Deliberately non-fatal: if this table
-    // is ever renamed/inaccessible, the primary employee-ID sync above must
-    // still succeed rather than fail the whole "Sync Now" over a field
-    // that's supplementary to begin with.
+    // The Capability Manager query is a network call, so it is fetched BEFORE
+    // the transaction opens (a transaction should not sit open on a slow
+    // BigQuery round trip). Still non-fatal, same as before.
+    let managerRows: Awaited<ReturnType<typeof fetchCapabilityManagerRows>> | null = null;
+    let managerFetchError: string | null = null;
     try {
-      const managerRows = await fetchCapabilityManagerRows();
-      const result = await reconcileCapabilityManager(managerRows);
-      setLastCapabilityManagerSync({ ok: true, ...result, synced_at: new Date().toISOString() });
+      managerRows = await fetchCapabilityManagerRows();
     } catch (e) {
-      const message = e instanceof Error ? e.message : String(e);
-      console.error("Capability Manager enrichment failed (non-fatal):", message);
-      setLastCapabilityManagerSync({ ok: false, error: message, synced_at: new Date().toISOString() });
+      managerFetchError = e instanceof Error ? e.message : String(e);
     }
 
-    await recomputeStatuses();
-    await db.insert(uploadsTable).values({ source: "TeachOS", filename: "BigQuery sync (niat_instructor_details, raw + reconciled)", rowCount: stored });
+    const stored = await inSyncTransaction(async () => {
+      const n = await storeTeachosDeployment(rows);
+      await reconcileTeachos(rows);
+
+      // Capability Manager enrichment (2026-09-07, per request): patched onto
+      // the rows just matched above via teachos_user_id (see
+      // reconcileCapabilityManager()). Deliberately non-fatal -- run in a
+      // savepoint (nested transaction) so a failure here rolls back only this
+      // step and cannot poison the surrounding transaction.
+      if (managerRows) {
+        try {
+          const result = await inSavepoint(async () => reconcileCapabilityManager(managerRows!));
+          setLastCapabilityManagerSync({ ok: true, ...result, synced_at: new Date().toISOString() });
+        } catch (e) {
+          const message = e instanceof Error ? e.message : String(e);
+          console.error("Capability Manager enrichment failed (non-fatal):", message);
+          setLastCapabilityManagerSync({ ok: false, error: message, synced_at: new Date().toISOString() });
+        }
+      } else {
+        console.error("Capability Manager enrichment failed (non-fatal):", managerFetchError);
+        setLastCapabilityManagerSync({ ok: false, error: managerFetchError ?? "unknown error", synced_at: new Date().toISOString() });
+      }
+
+      await recomputeStatuses();
+      await sdb.insert(uploadsTable).values({ source: "TeachOS", filename: "BigQuery sync (niat_instructor_details, raw + reconciled)", rowCount: n });
+      return n;
+    });
     return { ok: true, source: "teachos_live", stored, synced_at: new Date().toISOString() };
   } catch (e) {
     const message = e instanceof NiatInstructorDetailsError ? e.message : describeUnexpectedError(e);
@@ -146,9 +171,12 @@ async function runTeachosSync(): Promise<SyncResult> {
 async function runNiatInstructorDetailsSync(): Promise<SyncResult> {
   try {
     const rows = await fetchNiatInstructorDetailsRows();
-    const result = await reconcileTeachosEmployeeIdReference(rows);
-    await recomputeStatuses();
-    await db.insert(uploadsTable).values({ source: "NIAT Instructor Details", filename: "BigQuery sync (employee ID mapping)", rowCount: rows.length });
+    const result = await inSyncTransaction(async () => {
+      const r = await reconcileTeachosEmployeeIdReference(rows);
+      await recomputeStatuses();
+      await sdb.insert(uploadsTable).values({ source: "NIAT Instructor Details", filename: "BigQuery sync (employee ID mapping)", rowCount: rows.length });
+      return r;
+    });
     console.log(`niat_instructor_details sync: matched=${result.matched} unmatched=${result.unmatched} conflicts=${result.conflicts} total_rows=${result.total_rows}`);
     return { ok: true, source: "niat_instructor_details_live", stored: rows.length, synced_at: new Date().toISOString() };
   } catch (e) {
@@ -184,9 +212,24 @@ async function runTrainingStatusSync(): Promise<SyncResult> {
   }
 }
 
+
+// One sync at a time (2026-10-08): the daily job, the catch-up and every Sync
+// Now share one database lock (lib/syncContext.ts), so overlapping runs --
+// which blanked each other's half-filled data -- can no longer happen. A
+// manual click while something else is syncing gets a clear "already running"
+// answer and does not overwrite the last real result.
+export const SYNC_BUSY_MESSAGE = "Another sync is already running (the daily sync or someone else's Sync Now). Wait a few minutes and try again.";
+type ExclusiveResult = SyncResult & { busy?: boolean };
+
+async function runExclusive(source: string, run: () => Promise<SyncResult>): Promise<ExclusiveResult> {
+  const out = await withSyncLock(run);
+  if (out.ran) return out.value;
+  return { ok: false, source, error: SYNC_BUSY_MESSAGE, synced_at: new Date().toISOString(), busy: true };
+}
+
 router.post("/sync/training-status", async (_req, res) => {
-  const result = await runTrainingStatusSync();
-  LAST_SYNC.training_status_live = result;
+  const result = await runExclusive("training_status_live", runTrainingStatusSync);
+  if (!result.busy) LAST_SYNC.training_status_live = result;
   res.json(result);
 });
 
@@ -208,14 +251,14 @@ async function runContributionSync(): Promise<SyncResult> {
 }
 
 router.post("/sync/instructor-contribution", async (_req, res) => {
-  const result = await runContributionSync();
-  LAST_SYNC.contribution_live = result;
+  const result = await runExclusive("contribution_live", runContributionSync);
+  if (!result.busy) LAST_SYNC.contribution_live = result;
   res.json(result);
 });
 
 router.post("/sync/niat-instructor-details", async (_req, res) => {
-  const result = await runNiatInstructorDetailsSync();
-  LAST_SYNC.niat_instructor_details_live = result;
+  const result = await runExclusive("niat_instructor_details_live", runNiatInstructorDetailsSync);
+  if (!result.busy) LAST_SYNC.niat_instructor_details_live = result;
   res.json(result);
 });
 
@@ -230,20 +273,20 @@ router.get("/sync/niat-instructor-details/data", async (_req, res) => {
 });
 
 router.post("/sync/darwinbox", async (_req, res) => {
-  const result = await runDarwinboxSync();
-  LAST_SYNC.darwinbox_live = result;
+  const result = await runExclusive("darwinbox_live", runDarwinboxSync);
+  if (!result.busy) LAST_SYNC.darwinbox_live = result;
   res.json(result);
 });
 
 router.post("/sync/darwinbox-exits", async (_req, res) => {
-  const result = await runDarwinboxExitsSync();
-  LAST_SYNC.darwinbox_exits_live = result;
+  const result = await runExclusive("darwinbox_exits_live", runDarwinboxExitsSync);
+  if (!result.busy) LAST_SYNC.darwinbox_exits_live = result;
   res.json(result);
 });
 
 router.post("/sync/teachos", async (_req, res) => {
-  const result = await runTeachosSync();
-  LAST_SYNC.teachos_live = result;
+  const result = await runExclusive("teachos_live", runTeachosSync);
+  if (!result.busy) LAST_SYNC.teachos_live = result;
   res.json(result);
 });
 

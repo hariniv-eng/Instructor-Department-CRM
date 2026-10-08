@@ -1,0 +1,28 @@
+# Wakes the Replit Autoscale server at 5:00 AM IST and runs the daily sync
+# (Darwinbox, exits, TeachOS, training status, contribution).
+# Needs two repository secrets (Settings > Secrets and variables > Actions):
+#   SYNC_CRON_SECRET  the same value as the SYNC_CRON_SECRET secret on the Replit deployment
+#   APP_URL           https://instructor-department-crm.replit.app
+name: Daily sync
+
+on:
+  schedule:
+    - cron: "30 23 * * *" # 23:30 UTC = 05:00 IST (GitHub may start it a few minutes late)
+  workflow_dispatch: {} # lets you run it by hand from the Actions tab to test
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Call the daily sync endpoint
+        env:
+          SYNC_CRON_SECRET: ${{ secrets.SYNC_CRON_SECRET }}
+          APP_URL: ${{ secrets.APP_URL }}
+        run: |
+          # The server holds the request open until the sync is finished.
+          curl --silent --show-error --fail-with-body \
+            --max-time 1100 --retry 2 --retry-delay 30 --retry-all-errors \
+            -X POST "$APP_URL/api/sync/daily" \
+            -H "Authorization: Bearer $SYNC_CRON_SECRET"
+          echo

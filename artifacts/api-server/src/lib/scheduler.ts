@@ -20,79 +20,80 @@
 // -- keep both in sync if this cron expression/timezone ever changes.
 
 import cron from "node-cron";
-import { desc, eq } from "drizzle-orm";
+import { eq, max } from "drizzle-orm";
 import { db, uploadsTable, instructorArchiveTable } from "@workspace/db";
 import { archiveInstructors } from "./archiveInstructors";
 import { logger } from "./logger";
 import { runDarwinboxSync, runDarwinboxExitsSync, runTeachosSync, runTrainingStatusSync, runContributionSync } from "../routes/sync";
+import { withSyncLock } from "./syncContext";
 import { LAST_SYNC } from "./syncState";
 
 const DAILY_SYNC_CRON_EXPRESSION = "0 5 * * *"; // 05:00, every day
 const DAILY_SYNC_TIMEZONE = "Asia/Kolkata"; // 5am IST
 
-// Guards against the cron tick and a catch-up check (below) overlapping in
-// the same process -- each run is a full replace of every source, so a
-// second concurrent run would just be wasted work (and hammer Darwin/BigQuery).
-let dailySyncRunning = false;
+// The sources the daily job refreshes, in the order it refreshes them.
+// `uploadSource` is the name each successful run records in the uploads table
+// -- that history is what "is this source up to date for today?" is judged
+// against (it survives restarts, unlike LAST_SYNC).
+const DAILY_SOURCES = [
+  { uploadSource: "Darwin", key: "darwinbox_live", label: "Darwinbox", run: runDarwinboxSync },
+  { uploadSource: "Exit List", key: "darwinbox_exits_live", label: "Darwinbox exits", run: runDarwinboxExitsSync },
+  { uploadSource: "TeachOS", key: "teachos_live", label: "TeachOS/BigQuery", run: runTeachosSync },
+  { uploadSource: "Instructor Training Status", key: "training_status_live", label: "Instructor Training Status", run: runTrainingStatusSync },
+  { uploadSource: "Instructor Contribution", key: "contribution_live", label: "Instructor Contribution", run: runContributionSync },
+] as const;
 
-async function runDailyAutoSync() {
-  if (dailySyncRunning) {
-    logger.info("Daily auto-sync already running -- skipping duplicate trigger");
-    return;
+export type DailySyncOutcome =
+  | { ran: false; reason: "already_running" | "up_to_date" }
+  | { ran: true; results: Array<{ source: string; ok: boolean; error?: string }> };
+
+// Runs the given sources (all of them by default) one after another, holding
+// the shared sync lock for the whole run (lib/syncContext.ts) so two server
+// processes -- Autoscale can wake several at once -- never sync at the same
+// time. Each source's failure is caught on its own, so one source being down
+// does not block the others.
+async function runSources(only?: ReadonlySet<string>): Promise<DailySyncOutcome> {
+  const locked = await withSyncLock(async () => {
+    logger.info({ only: only ? [...only] : "all" }, "Daily auto-sync starting");
+    const results: Array<{ source: string; ok: boolean; error?: string }> = [];
+    for (const s of DAILY_SOURCES) {
+      if (only && !only.has(s.uploadSource)) continue;
+      const result = await s.run();
+      LAST_SYNC[s.key] = result;
+      if (!result.ok) logger.warn({ err: result.error }, `${s.label} auto-sync failed`);
+      results.push({ source: s.uploadSource, ok: result.ok, error: result.ok ? undefined : result.error });
+    }
+    logger.info("Daily auto-sync finished");
+    return results;
+  });
+  if (!locked.ran) {
+    logger.info("Daily auto-sync skipped -- another sync is already running");
+    return { ran: false, reason: "already_running" };
   }
-  dailySyncRunning = true;
-  try {
-    await runDailyAutoSyncInner();
-  } finally {
-    dailySyncRunning = false;
-  }
+  return { ran: true, results: locked.value };
 }
 
-async function runDailyAutoSyncInner() {
-  logger.info("Daily 5am auto-sync starting");
-
-  const darwinbox = await runDarwinboxSync();
-  LAST_SYNC.darwinbox_live = darwinbox;
-  if (!darwinbox.ok) logger.warn({ err: darwinbox.error }, "Darwinbox auto-sync failed");
-
-  const darwinboxExits = await runDarwinboxExitsSync();
-  LAST_SYNC.darwinbox_exits_live = darwinboxExits;
-  if (!darwinboxExits.ok) logger.warn({ err: darwinboxExits.error }, "Darwinbox exits auto-sync failed");
-
-  const teachos = await runTeachosSync();
-  LAST_SYNC.teachos_live = teachos;
-  if (!teachos.ok) logger.warn({ err: teachos.error }, "TeachOS/BigQuery auto-sync failed");
-
-  const trainingStatus = await runTrainingStatusSync();
-  LAST_SYNC.training_status_live = trainingStatus;
-  if (!trainingStatus.ok) logger.warn({ err: trainingStatus.error }, "Instructor Training Status auto-sync failed");
-
-  const contribution = await runContributionSync();
-  LAST_SYNC.contribution_live = contribution;
-  if (!contribution.ok) logger.warn({ err: contribution.error }, "Instructor Contribution auto-sync failed");
-
-  logger.info("Daily 5am auto-sync finished");
-}
-
-// Catch-up for missed 5am runs (2026-10-06, per report: "the sync didnt
-// happen in the morning"). The cron job above lives INSIDE this process, and
-// the Replit deployment is Autoscale (.replit: deploymentTarget =
-// "autoscale"), which shuts the server down while nobody is using it
-// overnight -- so at 5:00 AM IST there was no running process to fire the
-// timer, and the last recorded sync stayed at the previous afternoon's
-// manual run. Fix (no infrastructure/cost change): whenever the process
-// starts -- which on Autoscale is exactly what a first-visitor-of-the-day
-// wake-up is -- and then every 30 minutes while it stays up, compare the
-// newest recorded Darwin sync (uploads table, the same DB-backed history the
-// Uploads page's "Last synced" reads, so it survives restarts unlike
-// LAST_SYNC) against the most recent 5:00 AM IST that has already passed,
-// and run the full daily sync right away if it's older. Darwin is used as
-// the marker because the daily job always runs it first and only records an
-// uploads row when it succeeds -- so a failed run is retried at the next
-// check instead of being treated as done.
+// Catch-up for missed 5am runs. The cron timer below lives INSIDE this
+// process, and the Replit deployment is Autoscale (.replit: deploymentTarget
+// = "autoscale"), which shuts the server down while nobody is using it -- so
+// at 5:00 AM IST there is often no running process to fire the timer
+// (2026-10-06 and again 2026-10-08: "the sync didnt happen in the morning").
+//
+// Two things now cover that:
+//   1. An outside scheduler (GitHub Actions, see
+//      .github/workflows/daily-sync.yml) calls POST /api/sync/daily at 5:00 AM
+//      IST (routes/cron.ts). The request itself wakes the server, and stays
+//      open until the sync finishes so the server cannot go back to sleep
+//      halfway through.
+//   2. This catch-up, which runs shortly after every server start and then
+//      every 30 minutes while it stays up. It now judges EACH source against
+//      the most recent 5:00 AM IST that has passed and re-runs only the
+//      sources that are behind (before: it looked at Darwin alone and always
+//      re-ran everything, so one failing source re-synced all five every 30
+//      minutes). A failed run records nothing, so it is retried next check.
 const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000; // Asia/Kolkata has no DST
 const CATCH_UP_CHECK_INTERVAL_MS = 30 * 60 * 1000;
-const CATCH_UP_STARTUP_DELAY_MS = 30 * 1000; // let the server finish booting and serve its first request first
+const CATCH_UP_STARTUP_DELAY_MS = 5 * 1000; // just enough for the server to start answering requests
 
 // The most recent 05:00 IST at or before `now`, as a real UTC instant.
 function mostRecentScheduledRun(now: Date): Date {
@@ -102,13 +103,33 @@ function mostRecentScheduledRun(now: Date): Date {
   return new Date(candidateIst - IST_OFFSET_MS);
 }
 
+async function overdueSources(dueSince: Date): Promise<Set<string>> {
+  const rows = await db
+    .select({ source: uploadsTable.source, latest: max(uploadsTable.uploadedAt) })
+    .from(uploadsTable)
+    .groupBy(uploadsTable.source);
+  const latestBySource = new Map(rows.map((r) => [r.source, r.latest]));
+  const overdue = new Set<string>();
+  for (const s of DAILY_SOURCES) {
+    const latest = latestBySource.get(s.uploadSource);
+    if (!latest || latest < dueSince) overdue.add(s.uploadSource);
+  }
+  return overdue;
+}
+
+// `graceMs` lets the 5am request still count as "due" if the outside
+// scheduler's clock fires a few minutes before 5:00 sharp.
+export async function runDailySyncIfDue(graceMs = 0): Promise<DailySyncOutcome> {
+  const dueSince = mostRecentScheduledRun(new Date(Date.now() + graceMs));
+  const overdue = await overdueSources(dueSince);
+  if (overdue.size === 0) return { ran: false, reason: "up_to_date" };
+  logger.info({ dueSince, overdue: [...overdue] }, "Daily auto-sync due -- running now");
+  return runSources(overdue);
+}
+
 async function runCatchUpIfOverdue() {
   try {
-    const [latest] = await db.select({ uploadedAt: uploadsTable.uploadedAt }).from(uploadsTable).where(eq(uploadsTable.source, "Darwin")).orderBy(desc(uploadsTable.uploadedAt)).limit(1);
-    const dueSince = mostRecentScheduledRun(new Date());
-    if (latest && latest.uploadedAt >= dueSince) return;
-    logger.info({ lastDarwinSync: latest?.uploadedAt ?? null, dueSince }, "Daily auto-sync overdue (missed the 5am run) -- running catch-up sync now");
-    await runDailyAutoSync();
+    await runDailySyncIfDue();
   } catch (err) {
     logger.warn({ err }, "Auto-sync catch-up check failed");
   }
@@ -134,7 +155,7 @@ async function seedArchiveScopeIfEmpty() {
 }
 
 export function startScheduler() {
-  cron.schedule(DAILY_SYNC_CRON_EXPRESSION, runDailyAutoSync, { timezone: DAILY_SYNC_TIMEZONE });
+  cron.schedule(DAILY_SYNC_CRON_EXPRESSION, runCatchUpIfOverdue, { timezone: DAILY_SYNC_TIMEZONE });
   logger.info({ cron: DAILY_SYNC_CRON_EXPRESSION, timezone: DAILY_SYNC_TIMEZONE }, "Daily auto-sync scheduled (Darwin, Darwin Exits, TeachOS, Training Status, Contribution)");
 
   setTimeout(seedArchiveScopeIfEmpty, 5 * 1000);

@@ -133,7 +133,10 @@ const toApiInstructorSummary = (row: InstructorRow, contributionByTeachosId: Map
   id: row.id,
   full_name: row.fullName,
   employee_id: row.employeeId,
-  teachos_user_id: row.teachosUserId,
+  // Shown only while the person is ACTIVE in TeachOS (2026-10-07, per request):
+  // the stored ID stays on the row after they go inactive so they can be
+  // re-matched later, but it is stale then and must not look like TeachOS access.
+  teachos_user_id: row.inTeachos ? row.teachosUserId : null,
   // Falls back to exitDesignation/exitDepartment (2026-09-21, per request:
   // "payroll converted instructor dont have data like gender subject and
   // the department and also role ... get that data from the exit, map the
@@ -283,7 +286,7 @@ const toApiInstructorSummary = (row: InstructorRow, contributionByTeachosId: Map
   // no teachosUserId, or no matching contribution row at all (never synced,
   // or genuinely no COMPLETED sessions in the last 30 days) -- same "empty,
   // not missing" convention as institutes/enrolled_plans above.
-  niat_cohorts: (row.teachosUserId && contributionByTeachosId.get(row.teachosUserId)) || [],
+  niat_cohorts: (row.inTeachos && row.teachosUserId && contributionByTeachosId.get(row.teachosUserId)) || [],
 });
 
 // Instructor Department population (Instructors + Mentors + Ops team,
@@ -298,7 +301,7 @@ const toApiInstructorSummary = (row: InstructorRow, contributionByTeachosId: Map
 // definition below for the full "who counts as an Exception" reasoning
 // (unresolved exit-flagged people within the Instructor Department
 // population only — a review queue, not a headcount bucket).
-function computeDepartmentAndExceptionRows(rawRows: InstructorRow[]) {
+export function computeDepartmentAndExceptionRows(rawRows: InstructorRow[]) {
   // Edge case (2026-10-07, per request: "she should be considered as an edge
   // case"): anyone on CONFIRMED_INSTRUCTOR_DESPITE_FULL_ROSTER (NW0005068,
   // Saumya Sunil Patil) is ALWAYS counted as an ordinary Instructor, whatever
