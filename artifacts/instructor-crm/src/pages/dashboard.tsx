@@ -1,10 +1,11 @@
-import { AlertTriangle, ArrowRight, Briefcase, Building2, Check, ChevronDown, Clock, Copy, GraduationCap, MapPin, RefreshCw, Trash2, UserCog, UsersRound, X } from 'lucide-react';
+import { AlertTriangle, ArrowRight, Briefcase, Building2, Check, Clock, Copy, GraduationCap, RefreshCw, Trash2, UsersRound, X } from 'lucide-react';
 import { Link } from 'wouter';
 import { useMemo, useState } from 'react';
 import { useGetReportsInstructors, getGetReportsInstructorsQueryKey, type AccessSplit, type InstructorSummary } from '@workspace/api-client-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageIntro, QueryError, SkeletonBlock, DownloadCsvButton, TableSearchInput } from '@/components/ui-pieces';
 import { downloadCsv, slugify, toCsv } from '@/lib/csv';
+import { productLabel } from './instructors';
 
 function formatKpi(value: number | undefined) {
   return typeof value === 'number' ? value.toLocaleString('en-IN') : '—';
@@ -137,7 +138,7 @@ export default function DashboardPage() {
     </section>}
 
 
-    {report && <section className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,420px)_minmax(0,1fr)] animate-rise" aria-label="Campuses and capability managers">
+    {report && <section className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2 animate-rise" aria-label="Campuses and capability managers">
       <TopCampusesCard people={instructorPeople} />
       <CapabilityManagersCard people={instructorPeople} />
     </section>}
@@ -232,127 +233,78 @@ function ExceptionPendingPanel({ people, onClose }: { people: InstructorSummary[
   </section>;
 }
 
-// Top 10 campuses (2026-10-08, per request): instructor head-count per TeachOS campus. "Training Institute" is
-// always pinned first -- blank campus counts as Training Institute too, same rule as the Product column -- then
-// the other campuses by head-count. A person teaching at several campuses is counted at each of them.
+// Top 10 campuses (2026-10-08, per request): campus name + instructor head-count only -- the people themselves
+// are in the Instructors tab. Training Institute is always pinned first and is counted by PRODUCT, not by the raw
+// campus text: only people whose Product is "NIAT (Training)" are in it, so the Support (Operations) team, IIT X DSA
+// and Academy people never inflate it even when their campus is blank. Every other campus is counted from the
+// person's campus names (a person teaching at several campuses counts at each); Support people are left out.
 const TRAINING_CAMPUS = 'Training Institute';
+function RankedBarList({ rows, color, testPrefix }: { rows: [string, number][]; color: string; testPrefix: string }) {
+  const max = Math.max(1, ...rows.map(([, count]) => count));
+  return <ol className="space-y-3.5">
+    {rows.map(([name, count], index) => <li key={name} data-testid={`row-${testPrefix}-${slugify(name)}`} className="flex items-start gap-3">
+      <span className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-secondary font-mono-ui text-[11px] font-bold text-muted-foreground">{index + 1}</span>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="truncate text-[15px] text-foreground">{name}</span>
+          <span className="shrink-0 text-[14px] font-extrabold tabular-nums">{count.toLocaleString('en-IN')}</span>
+        </div>
+        <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-secondary"><div className="h-full rounded-full" style={{ width: `${Math.max(2, (count / max) * 100)}%`, backgroundColor: color }} /></div>
+      </div>
+    </li>)}
+  </ol>;
+}
+
 function TopCampusesCard({ people }: { people: InstructorSummary[] }) {
-  const [open, setOpen] = useState<string | null>(null);
   const campuses = useMemo(() => {
-    const map = new Map<string, InstructorSummary[]>();
-    const add = (campus: string, person: InstructorSummary) => {
-      const list = map.get(campus) ?? [];
-      list.push(person);
-      map.set(campus, list);
-    };
+    const counts = new Map<string, number>();
+    const add = (campus: string) => counts.set(campus, (counts.get(campus) ?? 0) + 1);
     for (const person of people) {
-      const names = [...new Set((person.institutes ?? []).map((name) => name.trim()).filter(Boolean))];
-      if (names.length === 0) add(TRAINING_CAMPUS, person);
-      else names.forEach((name) => add(name, person));
+      const product = productLabel(person);
+      if (product === 'Support') continue;
+      if (product === 'NIAT (Training)') add(TRAINING_CAMPUS);
+      const names = new Set((person.institutes ?? []).map((name) => name.trim()).filter((name) => name && name !== TRAINING_CAMPUS));
+      names.forEach(add);
     }
-    const training = map.get(TRAINING_CAMPUS) ?? [];
-    map.delete(TRAINING_CAMPUS);
-    const rest = [...map.entries()].sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0])).slice(0, 9);
-    return [[TRAINING_CAMPUS, training] as [string, InstructorSummary[]], ...rest];
+    const training = counts.get(TRAINING_CAMPUS) ?? 0;
+    counts.delete(TRAINING_CAMPUS);
+    const rest = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 9);
+    return [[TRAINING_CAMPUS, training] as [string, number], ...rest];
   }, [people]);
-  const max = Math.max(1, ...campuses.map(([, list]) => list.length));
   return <div data-testid="card-top-campuses" className="rounded-xl border border-border bg-card p-5 shadow-xs">
-    <div className="mb-4 flex items-center gap-2.5">
-      <span className="grid h-8 w-8 place-items-center rounded-lg bg-secondary text-foreground"><MapPin size={16} /></span>
+    <div className="mb-5 flex items-center gap-3">
+      <span className="grid h-9 w-9 place-items-center rounded-lg bg-secondary text-muted-foreground"><Building2 size={17} /></span>
       <div>
-        <h2 className="text-[15px] font-extrabold tracking-[-0.03em]">Top 10 campuses</h2>
-        <p className="text-[11px] text-muted-foreground">Instructors per campus · blank campus counts as Training Institute</p>
+        <h2 className="text-[16px] font-extrabold tracking-[-0.03em]">Top campuses</h2>
+        <p className="text-[11px] text-muted-foreground">By headcount</p>
       </div>
     </div>
-    <ol className="space-y-1">
-      {campuses.map(([campus, list], index) => {
-        const isOpen = open === campus;
-        const pinned = campus === TRAINING_CAMPUS;
-        return <li key={campus}>
-          <button type="button" onClick={() => setOpen(isOpen ? null : campus)} aria-expanded={isOpen} data-testid={`button-campus-${slugify(campus)}`} className={`group w-full rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-secondary ${isOpen ? 'bg-secondary' : ''}`}>
-            <span className="flex items-center gap-2.5">
-              <span className="w-5 shrink-0 font-mono-ui text-[11px] font-bold text-muted-foreground">{index + 1}</span>
-              <span className="min-w-0 flex-1 truncate text-[13px] font-bold">{campus}{pinned && <span className="ml-2 rounded-full bg-primary/10 px-1.5 py-0.5 align-middle font-mono-ui text-[9px] uppercase tracking-[0.08em] text-primary">Pinned</span>}</span>
-              <span className="text-[14px] font-extrabold tabular-nums">{list.length.toLocaleString('en-IN')}</span>
-              <ChevronDown size={14} className={`shrink-0 text-muted-foreground transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-            </span>
-            <span className="mt-1.5 ml-7 block h-1.5 overflow-hidden rounded-full bg-secondary group-hover:bg-card"><span className={`block h-full rounded-full ${pinned ? 'bg-primary' : 'bg-primary/55'}`} style={{ width: `${Math.max(2, (list.length / max) * 100)}%` }} /></span>
-          </button>
-          {isOpen && <div className="mb-1 ml-7 mt-1 flex max-h-[180px] flex-wrap gap-1 overflow-auto rounded-lg border border-border p-2">
-            {[...list].sort((a, b) => a.full_name.localeCompare(b.full_name)).map((p) => <span key={p.id} className="rounded-full bg-secondary px-2 py-0.5 text-[11px] text-foreground">{p.full_name}</span>)}
-            {list.length === 0 && <span className="text-[11px] text-muted-foreground">No instructors here right now.</span>}
-          </div>}
-        </li>;
-      })}
-    </ol>
+    <RankedBarList rows={campuses} color="#f26419" testPrefix="campus" />
   </div>;
 }
 
-// Capability Manager workload (2026-10-08, per request): every Capability Manager with the instructors they handle.
-// People without one are grouped last so nobody drops out of the picture.
-const NO_MANAGER = 'No capability manager';
+// Capability Manager workload (2026-10-08, per request): each Capability Manager and how many instructors they
+// handle -- names of the instructors are in the Instructors tab, not here. People with no Capability Manager are
+// simply left out of this list (2026-10-08, per request).
 function CapabilityManagersCard({ people }: { people: InstructorSummary[] }) {
-  const [search, setSearch] = useState('');
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const groups = useMemo(() => {
-    const map = new Map<string, InstructorSummary[]>();
+  const managers = useMemo(() => {
+    const counts = new Map<string, number>();
     for (const person of people) {
-      const key = person.capability_manager?.trim() || NO_MANAGER;
-      const list = map.get(key) ?? [];
-      list.push(person);
-      map.set(key, list);
+      const key = person.capability_manager?.trim();
+      if (!key) continue;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
     }
-    return [...map.entries()]
-      .map(([manager, list]) => [manager, [...list].sort((a, b) => a.full_name.localeCompare(b.full_name))] as [string, InstructorSummary[]])
-      .sort((a, b) => (a[0] === NO_MANAGER ? 1 : b[0] === NO_MANAGER ? -1 : b[1].length - a[1].length || a[0].localeCompare(b[0])));
+    return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
   }, [people]);
-  const q = search.trim().toLowerCase();
-  const visible = useMemo(() => (q
-    ? groups.filter(([manager, list]) => manager.toLowerCase().includes(q) || list.some((p) => p.full_name.toLowerCase().includes(q) || (p.employee_id ?? '').toLowerCase().includes(q)))
-    : groups), [groups, q]);
-  const managerCount = groups.filter(([manager]) => manager !== NO_MANAGER).length;
-  const toggle = (manager: string) => setExpanded((prev) => {
-    const next = new Set(prev);
-    if (next.has(manager)) next.delete(manager); else next.add(manager);
-    return next;
-  });
-  const PREVIEW = 6;
-  const handleDownload = () => downloadCsv('capability-managers-and-instructors.csv', toCsv(['Capability Manager', 'Instructor', 'Employee ID', 'Subject', 'Payroll / Nxtwave'], visible.flatMap(([manager, list]) => list.map((p) => [manager, p.full_name, p.employee_id ?? '', p.dept_area ?? '', payrollLabel(p)]))));
   return <div data-testid="card-capability-managers" className="rounded-xl border border-border bg-card p-5 shadow-xs">
-    <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-      <div className="flex items-center gap-2.5">
-        <span className="grid h-8 w-8 place-items-center rounded-lg bg-primary text-primary-foreground"><UserCog size={16} /></span>
-        <div>
-          <h2 className="text-[15px] font-extrabold tracking-[-0.03em]">Capability Managers</h2>
-          <p className="text-[11px] text-muted-foreground">{managerCount.toLocaleString('en-IN')} managers · {people.length.toLocaleString('en-IN')} instructors</p>
-        </div>
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <TableSearchInput value={search} onChange={setSearch} placeholder="Search manager or instructor..." testId="input-search-capability-managers" />
-        <DownloadCsvButton onClick={handleDownload} disabled={visible.length === 0} testId="button-download-capability-managers" />
+    <div className="mb-5 flex items-center gap-3">
+      <span className="grid h-9 w-9 place-items-center rounded-lg bg-secondary text-muted-foreground"><UsersRound size={17} /></span>
+      <div>
+        <h2 className="text-[16px] font-extrabold tracking-[-0.03em]">Manager workload</h2>
+        <p className="text-[11px] text-muted-foreground">Instructors per Capability Manager</p>
       </div>
     </div>
-    <div className="grid max-h-[560px] grid-cols-1 gap-3 overflow-auto pr-1 md:grid-cols-2">
-      {visible.map(([manager, list]) => {
-        const isOpen = expanded.has(manager) || (q.length > 0);
-        const shown = isOpen ? list : list.slice(0, PREVIEW);
-        const none = manager === NO_MANAGER;
-        return <div key={manager} data-testid={`group-capability-manager-${slugify(manager)}`} className={`overflow-hidden rounded-lg border ${none ? 'border-dashed border-border' : 'border-border'}`}>
-          <div className={`flex items-center justify-between gap-2 px-3 py-2 ${none ? 'bg-secondary text-muted-foreground' : 'bg-primary/10 text-foreground'}`}>
-            <span className="truncate text-[12.5px] font-extrabold">{manager}</span>
-            <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-extrabold tabular-nums ${none ? 'bg-card text-muted-foreground' : 'bg-primary text-primary-foreground'}`}>{list.length}</span>
-          </div>
-          <ul className="divide-y divide-border/60 text-[12px]">
-            {shown.map((p) => <li key={p.id} className="flex items-center justify-between gap-2 px-3 py-1.5">
-              <span className="min-w-0 truncate font-semibold">{p.full_name}</span>
-              <span className="shrink-0 truncate font-mono-ui text-[10px] text-muted-foreground">{p.dept_area ?? p.employee_id ?? ''}</span>
-            </li>)}
-          </ul>
-          {list.length > PREVIEW && !q && <button type="button" onClick={() => toggle(manager)} className="w-full border-t border-border/60 px-3 py-1.5 text-left text-[11px] font-bold text-primary transition-colors hover:bg-secondary">{isOpen ? 'Show fewer' : `Show all ${list.length}`}</button>}
-        </div>;
-      })}
-      {visible.length === 0 && <p className="col-span-full py-8 text-center text-[12px] text-muted-foreground">No one matches this search.</p>}
-    </div>
+    <div className="max-h-[520px] overflow-auto pr-1"><RankedBarList rows={managers} color="#12b5cb" testPrefix="capability-manager" /></div>
   </div>;
 }
 
