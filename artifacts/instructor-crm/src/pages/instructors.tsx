@@ -893,10 +893,9 @@ export function bifurcationLabel(classification: string | null): string {
 //         "Training Institute" entry.
 //       - NIAT (Deployed): everyone else in the NIAT bucket -- per
 //         request, "if they have any name or a college name" in Campus.
-//         This is also the fallback for a NIAT-bucket person with an
-//         empty Campus/institutes list (no case for that was given
-//         explicitly) -- flag this if that default is wrong for, say,
-//         Operations team rows.
+//         (2026-10-08, per request: a blank Campus now counts as NIAT
+//         (Training) instead -- see productLabel() -- except Operations
+//         team rows, which stay NIAT (Deployed) as before.)
 // 140px, added to both grid templates below and every list below, as the
 // new last column (matching how Enrolled Plan was added as the last column
 // on 2026-09-27).
@@ -907,6 +906,12 @@ export function productLabel(person: InstructorSummary): string {
   if (designation.includes('software developer') && location.includes('kapil kavuri hub')) return 'IIT X DSA';
   if ((person.institutes ?? []).some((i) => i.toLowerCase().includes('intensive'))) return 'Intensive';
   if ((person.institutes ?? []).includes('Training Institute')) return 'NIAT (Training)';
+  // Blank campus = NIAT training instructor (2026-10-08, per request: "if the campus
+  // is empty/blank then consider them as NIAT training instructors") -- they have not
+  // been deployed to any campus yet. Operations-team rows are left out: they never
+  // have a campus at all, so a blank there says nothing about training.
+  const isOpsRow = person.classification === 'excluded_ops_managers' || person.classification === 'instructor_ops';
+  if ((person.institutes ?? []).length === 0 && !isOpsRow) return 'NIAT (Training)';
   return 'NIAT (Deployed)';
 }
 
