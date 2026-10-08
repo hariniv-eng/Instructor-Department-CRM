@@ -149,7 +149,7 @@ const NO_CAPABILITY_MANAGER = '__none__';
 // filter above (removed same day, per request) now that Enrolled Plan's
 // data feeds the derived Product column instead (see productLabel() below
 // this page's PersonRow section). No "not on file" sentinel needed here --
-// productLabel() always returns one of the four product names, never null.
+// productLabel() always returns one of the product names (NIAT, Academy, Intensive, IIT X DSA, Support), never null.
 
 // Payroll filter (2026-09-15, per request) -- mirrors the Payroll/Nxtwave
 // badge already shown in the table for the Instructors category.
@@ -868,10 +868,10 @@ export function bifurcationLabel(classification: string | null): string {
 //     reports.ts's toApiInstructorSummary) contains "Kapil Kavuri Hub" or
 //     "KKH" (any floor; the live values are inconsistently spaced, hence
 //     the loose substring match), AND either
-//       - the TeachOS Capability Manager is empty, or
-//       - the Darwin manager is Jashwanth Dandu (NW0005864) -- so a KKH
-//         person who HAS a Capability Manager only counts when they report
-//         to him in Darwin.
+//       - the TeachOS Capability Manager is missing, or
+//       - the Darwin manager is Jashwanth Dandu (NW0005864).
+//     A KKH person who HAS a Capability Manager only counts when they
+//     report to him in Darwin.
 //   - Intensive: Campus (institutes) has ANY entry containing "intensive"
 //     (case-insensitive substring match, 2026-10-05, per request: "if the
 //     campus column value contains the value intensive then they are
@@ -887,15 +887,20 @@ export function bifurcationLabel(classification: string | null): string {
 //       - NIAT (Deployed): everyone else in the NIAT bucket -- per
 //         request, "if they have any name or a college name" in Campus.
 //         (2026-10-08, per request: a blank Campus now counts as NIAT
-//         (Training) instead -- see productLabel() -- except Operations
-//         team rows, which stay NIAT (Deployed) as before.)
+//         (Training) instead -- see productLabel().)
+//   - Support (2026-10-08, per request): every Operations team row
+//     (classification excluded_ops_managers / instructor_ops). Checked
+//     before everything else in productLabel().
 // 140px, added to both grid templates below and every list below, as the
 // new last column (matching how Enrolled Plan was added as the last column
 // on 2026-09-27).
 export function productLabel(person: InstructorSummary): string {
+  // Every Operations team row is the "Support" product (2026-10-08, per request) -- checked
+  // first so none of the instructor rules below (IIT X DSA, Training, ...) ever apply to them.
+  if (person.classification === 'excluded_ops_managers' || person.classification === 'instructor_ops') return 'Support';
   if ((person.enrolled_plans ?? '').includes('CCBP_ACADEMY_GENIUS_CAREER_PLUS')) return 'Academy';
   // IIT X DSA (rule changed 2026-10-08, per request -- designation no longer matters): Darwin
-  // location is KKH AND either the TeachOS Capability Manager is empty, or the Darwin manager
+  // location is KKH AND either the TeachOS Capability Manager is missing, or the Darwin manager
   // is Jashwanth Dandu (NW0005864).
   const location = (person.work_location ?? '').toLowerCase();
   const atKkh = location.includes('kapil kavuri hub') || location.includes('kkh');
@@ -907,10 +912,8 @@ export function productLabel(person: InstructorSummary): string {
   if ((person.institutes ?? []).includes('Training Institute')) return 'NIAT (Training)';
   // Blank campus = NIAT training instructor (2026-10-08, per request: "if the campus
   // is empty/blank then consider them as NIAT training instructors") -- they have not
-  // been deployed to any campus yet. Operations-team rows are left out: they never
-  // have a campus at all, so a blank there says nothing about training.
-  const isOpsRow = person.classification === 'excluded_ops_managers' || person.classification === 'instructor_ops';
-  if ((person.institutes ?? []).length === 0 && !isOpsRow) return 'NIAT (Training)';
+  // been deployed to any campus yet. (Operations team rows never get here: Support, above.)
+  if ((person.institutes ?? []).length === 0) return 'NIAT (Training)';
   return 'NIAT (Deployed)';
 }
 
