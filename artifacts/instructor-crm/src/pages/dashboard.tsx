@@ -1,4 +1,4 @@
-import { AlertTriangle, ArrowRight, Briefcase, Building2, Check, Clock, Copy, GraduationCap, RefreshCw, Trash2, UsersRound, X } from 'lucide-react';
+import { AlertTriangle, ArrowRight, Briefcase, Building2, Check, Clock, Copy, GraduationCap, LogOut, RefreshCw, Trash2, UsersRound, X } from 'lucide-react';
 import { Link } from 'wouter';
 import { useMemo, useState } from 'react';
 import { useGetReportsInstructors, getGetReportsInstructorsQueryKey, type AccessSplit, type InstructorSummary } from '@workspace/api-client-react';
@@ -74,6 +74,7 @@ export default function DashboardPage() {
   //     from TeachOS, since the queue only holds people still present in
   //     Darwin or TeachOS and this view additionally needs TeachOS presence.
   const [activeException, setActiveException] = useState<'remove' | 'pending' | null>(null);
+  const [removeInitialView, setRemoveInitialView] = useState<'exit' | 'notice' | 'archive'>('exit');
   const exceptionSplit = report?.access_breakdown?.exception;
   const reviewPeople = useMemo(() => [...(exceptionSplit?.darwin_only?.people ?? []), ...(exceptionSplit?.both?.people ?? []), ...(exceptionSplit?.teachos_only?.people ?? [])]
     .filter((p) => !p.exit_verification)
@@ -122,11 +123,11 @@ export default function DashboardPage() {
 
     {report && <section aria-label="Exceptions" data-testid="banner-exceptions" className="mb-4 grid grid-cols-1 divide-y divide-border overflow-hidden rounded-xl border border-border bg-card animate-rise sm:grid-cols-3 sm:divide-x sm:divide-y-0">
       <ExceptionSegment label="Exception 1" title="Needs review" meta="Exit record not reviewed yet — Capability Managers" count={reviewPeople.length} icon={<AlertTriangle size={16} />} href="/instructors?category=exception" testId="exception-1" />
-      <ExceptionSegment label="Exception 2" title="Remove TeachOS access" meta={`Exit list · ${noticePeople.length} serving notice`} count={removePeople.length} icon={<Trash2 size={16} />} active={activeException === 'remove'} onClick={() => setActiveException(activeException === 'remove' ? null : 'remove')} testId="exception-2" />
+      <ExceptionSegment label="Exception 2" title="Remove TeachOS access" meta={`Exit list · ${noticePeople.length} serving notice`} count={removePeople.length} icon={<Trash2 size={16} />} active={activeException === 'remove'} onClick={() => { setRemoveInitialView('exit'); setActiveException(activeException === 'remove' ? null : 'remove'); }} testId="exception-2" />
       <ExceptionSegment label="Exception 3" title="Approval pending" meta="Exit approval pending — HRBP action" count={pendingPeople.length} icon={<Clock size={16} />} active={activeException === 'pending'} onClick={() => setActiveException(activeException === 'pending' ? null : 'pending')} testId="exception-3" />
     </section>}
     {report && activeException === 'pending' && <ExceptionPendingPanel people={pendingPeople} onClose={() => setActiveException(null)} />}
-    {report && activeException === 'remove' && <ExceptionRemovePanel exitPeople={removePeople} noticePeople={noticePeople} onClose={() => setActiveException(null)} />}
+    {report && activeException === 'remove' && <ExceptionRemovePanel key={removeInitialView} initialView={removeInitialView} exitPeople={removePeople} noticePeople={noticePeople} onClose={() => setActiveException(null)} />}
 
     {reportQuery.isLoading && <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">{[1, 2, 3, 4].map((item) => <SkeletonBlock key={item} className="h-[126px]" />)}</div>}
     {reportQuery.isError && <QueryError message="Dashboard data is unavailable right now." />}
@@ -142,6 +143,7 @@ export default function DashboardPage() {
       <TopCampusesCard people={instructorPeople} />
       <CapabilityManagersCard people={instructorPeople} />
     </section>}
+    {report && <ExitedCard onViewAll={() => { setRemoveInitialView('archive'); setActiveException('remove'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} />}
 
     {report && activeAccessCard && <AccessDrilldown
       label={ACCESS_CARD_LABELS[activeAccessCard]}
@@ -306,6 +308,47 @@ function CapabilityManagersCard({ people }: { people: InstructorSummary[] }) {
     </div>
     <div className="max-h-[520px] overflow-auto pr-1"><RankedBarList rows={managers} color="#12b5cb" testPrefix="capability-manager" /></div>
   </div>;
+}
+
+// Exit data on the Overview (2026-10-08, per request): the approved exits recorded in the Instructor Archive
+// (status Exited) -- the total and the most recent few. The full list (search, copy user IDs, CSV) is the
+// "Exited (archive)" view of Exception 2, which "View all" opens.
+function ExitedCard({ onViewAll }: { onViewAll: () => void }) {
+  const archiveQuery = useQuery<{ people: ArchiveExitRow[] }>({
+    queryKey: ['reports', 'instructor-archive'],
+    queryFn: async () => {
+      const response = await fetch('/api/reports/instructor-archive');
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json();
+    },
+  });
+  const exited = useMemo(() => (archiveQuery.data?.people ?? [])
+    .filter((row) => row.status === 'Exited')
+    .sort((a, b) => (b.date_of_exit ?? '').localeCompare(a.date_of_exit ?? '') || a.full_name.localeCompare(b.full_name)), [archiveQuery.data]);
+  const recent = exited.slice(0, 8);
+  return <section data-testid="card-exited" className="mt-4 rounded-xl border border-border bg-card p-5 shadow-xs animate-rise">
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <div className="flex items-center gap-3">
+        <span className="grid h-9 w-9 place-items-center rounded-lg bg-secondary text-muted-foreground"><LogOut size={17} /></span>
+        <div>
+          <h2 className="text-[16px] font-extrabold tracking-[-0.03em]">Exit data</h2>
+          <p className="text-[11px] text-muted-foreground">Approved exits in the Instructor Archive</p>
+        </div>
+      </div>
+      <div className="flex items-center gap-3">
+        <span className="text-[26px] font-extrabold leading-none tracking-[-0.03em] tabular-nums" data-testid="text-exited-count">{archiveQuery.isLoading ? '…' : exited.length.toLocaleString('en-IN')}</span>
+        <button type="button" onClick={onViewAll} data-testid="button-view-all-exited" className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-3 py-1.5 text-[12px] font-bold text-foreground transition-colors hover:bg-secondary">View all <ArrowRight size={13} /></button>
+      </div>
+    </div>
+    {archiveQuery.isError && <p className="py-4 text-center text-[12px] text-muted-foreground">The archive is unavailable right now.</p>}
+    {!archiveQuery.isError && <ul className="grid grid-cols-1 gap-x-8 md:grid-cols-2">
+      {recent.map((row) => <li key={row.id} className="flex items-center justify-between gap-3 border-b border-border/60 py-2">
+        <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">{row.full_name}</span>
+        <span className="shrink-0 text-[12px] text-muted-foreground">{formatExitDate(row.date_of_exit)}</span>
+      </li>)}
+      {!archiveQuery.isLoading && recent.length === 0 && <li className="col-span-full py-6 text-center text-[12px] text-muted-foreground">No exited records in the archive yet.</li>}
+    </ul>}
+  </section>;
 }
 
 function KpiCard({ label, value, meta, icon, tone, alert = false, breakdown, active = false, onClick }: {
@@ -550,8 +593,8 @@ type ExitRow = { id: string; full_name: string; employee_id: string | null; teac
 type ArchiveExitRow = { id: number; full_name: string; employee_id: string | null; teachos_user_id: string | null; dept_area: string | null; capability_manager: string | null; is_payroll: boolean; date_of_exit: string | null; exit_status: string | null; exit_date: string | null; status: 'Active' | 'Exited' | 'SNP' };
 const toExitRow = (p: InstructorSummary): ExitRow => ({ id: String(p.id), full_name: p.full_name, employee_id: p.employee_id ?? null, teachos_user_id: p.teachos_user_id ?? null, dept_area: p.dept_area ?? null, capability_manager: p.capability_manager ?? null, is_payroll: !!p.is_payroll, date_of_exit: p.date_of_exit ?? null, exit_flag_status: p.exit_flag_status ?? null, exit_flag_date: p.exit_flag_date ?? null });
 
-function ExceptionRemovePanel({ exitPeople, noticePeople, onClose }: { exitPeople: InstructorSummary[]; noticePeople: InstructorSummary[]; onClose: () => void }) {
-  const [view, setView] = useState<'exit' | 'notice' | 'archive'>('exit');
+function ExceptionRemovePanel({ exitPeople, noticePeople, onClose, initialView = 'exit' }: { exitPeople: InstructorSummary[]; noticePeople: InstructorSummary[]; onClose: () => void; initialView?: 'exit' | 'notice' | 'archive' }) {
+  const [view, setView] = useState<'exit' | 'notice' | 'archive'>(initialView);
   const archiveQuery = useQuery<{ people: ArchiveExitRow[] }>({
     queryKey: ['reports', 'instructor-archive'],
     queryFn: async () => {
