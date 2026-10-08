@@ -1,8 +1,8 @@
-import { AlertTriangle, ArrowRight, Briefcase, Building2, Check, Clock, Copy, GraduationCap, RefreshCw, Trash2, UsersRound, X } from 'lucide-react';
+import { AlertTriangle, ArrowRight, Briefcase, Building2, Check, ChevronDown, Clock, Copy, GraduationCap, MapPin, RefreshCw, Trash2, UserCog, UsersRound, X } from 'lucide-react';
 import { Link } from 'wouter';
 import { useMemo, useState } from 'react';
 import { useGetReportsInstructors, getGetReportsInstructorsQueryKey, type AccessSplit, type InstructorSummary } from '@workspace/api-client-react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageIntro, QueryError, SkeletonBlock, DownloadCsvButton, TableSearchInput } from '@/components/ui-pieces';
 import { downloadCsv, slugify, toCsv } from '@/lib/csv';
 
@@ -94,6 +94,14 @@ export default function DashboardPage() {
   const pendingSplit = (report?.access_breakdown as Record<string, AccessSplit | undefined> | undefined)?.exception_pending;
   const pendingPeople = useMemo(() => [...(pendingSplit?.darwin_only?.people ?? []), ...(pendingSplit?.both?.people ?? []), ...(pendingSplit?.teachos_only?.people ?? [])]
     .sort((a, b) => a.full_name.localeCompare(b.full_name)), [pendingSplit]);
+  // Everyone counted in the Instructors card (all three access buckets, each person once) -- the population the
+  // Top 10 campuses and Capability Managers cards below are built from (2026-10-08, per request).
+  const instructorSplit = report?.access_breakdown?.instructors;
+  const instructorPeople = useMemo(() => {
+    const seen = new Set<number>();
+    return [...(instructorSplit?.both?.people ?? []), ...(instructorSplit?.darwin_only?.people ?? []), ...(instructorSplit?.teachos_only?.people ?? [])]
+      .filter((p) => (seen.has(p.id) ? false : (seen.add(p.id), true)));
+  }, [instructorSplit]);
   const toggleAccessCard = (card: AccessCardKey) => {
     if (activeAccessCard === card) {
       setActiveAccessCard(null);
@@ -129,6 +137,11 @@ export default function DashboardPage() {
     </section>}
 
 
+    {report && <section className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,420px)_minmax(0,1fr)] animate-rise" aria-label="Campuses and capability managers">
+      <TopCampusesCard people={instructorPeople} />
+      <CapabilityManagersCard people={instructorPeople} />
+    </section>}
+
     {report && activeAccessCard && <AccessDrilldown
       label={ACCESS_CARD_LABELS[activeAccessCard]}
       category={activeAccessCard}
@@ -153,10 +166,11 @@ function ExceptionSegment({ label, title, meta, count, icon, href, active = fals
   onClick?: () => void;
   testId: string;
 }) {
-  // Red while there is something to act on, green when the count is 0 (2026-10-08, per request).
+  // Coral while there is something to act on, teal when the count is 0 (2026-10-08, per request). Both tones are the
+  // ones the Operations team / Mentors cards already use, so the bar sits in the page's own palette.
   const clear = count === 0;
   const body = <>
-    <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg ${clear ? 'bg-[#cfead9]' : 'bg-[#f9d3d9]'}`}>{clear ? <Check size={16} /> : icon}</span>
+    <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg ${clear ? 'bg-[#c3e0d7]' : 'bg-[#ebc9bd]'}`}>{clear ? <Check size={16} /> : icon}</span>
     <span className="min-w-0 flex-1">
       <span className="block font-mono-ui text-[10px] font-bold uppercase tracking-[0.14em] opacity-80">{label}</span>
       <span className="flex items-baseline gap-2">
@@ -168,8 +182,8 @@ function ExceptionSegment({ label, title, meta, count, icon, href, active = fals
     <span className="inline-flex shrink-0 items-center gap-1 text-[12px] font-bold">Check <ArrowRight size={14} /></span>
   </>;
   const cls = `flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors ${clear
-    ? `text-[#1f6b46] hover:bg-[#dcf0e4] ${active ? 'bg-[#dcf0e4]' : 'bg-[#eaf6ef]'}`
-    : `text-[#9b1c31] hover:bg-[#fbdde2] ${active ? 'bg-[#fbdde2]' : 'bg-[#fdecef]'}`}`;
+    ? `text-[#256e65] hover:bg-[#d2e8e1] ${active ? 'bg-[#d2e8e1]' : 'bg-[#dff0eb]'}`
+    : `text-[#9b4434] hover:bg-[#f0d6cd] ${active ? 'bg-[#f0d6cd]' : 'bg-[#f6e4de]'}`}`;
   if (href) return <Link href={href} data-testid={`link-${testId}`} className={cls}>{body}</Link>;
   return <button type="button" data-testid={`button-${testId}`} onClick={onClick} aria-pressed={active} className={cls}>{body}</button>;
 }
@@ -216,6 +230,130 @@ function ExceptionPendingPanel({ people, onClose }: { people: InstructorSummary[
       </table>
     </div>
   </section>;
+}
+
+// Top 10 campuses (2026-10-08, per request): instructor head-count per TeachOS campus. "Training Institute" is
+// always pinned first -- blank campus counts as Training Institute too, same rule as the Product column -- then
+// the other campuses by head-count. A person teaching at several campuses is counted at each of them.
+const TRAINING_CAMPUS = 'Training Institute';
+function TopCampusesCard({ people }: { people: InstructorSummary[] }) {
+  const [open, setOpen] = useState<string | null>(null);
+  const campuses = useMemo(() => {
+    const map = new Map<string, InstructorSummary[]>();
+    const add = (campus: string, person: InstructorSummary) => {
+      const list = map.get(campus) ?? [];
+      list.push(person);
+      map.set(campus, list);
+    };
+    for (const person of people) {
+      const names = [...new Set((person.institutes ?? []).map((name) => name.trim()).filter(Boolean))];
+      if (names.length === 0) add(TRAINING_CAMPUS, person);
+      else names.forEach((name) => add(name, person));
+    }
+    const training = map.get(TRAINING_CAMPUS) ?? [];
+    map.delete(TRAINING_CAMPUS);
+    const rest = [...map.entries()].sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0])).slice(0, 9);
+    return [[TRAINING_CAMPUS, training] as [string, InstructorSummary[]], ...rest];
+  }, [people]);
+  const max = Math.max(1, ...campuses.map(([, list]) => list.length));
+  return <div data-testid="card-top-campuses" className="rounded-xl border border-border bg-card p-5 shadow-xs">
+    <div className="mb-4 flex items-center gap-2.5">
+      <span className="grid h-8 w-8 place-items-center rounded-lg bg-secondary text-foreground"><MapPin size={16} /></span>
+      <div>
+        <h2 className="text-[15px] font-extrabold tracking-[-0.03em]">Top 10 campuses</h2>
+        <p className="text-[11px] text-muted-foreground">Instructors per campus · blank campus counts as Training Institute</p>
+      </div>
+    </div>
+    <ol className="space-y-1">
+      {campuses.map(([campus, list], index) => {
+        const isOpen = open === campus;
+        const pinned = campus === TRAINING_CAMPUS;
+        return <li key={campus}>
+          <button type="button" onClick={() => setOpen(isOpen ? null : campus)} aria-expanded={isOpen} data-testid={`button-campus-${slugify(campus)}`} className={`group w-full rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-secondary ${isOpen ? 'bg-secondary' : ''}`}>
+            <span className="flex items-center gap-2.5">
+              <span className="w-5 shrink-0 font-mono-ui text-[11px] font-bold text-muted-foreground">{index + 1}</span>
+              <span className="min-w-0 flex-1 truncate text-[13px] font-bold">{campus}{pinned && <span className="ml-2 rounded-full bg-primary/10 px-1.5 py-0.5 align-middle font-mono-ui text-[9px] uppercase tracking-[0.08em] text-primary">Pinned</span>}</span>
+              <span className="text-[14px] font-extrabold tabular-nums">{list.length.toLocaleString('en-IN')}</span>
+              <ChevronDown size={14} className={`shrink-0 text-muted-foreground transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+            </span>
+            <span className="mt-1.5 ml-7 block h-1.5 overflow-hidden rounded-full bg-secondary group-hover:bg-card"><span className={`block h-full rounded-full ${pinned ? 'bg-primary' : 'bg-primary/55'}`} style={{ width: `${Math.max(2, (list.length / max) * 100)}%` }} /></span>
+          </button>
+          {isOpen && <div className="mb-1 ml-7 mt-1 flex max-h-[180px] flex-wrap gap-1 overflow-auto rounded-lg border border-border p-2">
+            {[...list].sort((a, b) => a.full_name.localeCompare(b.full_name)).map((p) => <span key={p.id} className="rounded-full bg-secondary px-2 py-0.5 text-[11px] text-foreground">{p.full_name}</span>)}
+            {list.length === 0 && <span className="text-[11px] text-muted-foreground">No instructors here right now.</span>}
+          </div>}
+        </li>;
+      })}
+    </ol>
+  </div>;
+}
+
+// Capability Manager workload (2026-10-08, per request): every Capability Manager with the instructors they handle.
+// People without one are grouped last so nobody drops out of the picture.
+const NO_MANAGER = 'No capability manager';
+function CapabilityManagersCard({ people }: { people: InstructorSummary[] }) {
+  const [search, setSearch] = useState('');
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const groups = useMemo(() => {
+    const map = new Map<string, InstructorSummary[]>();
+    for (const person of people) {
+      const key = person.capability_manager?.trim() || NO_MANAGER;
+      const list = map.get(key) ?? [];
+      list.push(person);
+      map.set(key, list);
+    }
+    return [...map.entries()]
+      .map(([manager, list]) => [manager, [...list].sort((a, b) => a.full_name.localeCompare(b.full_name))] as [string, InstructorSummary[]])
+      .sort((a, b) => (a[0] === NO_MANAGER ? 1 : b[0] === NO_MANAGER ? -1 : b[1].length - a[1].length || a[0].localeCompare(b[0])));
+  }, [people]);
+  const q = search.trim().toLowerCase();
+  const visible = useMemo(() => (q
+    ? groups.filter(([manager, list]) => manager.toLowerCase().includes(q) || list.some((p) => p.full_name.toLowerCase().includes(q) || (p.employee_id ?? '').toLowerCase().includes(q)))
+    : groups), [groups, q]);
+  const managerCount = groups.filter(([manager]) => manager !== NO_MANAGER).length;
+  const toggle = (manager: string) => setExpanded((prev) => {
+    const next = new Set(prev);
+    if (next.has(manager)) next.delete(manager); else next.add(manager);
+    return next;
+  });
+  const PREVIEW = 6;
+  const handleDownload = () => downloadCsv('capability-managers-and-instructors.csv', toCsv(['Capability Manager', 'Instructor', 'Employee ID', 'Subject', 'Payroll / Nxtwave'], visible.flatMap(([manager, list]) => list.map((p) => [manager, p.full_name, p.employee_id ?? '', p.dept_area ?? '', payrollLabel(p)]))));
+  return <div data-testid="card-capability-managers" className="rounded-xl border border-border bg-card p-5 shadow-xs">
+    <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+      <div className="flex items-center gap-2.5">
+        <span className="grid h-8 w-8 place-items-center rounded-lg bg-primary text-primary-foreground"><UserCog size={16} /></span>
+        <div>
+          <h2 className="text-[15px] font-extrabold tracking-[-0.03em]">Capability Managers</h2>
+          <p className="text-[11px] text-muted-foreground">{managerCount.toLocaleString('en-IN')} managers · {people.length.toLocaleString('en-IN')} instructors</p>
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <TableSearchInput value={search} onChange={setSearch} placeholder="Search manager or instructor..." testId="input-search-capability-managers" />
+        <DownloadCsvButton onClick={handleDownload} disabled={visible.length === 0} testId="button-download-capability-managers" />
+      </div>
+    </div>
+    <div className="grid max-h-[560px] grid-cols-1 gap-3 overflow-auto pr-1 md:grid-cols-2">
+      {visible.map(([manager, list]) => {
+        const isOpen = expanded.has(manager) || (q.length > 0);
+        const shown = isOpen ? list : list.slice(0, PREVIEW);
+        const none = manager === NO_MANAGER;
+        return <div key={manager} data-testid={`group-capability-manager-${slugify(manager)}`} className={`overflow-hidden rounded-lg border ${none ? 'border-dashed border-border' : 'border-border'}`}>
+          <div className={`flex items-center justify-between gap-2 px-3 py-2 ${none ? 'bg-secondary text-muted-foreground' : 'bg-primary/10 text-foreground'}`}>
+            <span className="truncate text-[12.5px] font-extrabold">{manager}</span>
+            <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-extrabold tabular-nums ${none ? 'bg-card text-muted-foreground' : 'bg-primary text-primary-foreground'}`}>{list.length}</span>
+          </div>
+          <ul className="divide-y divide-border/60 text-[12px]">
+            {shown.map((p) => <li key={p.id} className="flex items-center justify-between gap-2 px-3 py-1.5">
+              <span className="min-w-0 truncate font-semibold">{p.full_name}</span>
+              <span className="shrink-0 truncate font-mono-ui text-[10px] text-muted-foreground">{p.dept_area ?? p.employee_id ?? ''}</span>
+            </li>)}
+          </ul>
+          {list.length > PREVIEW && !q && <button type="button" onClick={() => toggle(manager)} className="w-full border-t border-border/60 px-3 py-1.5 text-left text-[11px] font-bold text-primary transition-colors hover:bg-secondary">{isOpen ? 'Show fewer' : `Show all ${list.length}`}</button>}
+        </div>;
+      })}
+      {visible.length === 0 && <p className="col-span-full py-8 text-center text-[12px] text-muted-foreground">No one matches this search.</p>}
+    </div>
+  </div>;
 }
 
 function KpiCard({ label, value, meta, icon, tone, alert = false, breakdown, active = false, onClick }: {
@@ -431,15 +569,15 @@ function CopyValue({ value, mono = false, testId }: { value: string | null | und
   </span>;
 }
 
-function matchesSearch(p: InstructorSummary, query: string) {
+function matchesSearch(p: { full_name: string; employee_id?: string | null; teachos_user_id?: string | null }, query: string) {
   const q = query.trim().toLowerCase();
   if (!q) return true;
   return p.full_name.toLowerCase().includes(q) || (p.employee_id ?? '').toLowerCase().includes(q) || (p.teachos_user_id ?? '').toLowerCase().includes(q);
 }
 
 // Payroll / Nxtwave bifurcation (2026-10-07, per request) for the Exception lists.
-const payrollLabel = (p: InstructorSummary) => (p.is_payroll ? 'Payroll' : 'Nxtwave');
-function PayrollBadge({ person }: { person: InstructorSummary }) {
+const payrollLabel = (p: { is_payroll?: boolean | null }) => (p.is_payroll ? 'Payroll' : 'Nxtwave');
+function PayrollBadge({ person }: { person: { is_payroll?: boolean | null } }) {
   return person.is_payroll
     ? <span className="inline-flex rounded-full bg-[#e6e9fb] px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] text-[#4a4fb0]">Payroll</span>
     : <span className="inline-flex rounded-full bg-secondary px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] text-muted-foreground">Nxtwave</span>;
@@ -453,11 +591,32 @@ function formatExitDate(value?: string | null) {
 
 // Exception 2: the removal worklist. Everything a person needs to find and
 // remove the record in TeachOS is one click from the clipboard.
+// Row shape shared by the three views. The Exit/Serving-notice views come from the live Instructors report; the
+// "Exited (archive)" view (2026-10-08, per request) comes from the Instructor Archive -- every archive row whose
+// status is Exited, i.e. the approved exit records, whether or not the person is still in TeachOS.
+type ExitRow = { id: string; full_name: string; employee_id: string | null; teachos_user_id: string | null; dept_area: string | null; capability_manager: string | null; is_payroll: boolean; date_of_exit: string | null; exit_flag_status: string | null; exit_flag_date: string | null };
+type ArchiveExitRow = { id: number; full_name: string; employee_id: string | null; teachos_user_id: string | null; dept_area: string | null; capability_manager: string | null; is_payroll: boolean; date_of_exit: string | null; exit_status: string | null; exit_date: string | null; status: 'Active' | 'Exited' | 'SNP' };
+const toExitRow = (p: InstructorSummary): ExitRow => ({ id: String(p.id), full_name: p.full_name, employee_id: p.employee_id ?? null, teachos_user_id: p.teachos_user_id ?? null, dept_area: p.dept_area ?? null, capability_manager: p.capability_manager ?? null, is_payroll: !!p.is_payroll, date_of_exit: p.date_of_exit ?? null, exit_flag_status: p.exit_flag_status ?? null, exit_flag_date: p.exit_flag_date ?? null });
+
 function ExceptionRemovePanel({ exitPeople, noticePeople, onClose }: { exitPeople: InstructorSummary[]; noticePeople: InstructorSummary[]; onClose: () => void }) {
-  const [view, setView] = useState<'exit' | 'notice'>('exit');
+  const [view, setView] = useState<'exit' | 'notice' | 'archive'>('exit');
+  const archiveQuery = useQuery<{ people: ArchiveExitRow[] }>({
+    queryKey: ['reports', 'instructor-archive'],
+    queryFn: async () => {
+      const response = await fetch('/api/reports/instructor-archive');
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json();
+    },
+  });
+  const archivePeople = useMemo<ExitRow[]>(() => (archiveQuery.data?.people ?? [])
+    .filter((row) => row.status === 'Exited')
+    .map((row) => ({ id: `a${row.id}`, full_name: row.full_name, employee_id: row.employee_id, teachos_user_id: row.teachos_user_id, dept_area: row.dept_area, capability_manager: row.capability_manager, is_payroll: row.is_payroll, date_of_exit: row.date_of_exit, exit_flag_status: row.exit_status, exit_flag_date: row.exit_date }))
+    .sort((a, b) => (b.date_of_exit ?? '').localeCompare(a.date_of_exit ?? '') || a.full_name.localeCompare(b.full_name)), [archiveQuery.data]);
+  const liveExit = useMemo(() => exitPeople.map(toExitRow), [exitPeople]);
+  const liveNotice = useMemo(() => noticePeople.map(toExitRow), [noticePeople]);
   const [search, setSearch] = useState('');
   const [copiedAll, setCopiedAll] = useState(false);
-  const people = view === 'exit' ? exitPeople : noticePeople;
+  const people = view === 'exit' ? liveExit : view === 'notice' ? liveNotice : archivePeople;
   const filtered = useMemo(() => people.filter((p) => matchesSearch(p, search)), [people, search]);
   const userIds = filtered.map((p) => p.teachos_user_id).filter((id): id is string => !!id);
   const copyAllIds = async () => {
@@ -466,19 +625,22 @@ function ExceptionRemovePanel({ exitPeople, noticePeople, onClose }: { exitPeopl
       window.setTimeout(() => setCopiedAll(false), 1500);
     }
   };
-  const handleDownload = () => downloadCsv(view === 'exit' ? 'exception-2-exit-remove-from-teachos.csv' : 'exception-2-serving-notice-period.csv', toCsv(['Name', 'Employee ID', 'TeachOS User ID', 'Subject', 'Capability Manager', 'Payroll / Nxtwave', 'date_of_exit', 'exit_status', 'exit_date'], filtered.map((p) => [p.full_name, p.employee_id ?? '', p.teachos_user_id ?? '', p.dept_area ?? '', p.capability_manager ?? '', payrollLabel(p), p.date_of_exit ?? '', p.exit_flag_status ?? '', p.exit_flag_date ?? ''])));
-  const views: { key: 'exit' | 'notice'; label: string; count: number }[] = [
+  const handleDownload = () => downloadCsv(view === 'exit' ? 'exception-2-exit-remove-from-teachos.csv' : view === 'notice' ? 'exception-2-serving-notice-period.csv' : 'exited-approved-instructor-archive.csv', toCsv(['Name', 'Employee ID', 'TeachOS User ID', 'Subject', 'Capability Manager', 'Payroll / Nxtwave', 'date_of_exit', 'exit_status', 'exit_date'], filtered.map((p) => [p.full_name, p.employee_id ?? '', p.teachos_user_id ?? '', p.dept_area ?? '', p.capability_manager ?? '', payrollLabel(p), p.date_of_exit ?? '', p.exit_flag_status ?? '', p.exit_flag_date ?? ''])));
+  const views: { key: 'exit' | 'notice' | 'archive'; label: string; count: number }[] = [
     { key: 'exit', label: 'Exit', count: exitPeople.length },
     { key: 'notice', label: 'Serving notice period', count: noticePeople.length },
+    { key: 'archive', label: 'Exited (archive)', count: archivePeople.length },
   ];
   return <section className="mb-4 rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6 animate-rise">
     <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
       <div>
         <p className="font-mono-ui text-[10px] uppercase tracking-[0.17em] text-muted-foreground">Exception 2 — TeachOS clean-up</p>
-        <h2 className="mt-1 text-[16px] font-extrabold tracking-[-0.03em]">{view === 'exit' ? 'Exited — remove TeachOS access' : 'Serving notice period'}</h2>
+        <h2 className="mt-1 text-[16px] font-extrabold tracking-[-0.03em]">{view === 'exit' ? 'Exited — remove TeachOS access' : view === 'notice' ? 'Serving notice period' : 'Exited — approved exit records'}</h2>
         <p className="mt-1 max-w-[640px] text-[12px] text-muted-foreground">{view === 'exit'
           ? 'Instructors and Mentors who have exited (or whose notice period has ended) and still have a TeachOS record. Copy the user ID, remove the person in TeachOS, and they drop off this list after the next sync.'
-          : 'Instructors and Mentors serving their notice period. The day after their date of exit passes, they move to the Exit list automatically.'}</p>
+          : view === 'notice'
+            ? 'Instructors and Mentors serving their notice period. The day after their date of exit passes, they move to the Exit list automatically.'
+            : 'Everyone recorded as Exited in the Instructor Archive (approved exits), newest exit first. This is the permanent record, so people stay here after they are removed from TeachOS.'}</p>
         <div className="mt-3 flex flex-wrap gap-1.5">
           {views.map((v) => <button key={v.key} type="button" data-testid={`button-exception-view-${v.key}`} onClick={() => setView(v.key)} className={`rounded-full px-3 py-1 text-[11px] font-bold transition-colors ${view === v.key ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground hover:bg-secondary/70'}`}>{v.label} ({v.count})</button>)}
         </div>
@@ -511,7 +673,7 @@ function ExceptionRemovePanel({ exitPeople, noticePeople, onClose }: { exitPeopl
             <td className="whitespace-nowrap px-3 py-2 text-muted-foreground" data-testid={`text-exit-status-${p.id}`}>{p.exit_flag_status || '—'}</td>
             <td className="whitespace-nowrap px-3 py-2 text-muted-foreground" data-testid={`text-exit-record-date-${p.id}`}>{formatExitDate(p.exit_flag_date)}</td>
           </tr>)}
-          {filtered.length === 0 && <tr><td colSpan={9} className="px-3 py-8 text-center text-muted-foreground">{people.length === 0 ? (view === 'exit' ? 'No one is waiting to be removed from TeachOS.' : 'No one is serving a notice period.') : 'No one matches this search.'}</td></tr>}
+          {filtered.length === 0 && <tr><td colSpan={9} className="px-3 py-8 text-center text-muted-foreground">{people.length === 0 ? (view === 'exit' ? 'No one is waiting to be removed from TeachOS.' : view === 'notice' ? 'No one is serving a notice period.' : archiveQuery.isLoading ? 'Loading the archive...' : archiveQuery.isError ? 'The archive is unavailable right now.' : 'No exited records in the archive yet.') : 'No one matches this search.'}</td></tr>}
         </tbody>
       </table>
     </div>
