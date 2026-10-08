@@ -747,6 +747,7 @@ components:
             instructors_mentors: { $ref: "#/components/schemas/AccessSplit" }
             exception_remove: { $ref: "#/components/schemas/AccessSplit" }
             exception_notice: { $ref: "#/components/schemas/AccessSplit" }
+            exception_pending: { $ref: "#/components/schemas/AccessSplit" }
     AccessBucket:
       type: object
       description: One darwin_only/both/teachos_only bucket -- a count plus the actual people in it, for the click-to-drill-down view.
