@@ -111,7 +111,7 @@ export default function DashboardPage() {
       action={<button type="button" data-testid="button-refresh-dashboard" onClick={() => queryClient.invalidateQueries({ queryKey: getGetReportsInstructorsQueryKey() })} className="inline-flex items-center gap-2 self-start rounded-lg border border-border bg-card px-3.5 py-2.5 text-[12px] font-bold text-foreground transition-colors hover:bg-secondary lg:self-auto"><RefreshCw size={14} /> Refresh data</button>}
     />
 
-    {report && <section aria-label="Exceptions" data-testid="banner-exceptions" className="mb-4 grid grid-cols-1 divide-y divide-[#f3c9cf] overflow-hidden rounded-xl border border-[#f3c9cf] bg-[#fdecef] text-[#9b1c31] animate-rise sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+    {report && <section aria-label="Exceptions" data-testid="banner-exceptions" className="mb-4 grid grid-cols-1 divide-y divide-border overflow-hidden rounded-xl border border-border bg-card animate-rise sm:grid-cols-3 sm:divide-x sm:divide-y-0">
       <ExceptionSegment label="Exception 1" title="Needs review" meta="Exit record not reviewed yet — Capability Managers" count={reviewPeople.length} icon={<AlertTriangle size={16} />} href="/instructors?category=exception" testId="exception-1" />
       <ExceptionSegment label="Exception 2" title="Remove TeachOS access" meta={`Exit list · ${noticePeople.length} serving notice`} count={removePeople.length} icon={<Trash2 size={16} />} active={activeException === 'remove'} onClick={() => setActiveException(activeException === 'remove' ? null : 'remove')} testId="exception-2" />
       <ExceptionSegment label="Exception 3" title="Approval pending" meta="Exit approval pending — HRBP action" count={pendingPeople.length} icon={<Clock size={16} />} active={activeException === 'pending'} onClick={() => setActiveException(activeException === 'pending' ? null : 'pending')} testId="exception-3" />
@@ -153,8 +153,10 @@ function ExceptionSegment({ label, title, meta, count, icon, href, active = fals
   onClick?: () => void;
   testId: string;
 }) {
+  // Red while there is something to act on, green when the count is 0 (2026-10-08, per request).
+  const clear = count === 0;
   const body = <>
-    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-[#f9d3d9]">{icon}</span>
+    <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg ${clear ? 'bg-[#cfead9]' : 'bg-[#f9d3d9]'}`}>{clear ? <Check size={16} /> : icon}</span>
     <span className="min-w-0 flex-1">
       <span className="block font-mono-ui text-[10px] font-bold uppercase tracking-[0.14em] opacity-80">{label}</span>
       <span className="flex items-baseline gap-2">
@@ -165,7 +167,9 @@ function ExceptionSegment({ label, title, meta, count, icon, href, active = fals
     </span>
     <span className="inline-flex shrink-0 items-center gap-1 text-[12px] font-bold">Check <ArrowRight size={14} /></span>
   </>;
-  const cls = `flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-[#fbdde2] ${active ? 'bg-[#fbdde2]' : ''}`;
+  const cls = `flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors ${clear
+    ? `text-[#1f6b46] hover:bg-[#dcf0e4] ${active ? 'bg-[#dcf0e4]' : 'bg-[#eaf6ef]'}`
+    : `text-[#9b1c31] hover:bg-[#fbdde2] ${active ? 'bg-[#fbdde2]' : 'bg-[#fdecef]'}`}`;
   if (href) return <Link href={href} data-testid={`link-${testId}`} className={cls}>{body}</Link>;
   return <button type="button" data-testid={`button-${testId}`} onClick={onClick} aria-pressed={active} className={cls}>{body}</button>;
 }
