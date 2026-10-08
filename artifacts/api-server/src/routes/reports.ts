@@ -484,7 +484,7 @@ export function computeDepartmentAndExceptionRows(rawRows: InstructorRow[]) {
 // Breakdown and TeachOS Breakdown below stay Admin-only.
 router.get("/reports/instructors", async (_req, res) => {
   const allRows = await db.select().from(instructorsTable);
-  const { mentors, opsTeamRows, darwinInstructorsForCount, payrollConvertedForCount, needsReviewForCount, countedInstructorRows, departmentRows, exceptionRows, exceptionRemoveRows, servingNoticeRows } = computeDepartmentAndExceptionRows(allRows);
+  const { mentors, opsTeamRows, darwinInstructorsForCount, payrollConvertedForCount, needsReviewForCount, countedInstructorRows, departmentRows, exceptionRows, exceptionRemoveRows, servingNoticeRows, exceptionQueueRows } = computeDepartmentAndExceptionRows(allRows);
 
   // NIAT cohort join (2026-09-29, per request -- see niat_cohorts' comment
   // on toApiInstructorSummary above): one extra query, keyed by
@@ -717,6 +717,14 @@ router.get("/reports/instructors", async (_req, res) => {
   const noticeIds = new Set(noticeBase.map((r) => r.id));
   const noticeListRows = [...noticeBase, ...exceptionRemoveRows.filter((r) => pendingWithoutExitDate(r) && !noticeIds.has(r.id))];
 
+  // Overview "Exception 3" (2026-10-08, per request): everyone whose exit approval is still
+  // pending -- the action list for the HRBP. Same queue as Exception 1 (still in Darwin or
+  // TeachOS, not payroll-converted, not filed under another team), narrowed to a latest exit
+  // record whose status is "Pending With Approver". Review labels don't matter here: a person
+  // stays on this list until Darwin shows the approval decision (it then leaves, or moves on
+  // as Approved).
+  const pendingApprovalRows = exceptionQueueRows.filter((r) => (r.exitFlagStatus ?? "").trim().toLowerCase().startsWith("pending"));
+
   const accessBreakdown = {
     department: buildAccessSplit(departmentRows),
     instructors: buildAccessSplit(countedInstructorRows),
@@ -730,6 +738,8 @@ router.get("/reports/instructors", async (_req, res) => {
     exception_remove: buildAccessSplit(exitListRows),
     // Overview "Exception 2" Serving notice period list (2026-10-07).
     exception_notice: buildAccessSplit(noticeListRows),
+    // Overview "Exception 3" (2026-10-08): exit approval still pending (HRBP action list).
+    exception_pending: buildAccessSplit(pendingApprovalRows),
   };
   res.json({
     kpis: {
@@ -751,6 +761,7 @@ router.get("/reports/instructors", async (_req, res) => {
       exception_count: exceptionRows.length,
       exception_remove_count: exitListRows.length,
       exception_notice_count: noticeListRows.length,
+      exception_pending_count: pendingApprovalRows.length,
       iit_kharagpur_count: iitKharagpurRows.length,
       // New employee-ID-mapping pipeline breakdown (see comment above
       // countedInstructorRows): who's actually feeding the headline total,

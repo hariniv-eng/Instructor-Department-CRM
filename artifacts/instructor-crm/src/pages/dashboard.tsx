@@ -1,4 +1,4 @@
-import { AlertTriangle, Briefcase, Building2, Check, Copy, ExternalLink, GraduationCap, RefreshCw, Trash2, UsersRound, X } from 'lucide-react';
+import { AlertTriangle, ArrowRight, Briefcase, Building2, Check, Clock, Copy, GraduationCap, RefreshCw, Trash2, UsersRound, X } from 'lucide-react';
 import { Link } from 'wouter';
 import { useMemo, useState } from 'react';
 import { useGetReportsInstructors, getGetReportsInstructorsQueryKey, type AccessSplit, type InstructorSummary } from '@workspace/api-client-react';
@@ -72,7 +72,7 @@ export default function DashboardPage() {
   //     them from TeachOS. A person leaves it by itself once they are gone
   //     from TeachOS, since the queue only holds people still present in
   //     Darwin or TeachOS and this view additionally needs TeachOS presence.
-  const [activeException, setActiveException] = useState<'review' | 'remove' | null>(null);
+  const [activeException, setActiveException] = useState<'remove' | 'pending' | null>(null);
   const exceptionSplit = report?.access_breakdown?.exception;
   const reviewPeople = useMemo(() => [...(exceptionSplit?.darwin_only?.people ?? []), ...(exceptionSplit?.both?.people ?? []), ...(exceptionSplit?.teachos_only?.people ?? [])]
     .filter((p) => !p.exit_verification)
@@ -89,6 +89,11 @@ export default function DashboardPage() {
   const noticeSplit = (report?.access_breakdown as Record<string, AccessSplit | undefined> | undefined)?.exception_notice;
   const noticePeople = useMemo(() => [...(noticeSplit?.darwin_only?.people ?? []), ...(noticeSplit?.both?.people ?? []), ...(noticeSplit?.teachos_only?.people ?? [])]
     .sort((a, b) => a.full_name.localeCompare(b.full_name)), [noticeSplit]);
+  // Exception 3 (2026-10-08, per request): everyone whose exit approval is still pending -- the
+  // HRBP's action list (access_breakdown.exception_pending; see pendingApprovalRows in reports.ts).
+  const pendingSplit = (report?.access_breakdown as Record<string, AccessSplit | undefined> | undefined)?.exception_pending;
+  const pendingPeople = useMemo(() => [...(pendingSplit?.darwin_only?.people ?? []), ...(pendingSplit?.both?.people ?? []), ...(pendingSplit?.teachos_only?.people ?? [])]
+    .sort((a, b) => a.full_name.localeCompare(b.full_name)), [pendingSplit]);
   const toggleAccessCard = (card: AccessCardKey) => {
     if (activeAccessCard === card) {
       setActiveAccessCard(null);
@@ -106,6 +111,14 @@ export default function DashboardPage() {
       action={<button type="button" data-testid="button-refresh-dashboard" onClick={() => queryClient.invalidateQueries({ queryKey: getGetReportsInstructorsQueryKey() })} className="inline-flex items-center gap-2 self-start rounded-lg border border-border bg-card px-3.5 py-2.5 text-[12px] font-bold text-foreground transition-colors hover:bg-secondary lg:self-auto"><RefreshCw size={14} /> Refresh data</button>}
     />
 
+    {report && <section aria-label="Exceptions" data-testid="banner-exceptions" className="mb-4 grid grid-cols-1 divide-y divide-[#f3c9cf] overflow-hidden rounded-xl border border-[#f3c9cf] bg-[#fdecef] text-[#9b1c31] animate-rise sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+      <ExceptionSegment label="Exception 1" title="Needs review" meta="Exit record not reviewed yet — Capability Managers" count={reviewPeople.length} icon={<AlertTriangle size={16} />} href="/instructors?category=exception" testId="exception-1" />
+      <ExceptionSegment label="Exception 2" title="Remove TeachOS access" meta={`Exit list · ${noticePeople.length} serving notice`} count={removePeople.length} icon={<Trash2 size={16} />} active={activeException === 'remove'} onClick={() => setActiveException(activeException === 'remove' ? null : 'remove')} testId="exception-2" />
+      <ExceptionSegment label="Exception 3" title="Approval pending" meta="Exit approval pending — HRBP action" count={pendingPeople.length} icon={<Clock size={16} />} active={activeException === 'pending'} onClick={() => setActiveException(activeException === 'pending' ? null : 'pending')} testId="exception-3" />
+    </section>}
+    {report && activeException === 'pending' && <ExceptionPendingPanel people={pendingPeople} onClose={() => setActiveException(null)} />}
+    {report && activeException === 'remove' && <ExceptionRemovePanel exitPeople={removePeople} noticePeople={noticePeople} onClose={() => setActiveException(null)} />}
+
     {reportQuery.isLoading && <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">{[1, 2, 3, 4].map((item) => <SkeletonBlock key={item} className="h-[126px]" />)}</div>}
     {reportQuery.isError && <QueryError message="Dashboard data is unavailable right now." />}
     {report && <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 animate-rise">
@@ -115,13 +128,6 @@ export default function DashboardPage() {
       <KpiCard label="Operations team" value={formatKpi(report.kpis.ops_team_count)} meta="Darwin — Delivery Support (Ops)" icon={<Briefcase size={17} />} tone="coral" breakdown={report.access_breakdown?.ops_team} active={activeAccessCard === 'ops_team'} onClick={() => toggleAccessCard('ops_team')} />
     </section>}
 
-    {report && <section className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 animate-rise" aria-label="Exceptions">
-      <KpiCard label="Exception 1 — Needs review" value={formatKpi(reviewPeople.length)} meta="Exit record, not reviewed yet" icon={<AlertTriangle size={17} />} tone="saffron" active={activeException === 'review'} onClick={() => setActiveException(activeException === 'review' ? null : 'review')} />
-      <KpiCard label="Exception 2 — Remove from TeachOS" value={formatKpi(removePeople.length)} meta={`Exit list · ${noticePeople.length} serving notice`} icon={<Trash2 size={17} />} tone="coral" active={activeException === 'remove'} onClick={() => setActiveException(activeException === 'remove' ? null : 'remove')} />
-    </section>}
-
-    {report && activeException === 'review' && <ExceptionReviewPanel people={reviewPeople} onClose={() => setActiveException(null)} />}
-    {report && activeException === 'remove' && <ExceptionRemovePanel exitPeople={removePeople} noticePeople={noticePeople} onClose={() => setActiveException(null)} />}
 
     {report && activeAccessCard && <AccessDrilldown
       label={ACCESS_CARD_LABELS[activeAccessCard]}
@@ -132,6 +138,80 @@ export default function DashboardPage() {
       onClose={() => setActiveAccessCard(null)}
     />}
   </div>;
+}
+
+// One third of the red Exceptions bar at the top of the Overview (2026-10-08, per request). Exception 1
+// jumps straight to the Instructors tab's Exception list; 2 and 3 open their list below the bar.
+function ExceptionSegment({ label, title, meta, count, icon, href, active = false, onClick, testId }: {
+  label: string;
+  title: string;
+  meta: string;
+  count: number;
+  icon: React.ReactNode;
+  href?: string;
+  active?: boolean;
+  onClick?: () => void;
+  testId: string;
+}) {
+  const body = <>
+    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-[#f9d3d9]">{icon}</span>
+    <span className="min-w-0 flex-1">
+      <span className="block font-mono-ui text-[10px] font-bold uppercase tracking-[0.14em] opacity-80">{label}</span>
+      <span className="flex items-baseline gap-2">
+        <span className="text-[22px] font-extrabold leading-tight tracking-[-0.03em]">{count.toLocaleString('en-IN')}</span>
+        <span className="truncate text-[13px] font-bold">{title}</span>
+      </span>
+      <span className="block truncate text-[11px] opacity-80">{meta}</span>
+    </span>
+    <span className="inline-flex shrink-0 items-center gap-1 text-[12px] font-bold">Check <ArrowRight size={14} /></span>
+  </>;
+  const cls = `flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-[#fbdde2] ${active ? 'bg-[#fbdde2]' : ''}`;
+  if (href) return <Link href={href} data-testid={`link-${testId}`} className={cls}>{body}</Link>;
+  return <button type="button" data-testid={`button-${testId}`} onClick={onClick} aria-pressed={active} className={cls}>{body}</button>;
+}
+
+// Exception 3: exit approval still pending. Read-only worklist for the HRBP.
+function ExceptionPendingPanel({ people, onClose }: { people: InstructorSummary[]; onClose: () => void }) {
+  const [search, setSearch] = useState('');
+  const filtered = useMemo(() => people.filter((p) => matchesSearch(p, search)), [people, search]);
+  const handleDownload = () => downloadCsv('exception-3-exit-approval-pending.csv', toCsv(['Name', 'Employee ID', 'Subject', 'Capability Manager', 'Manager (Darwin)', 'Payroll / Nxtwave', 'exit_status', 'exit_date', 'date_of_exit'], filtered.map((p) => [p.full_name, p.employee_id ?? '', p.dept_area ?? '', p.capability_manager ?? '', p.darwin_manager ?? '', payrollLabel(p), p.exit_flag_status ?? '', p.exit_flag_date ?? '', p.date_of_exit ?? ''])));
+  return <section className="mb-4 rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6 animate-rise">
+    <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <p className="font-mono-ui text-[10px] uppercase tracking-[0.17em] text-muted-foreground">Exception 3 — for the HRBP</p>
+        <h2 className="mt-1 text-[16px] font-extrabold tracking-[-0.03em]">Exit approval pending</h2>
+        <p className="mt-1 max-w-[640px] text-[12px] text-muted-foreground">These people have raised an exit request that is still Pending With Approver in Darwinbox. Each one needs an approval decision. They leave this list once Darwinbox shows the decision.</p>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        {people.length > 0 && <TableSearchInput value={search} onChange={setSearch} placeholder="Search name or employee ID..." testId="input-search-exception-pending" />}
+        <DownloadCsvButton onClick={handleDownload} disabled={filtered.length === 0} testId="button-download-exception-pending" />
+        <button type="button" data-testid="button-close-exception-pending" onClick={onClose} className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-[11px] font-bold text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
+          <X size={13} /> Close
+        </button>
+      </div>
+    </div>
+    <div className="max-h-[420px] overflow-auto rounded-lg border border-border">
+      <table className="w-full text-left text-[12px]">
+        <thead className="sticky top-0 bg-secondary font-mono-ui text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
+          <tr><th className="px-3 py-2">Name</th><th className="px-3 py-2">Employee ID</th><th className="px-3 py-2">Subject</th><th className="px-3 py-2">Capability Manager</th><th className="px-3 py-2">Manager (Darwin)</th><th className="px-3 py-2">Payroll / Nxtwave</th><th className="px-3 py-2">exit_status</th><th className="px-3 py-2">exit_date</th><th className="px-3 py-2">date_of_exit</th></tr>
+        </thead>
+        <tbody>
+          {filtered.map((p) => <tr key={p.id} className="border-t border-border/70">
+            <td className="px-3 py-2 font-semibold">{p.full_name}</td>
+            <td className="px-3 py-2 font-mono-ui text-muted-foreground">{p.employee_id ?? '—'}</td>
+            <td className="px-3 py-2 text-muted-foreground">{p.dept_area ?? '—'}</td>
+            <td className="px-3 py-2 text-muted-foreground">{p.capability_manager ?? '—'}</td>
+            <td className="px-3 py-2 text-muted-foreground">{p.darwin_manager ?? '—'}</td>
+            <td className="px-3 py-2"><PayrollBadge person={p} /></td>
+            <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{p.exit_flag_status || '—'}</td>
+            <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{formatExitDate(p.exit_flag_date)}</td>
+            <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{formatExitDate(p.date_of_exit)}</td>
+          </tr>)}
+          {filtered.length === 0 && <tr><td colSpan={9} className="px-3 py-8 text-center text-muted-foreground">{people.length === 0 ? 'No exit approvals are pending.' : 'No one matches this search.'}</td></tr>}
+        </tbody>
+      </table>
+    </div>
+  </section>;
 }
 
 function KpiCard({ label, value, meta, icon, tone, alert = false, breakdown, active = false, onClick }: {
@@ -353,51 +433,6 @@ function matchesSearch(p: InstructorSummary, query: string) {
   return p.full_name.toLowerCase().includes(q) || (p.employee_id ?? '').toLowerCase().includes(q) || (p.teachos_user_id ?? '').toLowerCase().includes(q);
 }
 
-// Exception 1: details only. Reviewing happens in the Instructors tab's
-// Exception view (that is where the Exit dropdown lives).
-function ExceptionReviewPanel({ people, onClose }: { people: InstructorSummary[]; onClose: () => void }) {
-  const [search, setSearch] = useState('');
-  const filtered = useMemo(() => people.filter((p) => matchesSearch(p, search)), [people, search]);
-  const handleDownload = () => downloadCsv('exception-1-needs-review.csv', toCsv(['Name', 'Employee ID', 'Capability Manager', 'Subject', 'Payroll / Nxtwave', 'date_of_exit'], filtered.map((p) => [p.full_name, p.employee_id ?? '', p.capability_manager ?? '', p.dept_area ?? '', payrollLabel(p), p.date_of_exit ?? ''])));
-  return <section className="mt-5 rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6 animate-rise">
-    <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-      <div>
-        <p className="font-mono-ui text-[10px] uppercase tracking-[0.17em] text-muted-foreground">Exception 1 — for Capability Managers</p>
-        <h2 className="mt-1 text-[16px] font-extrabold tracking-[-0.03em]">Exit records waiting for review</h2>
-        <p className="mt-1 max-w-[640px] text-[12px] text-muted-foreground">These people have an Approved or Pending exit record and nobody has reviewed it yet. Reviewing is done in the Instructors tab, under Exception, not here.</p>
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        {people.length > 0 && <TableSearchInput value={search} onChange={setSearch} testId="input-search-exception-review" />}
-        <DownloadCsvButton onClick={handleDownload} disabled={filtered.length === 0} testId="button-download-exception-review" />
-        <Link href="/instructors?category=exception" className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-[11px] font-bold text-foreground transition-colors hover:bg-secondary" data-testid="link-open-exception-instructors">
-          <ExternalLink size={13} /> Review in Instructors tab
-        </Link>
-        <button type="button" data-testid="button-close-exception-review" onClick={onClose} className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-[11px] font-bold text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
-          <X size={13} /> Close
-        </button>
-      </div>
-    </div>
-    <div className="max-h-[420px] overflow-auto rounded-lg border border-border">
-      <table className="w-full text-left text-[12px]">
-        <thead className="sticky top-0 bg-secondary font-mono-ui text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
-          <tr><th className="px-3 py-2">Name</th><th className="px-3 py-2">Employee ID</th><th className="px-3 py-2">Capability Manager</th><th className="px-3 py-2">Subject</th><th className="px-3 py-2">Payroll / Nxtwave</th><th className="px-3 py-2">date_of_exit</th></tr>
-        </thead>
-        <tbody>
-          {filtered.map((p) => <tr key={p.id} className="border-t border-border/70">
-            <td className="px-3 py-2 font-semibold">{p.full_name}</td>
-            <td className="px-3 py-2 font-mono-ui text-muted-foreground">{p.employee_id ?? '—'}</td>
-            <td className="px-3 py-2 text-muted-foreground">{p.capability_manager ?? '—'}</td>
-            <td className="px-3 py-2 text-muted-foreground">{p.dept_area ?? '—'}</td>
-            <td className="px-3 py-2"><PayrollBadge person={p} /></td>
-            <td className="whitespace-nowrap px-3 py-2 text-muted-foreground" data-testid={`text-exception1-date-of-exit-${p.id}`}>{formatExitDate(p.date_of_exit)}</td>
-          </tr>)}
-          {filtered.length === 0 && <tr><td colSpan={6} className="px-3 py-8 text-center text-muted-foreground">{people.length === 0 ? 'Nothing is waiting for review.' : 'No one matches this search.'}</td></tr>}
-        </tbody>
-      </table>
-    </div>
-  </section>;
-}
-
 // Payroll / Nxtwave bifurcation (2026-10-07, per request) for the Exception lists.
 const payrollLabel = (p: InstructorSummary) => (p.is_payroll ? 'Payroll' : 'Nxtwave');
 function PayrollBadge({ person }: { person: InstructorSummary }) {
@@ -432,7 +467,7 @@ function ExceptionRemovePanel({ exitPeople, noticePeople, onClose }: { exitPeopl
     { key: 'exit', label: 'Exit', count: exitPeople.length },
     { key: 'notice', label: 'Serving notice period', count: noticePeople.length },
   ];
-  return <section className="mt-5 rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6 animate-rise">
+  return <section className="mb-4 rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6 animate-rise">
     <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
       <div>
         <p className="font-mono-ui text-[10px] uppercase tracking-[0.17em] text-muted-foreground">Exception 2 — TeachOS clean-up</p>

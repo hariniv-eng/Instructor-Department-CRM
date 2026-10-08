@@ -19,4 +19,5 @@ export type InstructorsReportAccessBreakdown = {
   instructors_mentors?: AccessSplit;
   exception_remove?: AccessSplit;
   exception_notice?: AccessSplit;
+  exception_pending?: AccessSplit;
 };
