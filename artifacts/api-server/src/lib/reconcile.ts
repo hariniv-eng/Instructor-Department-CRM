@@ -218,7 +218,10 @@ function findExit(row: InstructorRow, exits: { byEmployeeId: Map<string, ExitInf
   return exits.byEmployeeId.get(row.employeeId);
 }
 
-export const recomputeStatuses = async () => {
+// `grantTeachosOnlyScope`: pass true only from the Darwin sync -- see
+// isDepartmentMember() in archiveInstructors.ts for why TeachOS-only people may
+// only be put in the Instructor Archive after a Darwin match has been tried.
+export const recomputeStatuses = async (options: { grantTeachosOnlyScope?: boolean } = {}) => {
   const rows = await db.select().from(instructorsTable);
   const exits = await loadLatestExitsByPerson();
   await Promise.all(rows.map((row) => {
@@ -378,7 +381,7 @@ export const recomputeStatuses = async () => {
   // Permanent archive (2026-09-28, per request) -- see archiveInstructors.ts.
   // Runs after every row above is fully updated, so it archives this
   // reconcile pass's final state, not a stale pre-update snapshot.
-  await archiveInstructors();
+  await archiveInstructors({ grantTeachosOnlyScope: options.grantTeachosOnlyScope ?? false });
 };
 
 export async function reconcileDarwin(rows: SheetRow[]) {

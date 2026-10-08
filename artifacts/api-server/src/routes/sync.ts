@@ -80,7 +80,7 @@ async function runDarwinboxSync(): Promise<SyncResult> {
       await storeDarwinboxFullRoster(fullRosterRows);
       await reconcileDarwin(instructorRows);
       await reconcileDarwinFullRosterFallback(fullRosterRows);
-      await recomputeStatuses();
+      await recomputeStatuses({ grantTeachosOnlyScope: true });
       await sdb.insert(uploadsTable).values({ source: "Darwin", filename: "Darwinbox API sync (raw + full roster + reconciled)", rowCount: n });
       return n;
     });

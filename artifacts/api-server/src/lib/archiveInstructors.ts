@@ -73,14 +73,26 @@ function approvedExitDate(row: LiveRow): string | null {
   return (row.exitFlagStatus ?? "").trim().toLowerCase() === "approved" ? row.exitFlagDate ?? null : null;
 }
 
-function isDepartmentMember(liveRow: LiveRow): boolean {
+// `grantTeachosOnlyScope` (2026-10-08): the two TeachOS-only branches below
+// (payroll_converted and needs-review) must NOT hand out the permanent
+// in-scope marker from a TeachOS sync. A brand-new TeachOS instructor is
+// created as a TeachOS-only row, and only the next Darwin sync links them to
+// their Darwin record (reconcileDarwinFullRosterFallback). In between, anyone
+// whose Darwin record is in another department (Robotics, Operations,
+// Physical AI & Robotics, ...) briefly looked like a department member, got
+// flagged for good, and then dropped out of the Instructors tab -- 11 such
+// people sat in the archive as "Active" with no exit record. So TeachOS-only
+// people are only flagged by a pass that follows a Darwin sync, after the
+// Darwin match has had its chance. Darwin-matched instructors, mentors and the
+// ops team are flagged on any pass, as before.
+function isDepartmentMember(liveRow: LiveRow, grantTeachosOnlyScope = true): boolean {
   // Pinned edge case (NW0005068): treated as an ordinary tech instructor on
   // every sync, even if today's Darwin/TeachOS match dropped her.
   const row: LiveRow = isConfirmedDespiteFullRoster(liveRow)
     ? { ...liveRow, inDarwin: true, inDarwinFullRoster: true, classification: null, deptBucket: liveRow.deptBucket === "non_tech" ? "non_tech" : "tech" }
     : liveRow;
   const darwinInstructor = row.inDarwin && (!row.inDarwinFullRoster || isConfirmedDespiteFullRoster(row)) && !row.classification && (row.deptBucket === "tech" || row.deptBucket === "non_tech");
-  const teachosOnly = row.inTeachos && !row.inDarwin;
+  const teachosOnly = grantTeachosOnlyScope && row.inTeachos && !row.inDarwin;
   const payrollConverted = teachosOnly && row.classification === "payroll_converted";
   const needsReview = teachosOnly
     && row.classification !== "excluded_other_department"
@@ -106,7 +118,8 @@ function findArchiveMatch(archived: ArchiveRow[], row: LiveRow): { match: Archiv
   return { match, matchedBy: match ? "name" : null };
 }
 
-export async function archiveInstructors(): Promise<{ created: number; updated: number }> {
+export async function archiveInstructors(options: { grantTeachosOnlyScope?: boolean } = {}): Promise<{ created: number; updated: number }> {
+  const grantTeachosOnlyScope = options.grantTeachosOnlyScope ?? true;
   const liveRows = await db.select().from(instructorsTable);
   const archivedRows = await db.select().from(instructorArchiveTable);
   let created = 0;
@@ -115,7 +128,7 @@ export async function archiveInstructors(): Promise<{ created: number; updated: 
   for (const row of liveRows) {
     const { match, matchedBy } = findArchiveMatch(archivedRows, row);
 
-    const inScopeNow = isDepartmentMember(row);
+    const inScopeNow = isDepartmentMember(row, grantTeachosOnlyScope);
 
     if (!match) {
       const [inserted] = await db.insert(instructorArchiveTable).values({
