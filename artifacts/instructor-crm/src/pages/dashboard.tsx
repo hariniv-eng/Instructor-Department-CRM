@@ -140,27 +140,25 @@ export default function DashboardPage() {
 
     {reportQuery.isLoading && <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">{[1, 2, 3, 4].map((item) => <SkeletonBlock key={item} className="h-[126px]" />)}</div>}
     {reportQuery.isError && <QueryError message="Dashboard data is unavailable right now." />}
-    {report && <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 animate-rise">
+    {report && <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5 animate-rise">
       <KpiCard label="Instructor Department" value={formatKpi(report.kpis.department_total_count)} meta="Instructors + Mentors + Ops team" icon={<Building2 size={12} />} tone="saffron" breakdown={report.access_breakdown?.department} active={activeAccessCard === 'department'} onClick={() => toggleAccessCard('department')} />
       <KpiCard label="Instructors" value={formatKpi(report.kpis.total_instructor_count)} meta="Matched with Darwin + payroll" icon={<UsersRound size={12} />} tone="navy" breakdown={report.access_breakdown?.instructors} active={activeAccessCard === 'instructors'} onClick={() => toggleAccessCard('instructors')} />
       <KpiCard label="Mentors" value={formatKpi(report.kpis.mentors_count)} meta="Darwin — Mentors department" icon={<GraduationCap size={12} />} tone="teal" breakdown={report.access_breakdown?.mentors} active={activeAccessCard === 'mentors'} onClick={() => toggleAccessCard('mentors')} />
       <KpiCard label="Operations team" value={formatKpi(report.kpis.ops_team_count)} meta="Darwin — Delivery Support (Ops)" icon={<Briefcase size={12} />} tone="coral" breakdown={report.access_breakdown?.ops_team} active={activeAccessCard === 'ops_team'} onClick={() => toggleAccessCard('ops_team')} />
+      <ExitKpiCard pendingCount={pendingPeople.length} onViewApproved={() => { setRemoveInitialView('archive'); setActiveException('remove'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} onViewPending={() => { setActiveException('pending'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} />
     </section>}
 
 
-    {report && <section className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2 animate-rise" aria-label="Product mix and NIAT contribution">
+    {report && <section className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-[7fr_3fr] animate-rise" aria-label="Product mix and NIAT contribution">
       <ProductMixCard people={departmentPeople} />
       <NiatContributionCard people={departmentPeople} />
     </section>}
-    {report && <section className="mt-3 animate-rise" aria-label="Top campuses">
+    {report && <section className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-[3fr_2fr] animate-rise" aria-label="Top campuses and capability managers">
       <TopCampusesCard people={instructorPeople} />
+      <CapabilityManagersCard people={instructorPeople} />
     </section>}
     {report && <section className="mt-3 animate-rise" aria-label="NIAT university locations">
       <NiatMapCard institutesByPerson={instructorPeople.filter((person) => productLabel(person) !== 'Support').map((person) => person.institutes)} />
-    </section>}
-    {report && <section className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2 animate-rise" aria-label="Capability managers and exit data">
-      <CapabilityManagersCard people={instructorPeople} />
-      <ExitedCard pendingPeople={pendingPeople} onViewApproved={() => { setRemoveInitialView('archive'); setActiveException('remove'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} onViewPending={() => { setActiveException('pending'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} />
     </section>}
 
     {report && activeAccessCard && <AccessDrilldown
@@ -256,7 +254,7 @@ function ExceptionPendingPanel({ people, onClose }: { people: InstructorSummary[
 // Product bifurcation (2026-10-09, per request): a donut ("pie") chart of the Instructor Department by Product --
 // the same productLabel() the Instructors tab's Product column and filter use, so the slices match it exactly.
 const PRODUCT_COLORS: Record<string, string> = {
-  'NIAT (Deployed)': '#27415f',
+  'NIAT (Deployed)': '#0f766e',
   'NIAT (Training)': '#22a7c4',
   Academy: '#e0a030',
   Intensive: '#4f9d5d',
@@ -286,28 +284,28 @@ function ProductMixCard({ people }: { people: InstructorSummary[] }) {
   });
   const active = hover ? slices.find((slice) => slice.name === hover) : null;
   return <div data-testid="card-product-mix" className="rounded-xl border border-border bg-card p-4 shadow-sm">
-    <div className="mb-4 flex items-center gap-3">
+    <div className="mb-3 flex items-center gap-3">
       <span className="grid h-7 w-7 place-items-center rounded-lg bg-secondary text-muted-foreground"><PieChart size={14} /></span>
       <div>
         <h2 className="text-[12px] font-extrabold tracking-[-0.03em]">Product mix</h2>
         <p className="text-[10px] text-muted-foreground">Instructor Department by Product</p>
       </div>
     </div>
-    <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-center xl:flex-col">
-      <div className="relative h-[116px] w-[116px] shrink-0">
+    <div className="flex flex-col items-center gap-4 sm:flex-row sm:gap-6">
+      <div className="relative h-[120px] w-[120px] shrink-0">
         <svg viewBox="0 0 42 42" className="h-full w-full -rotate-0" role="img" aria-label="Instructor Department split by Product">
           <circle cx="21" cy="21" r={RADIUS} fill="none" strokeWidth="6" className="stroke-secondary" />
           {arcs.map((arc) => <circle key={arc.name} cx="21" cy="21" r={RADIUS} fill="none" strokeWidth={hover === arc.name ? 7 : 6} stroke={PRODUCT_COLORS[arc.name] ?? '#8a93a6'} strokeDasharray={`${Math.max(arc.pct - 0.4, 0)} ${100 - Math.max(arc.pct - 0.4, 0)}`} strokeDashoffset={arc.dashOffset} onMouseEnter={() => setHover(arc.name)} onMouseLeave={() => setHover(null)} data-testid={`slice-product-${slugify(arc.name)}`}><title>{`${arc.name}: ${arc.count}`}</title></circle>)}
         </svg>
         <div className="pointer-events-none absolute inset-0 grid place-items-center text-center">
           <div>
-            <div className="text-[18px] font-extrabold leading-none tracking-[-0.03em] tabular-nums">{(active ? active.count : total).toLocaleString('en-IN')}</div>
-            <div className="mt-1 max-w-[88px] text-[10px] leading-tight text-muted-foreground">{active ? active.name : 'in the department'}</div>
+            <div className="text-[16px] font-extrabold leading-none tracking-[-0.03em] tabular-nums">{(active ? active.count : total).toLocaleString('en-IN')}</div>
+            <div className="mt-1 max-w-[76px] text-[10px] leading-tight text-muted-foreground">{active ? active.name : 'total'}</div>
           </div>
         </div>
       </div>
-      <ul className="w-full min-w-0 flex-1 space-y-1.5">
-        {slices.map((slice) => <li key={slice.name} onMouseEnter={() => setHover(slice.name)} onMouseLeave={() => setHover(null)} data-testid={`row-product-${slugify(slice.name)}`} className={`flex items-center gap-2.5 rounded-md px-2 py-1 transition-colors ${hover === slice.name ? 'bg-secondary' : ''}`}>
+      <ul className="w-full min-w-0 flex-1 space-y-0.5">
+        {slices.map((slice) => <li key={slice.name} onMouseEnter={() => setHover(slice.name)} onMouseLeave={() => setHover(null)} data-testid={`row-product-${slugify(slice.name)}`} className={`flex items-center gap-2.5 rounded-md px-2 py-0.5 transition-colors ${hover === slice.name ? 'bg-secondary' : ''}`}>
           <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ backgroundColor: PRODUCT_COLORS[slice.name] ?? '#8a93a6' }} />
           <span className="min-w-0 flex-1 truncate text-[12px]">{slice.name}</span>
           <span className="min-w-10 text-right text-[12px] font-extrabold tabular-nums">{slice.count.toLocaleString('en-IN')}</span>
@@ -437,12 +435,10 @@ function CapabilityManagersCard({ people }: { people: InstructorSummary[] }) {
   </div>;
 }
 
-// Exit data on the Overview (2026-10-08, per request): two lists side by side --
-//   Approved: the approved exits recorded in the Instructor Archive (status Exited, exit record Approved).
-//   Pending approval: exit requests still Pending With Approver (the same people as Exception 3).
-// Each shows its total and the most recent few; "View all" opens the full list (Exception 2's "Exited (archive)"
-// view, and Exception 3's panel).
-function ExitedCard({ pendingPeople, onViewApproved, onViewPending }: { pendingPeople: InstructorSummary[]; onViewApproved: () => void; onViewPending: () => void }) {
+// Exit data as a tile in the KPI row (2026-10-09, per request: "show the exit as a card in the same row and way as
+// the instructor cards"). Big number = approved exits in the Instructor Archive (status Exited, exit record Approved);
+// Pending = exit requests still Pending With Approver (the same people as Exception 3). Each opens its full list.
+function ExitKpiCard({ pendingCount, onViewApproved, onViewPending }: { pendingCount: number; onViewApproved: () => void; onViewPending: () => void }) {
   const archiveQuery = useQuery<{ people: ArchiveExitRow[] }>({
     queryKey: ['reports', 'instructor-archive'],
     queryFn: async () => {
@@ -451,46 +447,25 @@ function ExitedCard({ pendingPeople, onViewApproved, onViewPending }: { pendingP
       return response.json();
     },
   });
-  const approved = useMemo(() => (archiveQuery.data?.people ?? [])
-    .filter(isApprovedExit)
-    .sort((a, b) => (b.date_of_exit ?? '').localeCompare(a.date_of_exit ?? '') || a.full_name.localeCompare(b.full_name))
-    .map((row) => ({ key: `a${row.id}`, name: row.full_name, date: row.date_of_exit })), [archiveQuery.data]);
-  const pending = useMemo(() => [...pendingPeople]
-    .sort((a, b) => (b.exit_flag_date ?? '').localeCompare(a.exit_flag_date ?? '') || a.full_name.localeCompare(b.full_name))
-    .map((p) => ({ key: `p${p.id}`, name: p.full_name, date: p.date_of_exit ?? p.exit_flag_date ?? null })), [pendingPeople]);
-  const column = (testId: string, title: string, subtitle: string, rows: { key: string; name: string; date: string | null }[], loading: boolean, onViewAll: () => void, empty: string) => <div data-testid={testId} className="min-w-0">
-    <div className="mb-2 flex items-center justify-between gap-3">
-      <div>
-        <h3 className="text-[12px] font-extrabold tracking-[-0.02em]">{title}</h3>
-        <p className="text-[10px] text-muted-foreground">{subtitle}</p>
-      </div>
-      <div className="flex items-center gap-3">
-        <span className="text-[18px] font-extrabold leading-none tracking-[-0.03em] tabular-nums" data-testid={`${testId}-count`}>{loading ? '…' : rows.length.toLocaleString('en-IN')}</span>
-        <button type="button" onClick={onViewAll} data-testid={`${testId}-view-all`} className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-3 py-1.5 text-[12px] font-bold text-foreground transition-colors hover:bg-secondary">View all <ArrowRight size={13} /></button>
-      </div>
+  const approvedCount = (archiveQuery.data?.people ?? []).filter(isApprovedExit).length;
+  const value = archiveQuery.isLoading ? '…' : archiveQuery.isError ? '—' : approvedCount.toLocaleString('en-IN');
+  return <div data-testid="card-exited" className="relative w-full overflow-hidden rounded-xl border border-border bg-card py-3.5 pl-5 pr-4 text-center shadow-sm">
+    <span aria-hidden className="absolute bottom-3 left-0 top-3 w-1.5 rounded-r-full" style={{ backgroundColor: '#c75b3f' }} />
+    <p className="flex items-center justify-center gap-1.5 text-[11px] font-bold text-muted-foreground"><span className="grid h-5 w-5 place-items-center rounded-md bg-[#f6e4de] text-[#9b4434]"><LogOut size={12} /></span>Exit data</p>
+    <p className="mt-2 text-[26px] font-extrabold leading-none tracking-[-0.04em]" data-testid="exit-approved-count">{value}</p>
+    <p className="mt-1.5 text-[10px] text-muted-foreground">{archiveQuery.isError ? 'Archive unavailable right now' : 'Approved exits · Instructor Archive'}</p>
+    <div className="mt-3 grid grid-cols-2 gap-2 border-t border-border/70 pt-2">
+      <button type="button" onClick={onViewApproved} data-testid="exit-approved-view-all" className="flex flex-col rounded-md py-0.5 transition-colors hover:bg-secondary">
+        <span className="min-h-[23px] font-mono-ui text-[9px] leading-[1.3] uppercase tracking-[0.07em] text-muted-foreground">Approved</span>
+        <span className="mt-1 text-[13px] font-bold tracking-[-0.02em]">{value}</span>
+      </button>
+      <button type="button" onClick={onViewPending} data-testid="exit-pending-view-all" className="flex flex-col rounded-md py-0.5 transition-colors hover:bg-secondary">
+        <span className="min-h-[23px] font-mono-ui text-[9px] leading-[1.3] uppercase tracking-[0.07em] text-muted-foreground">Pending approval</span>
+        <span className="mt-1 text-[13px] font-bold tracking-[-0.02em]">{pendingCount.toLocaleString('en-IN')}</span>
+      </button>
     </div>
-    <ul>
-      {rows.slice(0, 5).map((row) => <li key={row.key} className="flex items-center justify-between gap-3 border-b border-border/60 py-1.5">
-        <span className="min-w-0 flex-1 truncate text-[12px] font-semibold">{row.name}</span>
-        <span className="shrink-0 text-[12px] text-muted-foreground">{formatExitDate(row.date)}</span>
-      </li>)}
-      {!loading && rows.length === 0 && <li className="py-6 text-center text-[12px] text-muted-foreground">{empty}</li>}
-    </ul>
+    <p className="mt-2 text-[10px] font-bold uppercase tracking-[0.08em] text-primary">Tap a count to view the list ▼</p>
   </div>;
-  return <section data-testid="card-exited" className="rounded-xl border border-border bg-card p-4 shadow-sm">
-    <div className="mb-4 flex items-center gap-3">
-      <span className="grid h-7 w-7 place-items-center rounded-lg bg-secondary text-muted-foreground"><LogOut size={14} /></span>
-      <div>
-        <h2 className="text-[12px] font-extrabold tracking-[-0.03em]">Exit data</h2>
-        <p className="text-[10px] text-muted-foreground">Approved exits and exits waiting for approval</p>
-      </div>
-    </div>
-    {archiveQuery.isError && <p className="mb-3 text-[12px] text-muted-foreground">The archive is unavailable right now, so approved exits cannot be shown.</p>}
-    <div className="grid grid-cols-1 gap-y-4">
-      {column('exit-approved', 'Approved', 'Instructor Archive · exit date', approved, archiveQuery.isLoading, onViewApproved, 'No approved exits in the archive yet.')}
-      {column('exit-pending', 'Pending approval', 'Waiting on the approver · date of exit', pending, false, onViewPending, 'No exit approvals are pending.')}
-    </div>
-  </section>;
 }
 
 function KpiCard({ label, value, meta, icon, tone, alert = false, breakdown, active = false, onClick }: {
