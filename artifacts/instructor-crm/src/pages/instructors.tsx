@@ -8,6 +8,7 @@ import { campusCityAndState } from '@/lib/campusRegions';
 import { PageIntro, EmptyState, QueryError, SkeletonBlock, DownloadCsvButton, MiniStat, pct, usePagedRows, TablePager } from '@/components/ui-pieces';
 import { downloadCsv, slugify, toCsv } from '@/lib/csv';
 import { toast } from '@/hooks/use-toast';
+import { ActionTakenCell, MovementCell, actionLabel, getKnownMovements, movementLabel, useMovementsByInstructor, type Movement } from '@/components/movement-tracker';
 
 // Manual-entry saves (Gender/Exit Verification/Subject below) used to fail
 // completely silently on a rejected request (2026-09-26, per report: "manual
@@ -811,14 +812,14 @@ function gridColsClass(category: CategoryKey): string {
   // mixed into Department/Exception just reads "Nxtwave" in this column,
   // same as any non-payroll instructor. Never wrong, just not usually the
   // interesting value there.
-  if (category === 'instructors' || category === 'mentors' || category === 'instructors_mentors' || category === 'department' || category === 'exception') return 'grid-cols-[260px_190px_130px_280px_220px_150px_160px_170px_220px_160px_110px_140px_190px_190px_160px_130px_130px_150px_190px_150px_170px_140px_170px]';
+  if (category === 'instructors' || category === 'mentors' || category === 'instructors_mentors' || category === 'department' || category === 'exception') return 'grid-cols-[260px_190px_130px_280px_220px_150px_160px_170px_220px_160px_110px_140px_190px_190px_160px_130px_130px_150px_190px_150px_170px_140px_170px_260px_150px]';
   // Operations team keeps its own shape (2026-09-21: not part of the above
   // request) -- no Campus column (ops rows aren't deployed to a teaching
   // campus the way instructors and mentors are), a single Department
   // column instead of Subject+Department, and no Payroll either (same
   // reason it's never meaningful for Mentors: payroll_converted can't be
   // assigned to an ops row).
-  return 'grid-cols-[260px_190px_130px_280px_220px_150px_280px_140px_190px_190px_160px_130px_150px_190px_150px_170px_140px_170px]';
+  return 'grid-cols-[260px_190px_130px_280px_220px_150px_280px_140px_190px_190px_160px_130px_150px_190px_150px_170px_140px_170px_260px_150px]';
 }
 
 // Manager (Darwin) (2026-09-22, per request: "in the overview table we have
@@ -956,6 +957,9 @@ export function downloadInstructorsCsv(category: CategoryKey, people: PersonWith
   headers.push('Enrolled Plan');
   headers.push('Product');
   headers.push('Contribution');
+  headers.push('Movement Tracker');
+  headers.push('Action Taken');
+  const knownMovements = getKnownMovements();
 
   const rows = people.map((person) => {
     const row: string[] = [person.full_name, person.designation ?? '', person.employee_id ?? '', person.teachos_user_id ?? '', person.org_email ?? '', person.work_location ?? ''];
@@ -976,6 +980,10 @@ export function downloadInstructorsCsv(category: CategoryKey, people: PersonWith
     row.push(person.enrolled_plans ?? '');
     row.push(productLabel(person));
     row.push(person.niat_cohorts?.join(', ') ?? '');
+    // Latest logged movement (type + remark) and its Action Taken -- see components/movement-tracker.tsx.
+    const latestMovement = knownMovements.get(person.id)?.[0];
+    row.push(latestMovement ? `${movementLabel(latestMovement.movement_type)}: ${latestMovement.remark}` : '');
+    row.push(latestMovement ? actionLabel(latestMovement.action_taken) : '');
     return row;
   });
 
@@ -987,11 +995,13 @@ export function downloadInstructorsCsv(category: CategoryKey, people: PersonWith
 // table scrolls sideways, so the person stays visible next to whichever column is being checked. The
 // -ml-5/pl-5 pair stretches the cell over the row's own left padding so nothing scrolls through that gap;
 // bg-card (and the row-hover tint) keep it opaque.
+const NO_MOVEMENTS: Movement[] = [];
 const STICKY_NAME_CELL = 'sticky left-0 z-10 -ml-5 pl-5 pr-3 border-r border-border/60 shadow-[4px_0_6px_-4px_rgba(15,23,42,0.12)]';
 
 export function CategoryTable({ category, people, backQuery, linkMode = 'row', backPrefix = '' }: { category: CategoryKey; people: PersonWithAccess[]; backQuery: string; linkMode?: 'row' | 'name'; backPrefix?: string }) {
   const columns = gridColsClass(category);
   const pager = usePagedRows(people, 50);
+  const movementsByInstructor = useMovementsByInstructor();
   return <div className="overflow-hidden rounded-xl border border-border bg-card shadow-xs">
     <div className="overflow-x-auto">
       <div className="w-max min-w-full">
@@ -1016,8 +1026,10 @@ export function CategoryTable({ category, people, backQuery, linkMode = 'row', b
           <span>Enrolled Plan</span>
           <span>Product</span>
           <span>Contribution</span>
+          <span>Movement Tracker</span>
+          <span>Action Taken</span>
         </div>
-        <div>{pager.pageRows.map((person) => <PersonRow key={person.id} category={category} person={person} columns={columns} backQuery={backQuery} linkMode={linkMode} backPrefix={backPrefix} />)}</div>
+        <div>{pager.pageRows.map((person) => <PersonRow key={person.id} category={category} person={person} columns={columns} backQuery={backQuery} linkMode={linkMode} backPrefix={backPrefix} movements={movementsByInstructor.get(person.id) ?? NO_MOVEMENTS} />)}</div>
       </div>
     </div>
     <TablePager
@@ -1049,7 +1061,7 @@ function AccessCell({ access }: { access: AccessKind }) {
 // is a link, everything else is plain, so clicking or dragging elsewhere in a
 // row never navigates. backPrefix tags where the profile's back link should
 // return to (see instructor-detail.tsx).
-function PersonRow({ category, person, columns, backQuery, linkMode = 'row', backPrefix = '' }: { category: CategoryKey; person: PersonWithAccess; columns: string; backQuery: string; linkMode?: 'row' | 'name'; backPrefix?: string }) {
+function PersonRow({ category, person, columns, backQuery, linkMode = 'row', backPrefix = '', movements }: { category: CategoryKey; person: PersonWithAccess; columns: string; backQuery: string; linkMode?: 'row' | 'name'; backPrefix?: string; movements: Movement[] }) {
   const campus = person.institutes && person.institutes.length > 0 ? person.institutes.join(', ') : '—';
   // Carries the Instructors tab's current filters/search/category forward
   // to this profile page (2026-09-28, per request) so its back link can
@@ -1093,6 +1105,8 @@ function PersonRow({ category, person, columns, backQuery, linkMode = 'row', bac
     <div className="truncate text-[12px] text-muted-foreground">{person.enrolled_plans || '—'}</div>
     <div className="truncate text-[12px] text-muted-foreground">{productLabel(person)}</div>
     <div className="truncate text-[12px] text-muted-foreground">{person.niat_cohorts && person.niat_cohorts.length > 0 ? person.niat_cohorts.join(', ') : '—'}</div>
+    <MovementCell instructorId={person.id} fullName={person.full_name} movements={movements} />
+    <ActionTakenCell movements={movements} />
   </>;
   const rowClass = `group grid items-center gap-4 border-b border-border/70 px-5 py-4 transition-colors last:border-0 hover:bg-[#f8fafb] ${columns}`;
   if (linkMode === 'name') return <div data-testid={`row-instructor-${person.id}`} className={rowClass}>{inner}</div>;

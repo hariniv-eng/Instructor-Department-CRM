@@ -519,6 +519,27 @@ export const insertInstructorContributionSchema = createInsertSchema(instructorC
 export type InstructorContribution = typeof instructorContributionTable.$inferSelect;
 export type InsertInstructorContribution = z.infer<typeof insertInstructorContributionSchema>;
 
+// Movement Tracker (2026-10-09, per request): a running log of every movement raised for an instructor -- CM
+// change, external move, DSA team, product move, deployment -- with a free-text remark (e.g. which Capability
+// Manager it should change to) and an "Action Taken" mark (yes / no / not yet) filled in by whoever actions it.
+// One row per movement, never overwritten, so the full history is kept. instructor_id points at the live
+// instructors row; the name/employee ID are copied at logging time so a row stays readable if that row is ever
+// rebuilt. Written from the Instructors tab (routes/movements.ts), not touched by any sync.
+export const instructorMovementsTable = pgTable("instructor_movements", {
+  id: serial("id").primaryKey(),
+  instructorId: integer("instructor_id").notNull(),
+  employeeId: text("employee_id"),
+  fullName: text("full_name").notNull(),
+  movementType: text("movement_type").notNull(),
+  remark: text("remark").notNull(),
+  requestedBy: text("requested_by").notNull(),
+  requestedAt: timestamp("requested_at", { withTimezone: true }).notNull().defaultNow(),
+  actionTaken: text("action_taken"),
+  actionBy: text("action_by"),
+  actionAt: timestamp("action_at", { withTimezone: true }),
+});
+export type InstructorMovement = typeof instructorMovementsTable.$inferSelect;
+
 export const insertInstructorSchema = createInsertSchema(instructorsTable);
 export const insertUploadSchema = createInsertSchema(uploadsTable);
 export const insertDarwinboxActiveSchema = createInsertSchema(darwinboxActiveTable);
