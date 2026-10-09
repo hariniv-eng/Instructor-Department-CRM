@@ -64,7 +64,7 @@ export default function InstructorDetailPage() {
     <div className="grid gap-5 lg:grid-cols-[.78fr_1.22fr]">
       <div className="space-y-5">
         <section className="rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6">
-          <div className="mb-5 flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-[#d9f0ec] text-primary"><UserRound size={19} /></span><div><p className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Identity</p><h2 className="text-[16px] font-extrabold">Source record</h2></div></div>
+          <div className="mb-5 flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-[#e1eaf1] text-primary"><UserRound size={19} /></span><div><p className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Identity</p><h2 className="text-[16px] font-extrabold">Source record</h2></div></div>
           <div className="space-y-4"><InfoRow icon={<Mail size={14} />} label="Work email" value={instructor.org_email} testId="text-detail-email" /><InfoRow icon={<Phone size={14} />} label="Mobile" value={instructor.mobile} testId="text-detail-mobile" /><InfoRow icon={<CalendarDays size={14} />} label="Date of joining" value={formatDate(instructor.date_of_joining)} testId="text-detail-joining-date" /><InfoRow icon={<MapPin size={14} />} label="Location" value={[instructor.current_city, instructor.current_state].filter(Boolean).join(', ') || instructor.work_location} testId="text-detail-location" /><InfoRow icon={<Building2 size={14} />} label="Capability Manager" value={instructor.teachos_manager} testId="text-detail-capability-manager" /><InfoRow icon={<Building2 size={14} />} label="Manager (Darwin)" value={instructor.direct_manager} testId="text-detail-darwin-manager" /></div>
         </section>
         <section className="rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6">
@@ -83,7 +83,7 @@ export default function InstructorDetailPage() {
               <label className="block"><span className="mb-1.5 block text-[11px] font-bold">Operator notes</span><textarea value={form.notes || ''} onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} data-testid="textarea-instructor-notes" rows={7} placeholder="Leave context for the next reviewer..." className="w-full resize-none rounded-lg border border-input bg-background px-3 py-3 text-[12px] leading-5 outline-none placeholder:text-muted-foreground/65 focus:border-primary focus:ring-2 focus:ring-ring/25" /></label>
             </div>
             {updateInstructor.isError && <p data-testid="status-update-error" className="mt-5 rounded-lg bg-[#fff0ec] px-3 py-2 text-[12px] font-semibold text-[#9b4434]">Save failed. The source record was not changed.</p>}
-            {saved && <p data-testid="status-update-success" className="mt-5 flex items-center gap-2 rounded-lg bg-[#e5f3ed] px-3 py-2 text-[12px] font-semibold text-[#2f6b2a]"><CheckCircle2 size={15} /> Changes saved to the operator layer.</p>}
+            {saved && <p data-testid="status-update-success" className="mt-5 flex items-center gap-2 rounded-lg bg-[#e5f3ed] px-3 py-2 text-[12px] font-semibold text-[#256e65]"><CheckCircle2 size={15} /> Changes saved to the operator layer.</p>}
             <div className="mt-7 flex justify-end"><SaveButton pending={updateInstructor.isPending} /></div>
           </form>
         // Manager view is read-only (no login, see App.tsx's Guard) --
@@ -109,7 +109,7 @@ function InfoRow({ icon, label, value, testId, compact = false }: { icon?: React
 }
 
 function Signal({ label, value, positive }: { label: string; value: string; positive: boolean }) {
-  return <div className={`rounded-lg border p-3 ${positive ? 'border-[#b9dfd1] bg-[#eff8f4]' : 'border-[#ebcbc4] bg-[#fff5f2]'}`}><div className="flex items-center justify-between"><span className="font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">{label}</span><span className={`h-2 w-2 rounded-full ${positive ? 'bg-[#4ab19a]' : 'bg-[#d45e47]'}`} /></div><p className={`mt-2 text-[13px] font-extrabold ${positive ? 'text-[#2f6b2a]' : 'text-[#9b4434]'}`}>{value}</p></div>;
+  return <div className={`rounded-lg border p-3 ${positive ? 'border-[#b9dfd1] bg-[#eff8f4]' : 'border-[#ebcbc4] bg-[#fff5f2]'}`}><div className="flex items-center justify-between"><span className="font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">{label}</span><span className={`h-2 w-2 rounded-full ${positive ? 'bg-[#4ab19a]' : 'bg-[#d45e47]'}`} /></div><p className={`mt-2 text-[13px] font-extrabold ${positive ? 'text-[#256e65]' : 'text-[#9b4434]'}`}>{value}</p></div>;
 }
 
 function formatDate(value?: string | null) {
@@ -127,7 +127,7 @@ function classificationLabel(value: string) {
 
 function statusTone(status: string) {
   const value = status.toLowerCase();
-  if (value.includes('active') || value.includes('match')) return 'bg-[#e3f3df] text-[#2f6b2a]';
+  if (value.includes('active') || value.includes('match')) return 'bg-[#dff0eb] text-[#256e65]';
   if (value.includes('exit') || value.includes('inactive')) return 'bg-[#f6e4de] text-[#9b4434]';
   if (value.includes('exception') || value.includes('mismatch')) return 'bg-[#fff1c9] text-[#8b6207]';
   return 'bg-secondary text-muted-foreground';

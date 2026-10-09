@@ -85,11 +85,11 @@ const formatWhen = (iso: string) => {
 };
 
 const TYPE_TONES: Record<string, string> = {
-  cm_change: 'bg-[#d9f0ec] text-primary',
+  cm_change: 'bg-[#e1eaf1] text-primary',
   external_move: 'bg-[#f6e4de] text-[#9b4434]',
   dsa_team: 'bg-[#e6e9fb] text-[#4a4fb0]',
   product_move: 'bg-[#fbeed3] text-[#8a5a0b]',
-  deployment_yes: 'bg-[#e3f3df] text-[#2f6b2a]',
+  deployment_yes: 'bg-[#dff0eb] text-[#256e65]',
   deployment_no: 'bg-secondary text-muted-foreground',
 };
 

@@ -32,7 +32,7 @@ const LIVE_SYNC_SOURCES = [
 
 const sources = [
   { key: 'Darwin', label: 'Darwin HRMS', detail: 'Employment master', color: 'bg-[#dce8f2] text-primary' },
-  { key: 'TeachOS', label: 'TeachOS', detail: 'Deployment access', color: 'bg-[#e3f3df] text-[#2f6b2a]' },
+  { key: 'TeachOS', label: 'TeachOS', detail: 'Deployment access', color: 'bg-[#dff0eb] text-[#256e65]' },
   { key: 'TeachOS ID Reference', label: 'TeachOS ID Reference', detail: 'Employee ID mapping', color: 'bg-[#eae4f6] text-[#5b3d99]' },
   { key: 'Exit List', label: 'Exit List', detail: 'Separation tracker', color: 'bg-[#f6e4de] text-[#9b4434]' },
 ];
@@ -89,7 +89,7 @@ export default function UploadsPage() {
           {!selectedFile ? <button type="button" data-testid="button-choose-source-file" onClick={() => inputRef.current?.click()} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); handleFile(event.dataTransfer.files?.[0]); }} className="flex min-h-[124px] w-full flex-col items-center justify-center rounded-lg border border-dashed border-[#b7c8d5] bg-[#f5f8fa] px-4 text-center transition-colors hover:border-primary hover:bg-[#edf3f6]"><UploadCloud size={22} className="text-primary" /><span className="mt-2 text-[12px] font-bold">Choose CSV or Excel file</span><span className="mt-1 text-[11px] text-muted-foreground">Drop a file here, or browse from your computer</span></button> : <div className="flex min-h-[124px] items-center gap-3 rounded-lg border border-[#b7c8d5] bg-[#f5f8fa] p-4"><span className="grid h-10 w-10 place-items-center rounded-lg bg-[#dce8f2] text-primary"><FileSpreadsheet size={19} /></span><div className="min-w-0 flex-1"><p className="truncate text-[12px] font-bold">{selectedFile.name}</p><p className="font-mono-ui mt-1 text-[10px] uppercase tracking-[0.1em] text-muted-foreground">{formatBytes(selectedFile.size)} · Ready to reconcile</p></div><button type="button" aria-label="Remove selected file" data-testid="button-remove-selected-file" onClick={() => { setSelectedFile(null); if (inputRef.current) inputRef.current.value = ''; }} className="rounded-md p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground"><X size={16} /></button></div>}
         </div>
         <div className="mt-5 flex items-start gap-2 rounded-lg bg-[#fff7db] p-3 text-[11px] leading-5 text-[#79601a]"><Info size={15} className="mt-0.5 shrink-0" /><span>Use the source export as-is. The first row is treated as a header when counting records.</span></div>
-        {feedback === 'success' && <p data-testid="status-upload-success" className="mt-4 flex items-center gap-2 rounded-lg bg-[#e5f3ed] px-3 py-2 text-[12px] font-semibold text-[#2f6b2a]"><CheckCircle2 size={15} /> Snapshot reconciled and recorded.</p>}
+        {feedback === 'success' && <p data-testid="status-upload-success" className="mt-4 flex items-center gap-2 rounded-lg bg-[#e5f3ed] px-3 py-2 text-[12px] font-semibold text-[#256e65]"><CheckCircle2 size={15} /> Snapshot reconciled and recorded.</p>}
         {feedback === 'error' && <p data-testid="status-upload-error" className="mt-4 rounded-lg bg-[#fff0ec] px-3 py-2 text-[12px] font-semibold text-[#9b4434]">We could not parse or reconcile this file. Please check its headers and try again.</p>}
         <button type="button" disabled={!selectedFile || uploadSource.isPending} data-testid="button-record-upload" onClick={handleSubmit} className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3 text-[12px] font-bold text-primary-foreground shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-45">{uploadSource.isPending ? 'Reconciling upload…' : `Reconcile ${source} snapshot`}</button>
       </section>
@@ -178,7 +178,7 @@ function LiveSyncPanel({ uploads }: { uploads: Upload[] | undefined }) {
             {lastUpload ? <span data-testid={`text-last-sync-${testKey}`}>Last synced {formatDateTime(lastUpload.uploaded_at)}</span> : <span>No recorded sync yet</span>}
           </div>
           {typeof interval === 'number' && <p className="mt-1 text-[10px] text-muted-foreground">{interval > 0 ? `Auto-syncs every ${interval}h` : 'Auto-sync is off for this source — use Sync now to refresh it'}</p>}
-          {result && <p data-testid={`status-sync-${testKey}`} className={`mt-3 flex items-start gap-1.5 rounded-lg px-3 py-2 text-[11px] font-semibold ${result.ok ? 'bg-[#e5f3ed] text-[#2f6b2a]' : 'bg-[#fff0ec] text-[#9b4434]'}`}>
+          {result && <p data-testid={`status-sync-${testKey}`} className={`mt-3 flex items-start gap-1.5 rounded-lg px-3 py-2 text-[11px] font-semibold ${result.ok ? 'bg-[#e5f3ed] text-[#256e65]' : 'bg-[#fff0ec] text-[#9b4434]'}`}>
             {result.ok ? <CheckCircle2 size={13} className="mt-0.5 shrink-0" /> : <AlertTriangle size={13} className="mt-0.5 shrink-0" />}
             <span>{result.message}</span>
           </p>}
