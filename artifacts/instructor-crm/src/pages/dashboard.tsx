@@ -154,7 +154,7 @@ export default function DashboardPage() {
     {report && <section className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2 animate-rise" aria-label="Campuses, capability managers and NIAT university map">
       <div className="flex min-w-0 flex-col gap-3">
         <TopCampusesCard people={instructorPeople} />
-        <CapabilityManagersCard people={instructorPeople} />
+        <CapabilityManagersCard people={departmentPeople} />
       </div>
       <NiatMapCard institutesByPerson={instructorPeople.filter((person) => productLabel(person) !== 'Support').map((person) => person.institutes)} />
     </section>}
@@ -281,7 +281,7 @@ function ProductMixCard({ people }: { people: InstructorSummary[] }) {
     return arc;
   });
   const active = hover ? slices.find((slice) => slice.name === hover) : null;
-  return <div data-testid="card-product-mix" className="min-w-0 rounded-xl border border-border bg-card p-4 shadow-sm">
+  return <div data-testid="card-product-mix" className="flex h-full min-w-0 flex-col rounded-xl border border-border bg-card p-4 shadow-sm">
     <div className="mb-3 flex items-center gap-3">
       <span className="grid h-7 w-7 place-items-center rounded-lg bg-secondary text-muted-foreground"><PieChart size={14} /></span>
       <div>
@@ -289,16 +289,16 @@ function ProductMixCard({ people }: { people: InstructorSummary[] }) {
         <p className="text-[10px] text-muted-foreground">Instructor Department by Product</p>
       </div>
     </div>
-    <div className="flex flex-col items-center gap-4 sm:flex-row sm:gap-6">
-      <div className="relative h-[120px] w-[120px] shrink-0">
+    <div className="flex flex-1 flex-col items-center justify-center gap-4 sm:flex-row sm:gap-8">
+      <div className="relative h-[170px] w-[170px] shrink-0">
         <svg viewBox="0 0 42 42" className="h-full w-full -rotate-0" role="img" aria-label="Instructor Department split by Product">
           <circle cx="21" cy="21" r={RADIUS} fill="none" strokeWidth="6" className="stroke-secondary" />
           {arcs.map((arc) => <circle key={arc.name} cx="21" cy="21" r={RADIUS} fill="none" strokeWidth={hover === arc.name ? 7 : 6} stroke={PRODUCT_COLORS[arc.name] ?? '#8a93a6'} strokeDasharray={`${Math.max(arc.pct - 0.4, 0)} ${100 - Math.max(arc.pct - 0.4, 0)}`} strokeDashoffset={arc.dashOffset} onMouseEnter={() => setHover(arc.name)} onMouseLeave={() => setHover(null)} data-testid={`slice-product-${slugify(arc.name)}`}><title>{`${arc.name}: ${arc.count}`}</title></circle>)}
         </svg>
         <div className="pointer-events-none absolute inset-0 grid place-items-center text-center">
           <div>
-            <div className="text-[16px] font-extrabold leading-none tracking-[-0.03em] tabular-nums">{(active ? active.count : total).toLocaleString('en-IN')}</div>
-            <div className="mt-1 max-w-[76px] text-[10px] leading-tight text-muted-foreground">{active ? active.name : 'total'}</div>
+            <div className="text-[22px] font-extrabold leading-none tracking-[-0.03em] tabular-nums">{(active ? active.count : total).toLocaleString('en-IN')}</div>
+            <div className="mt-1 max-w-[100px] text-[11px] leading-tight text-muted-foreground">{active ? active.name : 'total'}</div>
           </div>
         </div>
       </div>
@@ -335,7 +335,7 @@ function NiatContributionCard({ people }: { people: InstructorSummary[] }) {
   }, [people]);
   const max = Math.max(1, ...rows.map(([, count]) => count));
   const bar = (count: number, color: string) => <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-secondary"><div className="h-full rounded-full" style={{ width: `${Math.max(count > 0 ? 2 : 0, (count / max) * 100)}%`, backgroundColor: color }} /></div>;
-  return <div data-testid="card-niat-contribution" className="rounded-xl border border-border bg-card p-4 shadow-sm">
+  return <div data-testid="card-niat-contribution" className="flex h-full min-w-0 flex-col rounded-xl border border-border bg-card p-4 shadow-sm">
     <div className="mb-3 flex items-center gap-3">
       <span className="grid h-7 w-7 place-items-center rounded-lg bg-secondary text-muted-foreground"><GraduationCap size={14} /></span>
       <div>
@@ -347,7 +347,7 @@ function NiatContributionCard({ people }: { people: InstructorSummary[] }) {
       <span className="text-[18px] font-extrabold leading-none tracking-[-0.03em] tabular-nums" data-testid="text-niat-instructor-total">{total.toLocaleString('en-IN')}</span>
       <span className="text-[12px] text-muted-foreground">NIAT instructors (Deployed + Training)</span>
     </div>
-    <ul className="space-y-2">
+    <ul className="flex flex-1 flex-col justify-between gap-2">
       {rows.map(([cohort, count]) => <li key={cohort} data-testid={`row-niat-cohort-${slugify(cohort)}`}>
         <div className="flex items-baseline justify-between gap-3">
           <span className="text-[12px]">{cohort}</span>
@@ -418,8 +418,9 @@ function TopCampusesCard({ people }: { people: InstructorSummary[] }) {
   </div>;
 }
 
-// Capability Manager workload (2026-10-08, per request): each Capability Manager and how many instructors they
-// handle -- names of the instructors are in the Instructors tab, not here. People with no Capability Manager are
+// Capability Manager workload (2026-10-08, per request): each Capability Manager and how many people report to
+// them. 2026-10-09, per request: counts the whole department (instructors + mentors + Operations team), not just
+// instructors -- the caller passes departmentPeople. Names are in the Instructors tab, not here. People with no Capability Manager are
 // simply left out of this list (2026-10-08, per request).
 function CapabilityManagersCard({ people }: { people: InstructorSummary[] }) {
   const managers = useMemo(() => {
@@ -436,7 +437,7 @@ function CapabilityManagersCard({ people }: { people: InstructorSummary[] }) {
       <span className="grid h-7 w-7 place-items-center rounded-lg bg-secondary text-muted-foreground"><UsersRound size={14} /></span>
       <div>
         <h2 className="text-[12px] font-extrabold tracking-[-0.03em]">Manager workload</h2>
-        <p className="text-[10px] text-muted-foreground">Instructors per Capability Manager</p>
+        <p className="text-[10px] text-muted-foreground">Everyone reporting to each Capability Manager · Instructors + Mentors + Ops</p>
       </div>
     </div>
     <div className="max-h-[340px] overflow-auto pr-1"><CompactCountList rows={managers} testPrefix="capability-manager" /></div>
@@ -467,14 +468,14 @@ function ExitListCard({ pendingPeople, onViewApproved, onViewPending }: { pendin
       <button type="button" onClick={onViewAll} data-testid={`${testId}-view-all`} className="inline-flex items-center gap-1 text-[10px] font-bold text-primary hover:underline">View all <ArrowRight size={11} /></button>
     </div>
     <ul>
-      {rows.slice(0, 3).map((row) => <li key={row.key} className="flex items-center justify-between gap-2 border-b border-border/60 py-1">
+      {rows.slice(0, 3).map((row) => <li key={row.key} className="flex items-center justify-between gap-2 border-b border-border/60 py-1.5">
         <span className="min-w-0 flex-1 truncate text-[11px] font-semibold">{row.name}</span>
         <span className="shrink-0 text-[10px] text-muted-foreground">{formatExitDate(row.date)}</span>
       </li>)}
       {!loading && rows.length === 0 && <li className="py-2 text-center text-[11px] text-muted-foreground">{empty}</li>}
     </ul>
   </div>;
-  return <section data-testid="card-exit-lists" className="min-w-0 rounded-xl border border-border bg-card p-4 shadow-sm">
+  return <section data-testid="card-exit-lists" className="flex h-full min-w-0 flex-col rounded-xl border border-border bg-card p-4 shadow-sm">
     <div className="mb-3 flex items-center gap-3">
       <span className="grid h-7 w-7 place-items-center rounded-lg bg-secondary text-muted-foreground"><LogOut size={14} /></span>
       <div>
@@ -483,7 +484,7 @@ function ExitListCard({ pendingPeople, onViewApproved, onViewPending }: { pendin
       </div>
     </div>
     {archiveQuery.isError && <p className="mb-2 text-[11px] text-muted-foreground">The archive is unavailable right now, so approved exits cannot be shown.</p>}
-    <div className="space-y-3">
+    <div className="flex flex-1 flex-col justify-evenly gap-3">
       {section('exit-list-approved', 'Approved', approved, archiveQuery.isLoading, onViewApproved, 'No approved exits yet.')}
       {section('exit-list-pending', 'Pending approval', pending, false, onViewPending, 'Nothing waiting for approval.')}
     </div>
