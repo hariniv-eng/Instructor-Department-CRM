@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageIntro, QueryError, SkeletonBlock, DownloadCsvButton, TableSearchInput } from '@/components/ui-pieces';
 import { downloadCsv, slugify, toCsv } from '@/lib/csv';
 import { ALL_PRODUCTS, productLabel } from './instructors';
+import { NiatMapCard } from '@/components/niat-map';
 
 function formatKpi(value: number | undefined) {
   return typeof value === 'number' ? value.toLocaleString('en-IN') : '—';
@@ -140,20 +141,27 @@ export default function DashboardPage() {
     {reportQuery.isLoading && <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">{[1, 2, 3, 4].map((item) => <SkeletonBlock key={item} className="h-[126px]" />)}</div>}
     {reportQuery.isError && <QueryError message="Dashboard data is unavailable right now." />}
     {report && <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 animate-rise">
-      <KpiCard label="Instructor Department" value={formatKpi(report.kpis.department_total_count)} meta="Instructors + Mentors + Ops team" icon={<Building2 size={17} />} tone="saffron" breakdown={report.access_breakdown?.department} active={activeAccessCard === 'department'} onClick={() => toggleAccessCard('department')} />
-      <KpiCard label="Instructors" value={formatKpi(report.kpis.total_instructor_count)} meta="Matched with Darwin + payroll" icon={<UsersRound size={17} />} tone="navy" breakdown={report.access_breakdown?.instructors} active={activeAccessCard === 'instructors'} onClick={() => toggleAccessCard('instructors')} />
-      <KpiCard label="Mentors" value={formatKpi(report.kpis.mentors_count)} meta="Darwin — Mentors department" icon={<GraduationCap size={17} />} tone="teal" breakdown={report.access_breakdown?.mentors} active={activeAccessCard === 'mentors'} onClick={() => toggleAccessCard('mentors')} />
-      <KpiCard label="Operations team" value={formatKpi(report.kpis.ops_team_count)} meta="Darwin — Delivery Support (Ops)" icon={<Briefcase size={17} />} tone="coral" breakdown={report.access_breakdown?.ops_team} active={activeAccessCard === 'ops_team'} onClick={() => toggleAccessCard('ops_team')} />
+      <KpiCard label="Instructor Department" value={formatKpi(report.kpis.department_total_count)} meta="Instructors + Mentors + Ops team" icon={<Building2 size={12} />} tone="saffron" breakdown={report.access_breakdown?.department} active={activeAccessCard === 'department'} onClick={() => toggleAccessCard('department')} />
+      <KpiCard label="Instructors" value={formatKpi(report.kpis.total_instructor_count)} meta="Matched with Darwin + payroll" icon={<UsersRound size={12} />} tone="navy" breakdown={report.access_breakdown?.instructors} active={activeAccessCard === 'instructors'} onClick={() => toggleAccessCard('instructors')} />
+      <KpiCard label="Mentors" value={formatKpi(report.kpis.mentors_count)} meta="Darwin — Mentors department" icon={<GraduationCap size={12} />} tone="teal" breakdown={report.access_breakdown?.mentors} active={activeAccessCard === 'mentors'} onClick={() => toggleAccessCard('mentors')} />
+      <KpiCard label="Operations team" value={formatKpi(report.kpis.ops_team_count)} meta="Darwin — Delivery Support (Ops)" icon={<Briefcase size={12} />} tone="coral" breakdown={report.access_breakdown?.ops_team} active={activeAccessCard === 'ops_team'} onClick={() => toggleAccessCard('ops_team')} />
     </section>}
 
 
-    {report && <section className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2 animate-rise" aria-label="Product mix, NIAT contribution, campuses and capability managers">
+    {report && <section className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2 animate-rise" aria-label="Product mix and NIAT contribution">
       <ProductMixCard people={departmentPeople} />
       <NiatContributionCard people={departmentPeople} />
-      <TopCampusesCard people={instructorPeople} />
-      <CapabilityManagersCard people={instructorPeople} />
     </section>}
-    {report && <ExitedCard pendingPeople={pendingPeople} onViewApproved={() => { setRemoveInitialView('archive'); setActiveException('remove'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} onViewPending={() => { setActiveException('pending'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} />}
+    {report && <section className="mt-3 animate-rise" aria-label="Top campuses">
+      <TopCampusesCard people={instructorPeople} />
+    </section>}
+    {report && <section className="mt-3 animate-rise" aria-label="NIAT university locations">
+      <NiatMapCard institutesByPerson={instructorPeople.filter((person) => productLabel(person) !== 'Support').map((person) => person.institutes)} />
+    </section>}
+    {report && <section className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2 animate-rise" aria-label="Capability managers and exit data">
+      <CapabilityManagersCard people={instructorPeople} />
+      <ExitedCard pendingPeople={pendingPeople} onViewApproved={() => { setRemoveInitialView('archive'); setActiveException('remove'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} onViewPending={() => { setActiveException('pending'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} />
+    </section>}
 
     {report && activeAccessCard && <AccessDrilldown
       label={ACCESS_CARD_LABELS[activeAccessCard]}
@@ -277,7 +285,7 @@ function ProductMixCard({ people }: { people: InstructorSummary[] }) {
     return arc;
   });
   const active = hover ? slices.find((slice) => slice.name === hover) : null;
-  return <div data-testid="card-product-mix" className="rounded-xl border border-border bg-card p-4 shadow-xs">
+  return <div data-testid="card-product-mix" className="rounded-xl border border-border bg-card p-4 shadow-sm">
     <div className="mb-4 flex items-center gap-3">
       <span className="grid h-7 w-7 place-items-center rounded-lg bg-secondary text-muted-foreground"><PieChart size={14} /></span>
       <div>
@@ -331,7 +339,7 @@ function NiatContributionCard({ people }: { people: InstructorSummary[] }) {
   }, [people]);
   const max = Math.max(1, ...rows.map(([, count]) => count));
   const bar = (count: number, color: string) => <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-secondary"><div className="h-full rounded-full" style={{ width: `${Math.max(count > 0 ? 2 : 0, (count / max) * 100)}%`, backgroundColor: color }} /></div>;
-  return <div data-testid="card-niat-contribution" className="rounded-xl border border-border bg-card p-4 shadow-xs">
+  return <div data-testid="card-niat-contribution" className="rounded-xl border border-border bg-card p-4 shadow-sm">
     <div className="mb-3 flex items-center gap-3">
       <span className="grid h-7 w-7 place-items-center rounded-lg bg-secondary text-muted-foreground"><GraduationCap size={14} /></span>
       <div>
@@ -379,30 +387,28 @@ function RankedBarList({ rows, color, testPrefix }: { rows: [string, number][]; 
 }
 
 function TopCampusesCard({ people }: { people: InstructorSummary[] }) {
+  // Training Institute is left out of this chart (2026-10-09, per request): the 10 biggest real campuses only.
   const campuses = useMemo(() => {
     const counts = new Map<string, number>();
-    const add = (campus: string) => counts.set(campus, (counts.get(campus) ?? 0) + 1);
     for (const person of people) {
-      const product = productLabel(person);
-      if (product === 'Support') continue;
-      if (product === 'NIAT (Training)') add(TRAINING_CAMPUS);
+      if (productLabel(person) === 'Support') continue;
       const names = new Set((person.institutes ?? []).map((name) => name.trim()).filter((name) => name && name !== TRAINING_CAMPUS));
-      names.forEach(add);
+      names.forEach((name) => counts.set(name, (counts.get(name) ?? 0) + 1));
     }
-    const training = counts.get(TRAINING_CAMPUS) ?? 0;
-    counts.delete(TRAINING_CAMPUS);
-    const rest = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 9);
-    return [[TRAINING_CAMPUS, training] as [string, number], ...rest];
+    return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 10);
   }, [people]);
-  return <div data-testid="card-top-campuses" className="rounded-xl border border-border bg-card p-4 shadow-xs">
-    <div className="mb-3 flex items-center gap-3">
-      <span className="grid h-7 w-7 place-items-center rounded-lg bg-secondary text-muted-foreground"><Building2 size={14} /></span>
-      <div>
-        <h2 className="text-[12px] font-extrabold tracking-[-0.03em]">Top campuses</h2>
-        <p className="text-[10px] text-muted-foreground">By headcount</p>
-      </div>
+  const max = Math.max(1, ...campuses.map(([, count]) => count));
+  return <div data-testid="card-top-campuses" className="rounded-xl border border-border bg-card p-4 shadow-sm">
+    <h2 className="mb-3 text-center text-[12px] font-extrabold tracking-[-0.02em]">Top campuses by instructors</h2>
+    <div className="flex h-[150px] items-end justify-between gap-2 border-b border-border px-1">
+      {campuses.map(([campus, count]) => <div key={campus} data-testid={`row-campus-${slugify(campus)}`} title={`${campus}: ${count}`} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1">
+        <span className="text-[11px] font-extrabold tabular-nums">{count.toLocaleString('en-IN')}</span>
+        <div className="w-full rounded-t-md bg-[#4f86b8]" style={{ height: `${Math.max(count > 0 ? 3 : 0, (count / max) * 100)}%`, maxHeight: 'calc(100% - 18px)' }} />
+      </div>)}
     </div>
-    <RankedBarList rows={campuses} color="#f26419" testPrefix="campus" />
+    <div className="flex justify-between gap-2 px-1 pt-1.5">
+      {campuses.map(([campus]) => <span key={campus} title={campus} className="min-w-0 flex-1 truncate text-center text-[10px] text-muted-foreground">{campus}</span>)}
+    </div>
   </div>;
 }
 
@@ -419,7 +425,7 @@ function CapabilityManagersCard({ people }: { people: InstructorSummary[] }) {
     }
     return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
   }, [people]);
-  return <div data-testid="card-capability-managers" className="rounded-xl border border-border bg-card p-4 shadow-xs">
+  return <div data-testid="card-capability-managers" className="rounded-xl border border-border bg-card p-4 shadow-sm">
     <div className="mb-3 flex items-center gap-3">
       <span className="grid h-7 w-7 place-items-center rounded-lg bg-secondary text-muted-foreground"><UsersRound size={14} /></span>
       <div>
@@ -427,7 +433,7 @@ function CapabilityManagersCard({ people }: { people: InstructorSummary[] }) {
         <p className="text-[10px] text-muted-foreground">Instructors per Capability Manager</p>
       </div>
     </div>
-    <div className="max-h-[520px] overflow-auto pr-1"><RankedBarList rows={managers} color="#12b5cb" testPrefix="capability-manager" /></div>
+    <div className="max-h-[300px] overflow-auto pr-1"><RankedBarList rows={managers} color="#12b5cb" testPrefix="capability-manager" /></div>
   </div>;
 }
 
@@ -464,14 +470,14 @@ function ExitedCard({ pendingPeople, onViewApproved, onViewPending }: { pendingP
       </div>
     </div>
     <ul>
-      {rows.slice(0, 8).map((row) => <li key={row.key} className="flex items-center justify-between gap-3 border-b border-border/60 py-1.5">
+      {rows.slice(0, 5).map((row) => <li key={row.key} className="flex items-center justify-between gap-3 border-b border-border/60 py-1.5">
         <span className="min-w-0 flex-1 truncate text-[12px] font-semibold">{row.name}</span>
         <span className="shrink-0 text-[12px] text-muted-foreground">{formatExitDate(row.date)}</span>
       </li>)}
       {!loading && rows.length === 0 && <li className="py-6 text-center text-[12px] text-muted-foreground">{empty}</li>}
     </ul>
   </div>;
-  return <section data-testid="card-exited" className="mt-4 rounded-xl border border-border bg-card p-4 shadow-xs animate-rise">
+  return <section data-testid="card-exited" className="rounded-xl border border-border bg-card p-4 shadow-sm">
     <div className="mb-4 flex items-center gap-3">
       <span className="grid h-7 w-7 place-items-center rounded-lg bg-secondary text-muted-foreground"><LogOut size={14} /></span>
       <div>
@@ -480,7 +486,7 @@ function ExitedCard({ pendingPeople, onViewApproved, onViewPending }: { pendingP
       </div>
     </div>
     {archiveQuery.isError && <p className="mb-3 text-[12px] text-muted-foreground">The archive is unavailable right now, so approved exits cannot be shown.</p>}
-    <div className="grid grid-cols-1 gap-x-10 gap-y-4 lg:grid-cols-2">
+    <div className="grid grid-cols-1 gap-y-4">
       {column('exit-approved', 'Approved', 'Instructor Archive · exit date', approved, archiveQuery.isLoading, onViewApproved, 'No approved exits in the archive yet.')}
       {column('exit-pending', 'Pending approval', 'Waiting on the approver · date of exit', pending, false, onViewPending, 'No exit approvals are pending.')}
     </div>
@@ -498,33 +504,28 @@ function KpiCard({ label, value, meta, icon, tone, alert = false, breakdown, act
   active?: boolean;
   onClick?: () => void;
 }) {
+  // Centred tile with a coloured edge (2026-10-09, per request: dashboard-style Overview).
   const tones = { navy: 'bg-primary text-primary-foreground', teal: 'bg-[#dff0eb] text-[#256e65]', saffron: 'bg-[#fbeed3] text-[#8a5a0b]', coral: 'bg-[#f6e4de] text-[#9b4434]' };
-  const onNavy = tone === 'navy';
+  const edges = { navy: '#4f86b8', teal: '#2e8b7a', saffron: '#1f3a5f', coral: '#c75b3f' };
   return <button
     type="button"
     data-testid={`button-kpi-card-${label.toLowerCase().replace(/\s+/g, '-')}`}
     onClick={onClick}
     aria-pressed={active}
-    className={`relative w-full overflow-hidden rounded-xl border p-4 text-left shadow-xs transition-transform hover:-translate-y-0.5 ${onNavy ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-card'} ${active ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : ''}`}
+    className={`relative w-full overflow-hidden rounded-xl border border-border bg-card py-3.5 pl-5 pr-4 text-center shadow-sm transition-transform hover:-translate-y-0.5 ${active ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : ''}`}
   >
-    <div className="flex items-start justify-between">
-      <p className={`text-[10px] font-bold ${onNavy ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>{label}</p>
-      <span className={`grid h-8 w-8 place-items-center rounded-lg ${tones[tone]}`}>{icon}</span>
-    </div>
-    <p className="mt-3 text-[22px] font-extrabold tracking-[-0.06em]">{value}</p>
-    <p className={`mt-1 font-mono-ui text-[10px] uppercase tracking-[0.1em] ${onNavy ? 'text-primary-foreground/55' : alert ? 'text-[#a36b00]' : 'text-muted-foreground'}`}>{meta}</p>
-    {breakdown && <div className={`mt-3 grid grid-cols-3 gap-2 border-t pt-2 ${onNavy ? 'border-primary-foreground/15' : 'border-border/70'}`}>
+    <span aria-hidden className="absolute bottom-3 left-0 top-3 w-1.5 rounded-r-full" style={{ backgroundColor: edges[tone] }} />
+    <p className="flex items-center justify-center gap-1.5 text-[11px] font-bold text-muted-foreground"><span className={`grid h-5 w-5 place-items-center rounded-md ${tones[tone]}`}>{icon}</span>{label}</p>
+    <p className="mt-2 text-[26px] font-extrabold leading-none tracking-[-0.04em]">{value}</p>
+    <p className={`mt-1.5 text-[10px] ${alert ? 'text-[#a36b00]' : 'text-muted-foreground'}`}>{meta}</p>
+    {breakdown && <div className="mt-3 grid grid-cols-3 gap-2 border-t border-border/70 pt-2">
       {CARD_BREAKDOWN_ORDER.map((t) => <div key={t.key} className="flex flex-col">
-        {/* min-h + leading here is what keeps the number below lined up across
-            all three columns (2026-09-07, per request) -- "Both" is short
-            enough to never wrap, but "Darwin only" / "TeachOS only" can, on
-            a narrow card, sit on two lines and would otherwise push their
-            own number down while "Both"'s stayed put a line higher. */}
-        <p className={`min-h-[23px] font-mono-ui text-[9px] leading-[1.3] uppercase tracking-[0.07em] ${onNavy ? 'text-primary-foreground/55' : 'text-muted-foreground'}`}>{t.label}</p>
-        <p className="mt-1 text-[12px] font-bold tracking-[-0.02em]">{formatKpi(breakdown[t.key]?.count)}</p>
+        {/* min-h + leading keeps the number lined up across the three columns even when a label wraps. */}
+        <p className="min-h-[23px] font-mono-ui text-[9px] leading-[1.3] uppercase tracking-[0.07em] text-muted-foreground">{t.label}</p>
+        <p className="mt-1 text-[13px] font-bold tracking-[-0.02em]">{formatKpi(breakdown[t.key]?.count)}</p>
       </div>)}
     </div>}
-    <p className={`mt-3 text-[10px] font-bold uppercase tracking-[0.08em] ${onNavy ? 'text-primary-foreground/70' : 'text-primary'}`}>{active ? 'Hide people list ▲' : 'View people list ▼'}</p>
+    <p className="mt-2 text-[10px] font-bold uppercase tracking-[0.08em] text-primary">{active ? 'Hide people list ▲' : 'View people list ▼'}</p>
   </button>;
 }
 
