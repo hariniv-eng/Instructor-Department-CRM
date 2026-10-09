@@ -46,7 +46,8 @@ const UNIVERSITY_SPOTS: Record<string, { name: string; lat: number; lng: number 
 };
 
 // The sheet rows that aren't universities (set to Hyderabad separately) are not pinned.
-const NOT_UNIVERSITIES = new Set(['Training Institute', 'Nxtwave Institute of Advanced Technologies']);
+// St. Mary's Rehabilitation is a rehab centre, not a NIAT university (2026-10-09, per request) -- left off the map.
+const NOT_UNIVERSITIES = new Set(['Training Institute', 'Nxtwave Institute of Advanced Technologies', "St. Mary's Rehabilitation University"]);
 
 export type MapPin = {
   id: string;
@@ -54,21 +55,27 @@ export type MapPin = {
   state: string;
   lat: number;
   lng: number;
-  universities: { name: string; instructors: number }[];
+  universities: { name: string; instructors: number; mentors: number }[];
   instructors: number;
+  mentors: number;
 };
 
-// Pins for every university on the sheet, with how many of `institutesByPerson` (each person's TeachOS institute
-// names) work at each.
-export function niatMapPins(institutesByPerson: (string[] | null | undefined)[]): MapPin[] {
-  const counts = new Map<string, number>();
-  for (const institutes of institutesByPerson) {
-    const seen = new Set<string>();
-    for (const institute of institutes ?? []) {
-      const region = regionForInstitute(institute);
-      if (region && !seen.has(region.university)) { seen.add(region.university); counts.set(region.university, (counts.get(region.university) ?? 0) + 1); }
+// Pins for every university on the sheet, with how many instructors and how many mentors (each person's TeachOS
+// institute names) work at each (2026-10-09, per request: pins show instructors + mentors).
+export function niatMapPins(instructorInstitutes: (string[] | null | undefined)[], mentorInstitutes: (string[] | null | undefined)[] = []): MapPin[] {
+  const countBy = (lists: (string[] | null | undefined)[]) => {
+    const counts = new Map<string, number>();
+    for (const institutes of lists) {
+      const seen = new Set<string>();
+      for (const institute of institutes ?? []) {
+        const region = regionForInstitute(institute);
+        if (region && !seen.has(region.university)) { seen.add(region.university); counts.set(region.university, (counts.get(region.university) ?? 0) + 1); }
+      }
     }
-  }
+    return counts;
+  };
+  const counts = countBy(instructorInstitutes);
+  const mentorCounts = countBy(mentorInstitutes);
   const pins = new Map<string, MapPin>();
   for (const region of allRegions()) {
     if (NOT_UNIVERSITIES.has(region.university)) continue;
@@ -77,10 +84,12 @@ export function niatMapPins(institutesByPerson: (string[] | null | undefined)[])
     if (!coords) continue;
     const name = spot?.name ?? region.city;
     const id = `${name}|${region.state}`;
-    const pin = pins.get(id) ?? { id, name, state: region.state, lat: coords[0], lng: coords[1], universities: [], instructors: 0 };
+    const pin = pins.get(id) ?? { id, name, state: region.state, lat: coords[0], lng: coords[1], universities: [], instructors: 0, mentors: 0 };
     const instructors = counts.get(region.university) ?? 0;
-    pin.universities.push({ name: region.university, instructors });
+    const mentors = mentorCounts.get(region.university) ?? 0;
+    pin.universities.push({ name: region.university, instructors, mentors });
     pin.instructors += instructors;
+    pin.mentors += mentors;
     pins.set(id, pin);
   }
   return [...pins.values()].sort((a, b) => b.universities.length - a.universities.length || b.instructors - a.instructors || a.name.localeCompare(b.name));

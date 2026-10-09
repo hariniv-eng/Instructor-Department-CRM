@@ -14,8 +14,8 @@ const mercator = (lat: number) => Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI
 const projectX = (lng: number) => (lng - MAP_LON0) * PX_PER_DEG;
 const projectY = (lat: number) => (mercator(MAP_LAT1) - mercator(lat)) * PX_PER_DEG * (180 / Math.PI);
 
-export function NiatMapCard({ institutesByPerson }: { institutesByPerson: (string[] | null | undefined)[] }) {
-  const pins = useMemo(() => niatMapPins(institutesByPerson), [institutesByPerson]);
+export function NiatMapCard({ instructorInstitutes, mentorInstitutes }: { instructorInstitutes: (string[] | null | undefined)[]; mentorInstitutes: (string[] | null | undefined)[] }) {
+  const pins = useMemo(() => niatMapPins(instructorInstitutes, mentorInstitutes), [instructorInstitutes, mentorInstitutes]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = pins.find((pin) => pin.id === selectedId) ?? null;
   const universityCount = pins.reduce((sum, pin) => sum + pin.universities.length, 0);
@@ -51,10 +51,10 @@ export function NiatMapCard({ institutesByPerson }: { institutesByPerson: (strin
         <ul className="mt-1.5 space-y-1">
           {selected.universities.map((university) => <li key={university.name} className="flex items-center justify-between gap-3 text-[11px]">
             <span className="min-w-0 truncate" title={university.name}>{university.name}</span>
-            <span className="shrink-0 font-extrabold tabular-nums">{university.instructors.toLocaleString('en-IN')}</span>
+            <span className="shrink-0 font-extrabold tabular-nums" title={`${university.instructors} instructors + ${university.mentors} mentors`}>{(university.instructors + university.mentors).toLocaleString('en-IN')}</span>
           </li>)}
         </ul>
-        <p className="mt-1.5 text-[10px] text-muted-foreground">Numbers are instructors on that campus.</p>
+        <p className="mt-1.5 text-[10px] text-muted-foreground">Numbers are instructors + mentors on that campus.</p>
       </div>}
     </div>
     <p className="mt-1 text-center text-[9px] text-muted-foreground">Map data © <a href="https://www.amcharts.com/" target="_blank" rel="noreferrer" className="underline">amCharts</a></p>
