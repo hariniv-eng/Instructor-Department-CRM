@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import healthRouter from "./health";
 import authRouter from "./auth";
 import instructorRouter from "./instructors";
+import movementsRouter from "./movements";
 import dashboardRouter from "./dashboard";
 import uploadRouter from "./uploads";
 import syncRouter from "./sync";
@@ -22,6 +23,7 @@ const router: IRouter = Router();
 // needs to stay public/mixed rather than gated as a whole at this level.
 router.use(healthRouter);
 router.use(authRouter);
+router.use(movementsRouter);
 router.use(instructorRouter);
 router.use(reportsRouter);
 // Token-protected (not session-protected) trigger for the 5am daily sync --
