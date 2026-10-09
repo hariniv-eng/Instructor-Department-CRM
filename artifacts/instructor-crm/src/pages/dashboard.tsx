@@ -289,7 +289,7 @@ function ProductMixCard({ people }: { people: InstructorSummary[] }) {
       <div className="relative h-[170px] w-[170px] shrink-0">
         <svg viewBox="0 0 42 42" className="h-full w-full -rotate-0" role="img" aria-label="Instructor Department split by Product">
           <circle cx="21" cy="21" r={RADIUS} fill="none" strokeWidth="6" className="stroke-secondary" />
-          {arcs.map((arc) => <circle key={arc.name} cx="21" cy="21" r={RADIUS} fill="none" strokeWidth={hover === arc.name ? 7 : 6} stroke={PRODUCT_COLORS[arc.name] ?? '#8a93a6'} strokeDasharray={`${Math.max(arc.pct - 0.4, 0)} ${100 - Math.max(arc.pct - 0.4, 0)}`} strokeDashoffset={arc.dashOffset} onMouseEnter={() => setHover(arc.name)} onMouseLeave={() => setHover(null)} data-testid={`slice-product-${slugify(arc.name)}`}><title>{`${arc.name}: ${arc.count} (${arc.pct.toFixed(1)}%)`}</title></circle>)}
+          {arcs.map((arc) => <circle key={arc.name} cx="21" cy="21" r={RADIUS} fill="none" strokeWidth={hover === arc.name ? 7 : 6} stroke={PRODUCT_COLORS[arc.name] ?? '#8a93a6'} strokeDasharray={`${Math.max(arc.pct - 0.4, 0)} ${100 - Math.max(arc.pct - 0.4, 0)}`} strokeDashoffset={arc.dashOffset} onMouseEnter={() => setHover(arc.name)} onMouseLeave={() => setHover(null)} data-testid={`slice-product-${slugify(arc.name)}`}><title>{`${arc.name}: ${arc.count}`}</title></circle>)}
         </svg>
         <div className="pointer-events-none absolute inset-0 grid place-items-center text-center">
           <div>
@@ -302,8 +302,7 @@ function ProductMixCard({ people }: { people: InstructorSummary[] }) {
         {slices.map((slice) => <li key={slice.name} onMouseEnter={() => setHover(slice.name)} onMouseLeave={() => setHover(null)} data-testid={`row-product-${slugify(slice.name)}`} className={`flex items-center gap-2.5 rounded-md px-2 py-1 transition-colors ${hover === slice.name ? 'bg-secondary' : ''}`}>
           <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ backgroundColor: PRODUCT_COLORS[slice.name] ?? '#8a93a6' }} />
           <span className="min-w-0 flex-1 truncate text-[13px]">{slice.name}</span>
-          <span className="text-[11px] tabular-nums text-muted-foreground">{total ? ((slice.count / total) * 100).toFixed(1) : '0.0'}%</span>
-          <span className="w-10 text-right text-[13px] font-extrabold tabular-nums">{slice.count.toLocaleString('en-IN')}</span>
+          <span className="min-w-10 text-right text-[14px] font-extrabold tabular-nums">{slice.count.toLocaleString('en-IN')}</span>
         </li>)}
       </ul>
     </div>
@@ -499,7 +498,7 @@ function KpiCard({ label, value, meta, icon, tone, alert = false, breakdown, act
   active?: boolean;
   onClick?: () => void;
 }) {
-  const tones = { navy: 'bg-primary text-primary-foreground', teal: 'bg-[#dff0eb] text-[#256e65]', saffron: 'bg-accent text-accent-foreground', coral: 'bg-[#f6e4de] text-[#9b4434]' };
+  const tones = { navy: 'bg-primary text-primary-foreground', teal: 'bg-[#dff0eb] text-[#256e65]', saffron: 'bg-[#fbeed3] text-[#8a5a0b]', coral: 'bg-[#f6e4de] text-[#9b4434]' };
   const onNavy = tone === 'navy';
   return <button
     type="button"
