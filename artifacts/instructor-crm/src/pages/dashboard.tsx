@@ -12,36 +12,6 @@ function formatKpi(value: number | undefined) {
   return typeof value === 'number' ? value.toLocaleString('en-IN') : '—';
 }
 
-type AccessCardKey = 'department' | 'instructors' | 'mentors' | 'ops_team';
-type AccessTabKey = 'all' | 'both' | 'darwin_only' | 'teachos_only';
-
-const ACCESS_CARD_LABELS: Record<AccessCardKey, string> = {
-  department: 'Instructor Department',
-  instructors: 'Instructors',
-  mentors: 'Mentors',
-  ops_team: 'Operations team',
-};
-
-// "All" (2026-09-07, per request) isn't one of the backend's three access
-// buckets -- it's the union of all of them, computed client-side in
-// AccessDrilldown below, since darwin_only/both/teachos_only are already
-// mutually exclusive and safe to concatenate without dedup.
-const ACCESS_TABS: { key: AccessTabKey; label: string }[] = [
-  { key: 'all', label: 'All' },
-  { key: 'both', label: 'Both' },
-  { key: 'darwin_only', label: 'Only Darwin' },
-  { key: 'teachos_only', label: 'Only TeachOS' },
-];
-
-// Same Both / Darwin only / TeachOS only order as ACCESS_TABS above, used
-// for each KpiCard's own inline breakdown row (2026-09-07, per request --
-// it previously listed Darwin only first, out of step with the tabs).
-const CARD_BREAKDOWN_ORDER: { key: 'both' | 'darwin_only' | 'teachos_only'; label: string }[] = [
-  { key: 'both', label: 'Both' },
-  { key: 'darwin_only', label: 'Darwin only' },
-  { key: 'teachos_only', label: 'TeachOS only' },
-];
-
 // The Overview tab is deliberately just these cards (2026-09-04, per
 // request -- everything else that used to live here, the standing-rule
 // banner, source-match table, classification/role-mix glance row, and the
@@ -59,8 +29,6 @@ export default function DashboardPage() {
   const queryClient = useQueryClient();
   const reportQuery = useGetReportsInstructors();
   const report = reportQuery.data;
-  const [activeAccessCard, setActiveAccessCard] = useState<AccessCardKey | null>(null);
-  const [activeAccessTab, setActiveAccessTab] = useState<AccessTabKey>('both');
   // Exceptions on the Overview (2026-10-06, per request) -- two read-only
   // views of the same queue the Instructors tab's "Exception" tab shows
   // (access_breakdown.exception; see reports.ts's exceptionRows):
@@ -105,6 +73,13 @@ export default function DashboardPage() {
     return [...(instructorSplit?.both?.people ?? []), ...(instructorSplit?.darwin_only?.people ?? []), ...(instructorSplit?.teachos_only?.people ?? [])]
       .filter((p) => (seen.has(p.id) ? false : (seen.add(p.id), true)));
   }, [instructorSplit]);
+  // Mentors card population, each person once -- added to the instructors on the India map pins (2026-10-09).
+  const mentorSplit = report?.access_breakdown?.mentors;
+  const mentorPeople = useMemo(() => {
+    const seen = new Set<number>();
+    return [...(mentorSplit?.both?.people ?? []), ...(mentorSplit?.darwin_only?.people ?? []), ...(mentorSplit?.teachos_only?.people ?? [])]
+      .filter((p) => (seen.has(p.id) ? false : (seen.add(p.id), true)));
+  }, [mentorSplit]);
   // Whole Instructor Department (instructors + mentors + Operations team), each person once -- the population
   // the Product pie chart splits (Operations team rows are the Support product).
   const departmentSplit = report?.access_breakdown?.department;
@@ -113,15 +88,6 @@ export default function DashboardPage() {
     return [...(departmentSplit?.both?.people ?? []), ...(departmentSplit?.darwin_only?.people ?? []), ...(departmentSplit?.teachos_only?.people ?? [])]
       .filter((p) => (seen.has(p.id) ? false : (seen.add(p.id), true)));
   }, [departmentSplit]);
-  const toggleAccessCard = (card: AccessCardKey) => {
-    if (activeAccessCard === card) {
-      setActiveAccessCard(null);
-    } else {
-      setActiveAccessCard(card);
-      setActiveAccessTab('both');
-    }
-  };
-
   return <div className="mx-auto max-w-[1500px]">
     <PageIntro
       title="Faculty Command Center (FCC)"
@@ -139,10 +105,10 @@ export default function DashboardPage() {
     {reportQuery.isLoading && <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">{[1, 2, 3, 4].map((item) => <SkeletonBlock key={item} className="h-[126px]" />)}</div>}
     {reportQuery.isError && <QueryError message="Dashboard data is unavailable right now." />}
     {report && <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 animate-rise">
-      <KpiCard label="Instructor Department" value={formatKpi(report.kpis.department_total_count)} meta="Instructors + Mentors + Ops team" icon={<Building2 size={12} />} tone="saffron" breakdown={report.access_breakdown?.department} active={activeAccessCard === 'department'} onClick={() => toggleAccessCard('department')} />
-      <KpiCard label="Instructors" value={formatKpi(report.kpis.total_instructor_count)} meta="Matched with Darwin + payroll" icon={<UsersRound size={12} />} tone="navy" breakdown={report.access_breakdown?.instructors} active={activeAccessCard === 'instructors'} onClick={() => toggleAccessCard('instructors')} />
-      <KpiCard label="Mentors" value={formatKpi(report.kpis.mentors_count)} meta="Darwin — Mentors department" icon={<GraduationCap size={12} />} tone="teal" breakdown={report.access_breakdown?.mentors} active={activeAccessCard === 'mentors'} onClick={() => toggleAccessCard('mentors')} />
-      <KpiCard label="Operations team" value={formatKpi(report.kpis.ops_team_count)} meta="Darwin — Delivery Support (Ops)" icon={<Briefcase size={12} />} tone="coral" breakdown={report.access_breakdown?.ops_team} active={activeAccessCard === 'ops_team'} onClick={() => toggleAccessCard('ops_team')} />
+      <KpiCard label="Instructor Department" value={formatKpi(report.kpis.department_total_count)} meta="Instructors + Mentors + Ops team" icon={<Building2 size={12} />} tone="saffron" />
+      <KpiCard label="Instructors" value={formatKpi(report.kpis.total_instructor_count)} meta="Matched with Darwin + payroll" icon={<UsersRound size={12} />} tone="navy" />
+      <KpiCard label="Mentors" value={formatKpi(report.kpis.mentors_count)} meta="Darwin — Mentors department" icon={<GraduationCap size={12} />} tone="teal" />
+      <KpiCard label="Operations team" value={formatKpi(report.kpis.ops_team_count)} meta="Darwin — Delivery Support (Ops)" icon={<Briefcase size={12} />} tone="coral" />
     </section>}
 
 
@@ -153,20 +119,11 @@ export default function DashboardPage() {
     </section>}
     {report && <section className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2 animate-rise" aria-label="Campuses, capability managers and NIAT university map">
       <div className="flex min-w-0 flex-col gap-3">
-        <TopCampusesCard people={instructorPeople} />
+        <TopCampusesCard instructors={instructorPeople} mentors={mentorPeople} />
         <CapabilityManagersCard people={departmentPeople} />
       </div>
-      <NiatMapCard institutesByPerson={instructorPeople.filter((person) => productLabel(person) !== 'Support').map((person) => person.institutes)} />
+      <NiatMapCard instructorInstitutes={instructorPeople.filter((person) => productLabel(person) !== 'Support').map((person) => person.institutes)} mentorInstitutes={mentorPeople.filter((person) => productLabel(person) !== 'Support').map((person) => person.institutes)} />
     </section>}
-
-    {report && activeAccessCard && <AccessDrilldown
-      label={ACCESS_CARD_LABELS[activeAccessCard]}
-      category={activeAccessCard}
-      split={report.access_breakdown?.[activeAccessCard]}
-      tab={activeAccessTab}
-      onTabChange={setActiveAccessTab}
-      onClose={() => setActiveAccessCard(null)}
-    />}
   </div>;
 }
 
@@ -319,21 +276,34 @@ function ProductMixCard({ people }: { people: InstructorSummary[] }) {
 // last 30 days, or the last 2 months when they had no session in the last 30 days, see instructorContribution.ts), so one instructor teaching two cohorts counts in both rows.
 const NIAT_COHORT_ORDER = ['NIAT 2024', 'NIAT 2025', 'NIAT 2026'];
 function NiatContributionCard({ people }: { people: InstructorSummary[] }) {
-  const { rows, total } = useMemo(() => {
+  const { rows, combos, total } = useMemo(() => {
     const niat = people.filter((p) => productLabel(p).startsWith('NIAT'));
     const counts = new Map<string, number>(NIAT_COHORT_ORDER.map((name) => [name, 0]));
+    // Combinations (2026-10-09, per request): an instructor teaching 2+ cohorts at once, e.g. NIAT 2025 + NIAT 2026,
+    // counted once under the exact combination they teach.
+    const comboCounts = new Map<string, { cohorts: string[]; count: number }>();
+    const cohortRank = (name: string) => { const i = NIAT_COHORT_ORDER.indexOf(name); return i === -1 ? 99 : i; };
     for (const person of niat) {
-      const cohorts = person.niat_cohorts ?? [];
+      const cohorts = [...new Set(person.niat_cohorts ?? [])].sort((a, b) => cohortRank(a) - cohortRank(b) || a.localeCompare(b));
       for (const cohort of cohorts) counts.set(cohort, (counts.get(cohort) ?? 0) + 1);
+      if (cohorts.length > 1) {
+        const key = cohorts.join(' + ');
+        const entry = comboCounts.get(key) ?? { cohorts, count: 0 };
+        entry.count += 1;
+        comboCounts.set(key, entry);
+      }
     }
+    const combos = [...comboCounts.values()]
+      .map((entry) => ({ label: entry.cohorts.map((name, i) => (i === 0 ? name : name.replace(/^NIAT\s+/, ''))).join(' + '), count: entry.count, size: entry.cohorts.length }))
+      .sort((a, b) => b.count - a.count || a.size - b.size || a.label.localeCompare(b.label));
     const ordered = [...counts.entries()].sort((a, b) => {
       const ia = NIAT_COHORT_ORDER.indexOf(a[0]);
       const ib = NIAT_COHORT_ORDER.indexOf(b[0]);
       return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib) || a[0].localeCompare(b[0]);
     });
-    return { rows: ordered, total: niat.length };
+    return { rows: ordered, combos, total: niat.length };
   }, [people]);
-  const max = Math.max(1, ...rows.map(([, count]) => count));
+  const max = Math.max(1, ...rows.map(([, count]) => count), ...combos.map((combo) => combo.count));
   const bar = (count: number, color: string) => <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-secondary"><div className="h-full rounded-full" style={{ width: `${Math.max(count > 0 ? 2 : 0, (count / max) * 100)}%`, backgroundColor: color }} /></div>;
   return <div data-testid="card-niat-contribution" className="flex h-full min-w-0 flex-col rounded-xl border border-border bg-card p-4 shadow-sm">
     <div className="mb-3 flex items-center gap-3">
@@ -356,7 +326,19 @@ function NiatContributionCard({ people }: { people: InstructorSummary[] }) {
         {bar(count, '#4f86b8')}
       </li>)}
     </ul>
-    <p className="mt-4 text-[10px] text-muted-foreground">An instructor teaching more than one cohort is counted in each.</p>
+    {combos.length > 0 && <div data-testid="niat-cohort-combinations" className="mt-3 border-t border-border/70 pt-2.5">
+      <h3 className="mb-1.5 text-[11px] font-extrabold">Teaching a combination of cohorts</h3>
+      <ul className="space-y-2">
+        {combos.map((combo) => <li key={combo.label} data-testid={`row-niat-combo-${slugify(combo.label)}`}>
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="text-[12px]">{combo.label}</span>
+            <span className="text-[12px] font-extrabold tabular-nums">{combo.count.toLocaleString('en-IN')}</span>
+          </div>
+          {bar(combo.count, '#2e8b7a')}
+        </li>)}
+      </ul>
+    </div>}
+    <p className="mt-3 text-[10px] text-muted-foreground">Cohort rows count everyone teaching that cohort, including those teaching a combination; each instructor appears once under their exact combination.</p>
   </div>;
 }
 
@@ -392,28 +374,52 @@ function CompactCountList({ rows, testPrefix }: { rows: [string, number][]; test
   </ol>;
 }
 
-function TopCampusesCard({ people }: { people: InstructorSummary[] }) {
+function TopCampusesCard({ instructors, mentors }: { instructors: InstructorSummary[]; mentors: InstructorSummary[] }) {
   // Training Institute is left out of this chart (2026-10-09, per request): the 10 biggest real campuses only.
+  // 2026-10-09, per request: each bar counts instructors + mentors and shows the split (a mentor who is also on the
+  // instructors list is counted once, as an instructor).
   const campuses = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const person of people) {
-      if (productLabel(person) === 'Support') continue;
-      const names = new Set((person.institutes ?? []).map((name) => name.trim()).filter((name) => name && name !== TRAINING_CAMPUS));
-      names.forEach((name) => counts.set(name, (counts.get(name) ?? 0) + 1));
-    }
-    return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 10);
-  }, [people]);
-  const max = Math.max(1, ...campuses.map(([, count]) => count));
+    const counts = new Map<string, { instructors: number; mentors: number }>();
+    const instructorIds = new Set(instructors.map((person) => person.id));
+    const add = (people: InstructorSummary[], kind: 'instructors' | 'mentors') => {
+      for (const person of people) {
+        if (productLabel(person) === 'Support') continue;
+        const names = new Set((person.institutes ?? []).map((name) => name.trim()).filter((name) => name && name !== TRAINING_CAMPUS && !/st\.?\s*mary/i.test(name)));
+        names.forEach((name) => {
+          const entry = counts.get(name) ?? { instructors: 0, mentors: 0 };
+          entry[kind] += 1;
+          counts.set(name, entry);
+        });
+      }
+    };
+    add(instructors, 'instructors');
+    add(mentors.filter((person) => !instructorIds.has(person.id)), 'mentors');
+    return [...counts.entries()]
+      .map(([name, c]) => ({ name, ...c, total: c.instructors + c.mentors }))
+      .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name))
+      .slice(0, 10);
+  }, [instructors, mentors]);
+  const max = Math.max(1, ...campuses.map((campus) => campus.total));
   return <div data-testid="card-top-campuses" className="min-w-0 overflow-hidden rounded-xl border border-border bg-card p-4 shadow-sm">
-    <h2 className="mb-3 text-center text-[12px] font-extrabold tracking-[-0.02em]">Top campuses by instructors</h2>
-    <div className="flex h-[150px] items-end justify-between gap-2 border-b border-border px-1">
-      {campuses.map(([campus, count]) => <div key={campus} data-testid={`row-campus-${slugify(campus)}`} title={`${campus}: ${count}`} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1">
-        <span className="text-[11px] font-extrabold tabular-nums">{count.toLocaleString('en-IN')}</span>
-        <div className="w-full max-w-[36px] rounded-t-md bg-[#4f86b8]" style={{ height: `${Math.max(count > 0 ? 3 : 0, (count / max) * 100)}%`, maxHeight: 'calc(100% - 18px)' }} />
+    <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+      <h2 className="text-[12px] font-extrabold tracking-[-0.02em]">Top campuses by instructors + mentors</h2>
+      <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+        <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-sm bg-[#4f86b8]" />Instructors</span>
+        <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-sm bg-[#2e8b7a]" />Mentors</span>
+      </div>
+    </div>
+    <div className="flex h-[160px] items-end justify-between gap-2 border-b border-border px-1">
+      {campuses.map((campus) => <div key={campus.name} data-testid={`row-campus-${slugify(campus.name)}`} title={`${campus.name}: ${campus.total} (${campus.instructors} instructors + ${campus.mentors} mentors)`} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-0.5">
+        <span className="text-[11px] font-extrabold tabular-nums">{campus.total.toLocaleString('en-IN')}</span>
+        <span className="text-[9px] leading-none tabular-nums text-muted-foreground">{campus.instructors}+{campus.mentors}</span>
+        <div className="flex w-full max-w-[36px] flex-col justify-end overflow-hidden rounded-t-md" style={{ height: `${Math.max(campus.total > 0 ? 3 : 0, (campus.total / max) * 100)}%`, maxHeight: 'calc(100% - 30px)' }}>
+          <div className="bg-[#2e8b7a]" style={{ flexGrow: campus.mentors, flexBasis: 0 }} />
+          <div className="bg-[#4f86b8]" style={{ flexGrow: campus.instructors, flexBasis: 0 }} />
+        </div>
       </div>)}
     </div>
     <div className="flex justify-between gap-2 px-1 pt-1.5">
-      {campuses.map(([campus]) => <span key={campus} title={campus} className="min-w-0 flex-1 truncate text-center text-[10px] text-muted-foreground">{campus}</span>)}
+      {campuses.map((campus) => <span key={campus.name} title={campus.name} className="min-w-0 flex-1 truncate text-center text-[10px] text-muted-foreground">{campus.name}</span>)}
     </div>
   </div>;
 }
@@ -491,172 +497,28 @@ function ExitListCard({ pendingPeople, onViewApproved, onViewPending }: { pendin
   </section>;
 }
 
-function KpiCard({ label, value, meta, icon, tone, alert = false, breakdown, active = false, onClick }: {
+function KpiCard({ label, value, meta, icon, tone, alert = false }: {
   label: string;
   value: string;
   meta: string;
   icon: React.ReactNode;
   tone: 'navy' | 'teal' | 'saffron' | 'coral';
   alert?: boolean;
-  breakdown?: AccessSplit;
-  active?: boolean;
-  onClick?: () => void;
 }) {
-  // Centred tile with a coloured edge (2026-10-09, per request: dashboard-style Overview).
+  // Centred tile with a coloured edge (2026-10-09, per request: dashboard-style Overview). Numbers only
+  // (2026-10-09, per request): no Darwin / TeachOS access split and no people list on the Overview.
   const tones = { navy: 'bg-primary text-primary-foreground', teal: 'bg-[#dff0eb] text-[#256e65]', saffron: 'bg-[#fbeed3] text-[#8a5a0b]', coral: 'bg-[#f6e4de] text-[#9b4434]' };
   const edges = { navy: '#4f86b8', teal: '#2e8b7a', saffron: '#1f3a5f', coral: '#c75b3f' };
-  return <button
-    type="button"
-    data-testid={`button-kpi-card-${label.toLowerCase().replace(/\s+/g, '-')}`}
-    onClick={onClick}
-    aria-pressed={active}
-    className={`relative w-full overflow-hidden rounded-xl border border-border bg-card py-3.5 pl-5 pr-4 text-center shadow-sm transition-transform hover:-translate-y-0.5 ${active ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : ''}`}
+  return <div
+    data-testid={`card-kpi-${label.toLowerCase().replace(/\s+/g, '-')}`}
+    className="relative w-full overflow-hidden rounded-xl border border-border bg-card py-5 pl-5 pr-4 text-center shadow-sm"
   >
     <span aria-hidden className="absolute bottom-3 left-0 top-3 w-1.5 rounded-r-full" style={{ backgroundColor: edges[tone] }} />
     <p className="flex items-center justify-center gap-1.5 text-[11px] font-bold text-muted-foreground"><span className={`grid h-5 w-5 place-items-center rounded-md ${tones[tone]}`}>{icon}</span>{label}</p>
-    <p className="mt-2 text-[26px] font-extrabold leading-none tracking-[-0.04em]">{value}</p>
+    <p className="mt-2 text-[28px] font-extrabold leading-none tracking-[-0.04em]">{value}</p>
     <p className={`mt-1.5 text-[10px] ${alert ? 'text-[#a36b00]' : 'text-muted-foreground'}`}>{meta}</p>
-    {breakdown && <div className="mt-3 grid grid-cols-3 gap-2 border-t border-border/70 pt-2">
-      {CARD_BREAKDOWN_ORDER.map((t) => <div key={t.key} className="flex flex-col">
-        {/* min-h + leading keeps the number lined up across the three columns even when a label wraps. */}
-        <p className="min-h-[23px] font-mono-ui text-[9px] leading-[1.3] uppercase tracking-[0.07em] text-muted-foreground">{t.label}</p>
-        <p className="mt-1 text-[13px] font-bold tracking-[-0.02em]">{formatKpi(breakdown[t.key]?.count)}</p>
-      </div>)}
-    </div>}
-    <p className="mt-2 text-[10px] font-bold uppercase tracking-[0.08em] text-primary">{active ? 'Hide people list ▲' : 'View people list ▼'}</p>
-  </button>;
+  </div>;
 }
-
-function AccessDrilldown({ label, category, split, tab, onTabChange, onClose }: {
-  label: string;
-  category: AccessCardKey;
-  split?: AccessSplit;
-  tab: AccessTabKey;
-  onTabChange: (tab: AccessTabKey) => void;
-  onClose: () => void;
-}) {
-  // "All" (2026-09-07, per request) is the union of the three real buckets
-  // -- darwin_only/both/teachos_only are mutually exclusive by construction
-  // (see reports.ts's buildAccessSplit), so a plain concatenation is safe,
-  // no id-dedup needed. Sorted by name since it's assembled from three
-  // separately-ordered lists.
-  const people: InstructorSummary[] = tab === 'all'
-    ? [...(split?.darwin_only?.people ?? []), ...(split?.both?.people ?? []), ...(split?.teachos_only?.people ?? [])].sort((a, b) => a.full_name.localeCompare(b.full_name))
-    : (split?.[tab]?.people ?? []);
-  const tabCount = (key: AccessTabKey) => key === 'all'
-    ? (split?.darwin_only?.count ?? 0) + (split?.both?.count ?? 0) + (split?.teachos_only?.count ?? 0)
-    : split?.[key]?.count;
-  // Search box (2026-09-24, per request: "where ever there are tables in
-  // the application add search option to search for any person") -- matches
-  // name or employee ID, same fields the Instructors tab's own search
-  // already checks. Filters both what renders below AND what "Download CSV"
-  // exports (same precedent as instructors.tsx's own search).
-  const [search, setSearch] = useState('');
-  const filteredPeople = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    if (!query) return people;
-    return people.filter((p) => p.full_name.toLowerCase().includes(query) || (p.employee_id ?? '').toLowerCase().includes(query));
-  }, [people, search]);
-  // Designation (Darwin's "Designation" column, see reports.ts's
-  // toApiInstructorSummary) used to be surfaced only for the Operations
-  // team drill-down (2026-09-07). Now shown for every category (2026-09-09,
-  // per request) -- kept as its own flag rather than inlined everywhere
-  // below since the column is conditionally rendered in several places
-  // (header, row, CSV headers, empty-state colSpan).
-  const showDesignation = true;
-  // Operations team shows a single "Department" column instead of a
-  // "Subject" one -- ops roles aren't a teaching "subject" the way
-  // instructor/mentor rows are (2026-09-09, per request). Every other
-  // category now shows BOTH: Subject (dept_area, the derived teaching-area
-  // taxonomy) and Department (Darwin's raw department field) as two
-  // separate columns, mirroring instructors.tsx's own Subject/Department
-  // split (2026-09-09, per follow-up request).
-  const showDepartmentColumn = category !== 'ops_team';
-  // Every card now shows two explicit manager columns instead of one
-  // ambiguous "Manager" column that used to silently fall back between
-  // the two (2026-09-07, per request; extended to Department, then to
-  // Operations team and the underlying `manager` field removed entirely
-  // 2026-09-08, per follow-up request): Capability Manager (TeachOS's own
-  // instructor_manager assignment, strict -- no Darwin fallback) and
-  // Manager (Darwin) (Darwin's own Direct Manager field, equally strict --
-  // no TeachOS fallback). See capability_manager / darwin_manager in
-  // reports.ts -- the old combined `manager` field no longer exists on
-  // InstructorSummary at all.
-  const handleDownload = () => {
-    const headers = ['Name', ...(showDesignation ? ['Designation'] : []), 'Employee ID', category === 'ops_team' ? 'Department' : 'Subject', ...(showDepartmentColumn ? ['Department'] : []), 'Campus', 'Capability Manager', 'Manager (Darwin)'];
-    const rows = filteredPeople.map((p) => [
-      p.full_name,
-      ...(showDesignation ? [p.designation ?? ''] : []),
-      p.employee_id ?? '',
-      category === 'ops_team' ? (p.department ?? '') : (p.dept_area ?? ''),
-      ...(showDepartmentColumn ? [p.department ?? ''] : []),
-      p.institutes?.join(', ') ?? '',
-      p.capability_manager ?? '',
-      p.darwin_manager ?? '',
-    ]);
-    downloadCsv(`${slugify(label)}-${tab.replaceAll('_', '-')}.csv`, toCsv(headers, rows));
-  };
-
-  return <section className="mt-5 rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6 animate-rise">
-    <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-      <div>
-        <p className="font-mono-ui text-[10px] uppercase tracking-[0.17em] text-muted-foreground">{label} — by data source</p>
-        <h2 className="mt-1 text-[16px] font-extrabold tracking-[-0.03em]">Who has access where</h2>
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        {people.length > 0 && <TableSearchInput value={search} onChange={setSearch} testId="input-search-access-drilldown" />}
-        <DownloadCsvButton onClick={handleDownload} disabled={filteredPeople.length === 0} testId="button-download-access-drilldown" />
-        <button type="button" data-testid="button-close-access-drilldown" onClick={onClose} className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-[11px] font-bold text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
-          <X size={13} /> Close
-        </button>
-      </div>
-    </div>
-    <div className="flex flex-wrap gap-2">
-      {ACCESS_TABS.map((t) => {
-        const isActive = tab === t.key;
-        return <button
-          key={t.key}
-          type="button"
-          data-testid={`button-access-tab-${t.key}`}
-          onClick={() => onTabChange(t.key)}
-          className={`rounded-lg border px-3.5 py-2 text-[12px] font-bold transition-colors ${isActive ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-secondary text-foreground hover:bg-border/50'}`}
-        >
-          {t.label} <span className="ml-1 font-mono-ui opacity-75">{formatKpi(tabCount(t.key))}</span>
-        </button>;
-      })}
-    </div>
-    <div className="mt-4 max-h-[420px] overflow-auto rounded-lg border border-border">
-      <table className="w-full text-left text-[12px]">
-        <thead className="sticky top-0 bg-secondary font-mono-ui text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
-          <tr>
-            <th className="px-3 py-2">Name</th>
-            {showDesignation && <th className="px-3 py-2">Designation</th>}
-            <th className="px-3 py-2">Employee ID</th>
-            <th className="px-3 py-2">{category === 'ops_team' ? 'Department' : 'Subject'}</th>
-            {showDepartmentColumn && <th className="px-3 py-2">Department</th>}
-            <th className="px-3 py-2">Campus</th>
-            <th className="px-3 py-2">Capability Manager</th>
-            <th className="px-3 py-2">Manager (Darwin)</th>
-          </tr>
-        </thead>
-        <tbody>
-          {filteredPeople.map((p) => <tr key={p.id} className="border-t border-border/70">
-            <td className="px-3 py-2 font-semibold">{p.full_name}</td>
-            {showDesignation && <td className="px-3 py-2 text-muted-foreground">{p.designation ?? '—'}</td>}
-            <td className="px-3 py-2 font-mono-ui text-muted-foreground">{p.employee_id ?? '—'}</td>
-            <td className="px-3 py-2 text-muted-foreground">{category === 'ops_team' ? (p.department ?? '—') : (p.dept_area ?? '—')}</td>
-            {showDepartmentColumn && <td className="px-3 py-2 text-muted-foreground">{p.department ?? '—'}</td>}
-            <td className="px-3 py-2 text-muted-foreground">{p.institutes?.join(', ') || '—'}</td>
-            <td className="px-3 py-2 text-muted-foreground">{p.capability_manager ?? '—'}</td>
-            <td className="px-3 py-2 text-muted-foreground">{p.darwin_manager ?? '—'}</td>
-          </tr>)}
-          {filteredPeople.length === 0 && <tr><td colSpan={6 + (showDesignation ? 1 : 0) + (showDepartmentColumn ? 1 : 0)} className="px-3 py-8 text-center text-muted-foreground">{people.length === 0 ? 'No one in this bucket.' : 'No one matches this search.'}</td></tr>}
-        </tbody>
-      </table>
-    </div>
-  </section>;
-}
-
 
 // Copy-to-clipboard helpers for Exception 2 (2026-10-06, per request: the
 // user ID and Capability Manager details "should be shown in copyable state
