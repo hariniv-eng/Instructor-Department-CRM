@@ -143,7 +143,7 @@ export default function DashboardPage() {
       <TopCampusesCard people={instructorPeople} />
       <CapabilityManagersCard people={instructorPeople} />
     </section>}
-    {report && <ExitedCard onViewAll={() => { setRemoveInitialView('archive'); setActiveException('remove'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} />}
+    {report && <ExitedCard pendingPeople={pendingPeople} onViewApproved={() => { setRemoveInitialView('archive'); setActiveException('remove'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} onViewPending={() => { setActiveException('pending'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} />}
 
     {report && activeAccessCard && <AccessDrilldown
       label={ACCESS_CARD_LABELS[activeAccessCard]}
@@ -310,10 +310,12 @@ function CapabilityManagersCard({ people }: { people: InstructorSummary[] }) {
   </div>;
 }
 
-// Exit data on the Overview (2026-10-08, per request): the approved exits recorded in the Instructor Archive
-// (status Exited) -- the total and the most recent few. The full list (search, copy user IDs, CSV) is the
-// "Exited (archive)" view of Exception 2, which "View all" opens.
-function ExitedCard({ onViewAll }: { onViewAll: () => void }) {
+// Exit data on the Overview (2026-10-08, per request): two lists side by side --
+//   Approved: the approved exits recorded in the Instructor Archive (status Exited, exit record Approved).
+//   Pending approval: exit requests still Pending With Approver (the same people as Exception 3).
+// Each shows its total and the most recent few; "View all" opens the full list (Exception 2's "Exited (archive)"
+// view, and Exception 3's panel).
+function ExitedCard({ pendingPeople, onViewApproved, onViewPending }: { pendingPeople: InstructorSummary[]; onViewApproved: () => void; onViewPending: () => void }) {
   const archiveQuery = useQuery<{ people: ArchiveExitRow[] }>({
     queryKey: ['reports', 'instructor-archive'],
     queryFn: async () => {
@@ -322,32 +324,45 @@ function ExitedCard({ onViewAll }: { onViewAll: () => void }) {
       return response.json();
     },
   });
-  const exited = useMemo(() => (archiveQuery.data?.people ?? [])
-    .filter((row) => row.status === 'Exited')
-    .sort((a, b) => (b.date_of_exit ?? '').localeCompare(a.date_of_exit ?? '') || a.full_name.localeCompare(b.full_name)), [archiveQuery.data]);
-  const recent = exited.slice(0, 8);
-  return <section data-testid="card-exited" className="mt-4 rounded-xl border border-border bg-card p-5 shadow-xs animate-rise">
-    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-      <div className="flex items-center gap-3">
-        <span className="grid h-9 w-9 place-items-center rounded-lg bg-secondary text-muted-foreground"><LogOut size={17} /></span>
-        <div>
-          <h2 className="text-[16px] font-extrabold tracking-[-0.03em]">Exit data</h2>
-          <p className="text-[11px] text-muted-foreground">Approved exits in the Instructor Archive</p>
-        </div>
+  const approved = useMemo(() => (archiveQuery.data?.people ?? [])
+    .filter(isApprovedExit)
+    .sort((a, b) => (b.date_of_exit ?? '').localeCompare(a.date_of_exit ?? '') || a.full_name.localeCompare(b.full_name))
+    .map((row) => ({ key: `a${row.id}`, name: row.full_name, date: row.date_of_exit })), [archiveQuery.data]);
+  const pending = useMemo(() => [...pendingPeople]
+    .sort((a, b) => (b.exit_flag_date ?? '').localeCompare(a.exit_flag_date ?? '') || a.full_name.localeCompare(b.full_name))
+    .map((p) => ({ key: `p${p.id}`, name: p.full_name, date: p.date_of_exit ?? p.exit_flag_date ?? null })), [pendingPeople]);
+  const column = (testId: string, title: string, subtitle: string, rows: { key: string; name: string; date: string | null }[], loading: boolean, onViewAll: () => void, empty: string) => <div data-testid={testId} className="min-w-0">
+    <div className="mb-2 flex items-center justify-between gap-3">
+      <div>
+        <h3 className="text-[14px] font-extrabold tracking-[-0.02em]">{title}</h3>
+        <p className="text-[11px] text-muted-foreground">{subtitle}</p>
       </div>
       <div className="flex items-center gap-3">
-        <span className="text-[26px] font-extrabold leading-none tracking-[-0.03em] tabular-nums" data-testid="text-exited-count">{archiveQuery.isLoading ? '…' : exited.length.toLocaleString('en-IN')}</span>
-        <button type="button" onClick={onViewAll} data-testid="button-view-all-exited" className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-3 py-1.5 text-[12px] font-bold text-foreground transition-colors hover:bg-secondary">View all <ArrowRight size={13} /></button>
+        <span className="text-[24px] font-extrabold leading-none tracking-[-0.03em] tabular-nums" data-testid={`${testId}-count`}>{loading ? '…' : rows.length.toLocaleString('en-IN')}</span>
+        <button type="button" onClick={onViewAll} data-testid={`${testId}-view-all`} className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-3 py-1.5 text-[12px] font-bold text-foreground transition-colors hover:bg-secondary">View all <ArrowRight size={13} /></button>
       </div>
     </div>
-    {archiveQuery.isError && <p className="py-4 text-center text-[12px] text-muted-foreground">The archive is unavailable right now.</p>}
-    {!archiveQuery.isError && <ul className="grid grid-cols-1 gap-x-8 md:grid-cols-2">
-      {recent.map((row) => <li key={row.id} className="flex items-center justify-between gap-3 border-b border-border/60 py-2">
-        <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">{row.full_name}</span>
-        <span className="shrink-0 text-[12px] text-muted-foreground">{formatExitDate(row.date_of_exit)}</span>
+    <ul>
+      {rows.slice(0, 8).map((row) => <li key={row.key} className="flex items-center justify-between gap-3 border-b border-border/60 py-2">
+        <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">{row.name}</span>
+        <span className="shrink-0 text-[12px] text-muted-foreground">{formatExitDate(row.date)}</span>
       </li>)}
-      {!archiveQuery.isLoading && recent.length === 0 && <li className="col-span-full py-6 text-center text-[12px] text-muted-foreground">No exited records in the archive yet.</li>}
-    </ul>}
+      {!loading && rows.length === 0 && <li className="py-6 text-center text-[12px] text-muted-foreground">{empty}</li>}
+    </ul>
+  </div>;
+  return <section data-testid="card-exited" className="mt-4 rounded-xl border border-border bg-card p-5 shadow-xs animate-rise">
+    <div className="mb-4 flex items-center gap-3">
+      <span className="grid h-9 w-9 place-items-center rounded-lg bg-secondary text-muted-foreground"><LogOut size={17} /></span>
+      <div>
+        <h2 className="text-[16px] font-extrabold tracking-[-0.03em]">Exit data</h2>
+        <p className="text-[11px] text-muted-foreground">Approved exits and exits waiting for approval</p>
+      </div>
+    </div>
+    {archiveQuery.isError && <p className="mb-3 text-[12px] text-muted-foreground">The archive is unavailable right now, so approved exits cannot be shown.</p>}
+    <div className="grid grid-cols-1 gap-x-10 gap-y-6 lg:grid-cols-2">
+      {column('exit-approved', 'Approved', 'Instructor Archive · exit date', approved, archiveQuery.isLoading, onViewApproved, 'No approved exits in the archive yet.')}
+      {column('exit-pending', 'Pending approval', 'Waiting on the approver · date of exit', pending, false, onViewPending, 'No exit approvals are pending.')}
+    </div>
   </section>;
 }
 
@@ -591,6 +606,10 @@ function formatExitDate(value?: string | null) {
 // status is Exited, i.e. the approved exit records, whether or not the person is still in TeachOS.
 type ExitRow = { id: string; full_name: string; employee_id: string | null; teachos_user_id: string | null; dept_area: string | null; capability_manager: string | null; is_payroll: boolean; date_of_exit: string | null; exit_flag_status: string | null; exit_flag_date: string | null };
 type ArchiveExitRow = { id: number; full_name: string; employee_id: string | null; teachos_user_id: string | null; dept_area: string | null; capability_manager: string | null; is_payroll: boolean; date_of_exit: string | null; exit_status: string | null; exit_date: string | null; status: 'Active' | 'Exited' | 'SNP' };
+// Approved exits only (2026-10-08, per request: "no pending for approval"): the archive also marks people Exited
+// from a Pending With Approver record or a manually set exit date, so the Overview checks the exit record's own
+// status. Pending ones stay in Exception 3; people exited by a manual date only are in the Archive tab.
+const isApprovedExit = (row: ArchiveExitRow) => row.status === 'Exited' && (row.exit_status ?? '').trim().toLowerCase() === 'approved';
 const toExitRow = (p: InstructorSummary): ExitRow => ({ id: String(p.id), full_name: p.full_name, employee_id: p.employee_id ?? null, teachos_user_id: p.teachos_user_id ?? null, dept_area: p.dept_area ?? null, capability_manager: p.capability_manager ?? null, is_payroll: !!p.is_payroll, date_of_exit: p.date_of_exit ?? null, exit_flag_status: p.exit_flag_status ?? null, exit_flag_date: p.exit_flag_date ?? null });
 
 function ExceptionRemovePanel({ exitPeople, noticePeople, onClose, initialView = 'exit' }: { exitPeople: InstructorSummary[]; noticePeople: InstructorSummary[]; onClose: () => void; initialView?: 'exit' | 'notice' | 'archive' }) {
@@ -604,7 +623,7 @@ function ExceptionRemovePanel({ exitPeople, noticePeople, onClose, initialView =
     },
   });
   const archivePeople = useMemo<ExitRow[]>(() => (archiveQuery.data?.people ?? [])
-    .filter((row) => row.status === 'Exited')
+    .filter(isApprovedExit)
     .map((row) => ({ id: `a${row.id}`, full_name: row.full_name, employee_id: row.employee_id, teachos_user_id: row.teachos_user_id, dept_area: row.dept_area, capability_manager: row.capability_manager, is_payroll: row.is_payroll, date_of_exit: row.date_of_exit, exit_flag_status: row.exit_status, exit_flag_date: row.exit_date }))
     .sort((a, b) => (b.date_of_exit ?? '').localeCompare(a.date_of_exit ?? '') || a.full_name.localeCompare(b.full_name)), [archiveQuery.data]);
   const liveExit = useMemo(() => exitPeople.map(toExitRow), [exitPeople]);
@@ -635,7 +654,7 @@ function ExceptionRemovePanel({ exitPeople, noticePeople, onClose, initialView =
           ? 'Instructors and Mentors who have exited (or whose notice period has ended) and still have a TeachOS record. Copy the user ID, remove the person in TeachOS, and they drop off this list after the next sync.'
           : view === 'notice'
             ? 'Instructors and Mentors serving their notice period. The day after their date of exit passes, they move to the Exit list automatically.'
-            : 'Everyone recorded as Exited in the Instructor Archive (approved exits), newest exit first. This is the permanent record, so people stay here after they are removed from TeachOS.'}</p>
+            : 'Everyone in the Instructor Archive whose exit is Approved in Darwinbox (pending approvals are not included), newest exit first. This is the permanent record, so people stay here after they are removed from TeachOS.'}</p>
         <div className="mt-3 flex flex-wrap gap-1.5">
           {views.map((v) => <button key={v.key} type="button" data-testid={`button-exception-view-${v.key}`} onClick={() => setView(v.key)} className={`rounded-full px-3 py-1 text-[11px] font-bold transition-colors ${view === v.key ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground hover:bg-secondary/70'}`}>{v.label} ({v.count})</button>)}
         </div>
