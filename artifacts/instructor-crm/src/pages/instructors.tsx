@@ -8,7 +8,7 @@ import { campusCityAndState } from '@/lib/campusRegions';
 import { PageIntro, EmptyState, QueryError, SkeletonBlock, DownloadCsvButton, MiniStat, pct, usePagedRows, TablePager } from '@/components/ui-pieces';
 import { downloadCsv, slugify, toCsv } from '@/lib/csv';
 import { toast } from '@/hooks/use-toast';
-import { ActionTakenCell, MovementCell, actionLabel, getKnownMovements, movementLabel, useMovementsByInstructor, type Movement } from '@/components/movement-tracker';
+import { ActionTakenCell, MovementCell, actionLabel, currentMovement, getKnownMovements, movementLabel, useMovementsByInstructor, type Movement } from '@/components/movement-tracker';
 
 // Manual-entry saves (Gender/Exit Verification/Subject below) used to fail
 // completely silently on a rejected request (2026-09-26, per report: "manual
@@ -981,7 +981,7 @@ export function downloadInstructorsCsv(category: CategoryKey, people: PersonWith
     row.push(productLabel(person));
     row.push(person.niat_cohorts?.join(', ') ?? '');
     // Latest logged movement (type + remark) and its Action Taken -- see components/movement-tracker.tsx.
-    const latestMovement = knownMovements.get(person.id)?.[0];
+    const latestMovement = currentMovement(knownMovements.get(person.id) ?? []);
     row.push(latestMovement ? `${movementLabel(latestMovement.movement_type)}: ${latestMovement.remark}` : '');
     row.push(latestMovement ? actionLabel(latestMovement.action_taken) : '');
     return row;

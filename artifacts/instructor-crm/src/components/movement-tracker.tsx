@@ -39,18 +39,22 @@ export const MOVEMENT_TYPES: { value: string; label: string }[] = [
   { value: 'deployment_no', label: 'Deployment - No' },
 ];
 export const movementLabel = (value: string) => MOVEMENT_TYPES.find((type) => type.value === value)?.label ?? value;
+// After a movement is marked Action Taken = Yes, the Movement Tracker and Action Taken cells go back to blank once 24
+// hours have passed (2026-10-09, per request), so the same instructor can be given a fresh movement. The movement
+// itself is never deleted -- the dialog's History keeps everything. A "No" or a not-yet-actioned movement stays put.
+export const ACTION_RESET_MS = 24 * 60 * 60 * 1000;
+export function currentMovement(movements: Movement[], now: number = Date.now()): Movement | undefined {
+  const latest = movements[0];
+  if (!latest) return undefined;
+  if (latest.action_taken === 'yes' && latest.action_at) {
+    const actedAt = new Date(latest.action_at).getTime();
+    if (!Number.isNaN(actedAt) && now - actedAt >= ACTION_RESET_MS) return undefined;
+  }
+  return latest;
+}
 export const actionLabel = (value: string | null | undefined) => (value === 'yes' ? 'Yes' : value === 'no' ? 'No' : '');
 
 const QUERY_KEY = ['instructor-movements'];
-const NAME_STORAGE_KEY = 'fcc-movement-name';
-
-const readStoredName = () => {
-  try { return window.localStorage.getItem(NAME_STORAGE_KEY) ?? ''; } catch { return ''; }
-};
-const storeName = (name: string) => {
-  try { window.localStorage.setItem(NAME_STORAGE_KEY, name); } catch { /* private window: the name just isn't remembered */ }
-};
-
 async function readJson<T>(response: Response): Promise<T> {
   const body = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error((body as { error?: string }).error ?? `HTTP ${response.status}`);
@@ -93,11 +97,18 @@ const TYPE_TONES: Record<string, string> = {
   deployment_no: 'bg-secondary text-muted-foreground',
 };
 
-const stopRowClick = (event: React.SyntheticEvent) => { event.preventDefault(); event.stopPropagation(); };
+// The dialog is portalled to <body>, so a click inside it never reaches the row's <a> natively -- only React's
+// synthetic bubbling does. preventDefault there would also cancel the form's submit (that was why "Log movement"
+// did nothing), so it is only called for clicks that happened inside the cell itself.
+const stopRowClick = (event: React.SyntheticEvent) => {
+  event.stopPropagation();
+  if (event.currentTarget.contains(event.target as Node)) event.preventDefault();
+};
+const stopPropagationOnly = (event: React.SyntheticEvent) => event.stopPropagation();
 
 export function MovementCell({ instructorId, fullName, movements }: { instructorId: number; fullName: string; movements: Movement[] }) {
   const [open, setOpen] = useState(false);
-  const latest = movements[0];
+  const latest = currentMovement(movements);
   return <div onClick={stopRowClick} onKeyDown={(event) => event.stopPropagation()} className="min-w-0 text-[12px]">
     <div className="flex items-center gap-2">
       {latest
@@ -118,15 +129,13 @@ function MovementDialog({ open, onOpenChange, instructorId, fullName, movements 
   const queryClient = useQueryClient();
   const [type, setType] = useState('cm_change');
   const [remark, setRemark] = useState('');
-  const [name, setName] = useState(readStoredName);
   const log = useMutation({
     mutationFn: async () => readJson<Movement>(await fetch(`/api/instructors/${instructorId}/movements`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ movement_type: type, remark, requested_by: name }),
+      body: JSON.stringify({ movement_type: type, remark }),
     })),
     onSuccess: () => {
-      storeName(name.trim());
       setRemark('');
       queryClient.invalidateQueries({ queryKey: QUERY_KEY });
       toast({ title: 'Movement logged', description: `${movementLabel(type)} recorded for ${fullName}.` });
@@ -135,10 +144,10 @@ function MovementDialog({ open, onOpenChange, instructorId, fullName, movements 
   });
   const inputClass = 'w-full rounded-md border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-ring/25';
   return <Dialog open={open} onOpenChange={onOpenChange}>
-    <DialogContent className="max-h-[88vh] overflow-y-auto sm:max-w-[560px]" onClick={stopRowClick}>
+    <DialogContent className="max-h-[88vh] overflow-y-auto sm:max-w-[560px]" onClick={stopPropagationOnly}>
       <DialogHeader>
         <DialogTitle>Movement tracker — {fullName}</DialogTitle>
-        <DialogDescription>Log a change for this instructor. The action owner marks it done in the Action Taken column.</DialogDescription>
+        <DialogDescription>Log a change for this instructor. Mark it Yes in the Action Taken column once it is done; the two columns clear 24 hours after that.</DialogDescription>
       </DialogHeader>
       <form className="space-y-3" onSubmit={(event) => { event.preventDefault(); log.mutate(); }}>
         <label className="block text-[12px] font-bold">Movement
@@ -149,11 +158,8 @@ function MovementDialog({ open, onOpenChange, instructorId, fullName, movements 
         <label className="block text-[12px] font-bold">Remark
           <textarea value={remark} onChange={(event) => setRemark(event.target.value)} rows={3} maxLength={1000} data-testid="input-movement-remark" placeholder={type === 'cm_change' ? 'Which Capability Manager should this instructor move to?' : 'What is changing, and to what?'} className={`${inputClass} mt-1 resize-y`} />
         </label>
-        <label className="block text-[12px] font-bold">Your name
-          <input value={name} onChange={(event) => setName(event.target.value)} maxLength={120} data-testid="input-movement-name" placeholder="So the log shows who raised it" className={`${inputClass} mt-1`} />
-        </label>
         <div className="flex justify-end">
-          <button type="submit" disabled={log.isPending || !remark.trim() || !name.trim()} data-testid="button-submit-movement" className="rounded-lg bg-primary px-4 py-2 text-[12px] font-bold text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50">{log.isPending ? 'Saving…' : 'Log movement'}</button>
+          <button type="submit" disabled={log.isPending || !remark.trim()} data-testid="button-submit-movement" className="rounded-lg bg-primary px-4 py-2 text-[12px] font-bold text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50">{log.isPending ? 'Saving…' : 'Log movement'}</button>
         </div>
       </form>
       <div>
@@ -177,12 +183,12 @@ function MovementDialog({ open, onOpenChange, instructorId, fullName, movements 
 // Action Taken applies to the LATEST movement: blank until someone actions it, then Yes or No.
 export function ActionTakenCell({ movements }: { movements: Movement[] }) {
   const queryClient = useQueryClient();
-  const latest = movements[0];
+  const latest = currentMovement(movements);
   const update = useMutation({
-    mutationFn: async (action: 'yes' | 'no' | null) => readJson<Movement>(await fetch(`/api/instructor-movements/${latest.id}/action`, {
+    mutationFn: async (action: 'yes' | 'no' | null) => readJson<Movement>(await fetch(`/api/instructor-movements/${latest?.id}/action`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action_taken: action, action_by: readStoredName() || null }),
+      body: JSON.stringify({ action_taken: action }),
     })),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: QUERY_KEY }),
     onError: (error) => toast({ variant: 'destructive', title: "Couldn't save Action Taken", description: error instanceof Error ? error.message : 'Try again.' }),
