@@ -76,6 +76,12 @@ function normalise(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 }
 
+// Every distinct university row of the sheet (used by the Overview's India map, lib/campusLocations.ts).
+export function allRegions(): Region[] {
+  const seen = new Set<string>();
+  return RULES.map((rule) => rule.region).filter((region) => (seen.has(region.university) ? false : (seen.add(region.university), true)));
+}
+
 export function regionForInstitute(institute: string): Region | null {
   const name = normalise(institute);
   if (!name) return null;
