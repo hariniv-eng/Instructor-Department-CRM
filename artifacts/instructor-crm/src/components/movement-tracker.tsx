@@ -30,13 +30,14 @@ export type Movement = {
   action_at: string | null;
 };
 
+// Labels as requested 2026-10-09. The stored values keep their original keys so movements already logged still show.
 export const MOVEMENT_TYPES: { value: string; label: string }[] = [
   { value: 'cm_change', label: 'CM change' },
-  { value: 'external_move', label: 'Externally Move' },
-  { value: 'dsa_team', label: 'DSA team' },
-  { value: 'product_move', label: 'Product Move' },
-  { value: 'deployment_yes', label: 'Deployment - Yes' },
-  { value: 'deployment_no', label: 'Deployment - No' },
+  { value: 'external_move', label: 'Team Movement' },
+  { value: 'dsa_team', label: 'DSA team Move' },
+  { value: 'product_move', label: 'Product Movement' },
+  { value: 'deployment_yes', label: 'Ins/Men Deployment' },
+  { value: 'deployment_no', label: 'Ins/Men Recall' },
 ];
 export const movementLabel = (value: string) => MOVEMENT_TYPES.find((type) => type.value === value)?.label ?? value;
 // After a movement is marked Action Taken = Yes, the Movement Tracker and Action Taken cells go back to blank once 24

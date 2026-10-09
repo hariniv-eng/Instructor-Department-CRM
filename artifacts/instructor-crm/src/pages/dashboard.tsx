@@ -44,7 +44,7 @@ export default function DashboardPage() {
   //     from TeachOS, since the queue only holds people still present in
   //     Darwin or TeachOS and this view additionally needs TeachOS presence.
   const [activeException, setActiveException] = useState<'remove' | 'pending' | null>(null);
-  const [removeInitialView, setRemoveInitialView] = useState<'exit' | 'notice' | 'archive'>('exit');
+  const [removeInitialView, setRemoveInitialView] = useState<'exit' | 'notice'>('exit');
   const exceptionSplit = report?.access_breakdown?.exception;
   const reviewPeople = useMemo(() => [...(exceptionSplit?.darwin_only?.people ?? []), ...(exceptionSplit?.both?.people ?? []), ...(exceptionSplit?.teachos_only?.people ?? [])]
     .filter((p) => !p.exit_verification)
@@ -437,7 +437,7 @@ function CapabilityManagersCard({ people }: { people: InstructorSummary[] }) {
 // Exit data tile in the KPI row (2026-10-09, per request): the big number is the approved exits recorded so far
 // (Instructor Archive: status Exited, exit record Approved). Clicking it opens a pop-up with every approved name and
 // every name still pending approval (Exception 3's list), so the counts can be checked against real people.
-const REVIEW_LABELS: Record<string, string> = { exited: 'Exited', serving_notice_period: 'Serving notice', payroll_converted: 'Payroll converted' };
+const REVIEW_LABELS: Record<string, string> = { exited: 'Exited', absconded: 'Absconded', serving_notice_period: 'Serving notice', payroll_converted: 'Payroll converted' };
 function ExitKpiCard({ pendingPeople }: { pendingPeople: InstructorSummary[] }) {
   const [open, setOpen] = useState(false);
   const archiveQuery = useQuery<{ people: ArchiveExitRow[] }>({
@@ -448,10 +448,14 @@ function ExitKpiCard({ pendingPeople }: { pendingPeople: InstructorSummary[] }) 
       return response.json();
     },
   });
+  // Payroll candidates are never shown here (2026-10-09, per request) -- they are handled in the Exceptions.
   const approved = useMemo(() => (archiveQuery.data?.people ?? [])
-    .filter(isApprovedExit)
+    .filter((row) => isApprovedExit(row) && !row.is_payroll)
     .sort((a, b) => (b.date_of_exit ?? '').localeCompare(a.date_of_exit ?? '') || a.full_name.localeCompare(b.full_name)), [archiveQuery.data]);
-  const pending = useMemo(() => [...pendingPeople]
+  // Upcoming exits (2026-10-09, per request): only people a Capability Manager has marked Exited or Absconded whose
+  // exit is still pending approval. Serving-notice and payroll candidates stay in Exception 3 only.
+  const upcoming = useMemo(() => pendingPeople
+    .filter((person) => !person.is_payroll && (person.exit_verification === 'exited' || person.exit_verification === 'absconded'))
     .sort((a, b) => (b.exit_flag_date ?? '').localeCompare(a.exit_flag_date ?? '') || a.full_name.localeCompare(b.full_name)), [pendingPeople]);
   const value = archiveQuery.isLoading ? '…' : archiveQuery.isError ? '—' : approved.length.toLocaleString('en-IN');
   const chip = (text: string, tone: 'amber' | 'blue') => <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${tone === 'amber' ? 'bg-[#fbeed3] text-[#8a5a0b]' : 'bg-[#e1eaf1] text-primary'}`}>{text}</span>;
@@ -474,7 +478,7 @@ function ExitKpiCard({ pendingPeople }: { pendingPeople: InstructorSummary[] }) 
       <DialogContent className="max-w-xl" data-testid="dialog-exit-data">
         <DialogHeader>
           <DialogTitle>Exit data</DialogTitle>
-          <DialogDescription>Approved exits recorded so far, and exits still waiting for approval.</DialogDescription>
+          <DialogDescription>Approved exits recorded so far, and upcoming exits still waiting for approval.</DialogDescription>
         </DialogHeader>
         <div className="space-y-5">
           <section data-testid="exit-dialog-approved">
@@ -491,16 +495,19 @@ function ExitKpiCard({ pendingPeople }: { pendingPeople: InstructorSummary[] }) 
               {!archiveQuery.isLoading && approved.length === 0 && <li className="py-2 text-[12px] text-muted-foreground">No approved exits yet.</li>}
             </ul>
           </section>
-          <section data-testid="exit-dialog-pending">
-            <h3 className="mb-1 text-[12px] font-extrabold">Pending approval <span className="tabular-nums text-muted-foreground">{pending.length}</span></h3>
+          <section data-testid="exit-dialog-upcoming">
+            <h3 className="mb-1 text-[12px] font-extrabold">Upcoming exits <span className="tabular-nums text-muted-foreground">{upcoming.length}</span></h3>
+            <p className="mb-1 text-[10px] text-muted-foreground">Marked Exited or Absconded by the Capability Manager; approval is still pending.</p>
             <ul>
-              {pending.map((person) => <li key={person.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-border/60 py-1.5">
-                <span className="min-w-0 flex-1 truncate text-[12px] font-semibold">{person.full_name}</span>
-                {(person.is_payroll || person.exit_verification === 'payroll_converted') && chip('Payroll converted', 'blue')}
-                {person.exit_verification && chip(`Marked by CM: ${REVIEW_LABELS[person.exit_verification] ?? person.exit_verification}`, 'amber')}
+              {upcoming.map((person) => <li key={person.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-border/60 py-1.5">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[12px] font-semibold">{person.full_name}</p>
+                  <p className="truncate text-[10px] text-muted-foreground">{[person.employee_id, person.dept_area, person.capability_manager ? `CM: ${person.capability_manager}` : null].filter(Boolean).join(' · ') || '—'}</p>
+                </div>
+                {person.exit_verification && chip(REVIEW_LABELS[person.exit_verification] ?? person.exit_verification, 'amber')}
                 <span className="shrink-0 text-[11px] text-muted-foreground">{formatExitDate(person.date_of_exit ?? person.exit_flag_date)}</span>
               </li>)}
-              {pending.length === 0 && <li className="py-2 text-[12px] text-muted-foreground">Nothing waiting for approval.</li>}
+              {upcoming.length === 0 && <li className="py-2 text-[12px] text-muted-foreground">No upcoming exits.</li>}
             </ul>
           </section>
         </div>
@@ -606,25 +613,15 @@ type ArchiveExitRow = { id: number; full_name: string; employee_id: string | nul
 const isApprovedExit = (row: ArchiveExitRow) => row.status === 'Exited' && (row.exit_status ?? '').trim().toLowerCase() === 'approved';
 const toExitRow = (p: InstructorSummary): ExitRow => ({ id: String(p.id), full_name: p.full_name, employee_id: p.employee_id ?? null, teachos_user_id: p.teachos_user_id ?? null, dept_area: p.dept_area ?? null, capability_manager: p.capability_manager ?? null, is_payroll: !!p.is_payroll, date_of_exit: p.date_of_exit ?? null, exit_flag_status: p.exit_flag_status ?? null, exit_flag_date: p.exit_flag_date ?? null });
 
-function ExceptionRemovePanel({ exitPeople, noticePeople, onClose, initialView = 'exit' }: { exitPeople: InstructorSummary[]; noticePeople: InstructorSummary[]; onClose: () => void; initialView?: 'exit' | 'notice' | 'archive' }) {
-  const [view, setView] = useState<'exit' | 'notice' | 'archive'>(initialView);
-  const archiveQuery = useQuery<{ people: ArchiveExitRow[] }>({
-    queryKey: ['reports', 'instructor-archive'],
-    queryFn: async () => {
-      const response = await fetch('/api/reports/instructor-archive');
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      return response.json();
-    },
-  });
-  const archivePeople = useMemo<ExitRow[]>(() => (archiveQuery.data?.people ?? [])
-    .filter(isApprovedExit)
-    .map((row) => ({ id: `a${row.id}`, full_name: row.full_name, employee_id: row.employee_id, teachos_user_id: row.teachos_user_id, dept_area: row.dept_area, capability_manager: row.capability_manager, is_payroll: row.is_payroll, date_of_exit: row.date_of_exit, exit_flag_status: row.exit_status, exit_flag_date: row.exit_date }))
-    .sort((a, b) => (b.date_of_exit ?? '').localeCompare(a.date_of_exit ?? '') || a.full_name.localeCompare(b.full_name)), [archiveQuery.data]);
+function ExceptionRemovePanel({ exitPeople, noticePeople, onClose, initialView = 'exit' }: { exitPeople: InstructorSummary[]; noticePeople: InstructorSummary[]; onClose: () => void; initialView?: 'exit' | 'notice' }) {
+  // Exception 2 is only the two worklists (2026-10-09, per request): who must be removed from TeachOS, and who is
+  // serving notice. The approved-exit records live on the Overview's Exit data card, not here.
+  const [view, setView] = useState<'exit' | 'notice'>(initialView);
   const liveExit = useMemo(() => exitPeople.map(toExitRow), [exitPeople]);
   const liveNotice = useMemo(() => noticePeople.map(toExitRow), [noticePeople]);
   const [search, setSearch] = useState('');
   const [copiedAll, setCopiedAll] = useState(false);
-  const people = view === 'exit' ? liveExit : view === 'notice' ? liveNotice : archivePeople;
+  const people = view === 'exit' ? liveExit : liveNotice;
   const filtered = useMemo(() => people.filter((p) => matchesSearch(p, search)), [people, search]);
   const userIds = filtered.map((p) => p.teachos_user_id).filter((id): id is string => !!id);
   const copyAllIds = async () => {
@@ -633,22 +630,19 @@ function ExceptionRemovePanel({ exitPeople, noticePeople, onClose, initialView =
       window.setTimeout(() => setCopiedAll(false), 1500);
     }
   };
-  const handleDownload = () => downloadCsv(view === 'exit' ? 'exception-2-exit-remove-from-teachos.csv' : view === 'notice' ? 'exception-2-serving-notice-period.csv' : 'exited-approved-instructor-archive.csv', toCsv(['Name', 'Employee ID', 'TeachOS User ID', 'Subject', 'Capability Manager', 'Payroll / Nxtwave', 'date_of_exit', 'exit_status', 'exit_date'], filtered.map((p) => [p.full_name, p.employee_id ?? '', p.teachos_user_id ?? '', p.dept_area ?? '', p.capability_manager ?? '', payrollLabel(p), p.date_of_exit ?? '', p.exit_flag_status ?? '', p.exit_flag_date ?? ''])));
-  const views: { key: 'exit' | 'notice' | 'archive'; label: string; count: number }[] = [
+  const handleDownload = () => downloadCsv(view === 'exit' ? 'exception-2-exit-remove-from-teachos.csv' : 'exception-2-serving-notice-period.csv', toCsv(['Name', 'Employee ID', 'TeachOS User ID', 'Subject', 'Capability Manager', 'Payroll / Nxtwave', 'date_of_exit', 'exit_status', 'exit_date'], filtered.map((p) => [p.full_name, p.employee_id ?? '', p.teachos_user_id ?? '', p.dept_area ?? '', p.capability_manager ?? '', payrollLabel(p), p.date_of_exit ?? '', p.exit_flag_status ?? '', p.exit_flag_date ?? ''])));
+  const views: { key: 'exit' | 'notice'; label: string; count: number }[] = [
     { key: 'exit', label: 'Exit', count: exitPeople.length },
     { key: 'notice', label: 'Serving notice period', count: noticePeople.length },
-    { key: 'archive', label: 'Exited (archive)', count: archivePeople.length },
   ];
   return <section className="mb-4 rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6 animate-rise">
     <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
       <div>
         <p className="font-mono-ui text-[10px] uppercase tracking-[0.17em] text-muted-foreground">Exception 2 — TeachOS clean-up</p>
-        <h2 className="mt-1 text-[16px] font-extrabold tracking-[-0.03em]">{view === 'exit' ? 'Exited — remove TeachOS access' : view === 'notice' ? 'Serving notice period' : 'Exited — approved exit records'}</h2>
+        <h2 className="mt-1 text-[16px] font-extrabold tracking-[-0.03em]">{view === 'exit' ? 'Exited — remove TeachOS access' : 'Serving notice period'}</h2>
         <p className="mt-1 max-w-[640px] text-[12px] text-muted-foreground">{view === 'exit'
           ? 'Instructors and Mentors who have exited (or whose notice period has ended) and still have a TeachOS record. Copy the user ID, remove the person in TeachOS, and they drop off this list after the next sync.'
-          : view === 'notice'
-            ? 'Instructors and Mentors serving their notice period. The day after their date of exit passes, they move to the Exit list automatically.'
-            : 'Everyone in the Instructor Archive whose exit is Approved in Darwinbox (pending approvals are not included), newest exit first. This is the permanent record, so people stay here after they are removed from TeachOS.'}</p>
+          : 'Instructors and Mentors serving their notice period. The day after their date of exit passes, they move to the Exit list automatically.'}</p>
         <div className="mt-3 flex flex-wrap gap-1.5">
           {views.map((v) => <button key={v.key} type="button" data-testid={`button-exception-view-${v.key}`} onClick={() => setView(v.key)} className={`rounded-full px-3 py-1 text-[11px] font-bold transition-colors ${view === v.key ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground hover:bg-secondary/70'}`}>{v.label} ({v.count})</button>)}
         </div>
@@ -681,7 +675,7 @@ function ExceptionRemovePanel({ exitPeople, noticePeople, onClose, initialView =
             <td className="whitespace-nowrap px-3 py-2 text-muted-foreground" data-testid={`text-exit-status-${p.id}`}>{p.exit_flag_status || '—'}</td>
             <td className="whitespace-nowrap px-3 py-2 text-muted-foreground" data-testid={`text-exit-record-date-${p.id}`}>{formatExitDate(p.exit_flag_date)}</td>
           </tr>)}
-          {filtered.length === 0 && <tr><td colSpan={9} className="px-3 py-8 text-center text-muted-foreground">{people.length === 0 ? (view === 'exit' ? 'No one is waiting to be removed from TeachOS.' : view === 'notice' ? 'No one is serving a notice period.' : archiveQuery.isLoading ? 'Loading the archive...' : archiveQuery.isError ? 'The archive is unavailable right now.' : 'No exited records in the archive yet.') : 'No one matches this search.'}</td></tr>}
+          {filtered.length === 0 && <tr><td colSpan={9} className="px-3 py-8 text-center text-muted-foreground">{people.length === 0 ? (view === 'exit' ? 'No one is waiting to be removed from TeachOS.' : 'No one is serving a notice period.') : 'No one matches this search.'}</td></tr>}
         </tbody>
       </table>
     </div>
