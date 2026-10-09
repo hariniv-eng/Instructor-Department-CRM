@@ -609,7 +609,7 @@ export default function InstructorsPage() {
 
     {capabilityManagerFilter.length > 0 && capabilityManagerBreakdown && <section className="mb-5 rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6">
       <div className="mb-4 flex items-center gap-2">
-        <span className="grid h-8 w-8 place-items-center rounded-lg bg-[#dff0eb] text-[#287469]"><UserCheck size={16} /></span>
+        <span className="grid h-8 w-8 place-items-center rounded-lg bg-[#e3f3df] text-[#2f6b2a]"><UserCheck size={16} /></span>
         <div>
           <p className="font-mono-ui text-[10px] uppercase tracking-[0.17em] text-muted-foreground">TeachOS — Capability Manager</p>
           <h2 className="text-[15px] font-extrabold tracking-[-0.03em]">{selectionSummary(capabilityManagerFilter, (key) => (key === NO_CAPABILITY_MANAGER ? 'Not on file' : key))} headcount, by category</h2>
@@ -1046,8 +1046,8 @@ export function CategoryTable({ category, people, backQuery, linkMode = 'row', b
 }
 
 const ACCESS_PILL_CLASSES: Record<AccessKind, string> = {
-  both: 'bg-[#dff0eb] text-[#256e65]',
-  darwin_only: 'bg-[#e1eaf1] text-primary',
+  both: 'bg-[#e3f3df] text-[#2f6b2a]',
+  darwin_only: 'bg-[#d9f0ec] text-primary',
   teachos_only: 'bg-[#f6e4de] text-[#9b4434]',
 };
 
@@ -1069,7 +1069,7 @@ function PersonRow({ category, person, columns, backQuery, linkMode = 'row', bac
   // which decodes this same `back` param.
   const href = backQuery || backPrefix ? `/instructors/${person.id}?back=${encodeURIComponent(backPrefix + backQuery)}` : `/instructors/${person.id}`;
   const nameBlock = <>
-    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#e1eaf1] text-[11px] font-extrabold text-primary">{initials(person.full_name)}</span>
+    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#d9f0ec] text-[11px] font-extrabold text-primary">{initials(person.full_name)}</span>
     <span className="min-w-0">
       <span className={`block truncate text-[13px] font-bold text-foreground ${linkMode === 'name' ? 'group-hover/name:text-primary group-hover/name:underline' : ''}`}>{person.full_name}</span>
     </span>

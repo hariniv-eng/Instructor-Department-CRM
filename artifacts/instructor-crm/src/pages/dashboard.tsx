@@ -203,7 +203,7 @@ function ExceptionSegment({ label, title, meta, count, icon, href, active = fals
     <span className="inline-flex shrink-0 items-center gap-1 text-[12px] font-bold">Check <ArrowRight size={14} /></span>
   </>;
   const cls = `flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors ${clear
-    ? `text-[#256e65] hover:bg-[#d2e8e1] ${active ? 'bg-[#d2e8e1]' : 'bg-[#dff0eb]'}`
+    ? `text-[#2f6b2a] hover:bg-[#d3ebce] ${active ? 'bg-[#d3ebce]' : 'bg-[#e3f3df]'}`
     : `text-[#9b4434] hover:bg-[#f0d6cd] ${active ? 'bg-[#f0d6cd]' : 'bg-[#f6e4de]'}`}`;
   if (href) return <Link href={href} data-testid={`link-${testId}`} className={cls}>{body}</Link>;
   return <button type="button" data-testid={`button-${testId}`} onClick={onClick} aria-pressed={active} className={cls}>{body}</button>;
@@ -257,9 +257,9 @@ function ExceptionPendingPanel({ people, onClose }: { people: InstructorSummary[
 // the same productLabel() the Instructors tab's Product column and filter use, so the slices match it exactly.
 const PRODUCT_COLORS: Record<string, string> = {
   'NIAT (Deployed)': '#27415f',
-  'NIAT (Training)': '#4f86b8',
+  'NIAT (Training)': '#22a7c4',
   Academy: '#e0a030',
-  Intensive: '#2e8b7a',
+  Intensive: '#4f9d5d',
   'IIT X DSA': '#c75b3f',
   Support: '#8a93a6',
 };
@@ -357,7 +357,7 @@ function NiatContributionCard({ people }: { people: InstructorSummary[] }) {
           <span className="text-[12px]">{cohort}</span>
           <span className="text-[12px] font-extrabold tabular-nums">{count.toLocaleString('en-IN')}</span>
         </div>
-        {bar(count, '#4f86b8')}
+        {bar(count, '#1aa59a')}
       </li>)}
     </ul>
     <p className="mt-4 text-[10px] text-muted-foreground">An instructor teaching more than one cohort is counted in each.</p>
@@ -403,7 +403,7 @@ function TopCampusesCard({ people }: { people: InstructorSummary[] }) {
     <div className="flex h-[150px] items-end justify-between gap-2 border-b border-border px-1">
       {campuses.map(([campus, count]) => <div key={campus} data-testid={`row-campus-${slugify(campus)}`} title={`${campus}: ${count}`} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1">
         <span className="text-[11px] font-extrabold tabular-nums">{count.toLocaleString('en-IN')}</span>
-        <div className="w-full rounded-t-md bg-[#4f86b8]" style={{ height: `${Math.max(count > 0 ? 3 : 0, (count / max) * 100)}%`, maxHeight: 'calc(100% - 18px)' }} />
+        <div className="w-full rounded-t-md bg-[#1aa59a]" style={{ height: `${Math.max(count > 0 ? 3 : 0, (count / max) * 100)}%`, maxHeight: 'calc(100% - 18px)' }} />
       </div>)}
     </div>
     <div className="flex justify-between gap-2 px-1 pt-1.5">
@@ -505,8 +505,8 @@ function KpiCard({ label, value, meta, icon, tone, alert = false, breakdown, act
   onClick?: () => void;
 }) {
   // Centred tile with a coloured edge (2026-10-09, per request: dashboard-style Overview).
-  const tones = { navy: 'bg-primary text-primary-foreground', teal: 'bg-[#dff0eb] text-[#256e65]', saffron: 'bg-[#fbeed3] text-[#8a5a0b]', coral: 'bg-[#f6e4de] text-[#9b4434]' };
-  const edges = { navy: '#4f86b8', teal: '#2e8b7a', saffron: '#1f3a5f', coral: '#c75b3f' };
+  const tones = { navy: 'bg-primary text-primary-foreground', teal: 'bg-[#e3f3df] text-[#2f6b2a]', saffron: 'bg-[#fbeed3] text-[#8a5a0b]', coral: 'bg-[#f6e4de] text-[#9b4434]' };
+  const edges = { navy: '#1aa59a', teal: '#4f9d5d', saffron: '#0f766e', coral: '#c75b3f' };
   return <button
     type="button"
     data-testid={`button-kpi-card-${label.toLowerCase().replace(/\s+/g, '-')}`}
@@ -696,7 +696,7 @@ function CopyValue({ value, mono = false, testId }: { value: string | null | und
   return <span className="inline-flex items-center gap-1.5">
     <span className={mono ? 'font-mono-ui' : ''}>{value}</span>
     <button type="button" onClick={onCopy} data-testid={testId} aria-label={`Copy ${value}`} title={copied ? 'Copied' : 'Copy'} className="grid h-5 w-5 shrink-0 place-items-center rounded border border-border text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
-      {copied ? <Check size={11} className="text-[#256e65]" /> : <Copy size={11} />}
+      {copied ? <Check size={11} className="text-[#2f6b2a]" /> : <Copy size={11} />}
     </button>
   </span>;
 }
@@ -784,7 +784,7 @@ function ExceptionRemovePanel({ exitPeople, noticePeople, onClose, initialView =
       <div className="flex flex-wrap items-center gap-2">
         {people.length > 0 && <TableSearchInput value={search} onChange={setSearch} placeholder="Search name, employee ID or user ID..." testId="input-search-exception-remove" />}
         <button type="button" onClick={copyAllIds} disabled={userIds.length === 0} data-testid="button-copy-all-user-ids" className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-[11px] font-bold text-foreground transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50">
-          {copiedAll ? <Check size={13} className="text-[#256e65]" /> : <Copy size={13} />} {copiedAll ? 'Copied' : `Copy all user IDs (${userIds.length})`}
+          {copiedAll ? <Check size={13} className="text-[#2f6b2a]" /> : <Copy size={13} />} {copiedAll ? 'Copied' : `Copy all user IDs (${userIds.length})`}
         </button>
         <DownloadCsvButton onClick={handleDownload} disabled={filtered.length === 0} testId="button-download-exception-remove" />
         <button type="button" data-testid="button-close-exception-remove" onClick={onClose} className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-[11px] font-bold text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
