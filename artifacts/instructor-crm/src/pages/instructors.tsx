@@ -876,9 +876,13 @@ export function bifurcationLabel(classification: string | null): string {
 //     'or' it is 'and'") BOTH of
 //       - the TeachOS Capability Manager is missing, and
 //       - the Darwin manager is Jashwanth Dandu (NW0005864).
-//     So a KKH person with a Capability Manager is never IIT X DSA, and
-//     neither is a KKH person with no Capability Manager who reports to
-//     someone else.
+//     PLUS (2026-10-09, per request: "also include instructors whose darwin
+//     manager is Jashwanth Dandu (NW0005864)") anyone whose Darwin manager is
+//     Jashwanth Dandu, wherever they sit and whatever their Capability
+//     Manager. The KKH rule above is therefore already covered by this one
+//     (it needs that same manager), so in effect: Darwin manager =
+//     Jashwanth Dandu (NW0005864). Support (Ops) and Academy are still
+//     decided first.
 //   - Intensive: Campus (institutes) has ANY entry containing "intensive"
 //     (case-insensitive substring match, 2026-10-05, per request: "if the
 //     campus column value contains the value intensive then they are
@@ -910,13 +914,12 @@ export function productLabel(person: InstructorSummary): string {
   if ((person.enrolled_plans ?? '').includes('CCBP_ACADEMY_GENIUS_CAREER_PLUS')) return 'Academy';
   // IIT X DSA (rule changed 2026-10-08, per request -- designation no longer matters): Darwin
   // location is KKH AND the TeachOS Capability Manager is missing AND the
-  // Darwin manager is Jashwanth Dandu (NW0005864) -- all three, not "or".
-  const location = (person.work_location ?? '').toLowerCase();
-  const atKkh = location.includes('kapil kavuri hub') || location.includes('kkh');
-  const noCapabilityManager = !(person.capability_manager ?? '').trim();
+  // Darwin manager is Jashwanth Dandu (NW0005864) -- all three, not "or" -- OR (2026-10-09) the
+  // Darwin manager is Jashwanth Dandu (NW0005864) on his own, at any location.
+  // (The KKH + no-Capability-Manager conditions are implied: that rule already needed this same manager.)
   const darwinManager = (person.darwin_manager ?? '').toLowerCase();
   const reportsToJashwanth = darwinManager.includes('nw0005864') || darwinManager.includes('jashwanth dandu');
-  if (atKkh && noCapabilityManager && reportsToJashwanth) return 'IIT X DSA';
+  if (reportsToJashwanth) return 'IIT X DSA';
   if ((person.institutes ?? []).some((i) => i.toLowerCase().includes('intensive'))) return 'Intensive';
   if ((person.institutes ?? []).includes('Training Institute')) return 'NIAT (Training)';
   // Blank campus = NIAT training instructor (2026-10-08, per request: "if the campus
