@@ -50,11 +50,8 @@ router.post("/instructors/:id/movements", async (req, res): Promise<void> => {
     res.status(400).json({ error: "Write a remark (for a CM change, which Capability Manager it should change to)." });
     return;
   }
-  const requestedBy = cleanText(body.requested_by, 120);
-  if (!requestedBy) {
-    res.status(400).json({ error: "Enter your name so the movement shows who logged it." });
-    return;
-  }
+  // No "your name" field any more (2026-10-09, per request): the form doesn't ask who is logging it.
+  const requestedBy = cleanText(body.requested_by, 120) || "Capability Manager";
   const [instructor] = await db.select().from(instructorsTable).where(eq(instructorsTable.id, Number(req.params.id)));
   if (!instructor) {
     res.status(404).json({ error: "Instructor not found" });

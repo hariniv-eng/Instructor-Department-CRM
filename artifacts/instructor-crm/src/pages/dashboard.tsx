@@ -464,17 +464,11 @@ function ExitKpiCard({ pendingPeople }: { pendingPeople: InstructorSummary[] }) 
         <span className="grid h-6 w-6 place-items-center rounded-full bg-primary-foreground/15"><LogOut size={12} /></span>
         <span className="font-mono-ui text-[10px] font-bold uppercase tracking-[0.14em] text-primary-foreground/75">Exit data</span>
       </div>
-      <div className="relative mt-3 grid grid-cols-2 divide-x divide-primary-foreground/20">
-        <div className="pr-3">
-          <p className="text-[28px] font-extrabold leading-none tracking-[-0.04em]" data-testid="exit-approved-count">{value}</p>
-          <p className="mt-1 text-[10px] font-semibold text-primary-foreground/75">Approved</p>
-        </div>
-        <div className="pl-3">
-          <p className="text-[28px] font-extrabold leading-none tracking-[-0.04em]" data-testid="exit-pending-count">{pending.length.toLocaleString('en-IN')}</p>
-          <p className="mt-1 text-[10px] font-semibold text-primary-foreground/75">Pending approval</p>
-        </div>
+      <div className="relative mt-3">
+        <p className="text-[28px] font-extrabold leading-none tracking-[-0.04em]" data-testid="exit-approved-count">{value}</p>
+        <p className="mt-1 text-[10px] font-semibold text-primary-foreground/75">Approved exits</p>
       </div>
-      <p className="relative mt-3 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.08em] text-primary-foreground/90">{archiveQuery.isError ? 'Archive unavailable right now' : 'View names'} <ArrowRight size={11} className="transition-transform group-hover:translate-x-0.5" /></p>
+      <p className="relative mt-3 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.08em] text-primary-foreground/90">{archiveQuery.isError ? 'Archive unavailable right now' : 'View exit details'} <ArrowRight size={11} className="transition-transform group-hover:translate-x-0.5" /></p>
     </button>
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="max-w-xl" data-testid="dialog-exit-data">
@@ -487,7 +481,10 @@ function ExitKpiCard({ pendingPeople }: { pendingPeople: InstructorSummary[] }) 
             <h3 className="mb-1 text-[12px] font-extrabold">Approved <span className="tabular-nums text-muted-foreground">{approved.length}</span></h3>
             <ul>
               {approved.map((row) => <li key={row.id} className="flex items-center justify-between gap-3 border-b border-border/60 py-1.5">
-                <span className="min-w-0 flex-1 truncate text-[12px] font-semibold">{row.full_name}</span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[12px] font-semibold">{row.full_name}</p>
+                  <p className="truncate text-[10px] text-muted-foreground">{[row.employee_id, row.dept_area, row.capability_manager ? `CM: ${row.capability_manager}` : null].filter(Boolean).join(' · ') || '—'}</p>
+                </div>
                 {row.is_payroll && chip('Payroll', 'blue')}
                 <span className="shrink-0 text-[11px] text-muted-foreground">{formatExitDate(row.date_of_exit)}</span>
               </li>)}
