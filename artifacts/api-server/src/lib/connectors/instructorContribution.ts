@@ -357,7 +357,8 @@ export async function fetchContributionRows(): Promise<ContributionRow[]> {
       SUM(CASE WHEN session_type NOT IN ('LECTURE', 'PRACTICE') THEN session_duration_in_mins_from_schedule_time ELSE 0 END) AS other_minutes,
       COUNT(*) AS sessions_completed,
       ARRAY_AGG(DISTINCT batch_name IGNORE NULLS) AS all_batches,
-      ARRAY_AGG(DISTINCT CASE WHEN session_start_datetime >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 30 DAY) THEN batch_name END IGNORE NULLS) AS recent_batches
+      ARRAY_AGG(DISTINCT CASE WHEN session_start_datetime >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 30 DAY) THEN batch_name END IGNORE NULLS) AS recent_batches,
+      ARRAY_AGG(DISTINCT CASE WHEN session_start_datetime >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 60 DAY) THEN batch_name END IGNORE NULLS) AS last_two_months_batches
     FROM \`${ref}\`
     WHERE session_status = 'COMPLETED' AND instructor_user_id IS NOT NULL
     GROUP BY instructor_user_id
@@ -369,6 +370,7 @@ export async function fetchContributionRows(): Promise<ContributionRow[]> {
       .map((r) => {
         const allBatches = Array.isArray(r.all_batches) ? r.all_batches.map((v) => String(v)) : [];
         const recentBatches = Array.isArray(r.recent_batches) ? r.recent_batches.map((v) => String(v)) : [];
+        const lastTwoMonthsBatches = Array.isArray(r.last_two_months_batches) ? r.last_two_months_batches.map((v) => String(v)) : [];
         return {
           instructor_user_id: String(r.instructor_user_id ?? ""),
           lecture_minutes: Number(r.lecture_minutes ?? 0),
@@ -386,7 +388,15 @@ export async function fetchContributionRows(): Promise<ContributionRow[]> {
           // A person with zero COMPLETED sessions in the last 30 days
           // gets an empty niat_cohorts, same as they'd get an empty
           // recent_batches.
-          niat_cohorts: cohortsForBatches(recentBatches),
+          //
+          // 2026-10-09, per request ("if for the last few days there was no
+          // session then take the data for last 2 months"): when the person
+          // has NO completed session at all in the last 30 days, the cohort
+          // falls back to the batches they taught in the last 60 days.
+          // Someone who did teach in the last 30 days keeps the 30-day
+          // cohort(s) only, even if those batches map to no NIAT cohort.
+          // recent_batches itself stays the strict 30-day list.
+          niat_cohorts: cohortsForBatches(recentBatches.length > 0 ? recentBatches : lastTwoMonthsBatches),
         };
       })
       .filter((r) => r.instructor_user_id);
