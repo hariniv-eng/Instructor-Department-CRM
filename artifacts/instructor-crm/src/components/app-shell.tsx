@@ -82,15 +82,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
 
         <div className="mt-auto p-4">
-          <div className="rounded-xl border border-sidebar-border bg-sidebar-accent/60 p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <span className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-sidebar-foreground/55">Data pulse</span>
-              <span className="h-2 w-2 rounded-full bg-[#70d2a2] shadow-[0_0_0_3px_rgba(112,210,162,.12)]" />
-            </div>
-            <p className="text-[12px] leading-5 text-sidebar-foreground/70">All source systems are reporting normally.</p>
-            <p className="font-mono-ui mt-3 text-[10px] text-sidebar-foreground/40">LAST CHECK · 09:42 IST</p>
-          </div>
-          <div className="mt-4 flex items-center gap-3 border-t border-sidebar-border px-2 pt-4">
+          <div className="flex items-center gap-3 border-t border-sidebar-border px-2 pt-4">
             <div className="grid h-8 w-8 place-items-center rounded-full bg-[#d4e1ee] text-[11px] font-extrabold text-[#263d58]">{user ? initials(displayName) : <Eye size={14} />}</div>
             <div className="min-w-0 flex-1">
               <p className="truncate text-[12px] font-bold">{displayName}</p>
