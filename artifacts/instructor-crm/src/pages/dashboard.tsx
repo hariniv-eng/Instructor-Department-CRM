@@ -7,6 +7,7 @@ import { PageIntro, QueryError, SkeletonBlock, DownloadCsvButton, TableSearchInp
 import { downloadCsv, slugify, toCsv } from '@/lib/csv';
 import { ALL_PRODUCTS, productLabel } from './instructors';
 import { NiatMapCard } from '@/components/niat-map';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 function formatKpi(value: number | undefined) {
   return typeof value === 'number' ? value.toLocaleString('en-IN') : '—';
@@ -104,18 +105,18 @@ export default function DashboardPage() {
 
     {reportQuery.isLoading && <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">{[1, 2, 3, 4].map((item) => <SkeletonBlock key={item} className="h-[126px]" />)}</div>}
     {reportQuery.isError && <QueryError message="Dashboard data is unavailable right now." />}
-    {report && <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 animate-rise">
+    {report && <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5 animate-rise">
       <KpiCard label="Instructor Department" value={formatKpi(report.kpis.department_total_count)} meta="Instructors + Mentors + Ops team" icon={<Building2 size={12} />} tone="saffron" />
       <KpiCard label="Instructors" value={formatKpi(report.kpis.total_instructor_count)} meta="Matched with Darwin + payroll" icon={<UsersRound size={12} />} tone="navy" />
       <KpiCard label="Mentors" value={formatKpi(report.kpis.mentors_count)} meta="Darwin — Mentors department" icon={<GraduationCap size={12} />} tone="teal" />
       <KpiCard label="Operations team" value={formatKpi(report.kpis.ops_team_count)} meta="Darwin — Delivery Support (Ops)" icon={<Briefcase size={12} />} tone="coral" />
+      <ExitKpiCard pendingPeople={pendingPeople} />
     </section>}
 
 
-    {report && <section className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)] lg:items-stretch animate-rise" aria-label="Product mix, NIAT contribution and exit data">
+    {report && <section className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:items-stretch animate-rise" aria-label="Product mix, NIAT contribution and exit data">
       <ProductMixCard people={departmentPeople} />
       <NiatContributionCard people={departmentPeople} />
-      <ExitListCard pendingPeople={pendingPeople} onViewApproved={() => { setRemoveInitialView('archive'); setActiveException('remove'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} onViewPending={() => { setActiveException('pending'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} />
     </section>}
     {report && <section className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2 animate-rise" aria-label="Campuses, capability managers and NIAT university map">
       <div className="flex min-w-0 flex-col gap-3">
@@ -246,20 +247,20 @@ function ProductMixCard({ people }: { people: InstructorSummary[] }) {
         <p className="text-[10px] text-muted-foreground">Instructor Department by Product</p>
       </div>
     </div>
-    <div className="flex flex-1 flex-col items-center justify-center gap-4 sm:flex-row sm:gap-8">
-      <div className="relative h-[170px] w-[170px] shrink-0">
+    <div className="flex flex-1 flex-col items-center justify-center gap-4 sm:flex-row sm:gap-10">
+      <div className="relative h-[210px] w-[210px] shrink-0 lg:h-[250px] lg:w-[250px]">
         <svg viewBox="0 0 42 42" className="h-full w-full -rotate-0" role="img" aria-label="Instructor Department split by Product">
           <circle cx="21" cy="21" r={RADIUS} fill="none" strokeWidth="6" className="stroke-secondary" />
           {arcs.map((arc) => <circle key={arc.name} cx="21" cy="21" r={RADIUS} fill="none" strokeWidth={hover === arc.name ? 7 : 6} stroke={PRODUCT_COLORS[arc.name] ?? '#8a93a6'} strokeDasharray={`${Math.max(arc.pct - 0.4, 0)} ${100 - Math.max(arc.pct - 0.4, 0)}`} strokeDashoffset={arc.dashOffset} onMouseEnter={() => setHover(arc.name)} onMouseLeave={() => setHover(null)} data-testid={`slice-product-${slugify(arc.name)}`}><title>{`${arc.name}: ${arc.count}`}</title></circle>)}
         </svg>
         <div className="pointer-events-none absolute inset-0 grid place-items-center text-center">
           <div>
-            <div className="text-[22px] font-extrabold leading-none tracking-[-0.03em] tabular-nums">{(active ? active.count : total).toLocaleString('en-IN')}</div>
-            <div className="mt-1 max-w-[100px] text-[11px] leading-tight text-muted-foreground">{active ? active.name : 'total'}</div>
+            <div className="text-[28px] font-extrabold leading-none tracking-[-0.03em] tabular-nums">{(active ? active.count : total).toLocaleString('en-IN')}</div>
+            <div className="mt-1 max-w-[120px] text-[12px] leading-tight text-muted-foreground">{active ? active.name : 'total'}</div>
           </div>
         </div>
       </div>
-      <ul className="w-full min-w-0 max-w-[280px] space-y-0.5">
+      <ul className="w-full min-w-0 max-w-[300px] space-y-1">
         {slices.map((slice) => <li key={slice.name} onMouseEnter={() => setHover(slice.name)} onMouseLeave={() => setHover(null)} data-testid={`row-product-${slugify(slice.name)}`} className={`flex items-center gap-2.5 rounded-md px-2 py-0.5 transition-colors ${hover === slice.name ? 'bg-secondary' : ''}`}>
           <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ backgroundColor: PRODUCT_COLORS[slice.name] ?? '#8a93a6' }} />
           <span className="min-w-0 flex-1 truncate text-[12px]">{slice.name}</span>
@@ -276,38 +277,33 @@ function ProductMixCard({ people }: { people: InstructorSummary[] }) {
 // last 30 days, or the last 2 months when they had no session in the last 30 days, see instructorContribution.ts), so one instructor teaching two cohorts counts in both rows.
 const NIAT_COHORT_ORDER = ['NIAT 2024', 'NIAT 2025', 'NIAT 2026'];
 function NiatContributionCard({ people }: { people: InstructorSummary[] }) {
-  const { rows, combos, total } = useMemo(() => {
+  // One flat list (2026-10-09, per request): every row is the exact cohort(s) an instructor teaches, in the order
+  // 2024, 2024 + 2025, 2025, 2025 + 2026, 2026 -- no separate "only one cohort" / "combination" sections. Each
+  // instructor is counted once, under exactly the cohort(s) they teach, so the rows add up to the NIAT total.
+  const { rows, total } = useMemo(() => {
     const niat = people.filter((p) => productLabel(p).startsWith('NIAT'));
-    const counts = new Map<string, number>(NIAT_COHORT_ORDER.map((name) => [name, 0]));
-    // Combinations (2026-10-09, per request): an instructor teaching 2+ cohorts at once, e.g. NIAT 2025 + NIAT 2026,
-    // counted once under the exact combination they teach.
-    const comboCounts = new Map<string, { cohorts: string[]; count: number }>();
-    const cohortRank = (name: string) => { const i = NIAT_COHORT_ORDER.indexOf(name); return i === -1 ? 99 : i; };
+    const rank = (name: string) => { const i = NIAT_COHORT_ORDER.indexOf(name); return i === -1 ? 99 : i; };
+    const labelOf = (cohorts: string[]) => cohorts.map((name, i) => (i === 0 ? name : name.replace(/^NIAT\s+/, ''))).join(' + ');
+    const groups = new Map<string, { cohorts: string[]; count: number }>();
+    for (const name of NIAT_COHORT_ORDER) groups.set(name, { cohorts: [name], count: 0 });
     for (const person of niat) {
-      const cohorts = [...new Set(person.niat_cohorts ?? [])].sort((a, b) => cohortRank(a) - cohortRank(b) || a.localeCompare(b));
-      for (const cohort of cohorts) counts.set(cohort, (counts.get(cohort) ?? 0) + 1);
-      if (cohorts.length > 1) {
-        const key = cohorts.join(' + ');
-        const entry = comboCounts.get(key) ?? { cohorts, count: 0 };
-        entry.count += 1;
-        comboCounts.set(key, entry);
-      }
+      const cohorts = [...new Set(person.niat_cohorts ?? [])].sort((x, y) => rank(x) - rank(y) || x.localeCompare(y));
+      if (cohorts.length === 0) continue;
+      const key = cohorts.join(' + ');
+      const entry = groups.get(key) ?? { cohorts, count: 0 };
+      entry.count += 1;
+      groups.set(key, entry);
     }
-    const combos = [...comboCounts.values()]
-      .map((entry) => ({ label: entry.cohorts.map((name, i) => (i === 0 ? name : name.replace(/^NIAT\s+/, ''))).join(' + '), count: entry.count, size: entry.cohorts.length }))
-      .sort((a, b) => b.count - a.count || a.size - b.size || a.label.localeCompare(b.label));
-    const ordered = [...counts.entries()].sort((a, b) => {
-      const ia = NIAT_COHORT_ORDER.indexOf(a[0]);
-      const ib = NIAT_COHORT_ORDER.indexOf(b[0]);
-      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib) || a[0].localeCompare(b[0]);
-    });
-    return { rows: ordered, combos, total: niat.length };
+    const ordered = [...groups.values()]
+      .sort((x, y) => rank(x.cohorts[0]) - rank(y.cohorts[0]) || x.cohorts.length - y.cohorts.length || labelOf(x.cohorts).localeCompare(labelOf(y.cohorts)))
+      .map((entry) => ({ label: labelOf(entry.cohorts), count: entry.count }));
+    return { rows: ordered, total: niat.length };
   }, [people]);
-  const max = Math.max(1, ...rows.map(([, count]) => count), ...combos.map((combo) => combo.count));
-  const bar = (count: number, color: string) => <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-secondary"><div className="h-full rounded-full" style={{ width: `${Math.max(count > 0 ? 2 : 0, (count / max) * 100)}%`, backgroundColor: color }} /></div>;
+  const max = Math.max(1, ...rows.map((row) => row.count));
+  const bar = (count: number) => <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-secondary"><div className="h-full rounded-full" style={{ width: `${Math.max(count > 0 ? 2 : 0, (count / max) * 100)}%`, backgroundColor: '#4f86b8' }} /></div>;
   return <div data-testid="card-niat-contribution" className="flex h-full min-w-0 flex-col rounded-xl border border-border bg-card p-4 shadow-sm">
     <div className="mb-3 flex items-center gap-3">
-      <span className="grid h-7 w-7 place-items-center rounded-lg bg-secondary text-muted-foreground"><GraduationCap size={14} /></span>
+      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-secondary text-muted-foreground"><GraduationCap size={14} /></span>
       <div>
         <h2 className="text-[12px] font-extrabold tracking-[-0.03em]">Contribution of NIAT instructors</h2>
         <p className="text-[10px] text-muted-foreground">Instructors teaching each NIAT cohort · last 30 days (last 2 months if none)</p>
@@ -318,27 +314,15 @@ function NiatContributionCard({ people }: { people: InstructorSummary[] }) {
       <span className="text-[12px] text-muted-foreground">NIAT instructors (Deployed + Training)</span>
     </div>
     <ul className="flex flex-1 flex-col justify-between gap-2">
-      {rows.map(([cohort, count]) => <li key={cohort} data-testid={`row-niat-cohort-${slugify(cohort)}`}>
+      {rows.map((row) => <li key={row.label} data-testid={`row-niat-cohort-${slugify(row.label)}`}>
         <div className="flex items-baseline justify-between gap-3">
-          <span className="text-[12px]">{cohort}</span>
-          <span className="text-[12px] font-extrabold tabular-nums">{count.toLocaleString('en-IN')}</span>
+          <span className="text-[12px]">{row.label}</span>
+          <span className="text-[12px] font-extrabold tabular-nums">{row.count.toLocaleString('en-IN')}</span>
         </div>
-        {bar(count, '#4f86b8')}
+        {bar(row.count)}
       </li>)}
     </ul>
-    {combos.length > 0 && <div data-testid="niat-cohort-combinations" className="mt-3 border-t border-border/70 pt-2.5">
-      <h3 className="mb-1.5 text-[11px] font-extrabold">Teaching a combination of cohorts</h3>
-      <ul className="space-y-2">
-        {combos.map((combo) => <li key={combo.label} data-testid={`row-niat-combo-${slugify(combo.label)}`}>
-          <div className="flex items-baseline justify-between gap-3">
-            <span className="text-[12px]">{combo.label}</span>
-            <span className="text-[12px] font-extrabold tabular-nums">{combo.count.toLocaleString('en-IN')}</span>
-          </div>
-          {bar(combo.count, '#2e8b7a')}
-        </li>)}
-      </ul>
-    </div>}
-    <p className="mt-3 text-[10px] text-muted-foreground">Cohort rows count everyone teaching that cohort, including those teaching a combination; each instructor appears once under their exact combination.</p>
+    <p className="mt-3 text-[10px] text-muted-foreground">Each instructor is counted once, under the exact cohort(s) they teach.</p>
   </div>;
 }
 
@@ -450,9 +434,12 @@ function CapabilityManagersCard({ people }: { people: InstructorSummary[] }) {
   </div>;
 }
 
-// Exit lists (2026-10-09, per request: use the spare room beside Product mix): the latest few approved exits and the
-// latest few waiting for approval, each with its total and a View all that opens the full list.
-function ExitListCard({ pendingPeople, onViewApproved, onViewPending }: { pendingPeople: InstructorSummary[]; onViewApproved: () => void; onViewPending: () => void }) {
+// Exit data tile in the KPI row (2026-10-09, per request): the big number is the approved exits recorded so far
+// (Instructor Archive: status Exited, exit record Approved). Clicking it opens a pop-up with every approved name and
+// every name still pending approval (Exception 3's list), so the counts can be checked against real people.
+const REVIEW_LABELS: Record<string, string> = { exited: 'Exited', serving_notice_period: 'Serving notice', payroll_converted: 'Payroll converted' };
+function ExitKpiCard({ pendingPeople }: { pendingPeople: InstructorSummary[] }) {
+  const [open, setOpen] = useState(false);
   const archiveQuery = useQuery<{ people: ArchiveExitRow[] }>({
     queryKey: ['reports', 'instructor-archive'],
     queryFn: async () => {
@@ -463,38 +450,66 @@ function ExitListCard({ pendingPeople, onViewApproved, onViewPending }: { pendin
   });
   const approved = useMemo(() => (archiveQuery.data?.people ?? [])
     .filter(isApprovedExit)
-    .sort((a, b) => (b.date_of_exit ?? '').localeCompare(a.date_of_exit ?? '') || a.full_name.localeCompare(b.full_name))
-    .map((row) => ({ key: `a${row.id}`, name: row.full_name, date: row.date_of_exit })), [archiveQuery.data]);
+    .sort((a, b) => (b.date_of_exit ?? '').localeCompare(a.date_of_exit ?? '') || a.full_name.localeCompare(b.full_name)), [archiveQuery.data]);
   const pending = useMemo(() => [...pendingPeople]
-    .sort((a, b) => (b.exit_flag_date ?? '').localeCompare(a.exit_flag_date ?? '') || a.full_name.localeCompare(b.full_name))
-    .map((p) => ({ key: `p${p.id}`, name: p.full_name, date: p.date_of_exit ?? p.exit_flag_date ?? null })), [pendingPeople]);
-  const section = (testId: string, title: string, rows: { key: string; name: string; date: string | null }[], loading: boolean, onViewAll: () => void, empty: string) => <div data-testid={testId} className="min-w-0">
-    <div className="mb-1 flex items-center justify-between gap-2">
-      <h3 className="text-[11px] font-extrabold">{title} <span className="tabular-nums text-muted-foreground" data-testid={`${testId}-count`}>{loading ? '…' : rows.length.toLocaleString('en-IN')}</span></h3>
-      <button type="button" onClick={onViewAll} data-testid={`${testId}-view-all`} className="inline-flex items-center gap-1 text-[10px] font-bold text-primary hover:underline">View all <ArrowRight size={11} /></button>
-    </div>
-    <ul>
-      {rows.slice(0, 3).map((row) => <li key={row.key} className="flex items-center justify-between gap-2 border-b border-border/60 py-1.5">
-        <span className="min-w-0 flex-1 truncate text-[11px] font-semibold">{row.name}</span>
-        <span className="shrink-0 text-[10px] text-muted-foreground">{formatExitDate(row.date)}</span>
-      </li>)}
-      {!loading && rows.length === 0 && <li className="py-2 text-center text-[11px] text-muted-foreground">{empty}</li>}
-    </ul>
-  </div>;
-  return <section data-testid="card-exit-lists" className="flex h-full min-w-0 flex-col rounded-xl border border-border bg-card p-4 shadow-sm">
-    <div className="mb-3 flex items-center gap-3">
-      <span className="grid h-7 w-7 place-items-center rounded-lg bg-secondary text-muted-foreground"><LogOut size={14} /></span>
-      <div>
-        <h2 className="text-[12px] font-extrabold tracking-[-0.03em]">Exit data</h2>
-        <p className="text-[10px] text-muted-foreground">Latest approved and pending exits</p>
+    .sort((a, b) => (b.exit_flag_date ?? '').localeCompare(a.exit_flag_date ?? '') || a.full_name.localeCompare(b.full_name)), [pendingPeople]);
+  const value = archiveQuery.isLoading ? '…' : archiveQuery.isError ? '—' : approved.length.toLocaleString('en-IN');
+  const chip = (text: string, tone: 'amber' | 'blue') => <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${tone === 'amber' ? 'bg-[#fbeed3] text-[#8a5a0b]' : 'bg-[#e1eaf1] text-primary'}`}>{text}</span>;
+  return <>
+    {/* Deliberately unlike the four live-headcount tiles: a filled card, two counts side by side, and a clear call to open the names (2026-10-09, per request). */}
+    <button type="button" data-testid="button-kpi-card-exit-data" onClick={() => setOpen(true)} className="group relative flex w-full flex-col justify-between overflow-hidden rounded-xl border border-primary bg-primary p-4 text-left text-primary-foreground shadow-md transition-transform hover:-translate-y-0.5">
+      <span aria-hidden className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full bg-primary-foreground/10" />
+      <span aria-hidden className="pointer-events-none absolute -bottom-8 right-8 h-16 w-16 rounded-full bg-primary-foreground/5" />
+      <div className="relative flex items-center gap-2">
+        <span className="grid h-6 w-6 place-items-center rounded-full bg-primary-foreground/15"><LogOut size={12} /></span>
+        <span className="font-mono-ui text-[10px] font-bold uppercase tracking-[0.14em] text-primary-foreground/75">Exit data</span>
       </div>
-    </div>
-    {archiveQuery.isError && <p className="mb-2 text-[11px] text-muted-foreground">The archive is unavailable right now, so approved exits cannot be shown.</p>}
-    <div className="flex flex-1 flex-col justify-evenly gap-3">
-      {section('exit-list-approved', 'Approved', approved, archiveQuery.isLoading, onViewApproved, 'No approved exits yet.')}
-      {section('exit-list-pending', 'Pending approval', pending, false, onViewPending, 'Nothing waiting for approval.')}
-    </div>
-  </section>;
+      <div className="relative mt-3 grid grid-cols-2 divide-x divide-primary-foreground/20">
+        <div className="pr-3">
+          <p className="text-[28px] font-extrabold leading-none tracking-[-0.04em]" data-testid="exit-approved-count">{value}</p>
+          <p className="mt-1 text-[10px] font-semibold text-primary-foreground/75">Approved</p>
+        </div>
+        <div className="pl-3">
+          <p className="text-[28px] font-extrabold leading-none tracking-[-0.04em]" data-testid="exit-pending-count">{pending.length.toLocaleString('en-IN')}</p>
+          <p className="mt-1 text-[10px] font-semibold text-primary-foreground/75">Pending approval</p>
+        </div>
+      </div>
+      <p className="relative mt-3 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.08em] text-primary-foreground/90">{archiveQuery.isError ? 'Archive unavailable right now' : 'View names'} <ArrowRight size={11} className="transition-transform group-hover:translate-x-0.5" /></p>
+    </button>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogContent className="max-w-xl" data-testid="dialog-exit-data">
+        <DialogHeader>
+          <DialogTitle>Exit data</DialogTitle>
+          <DialogDescription>Approved exits recorded so far, and exits still waiting for approval.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-5">
+          <section data-testid="exit-dialog-approved">
+            <h3 className="mb-1 text-[12px] font-extrabold">Approved <span className="tabular-nums text-muted-foreground">{approved.length}</span></h3>
+            <ul>
+              {approved.map((row) => <li key={row.id} className="flex items-center justify-between gap-3 border-b border-border/60 py-1.5">
+                <span className="min-w-0 flex-1 truncate text-[12px] font-semibold">{row.full_name}</span>
+                {row.is_payroll && chip('Payroll', 'blue')}
+                <span className="shrink-0 text-[11px] text-muted-foreground">{formatExitDate(row.date_of_exit)}</span>
+              </li>)}
+              {!archiveQuery.isLoading && approved.length === 0 && <li className="py-2 text-[12px] text-muted-foreground">No approved exits yet.</li>}
+            </ul>
+          </section>
+          <section data-testid="exit-dialog-pending">
+            <h3 className="mb-1 text-[12px] font-extrabold">Pending approval <span className="tabular-nums text-muted-foreground">{pending.length}</span></h3>
+            <ul>
+              {pending.map((person) => <li key={person.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-border/60 py-1.5">
+                <span className="min-w-0 flex-1 truncate text-[12px] font-semibold">{person.full_name}</span>
+                {(person.is_payroll || person.exit_verification === 'payroll_converted') && chip('Payroll converted', 'blue')}
+                {person.exit_verification && chip(`Marked by CM: ${REVIEW_LABELS[person.exit_verification] ?? person.exit_verification}`, 'amber')}
+                <span className="shrink-0 text-[11px] text-muted-foreground">{formatExitDate(person.date_of_exit ?? person.exit_flag_date)}</span>
+              </li>)}
+              {pending.length === 0 && <li className="py-2 text-[12px] text-muted-foreground">Nothing waiting for approval.</li>}
+            </ul>
+          </section>
+        </div>
+      </DialogContent>
+    </Dialog>
+  </>;
 }
 
 function KpiCard({ label, value, meta, icon, tone, alert = false }: {
