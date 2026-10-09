@@ -979,6 +979,13 @@ export function downloadInstructorsCsv(category: CategoryKey, people: PersonWith
   downloadCsv(fileName ?? `${slugify(category)}.csv`, toCsv(headers, rows));
 }
 
+// Frozen name column (2026-10-09, per request: "freeze the instructor name column even when scrolling
+// through the table"): the first cell of the header and of every row sticks to the left edge while the
+// table scrolls sideways, so the person stays visible next to whichever column is being checked. The
+// -ml-5/pl-5 pair stretches the cell over the row's own left padding so nothing scrolls through that gap;
+// bg-card (and the row-hover tint) keep it opaque.
+const STICKY_NAME_CELL = 'sticky left-0 z-10 -ml-5 pl-5 pr-3 border-r border-border/60 shadow-[4px_0_6px_-4px_rgba(15,23,42,0.12)]';
+
 export function CategoryTable({ category, people, backQuery, linkMode = 'row', backPrefix = '' }: { category: CategoryKey; people: PersonWithAccess[]; backQuery: string; linkMode?: 'row' | 'name'; backPrefix?: string }) {
   const columns = gridColsClass(category);
   const pager = usePagedRows(people, 50);
@@ -986,7 +993,7 @@ export function CategoryTable({ category, people, backQuery, linkMode = 'row', b
     <div className="overflow-x-auto">
       <div className="w-max min-w-full">
         <div className={`grid gap-4 border-b border-border bg-[#f4f7f9] px-5 py-3.5 text-left font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground ${columns}`}>
-          <span>{nameColumnLabel(category)}</span>
+          <span className={`${STICKY_NAME_CELL} bg-[#f4f7f9]`}>{nameColumnLabel(category)}</span>
           <span>Designation</span>
           <span>Employee ID</span>
           <span>TeachOS User ID</span>
@@ -1054,8 +1061,8 @@ function PersonRow({ category, person, columns, backQuery, linkMode = 'row', bac
   </>;
   const inner = <>
     {linkMode === 'name'
-      ? <Link href={href} data-testid={`link-instructor-${person.id}`} className="group/name flex min-w-0 items-center gap-3">{nameBlock}</Link>
-      : <div className="flex min-w-0 items-center gap-3">{nameBlock}</div>}
+      ? <Link href={href} data-testid={`link-instructor-${person.id}`} className={`group/name flex min-w-0 items-center gap-3 bg-card group-hover:bg-[#f8fafb] ${STICKY_NAME_CELL}`}>{nameBlock}</Link>
+      : <div className={`flex min-w-0 items-center gap-3 bg-card group-hover:bg-[#f8fafb] ${STICKY_NAME_CELL}`}>{nameBlock}</div>}
     <div className="truncate text-[12px] text-muted-foreground">{person.designation || '—'}</div>
     <div className="truncate font-mono-ui text-[11px] text-muted-foreground">{person.employee_id || '—'}</div>
     <div className="truncate font-mono-ui text-[11px] text-muted-foreground">{person.teachos_user_id || ''}</div>
