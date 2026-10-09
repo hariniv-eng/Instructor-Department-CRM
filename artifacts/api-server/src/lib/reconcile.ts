@@ -651,15 +651,30 @@ export async function reconcileDarwinFullRosterFallback(fullRosterRows: SheetRow
     .from(instructorsTable)
     .where(and(eq(instructorsTable.inTeachos, true), eq(instructorsTable.inDarwin, false)));
 
+  // Which row already owns each employee ID (2026-10-09). employee_id is UNIQUE, so a name-only
+  // TeachOS row must never be handed an ID that another row already has -- that update used to
+  // fail with "instructors_employee_id_unique" and take the WHOLE Darwin sync down with it
+  // (NW2000737). When the ID belongs to another row, that row is the real Darwin record and this
+  // candidate is just a duplicate TeachOS-side twin, so it is skipped (it stays TeachOS-only).
+  const idOwner = new Map<string, number>();
+  for (const row of await db.select({ id: instructorsTable.id, employeeId: instructorsTable.employeeId }).from(instructorsTable)) {
+    if (row.employeeId) idOwner.set(row.employeeId, row.id);
+  }
+
   let matchedCount = 0;
   for (const person of candidates) {
     const match = (person.employeeId && byEmployeeId.get(person.employeeId)) || byName.get(normalize(person.fullName));
     if (!match) continue;
 
     const employeeId = cell(match, "Employee Id", "employee_id");
+    if (employeeId && idOwner.has(employeeId) && idOwner.get(employeeId) !== person.id) {
+      console.warn(`reconcileDarwinFullRosterFallback: skipped "${person.fullName}" -- employee ID ${employeeId} already belongs to another record.`);
+      continue;
+    }
     const department = cell(match, "Department", "department");
     const darwinEmployeeStatus = cell(match, "Employee Status", "darwin_employee_status") ?? "Active";
 
+    if (employeeId) idOwner.set(employeeId, person.id);
     await db.update(instructorsTable).set({
       inDarwin: true,
       inDarwinFullRoster: true,
@@ -695,8 +710,10 @@ export async function reconcileDarwinFullRosterFallback(fullRosterRows: SheetRow
     const employeeId = cell(match, "Employee Id", "employee_id");
     const fullName = cell(match, "Full Name", "full_name");
     if (!fullName) continue;
-    const existing = everyone.find((p) => (employeeId && p.employeeId === employeeId) || normalize(p.fullName) === normalize(fullName));
+    const existing = (employeeId ? everyone.find((p) => p.employeeId === employeeId) : undefined) ?? everyone.find((p) => normalize(p.fullName) === normalize(fullName));
     if (existing && existing.inDarwin) continue;
+    // Same employee_id guard as above: never hand this ID to a row when another row already has it.
+    if (employeeId && existing && existing.employeeId !== employeeId && everyone.some((p) => p.id !== existing.id && p.employeeId === employeeId)) continue;
     const values = {
       inDarwin: true,
       inDarwinFullRoster: true,
