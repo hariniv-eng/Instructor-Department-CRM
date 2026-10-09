@@ -1,11 +1,11 @@
-import { AlertTriangle, ArrowRight, Briefcase, Building2, Check, Clock, Copy, GraduationCap, LogOut, RefreshCw, Trash2, UsersRound, X } from 'lucide-react';
+import { AlertTriangle, ArrowRight, Briefcase, Building2, Check, Clock, Copy, GraduationCap, LogOut, PieChart, RefreshCw, Trash2, UsersRound, X } from 'lucide-react';
 import { Link } from 'wouter';
 import { useMemo, useState } from 'react';
 import { useGetReportsInstructors, getGetReportsInstructorsQueryKey, type AccessSplit, type InstructorSummary } from '@workspace/api-client-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageIntro, QueryError, SkeletonBlock, DownloadCsvButton, TableSearchInput } from '@/components/ui-pieces';
 import { downloadCsv, slugify, toCsv } from '@/lib/csv';
-import { productLabel } from './instructors';
+import { ALL_PRODUCTS, productLabel } from './instructors';
 
 function formatKpi(value: number | undefined) {
   return typeof value === 'number' ? value.toLocaleString('en-IN') : '—';
@@ -104,6 +104,14 @@ export default function DashboardPage() {
     return [...(instructorSplit?.both?.people ?? []), ...(instructorSplit?.darwin_only?.people ?? []), ...(instructorSplit?.teachos_only?.people ?? [])]
       .filter((p) => (seen.has(p.id) ? false : (seen.add(p.id), true)));
   }, [instructorSplit]);
+  // Whole Instructor Department (instructors + mentors + Operations team), each person once -- the population
+  // the Product pie chart splits (Operations team rows are the Support product).
+  const departmentSplit = report?.access_breakdown?.department;
+  const departmentPeople = useMemo(() => {
+    const seen = new Set<number>();
+    return [...(departmentSplit?.both?.people ?? []), ...(departmentSplit?.darwin_only?.people ?? []), ...(departmentSplit?.teachos_only?.people ?? [])]
+      .filter((p) => (seen.has(p.id) ? false : (seen.add(p.id), true)));
+  }, [departmentSplit]);
   const toggleAccessCard = (card: AccessCardKey) => {
     if (activeAccessCard === card) {
       setActiveAccessCard(null);
@@ -139,7 +147,9 @@ export default function DashboardPage() {
     </section>}
 
 
-    {report && <section className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2 animate-rise" aria-label="Campuses and capability managers">
+    {report && <section className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2 animate-rise" aria-label="Product mix, NIAT contribution, campuses and capability managers">
+      <ProductMixCard people={departmentPeople} />
+      <NiatContributionCard people={departmentPeople} />
       <TopCampusesCard people={instructorPeople} />
       <CapabilityManagersCard people={instructorPeople} />
     </section>}
@@ -233,6 +243,118 @@ function ExceptionPendingPanel({ people, onClose }: { people: InstructorSummary[
       </table>
     </div>
   </section>;
+}
+
+// Product bifurcation (2026-10-09, per request): a donut ("pie") chart of the Instructor Department by Product --
+// the same productLabel() the Instructors tab's Product column and filter use, so the slices match it exactly.
+const PRODUCT_COLORS: Record<string, string> = {
+  'NIAT (Deployed)': '#27415f',
+  'NIAT (Training)': '#4f86b8',
+  Academy: '#e0a030',
+  Intensive: '#2e8b7a',
+  'IIT X DSA': '#c75b3f',
+  Support: '#8a93a6',
+};
+function ProductMixCard({ people }: { people: InstructorSummary[] }) {
+  const slices = useMemo(() => {
+    const counts = new Map<string, number>(ALL_PRODUCTS.map((name) => [name, 0]));
+    for (const person of people) {
+      const label = productLabel(person);
+      counts.set(label, (counts.get(label) ?? 0) + 1);
+    }
+    return [...counts.entries()].map(([name, count]) => ({ name, count }));
+  }, [people]);
+  const total = slices.reduce((sum, slice) => sum + slice.count, 0);
+  const [hover, setHover] = useState<string | null>(null);
+  // Donut drawn as stacked circle strokes: with r = 100 / (2 * pi) the circumference is exactly 100,
+  // so a slice's dash length is simply its percentage.
+  const RADIUS = 100 / (2 * Math.PI);
+  let offset = 25; // start at 12 o'clock
+  const arcs = slices.filter((slice) => slice.count > 0).map((slice) => {
+    const pct = total ? (slice.count / total) * 100 : 0;
+    const arc = { ...slice, pct, dashOffset: offset };
+    offset -= pct;
+    return arc;
+  });
+  const active = hover ? slices.find((slice) => slice.name === hover) : null;
+  return <div data-testid="card-product-mix" className="rounded-xl border border-border bg-card p-5 shadow-xs">
+    <div className="mb-4 flex items-center gap-3">
+      <span className="grid h-9 w-9 place-items-center rounded-lg bg-secondary text-muted-foreground"><PieChart size={17} /></span>
+      <div>
+        <h2 className="text-[16px] font-extrabold tracking-[-0.03em]">Product mix</h2>
+        <p className="text-[11px] text-muted-foreground">Instructor Department by Product</p>
+      </div>
+    </div>
+    <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-center xl:flex-col">
+      <div className="relative h-[170px] w-[170px] shrink-0">
+        <svg viewBox="0 0 42 42" className="h-full w-full -rotate-0" role="img" aria-label="Instructor Department split by Product">
+          <circle cx="21" cy="21" r={RADIUS} fill="none" strokeWidth="6" className="stroke-secondary" />
+          {arcs.map((arc) => <circle key={arc.name} cx="21" cy="21" r={RADIUS} fill="none" strokeWidth={hover === arc.name ? 7 : 6} stroke={PRODUCT_COLORS[arc.name] ?? '#8a93a6'} strokeDasharray={`${Math.max(arc.pct - 0.4, 0)} ${100 - Math.max(arc.pct - 0.4, 0)}`} strokeDashoffset={arc.dashOffset} onMouseEnter={() => setHover(arc.name)} onMouseLeave={() => setHover(null)} data-testid={`slice-product-${slugify(arc.name)}`}><title>{`${arc.name}: ${arc.count} (${arc.pct.toFixed(1)}%)`}</title></circle>)}
+        </svg>
+        <div className="pointer-events-none absolute inset-0 grid place-items-center text-center">
+          <div>
+            <div className="text-[24px] font-extrabold leading-none tracking-[-0.03em] tabular-nums">{(active ? active.count : total).toLocaleString('en-IN')}</div>
+            <div className="mt-1 max-w-[88px] text-[10px] leading-tight text-muted-foreground">{active ? active.name : 'in the department'}</div>
+          </div>
+        </div>
+      </div>
+      <ul className="w-full min-w-0 flex-1 space-y-1.5">
+        {slices.map((slice) => <li key={slice.name} onMouseEnter={() => setHover(slice.name)} onMouseLeave={() => setHover(null)} data-testid={`row-product-${slugify(slice.name)}`} className={`flex items-center gap-2.5 rounded-md px-2 py-1 transition-colors ${hover === slice.name ? 'bg-secondary' : ''}`}>
+          <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ backgroundColor: PRODUCT_COLORS[slice.name] ?? '#8a93a6' }} />
+          <span className="min-w-0 flex-1 truncate text-[13px]">{slice.name}</span>
+          <span className="text-[11px] tabular-nums text-muted-foreground">{total ? ((slice.count / total) * 100).toFixed(1) : '0.0'}%</span>
+          <span className="w-10 text-right text-[13px] font-extrabold tabular-nums">{slice.count.toLocaleString('en-IN')}</span>
+        </li>)}
+      </ul>
+    </div>
+  </div>;
+}
+
+// Contribution of NIAT instructors (2026-10-09, per request: "beside the pie chart ... contribution of niat
+// instructors"): how many NIAT instructors (Product NIAT Deployed or Training) are teaching each NIAT cohort. The
+// cohort comes from the Contribution column (person.niat_cohorts: the cohort(s) of the batches they taught in the
+// last 30 days, or the last 2 months when they had no session in the last 30 days, see instructorContribution.ts), so one instructor teaching two cohorts counts in both rows.
+const NIAT_COHORT_ORDER = ['NIAT 2024', 'NIAT 2025', 'NIAT 2026'];
+function NiatContributionCard({ people }: { people: InstructorSummary[] }) {
+  const { rows, total } = useMemo(() => {
+    const niat = people.filter((p) => productLabel(p).startsWith('NIAT'));
+    const counts = new Map<string, number>(NIAT_COHORT_ORDER.map((name) => [name, 0]));
+    for (const person of niat) {
+      const cohorts = person.niat_cohorts ?? [];
+      for (const cohort of cohorts) counts.set(cohort, (counts.get(cohort) ?? 0) + 1);
+    }
+    const ordered = [...counts.entries()].sort((a, b) => {
+      const ia = NIAT_COHORT_ORDER.indexOf(a[0]);
+      const ib = NIAT_COHORT_ORDER.indexOf(b[0]);
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib) || a[0].localeCompare(b[0]);
+    });
+    return { rows: ordered, total: niat.length };
+  }, [people]);
+  const max = Math.max(1, ...rows.map(([, count]) => count));
+  const bar = (count: number, color: string) => <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-secondary"><div className="h-full rounded-full" style={{ width: `${Math.max(count > 0 ? 2 : 0, (count / max) * 100)}%`, backgroundColor: color }} /></div>;
+  return <div data-testid="card-niat-contribution" className="rounded-xl border border-border bg-card p-5 shadow-xs">
+    <div className="mb-5 flex items-center gap-3">
+      <span className="grid h-9 w-9 place-items-center rounded-lg bg-secondary text-muted-foreground"><GraduationCap size={17} /></span>
+      <div>
+        <h2 className="text-[16px] font-extrabold tracking-[-0.03em]">Contribution of NIAT instructors</h2>
+        <p className="text-[11px] text-muted-foreground">Instructors teaching each NIAT cohort · last 30 days (last 2 months if none)</p>
+      </div>
+    </div>
+    <div className="mb-5 flex items-baseline gap-2">
+      <span className="text-[30px] font-extrabold leading-none tracking-[-0.03em] tabular-nums" data-testid="text-niat-instructor-total">{total.toLocaleString('en-IN')}</span>
+      <span className="text-[12px] text-muted-foreground">NIAT instructors (Deployed + Training)</span>
+    </div>
+    <ul className="space-y-3.5">
+      {rows.map(([cohort, count]) => <li key={cohort} data-testid={`row-niat-cohort-${slugify(cohort)}`}>
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="text-[15px]">{cohort}</span>
+          <span className="text-[14px] font-extrabold tabular-nums">{count.toLocaleString('en-IN')}</span>
+        </div>
+        {bar(count, '#4f86b8')}
+      </li>)}
+    </ul>
+    <p className="mt-4 text-[11px] text-muted-foreground">An instructor teaching more than one cohort is counted in each.</p>
+  </div>;
 }
 
 // Top 10 campuses (2026-10-08, per request): campus name + instructor head-count only -- the people themselves
