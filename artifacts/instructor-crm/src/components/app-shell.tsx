@@ -91,7 +91,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <p className="font-mono-ui mt-3 text-[10px] text-sidebar-foreground/40">LAST CHECK · 09:42 IST</p>
           </div>
           <div className="mt-4 flex items-center gap-3 border-t border-sidebar-border px-2 pt-4">
-            <div className="grid h-8 w-8 place-items-center rounded-full bg-[#d4e1ee] text-[11px] font-extrabold text-[#263d58]">{user ? initials(displayName) : <Eye size={14} />}</div>
+            <div className="grid h-8 w-8 place-items-center rounded-full bg-[#d3ece8] text-[11px] font-extrabold text-[#134e4a]">{user ? initials(displayName) : <Eye size={14} />}</div>
             <div className="min-w-0 flex-1">
               <p className="truncate text-[12px] font-bold">{displayName}</p>
               <p className="font-mono-ui truncate text-[10px] text-sidebar-foreground/45">{roleLabel}</p>
@@ -107,7 +107,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      {mobileOpen && !hideNav && <button type="button" aria-label="Close navigation overlay" data-testid="button-navigation-overlay" onClick={() => setMobileOpen(false)} className="fixed inset-0 z-30 bg-[#142238]/45 md:hidden" />}
+      {mobileOpen && !hideNav && <button type="button" aria-label="Close navigation overlay" data-testid="button-navigation-overlay" onClick={() => setMobileOpen(false)} className="fixed inset-0 z-30 bg-[#0b2b29]/45 md:hidden" />}
 
       <div className={hideNav ? '' : 'md:pl-[252px]'}>
         <header className="sticky top-0 z-20 flex h-[76px] items-center justify-between border-b border-border/80 bg-background/90 px-5 backdrop-blur-md sm:px-8">
@@ -134,7 +134,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <div className="ml-2 hidden h-8 w-px bg-border sm:block" />
             {user
               ? <button type="button" aria-label="Sign out" title="Sign out" data-testid="button-profile" onClick={() => logout()} className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-secondary">
-                  <span className="grid h-8 w-8 place-items-center rounded-full bg-[#d4e1ee] text-[11px] font-extrabold text-[#263d58]">{initials(displayName)}</span>
+                  <span className="grid h-8 w-8 place-items-center rounded-full bg-[#d3ece8] text-[11px] font-extrabold text-[#134e4a]">{initials(displayName)}</span>
                   <span className="hidden sm:block"><span className="block text-[12px] font-bold leading-4">{displayName}</span><span className="font-mono-ui block text-[9px] text-muted-foreground">{roleLabel}</span></span>
                 </button>
               : <Link href="/login" data-testid="link-header-sign-in-admin" className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-secondary">

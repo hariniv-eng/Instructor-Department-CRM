@@ -114,10 +114,10 @@ export type StatTone = 'navy' | 'teal' | 'saffron' | 'indigo' | 'green' | 'muted
 export function TopStat({ label, value, meta, icon, tone, alert = false }: { label: string; value: string; meta: string; icon: React.ReactNode; tone: StatTone; alert?: boolean }) {
   const tones: Record<StatTone, string> = {
     navy: 'bg-primary text-primary-foreground',
-    teal: 'bg-[#dff0eb] text-[#256e65]',
-    saffron: 'bg-accent text-accent-foreground',
+    teal: 'bg-[#e3f3df] text-[#2f6b2a]',
+    saffron: 'bg-[#fbeed3] text-[#8a5a0b]',
     indigo: 'bg-[#e3e4fa] text-[#4a4fb0]',
-    green: 'bg-[#dcf0ea] text-[#287469]',
+    green: 'bg-[#e3f3df] text-[#2f6b2a]',
     muted: 'bg-secondary text-muted-foreground',
     amber: 'bg-[#f7e9cf] text-[#8b6207]',
   };
@@ -134,10 +134,10 @@ export function TopStat({ label, value, meta, icon, tone, alert = false }: { lab
 export function MiniStat({ label, value, meta, tone }: { label: string; value: number; meta: string; tone: StatTone }) {
   const toneTextClass: Record<StatTone, string> = {
     navy: 'text-primary',
-    teal: 'text-[#256e65]',
-    saffron: 'text-accent-foreground',
+    teal: 'text-[#2f6b2a]',
+    saffron: 'text-[#8a5a0b]',
     indigo: 'text-[#4a4fb0]',
-    green: 'text-[#287469]',
+    green: 'text-[#2f6b2a]',
     muted: 'text-muted-foreground',
     amber: 'text-[#8b6207]',
   };

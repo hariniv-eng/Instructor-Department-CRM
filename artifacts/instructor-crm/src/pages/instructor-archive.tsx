@@ -94,7 +94,7 @@ function PayrollBadge({ isPayroll }: { isPayroll: boolean }) {
 }
 
 function StatusBadge({ status }: { status: ArchiveRow['status'] }) {
-  const toneClass = status === 'Active' ? 'bg-[#e5f3ed] text-[#287469]' : status === 'SNP' ? 'bg-[#fff4dc] text-[#9a6b0c]' : 'bg-[#fdeeea] text-[#b45436]';
+  const toneClass = status === 'Active' ? 'bg-[#e5f3ed] text-[#2f6b2a]' : status === 'SNP' ? 'bg-[#fff4dc] text-[#9a6b0c]' : 'bg-[#fdeeea] text-[#b45436]';
   return <span className={`inline-flex rounded-full px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] ${toneClass}`}>{status}</span>;
 }
 

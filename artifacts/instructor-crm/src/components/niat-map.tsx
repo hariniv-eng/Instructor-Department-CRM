@@ -28,7 +28,7 @@ export function NiatMapCard({ institutesByPerson }: { institutesByPerson: (strin
     <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
       <div className="mx-auto w-full max-w-[420px]">
         <svg viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`} role="img" aria-label="Map of India with a pin at each NIAT university location" className="h-auto w-full">
-          <g fill="#dfe8f0" stroke="#ffffff" strokeWidth={0.8} strokeLinejoin="round">
+          <g fill="#dcebe8" stroke="#ffffff" strokeWidth={0.8} strokeLinejoin="round">
             {INDIA_STATES.map((state) => <path key={state.name} d={state.d} />)}
           </g>
           {pins.map((pin) => {
@@ -37,7 +37,7 @@ export function NiatMapCard({ institutesByPerson }: { institutesByPerson: (strin
             return <g key={pin.id} transform={`translate(${projectX(pin.lng).toFixed(1)} ${projectY(pin.lat).toFixed(1)})`} onClick={() => setSelectedId(active ? null : pin.id)} style={{ cursor: 'pointer' }} data-testid={`pin-${pin.name}`}>
               <title>{`${pin.name}, ${pin.state} — ${pin.universities.length} ${pin.universities.length === 1 ? 'university' : 'universities'}`}</title>
               <circle r={radius + 3} fill="#c75b3f" opacity={active ? 0.3 : 0.16} />
-              <circle r={radius} fill={active ? '#1f3a5f' : '#c75b3f'} stroke="#ffffff" strokeWidth={1.5} />
+              <circle r={radius} fill={active ? '#0f766e' : '#c75b3f'} stroke="#ffffff" strokeWidth={1.5} />
               {pin.universities.length > 1 && <text textAnchor="middle" dy="0.35em" fontSize={9} fontWeight={800} fill="#ffffff" style={{ pointerEvents: 'none' }}>{pin.universities.length}</text>}
             </g>;
           })}
