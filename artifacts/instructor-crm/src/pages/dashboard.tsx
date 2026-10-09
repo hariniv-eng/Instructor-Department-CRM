@@ -277,23 +277,23 @@ function ProductMixCard({ people }: { people: InstructorSummary[] }) {
     return arc;
   });
   const active = hover ? slices.find((slice) => slice.name === hover) : null;
-  return <div data-testid="card-product-mix" className="rounded-xl border border-border bg-card p-5 shadow-xs">
+  return <div data-testid="card-product-mix" className="rounded-xl border border-border bg-card p-4 shadow-xs">
     <div className="mb-4 flex items-center gap-3">
-      <span className="grid h-9 w-9 place-items-center rounded-lg bg-secondary text-muted-foreground"><PieChart size={17} /></span>
+      <span className="grid h-7 w-7 place-items-center rounded-lg bg-secondary text-muted-foreground"><PieChart size={14} /></span>
       <div>
-        <h2 className="text-[16px] font-extrabold tracking-[-0.03em]">Product mix</h2>
-        <p className="text-[11px] text-muted-foreground">Instructor Department by Product</p>
+        <h2 className="text-[12px] font-extrabold tracking-[-0.03em]">Product mix</h2>
+        <p className="text-[10px] text-muted-foreground">Instructor Department by Product</p>
       </div>
     </div>
-    <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-center xl:flex-col">
-      <div className="relative h-[170px] w-[170px] shrink-0">
+    <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-center xl:flex-col">
+      <div className="relative h-[116px] w-[116px] shrink-0">
         <svg viewBox="0 0 42 42" className="h-full w-full -rotate-0" role="img" aria-label="Instructor Department split by Product">
           <circle cx="21" cy="21" r={RADIUS} fill="none" strokeWidth="6" className="stroke-secondary" />
           {arcs.map((arc) => <circle key={arc.name} cx="21" cy="21" r={RADIUS} fill="none" strokeWidth={hover === arc.name ? 7 : 6} stroke={PRODUCT_COLORS[arc.name] ?? '#8a93a6'} strokeDasharray={`${Math.max(arc.pct - 0.4, 0)} ${100 - Math.max(arc.pct - 0.4, 0)}`} strokeDashoffset={arc.dashOffset} onMouseEnter={() => setHover(arc.name)} onMouseLeave={() => setHover(null)} data-testid={`slice-product-${slugify(arc.name)}`}><title>{`${arc.name}: ${arc.count}`}</title></circle>)}
         </svg>
         <div className="pointer-events-none absolute inset-0 grid place-items-center text-center">
           <div>
-            <div className="text-[24px] font-extrabold leading-none tracking-[-0.03em] tabular-nums">{(active ? active.count : total).toLocaleString('en-IN')}</div>
+            <div className="text-[18px] font-extrabold leading-none tracking-[-0.03em] tabular-nums">{(active ? active.count : total).toLocaleString('en-IN')}</div>
             <div className="mt-1 max-w-[88px] text-[10px] leading-tight text-muted-foreground">{active ? active.name : 'in the department'}</div>
           </div>
         </div>
@@ -301,8 +301,8 @@ function ProductMixCard({ people }: { people: InstructorSummary[] }) {
       <ul className="w-full min-w-0 flex-1 space-y-1.5">
         {slices.map((slice) => <li key={slice.name} onMouseEnter={() => setHover(slice.name)} onMouseLeave={() => setHover(null)} data-testid={`row-product-${slugify(slice.name)}`} className={`flex items-center gap-2.5 rounded-md px-2 py-1 transition-colors ${hover === slice.name ? 'bg-secondary' : ''}`}>
           <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ backgroundColor: PRODUCT_COLORS[slice.name] ?? '#8a93a6' }} />
-          <span className="min-w-0 flex-1 truncate text-[13px]">{slice.name}</span>
-          <span className="min-w-10 text-right text-[14px] font-extrabold tabular-nums">{slice.count.toLocaleString('en-IN')}</span>
+          <span className="min-w-0 flex-1 truncate text-[12px]">{slice.name}</span>
+          <span className="min-w-10 text-right text-[12px] font-extrabold tabular-nums">{slice.count.toLocaleString('en-IN')}</span>
         </li>)}
       </ul>
     </div>
@@ -330,29 +330,29 @@ function NiatContributionCard({ people }: { people: InstructorSummary[] }) {
     return { rows: ordered, total: niat.length };
   }, [people]);
   const max = Math.max(1, ...rows.map(([, count]) => count));
-  const bar = (count: number, color: string) => <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-secondary"><div className="h-full rounded-full" style={{ width: `${Math.max(count > 0 ? 2 : 0, (count / max) * 100)}%`, backgroundColor: color }} /></div>;
-  return <div data-testid="card-niat-contribution" className="rounded-xl border border-border bg-card p-5 shadow-xs">
-    <div className="mb-5 flex items-center gap-3">
-      <span className="grid h-9 w-9 place-items-center rounded-lg bg-secondary text-muted-foreground"><GraduationCap size={17} /></span>
+  const bar = (count: number, color: string) => <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-secondary"><div className="h-full rounded-full" style={{ width: `${Math.max(count > 0 ? 2 : 0, (count / max) * 100)}%`, backgroundColor: color }} /></div>;
+  return <div data-testid="card-niat-contribution" className="rounded-xl border border-border bg-card p-4 shadow-xs">
+    <div className="mb-3 flex items-center gap-3">
+      <span className="grid h-7 w-7 place-items-center rounded-lg bg-secondary text-muted-foreground"><GraduationCap size={14} /></span>
       <div>
-        <h2 className="text-[16px] font-extrabold tracking-[-0.03em]">Contribution of NIAT instructors</h2>
-        <p className="text-[11px] text-muted-foreground">Instructors teaching each NIAT cohort · last 30 days (last 2 months if none)</p>
+        <h2 className="text-[12px] font-extrabold tracking-[-0.03em]">Contribution of NIAT instructors</h2>
+        <p className="text-[10px] text-muted-foreground">Instructors teaching each NIAT cohort · last 30 days (last 2 months if none)</p>
       </div>
     </div>
-    <div className="mb-5 flex items-baseline gap-2">
-      <span className="text-[30px] font-extrabold leading-none tracking-[-0.03em] tabular-nums" data-testid="text-niat-instructor-total">{total.toLocaleString('en-IN')}</span>
+    <div className="mb-3 flex items-baseline gap-2">
+      <span className="text-[18px] font-extrabold leading-none tracking-[-0.03em] tabular-nums" data-testid="text-niat-instructor-total">{total.toLocaleString('en-IN')}</span>
       <span className="text-[12px] text-muted-foreground">NIAT instructors (Deployed + Training)</span>
     </div>
-    <ul className="space-y-3.5">
+    <ul className="space-y-2">
       {rows.map(([cohort, count]) => <li key={cohort} data-testid={`row-niat-cohort-${slugify(cohort)}`}>
         <div className="flex items-baseline justify-between gap-3">
-          <span className="text-[15px]">{cohort}</span>
-          <span className="text-[14px] font-extrabold tabular-nums">{count.toLocaleString('en-IN')}</span>
+          <span className="text-[12px]">{cohort}</span>
+          <span className="text-[12px] font-extrabold tabular-nums">{count.toLocaleString('en-IN')}</span>
         </div>
         {bar(count, '#4f86b8')}
       </li>)}
     </ul>
-    <p className="mt-4 text-[11px] text-muted-foreground">An instructor teaching more than one cohort is counted in each.</p>
+    <p className="mt-4 text-[10px] text-muted-foreground">An instructor teaching more than one cohort is counted in each.</p>
   </div>;
 }
 
@@ -364,15 +364,15 @@ function NiatContributionCard({ people }: { people: InstructorSummary[] }) {
 const TRAINING_CAMPUS = 'Training Institute';
 function RankedBarList({ rows, color, testPrefix }: { rows: [string, number][]; color: string; testPrefix: string }) {
   const max = Math.max(1, ...rows.map(([, count]) => count));
-  return <ol className="space-y-3.5">
+  return <ol className="space-y-2">
     {rows.map(([name, count], index) => <li key={name} data-testid={`row-${testPrefix}-${slugify(name)}`} className="flex items-start gap-3">
-      <span className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-secondary font-mono-ui text-[11px] font-bold text-muted-foreground">{index + 1}</span>
+      <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-md bg-secondary font-mono-ui text-[10px] font-bold text-muted-foreground">{index + 1}</span>
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between gap-3">
-          <span className="truncate text-[15px] text-foreground">{name}</span>
-          <span className="shrink-0 text-[14px] font-extrabold tabular-nums">{count.toLocaleString('en-IN')}</span>
+          <span className="truncate text-[12px] text-foreground">{name}</span>
+          <span className="shrink-0 text-[12px] font-extrabold tabular-nums">{count.toLocaleString('en-IN')}</span>
         </div>
-        <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-secondary"><div className="h-full rounded-full" style={{ width: `${Math.max(2, (count / max) * 100)}%`, backgroundColor: color }} /></div>
+        <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-secondary"><div className="h-full rounded-full" style={{ width: `${Math.max(2, (count / max) * 100)}%`, backgroundColor: color }} /></div>
       </div>
     </li>)}
   </ol>;
@@ -394,12 +394,12 @@ function TopCampusesCard({ people }: { people: InstructorSummary[] }) {
     const rest = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 9);
     return [[TRAINING_CAMPUS, training] as [string, number], ...rest];
   }, [people]);
-  return <div data-testid="card-top-campuses" className="rounded-xl border border-border bg-card p-5 shadow-xs">
-    <div className="mb-5 flex items-center gap-3">
-      <span className="grid h-9 w-9 place-items-center rounded-lg bg-secondary text-muted-foreground"><Building2 size={17} /></span>
+  return <div data-testid="card-top-campuses" className="rounded-xl border border-border bg-card p-4 shadow-xs">
+    <div className="mb-3 flex items-center gap-3">
+      <span className="grid h-7 w-7 place-items-center rounded-lg bg-secondary text-muted-foreground"><Building2 size={14} /></span>
       <div>
-        <h2 className="text-[16px] font-extrabold tracking-[-0.03em]">Top campuses</h2>
-        <p className="text-[11px] text-muted-foreground">By headcount</p>
+        <h2 className="text-[12px] font-extrabold tracking-[-0.03em]">Top campuses</h2>
+        <p className="text-[10px] text-muted-foreground">By headcount</p>
       </div>
     </div>
     <RankedBarList rows={campuses} color="#f26419" testPrefix="campus" />
@@ -419,12 +419,12 @@ function CapabilityManagersCard({ people }: { people: InstructorSummary[] }) {
     }
     return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
   }, [people]);
-  return <div data-testid="card-capability-managers" className="rounded-xl border border-border bg-card p-5 shadow-xs">
-    <div className="mb-5 flex items-center gap-3">
-      <span className="grid h-9 w-9 place-items-center rounded-lg bg-secondary text-muted-foreground"><UsersRound size={17} /></span>
+  return <div data-testid="card-capability-managers" className="rounded-xl border border-border bg-card p-4 shadow-xs">
+    <div className="mb-3 flex items-center gap-3">
+      <span className="grid h-7 w-7 place-items-center rounded-lg bg-secondary text-muted-foreground"><UsersRound size={14} /></span>
       <div>
-        <h2 className="text-[16px] font-extrabold tracking-[-0.03em]">Manager workload</h2>
-        <p className="text-[11px] text-muted-foreground">Instructors per Capability Manager</p>
+        <h2 className="text-[12px] font-extrabold tracking-[-0.03em]">Manager workload</h2>
+        <p className="text-[10px] text-muted-foreground">Instructors per Capability Manager</p>
       </div>
     </div>
     <div className="max-h-[520px] overflow-auto pr-1"><RankedBarList rows={managers} color="#12b5cb" testPrefix="capability-manager" /></div>
@@ -455,32 +455,32 @@ function ExitedCard({ pendingPeople, onViewApproved, onViewPending }: { pendingP
   const column = (testId: string, title: string, subtitle: string, rows: { key: string; name: string; date: string | null }[], loading: boolean, onViewAll: () => void, empty: string) => <div data-testid={testId} className="min-w-0">
     <div className="mb-2 flex items-center justify-between gap-3">
       <div>
-        <h3 className="text-[14px] font-extrabold tracking-[-0.02em]">{title}</h3>
-        <p className="text-[11px] text-muted-foreground">{subtitle}</p>
+        <h3 className="text-[12px] font-extrabold tracking-[-0.02em]">{title}</h3>
+        <p className="text-[10px] text-muted-foreground">{subtitle}</p>
       </div>
       <div className="flex items-center gap-3">
-        <span className="text-[24px] font-extrabold leading-none tracking-[-0.03em] tabular-nums" data-testid={`${testId}-count`}>{loading ? '…' : rows.length.toLocaleString('en-IN')}</span>
+        <span className="text-[18px] font-extrabold leading-none tracking-[-0.03em] tabular-nums" data-testid={`${testId}-count`}>{loading ? '…' : rows.length.toLocaleString('en-IN')}</span>
         <button type="button" onClick={onViewAll} data-testid={`${testId}-view-all`} className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-3 py-1.5 text-[12px] font-bold text-foreground transition-colors hover:bg-secondary">View all <ArrowRight size={13} /></button>
       </div>
     </div>
     <ul>
-      {rows.slice(0, 8).map((row) => <li key={row.key} className="flex items-center justify-between gap-3 border-b border-border/60 py-2">
-        <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">{row.name}</span>
+      {rows.slice(0, 8).map((row) => <li key={row.key} className="flex items-center justify-between gap-3 border-b border-border/60 py-1.5">
+        <span className="min-w-0 flex-1 truncate text-[12px] font-semibold">{row.name}</span>
         <span className="shrink-0 text-[12px] text-muted-foreground">{formatExitDate(row.date)}</span>
       </li>)}
       {!loading && rows.length === 0 && <li className="py-6 text-center text-[12px] text-muted-foreground">{empty}</li>}
     </ul>
   </div>;
-  return <section data-testid="card-exited" className="mt-4 rounded-xl border border-border bg-card p-5 shadow-xs animate-rise">
+  return <section data-testid="card-exited" className="mt-4 rounded-xl border border-border bg-card p-4 shadow-xs animate-rise">
     <div className="mb-4 flex items-center gap-3">
-      <span className="grid h-9 w-9 place-items-center rounded-lg bg-secondary text-muted-foreground"><LogOut size={17} /></span>
+      <span className="grid h-7 w-7 place-items-center rounded-lg bg-secondary text-muted-foreground"><LogOut size={14} /></span>
       <div>
-        <h2 className="text-[16px] font-extrabold tracking-[-0.03em]">Exit data</h2>
-        <p className="text-[11px] text-muted-foreground">Approved exits and exits waiting for approval</p>
+        <h2 className="text-[12px] font-extrabold tracking-[-0.03em]">Exit data</h2>
+        <p className="text-[10px] text-muted-foreground">Approved exits and exits waiting for approval</p>
       </div>
     </div>
     {archiveQuery.isError && <p className="mb-3 text-[12px] text-muted-foreground">The archive is unavailable right now, so approved exits cannot be shown.</p>}
-    <div className="grid grid-cols-1 gap-x-10 gap-y-6 lg:grid-cols-2">
+    <div className="grid grid-cols-1 gap-x-10 gap-y-4 lg:grid-cols-2">
       {column('exit-approved', 'Approved', 'Instructor Archive · exit date', approved, archiveQuery.isLoading, onViewApproved, 'No approved exits in the archive yet.')}
       {column('exit-pending', 'Pending approval', 'Waiting on the approver · date of exit', pending, false, onViewPending, 'No exit approvals are pending.')}
     </div>
@@ -505,15 +505,15 @@ function KpiCard({ label, value, meta, icon, tone, alert = false, breakdown, act
     data-testid={`button-kpi-card-${label.toLowerCase().replace(/\s+/g, '-')}`}
     onClick={onClick}
     aria-pressed={active}
-    className={`relative w-full overflow-hidden rounded-xl border p-4 text-left shadow-xs transition-transform hover:-translate-y-0.5 sm:p-5 ${onNavy ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-card'} ${active ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : ''}`}
+    className={`relative w-full overflow-hidden rounded-xl border p-4 text-left shadow-xs transition-transform hover:-translate-y-0.5 ${onNavy ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-card'} ${active ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : ''}`}
   >
     <div className="flex items-start justify-between">
-      <p className={`text-[11px] font-bold ${onNavy ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>{label}</p>
+      <p className={`text-[10px] font-bold ${onNavy ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>{label}</p>
       <span className={`grid h-8 w-8 place-items-center rounded-lg ${tones[tone]}`}>{icon}</span>
     </div>
-    <p className="mt-5 text-[27px] font-extrabold tracking-[-0.06em]">{value}</p>
+    <p className="mt-3 text-[22px] font-extrabold tracking-[-0.06em]">{value}</p>
     <p className={`mt-1 font-mono-ui text-[10px] uppercase tracking-[0.1em] ${onNavy ? 'text-primary-foreground/55' : alert ? 'text-[#a36b00]' : 'text-muted-foreground'}`}>{meta}</p>
-    {breakdown && <div className={`mt-4 grid grid-cols-3 gap-2 border-t pt-3 ${onNavy ? 'border-primary-foreground/15' : 'border-border/70'}`}>
+    {breakdown && <div className={`mt-3 grid grid-cols-3 gap-2 border-t pt-2 ${onNavy ? 'border-primary-foreground/15' : 'border-border/70'}`}>
       {CARD_BREAKDOWN_ORDER.map((t) => <div key={t.key} className="flex flex-col">
         {/* min-h + leading here is what keeps the number below lined up across
             all three columns (2026-09-07, per request) -- "Both" is short
@@ -521,7 +521,7 @@ function KpiCard({ label, value, meta, icon, tone, alert = false, breakdown, act
             a narrow card, sit on two lines and would otherwise push their
             own number down while "Both"'s stayed put a line higher. */}
         <p className={`min-h-[23px] font-mono-ui text-[9px] leading-[1.3] uppercase tracking-[0.07em] ${onNavy ? 'text-primary-foreground/55' : 'text-muted-foreground'}`}>{t.label}</p>
-        <p className="mt-1 text-[15px] font-bold tracking-[-0.02em]">{formatKpi(breakdown[t.key]?.count)}</p>
+        <p className="mt-1 text-[12px] font-bold tracking-[-0.02em]">{formatKpi(breakdown[t.key]?.count)}</p>
       </div>)}
     </div>}
     <p className={`mt-3 text-[10px] font-bold uppercase tracking-[0.08em] ${onNavy ? 'text-primary-foreground/70' : 'text-primary'}`}>{active ? 'Hide people list ▲' : 'View people list ▼'}</p>
