@@ -45,7 +45,7 @@ export default function AccessChoicePage() {
         <div className="grid gap-4 sm:grid-cols-2">
           <Card>
             <CardContent className="flex h-full flex-col p-6">
-              <span className="grid h-10 w-10 place-items-center rounded-lg bg-[#d9f0ec] text-primary"><ShieldCheck size={19} /></span>
+              <span className="grid h-10 w-10 place-items-center rounded-lg bg-[#e1eaf1] text-primary"><ShieldCheck size={19} /></span>
               <h2 className="mt-4 text-[14px] font-bold">Admin</h2>
               <p className="mt-1.5 flex-1 text-[12px] leading-5 text-muted-foreground">Sign in with your email and password for full access -- every tab, plus adding and editing instructor records.</p>
               <button

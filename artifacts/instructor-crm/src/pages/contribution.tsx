@@ -139,7 +139,7 @@ export default function ContributionPage() {
       </div>}
     />
 
-    {syncMessage && <p data-testid="status-sync-contribution" className={`mb-4 max-w-2xl rounded-lg px-3 py-2 text-[12px] font-semibold ${syncMessage.ok ? 'bg-[#e5f3ed] text-[#2f6b2a]' : 'bg-[#fff0ec] text-[#9b4434]'}`}>{syncMessage.text}</p>}
+    {syncMessage && <p data-testid="status-sync-contribution" className={`mb-4 max-w-2xl rounded-lg px-3 py-2 text-[12px] font-semibold ${syncMessage.ok ? 'bg-[#e5f3ed] text-[#256e65]' : 'bg-[#fff0ec] text-[#9b4434]'}`}>{syncMessage.text}</p>}
 
     {query.isLoading && <SkeletonBlock className="h-[520px]" />}
     {query.isError && <QueryError message="Contribution is unavailable right now." />}

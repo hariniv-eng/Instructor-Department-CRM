@@ -120,7 +120,7 @@ function groupByTrack(taxonomy: TrainingCourseDef[]): { trackGroup: string; defs
 // at all) -- kept visually distinct (grey, no emoji) so they're never
 // mistaken for one of the sheet's real 4 statuses.
 const STATUS_BADGE: Record<CourseStatus, { label: string; className: string }> = {
-  COMPLETED: { label: '✅ Completed', className: 'bg-[#e5f3ed] text-[#2f6b2a]' },
+  COMPLETED: { label: '✅ Completed', className: 'bg-[#e5f3ed] text-[#256e65]' },
   IN_PROGRESS: { label: '🟡 In Progress', className: 'bg-[#fff3d6] text-[#8a6a12]' },
   NOT_STARTED: { label: '❌ Not Started', className: 'bg-[#f3f0ec] text-[#8a7a63]' },
   PENDING_MAPPING: { label: 'Mapping pending', className: 'bg-[#f1f2f4] italic text-muted-foreground' },
@@ -199,7 +199,7 @@ export default function TrainingStatsPage() {
       </div>}
     />
 
-    {syncMessage && <p data-testid="status-sync-training-status" className={`mb-4 max-w-2xl rounded-lg px-3 py-2 text-[12px] font-semibold ${syncMessage.ok ? 'bg-[#e5f3ed] text-[#2f6b2a]' : 'bg-[#fff0ec] text-[#9b4434]'}`}>{syncMessage.text}</p>}
+    {syncMessage && <p data-testid="status-sync-training-status" className={`mb-4 max-w-2xl rounded-lg px-3 py-2 text-[12px] font-semibold ${syncMessage.ok ? 'bg-[#e5f3ed] text-[#256e65]' : 'bg-[#fff0ec] text-[#9b4434]'}`}>{syncMessage.text}</p>}
 
     <div className="mb-6 flex flex-wrap gap-2 border-b border-border pb-3">
       {SUB_TABS.map((tab) => <button
