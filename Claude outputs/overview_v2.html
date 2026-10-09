@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Overview mock, dashboard style</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap">
+<style>
+  :root{
+    --bg:#eaf0f4; --card:#fff; --ink:#14202e; --mute:#64748b; --line:#dde5ec; --soft:#eef2f5;
+    --navy:#1f3a5f; --blue:#4f86b8; --saffron:#e0a030; --teal:#2e8b7a; --coral:#c75b3f; --grey:#8a93a6;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:"Plus Jakarta Sans",system-ui,sans-serif;font-size:12px}
+  .wrap{max-width:1180px;margin:0 auto;padding:22px 18px 50px}
+  .note{color:var(--mute);margin:0 0 14px;max-width:700px;line-height:1.5}
+  .shell{background:var(--bg);border:1px dashed #b9c6d1;border-radius:16px;padding:14px;display:grid;gap:12px}
+  .card{background:var(--card);border-radius:14px;box-shadow:0 1px 2px rgba(20,32,46,.06),0 4px 14px -6px rgba(20,32,46,.10);padding:12px 14px}
+  .card h4{margin:0 0 8px;font-size:12px;text-align:center;font-weight:700}
+  /* filter row */
+  .filters{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+  .f{display:grid;gap:3px;min-width:130px;flex:1}
+  .f b{font-size:10px;color:var(--mute);font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+  .f span{border:1px solid var(--line);border-radius:8px;padding:5px 8px;background:#fff;display:flex;justify-content:space-between;font-size:11px}
+  .f span::after{content:"▾";color:var(--mute)}
+  .reset{border:1px solid var(--line);border-radius:8px;padding:6px 12px;font-weight:700;font-size:11px;background:#fff;align-self:end}
+  /* kpis */
+  .kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+  .kpi{position:relative;text-align:center;padding:14px 10px 12px 16px}
+  .kpi::before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:5px;border-radius:0 4px 4px 0;background:var(--c)}
+  .kpi .n{font-size:26px;font-weight:800;letter-spacing:-.03em;line-height:1}
+  .kpi .l{font-size:10.5px;color:var(--mute);font-weight:700;margin-top:5px}
+  .kpi .s{font-size:9.5px;color:var(--mute);margin-top:6px;border-top:1px solid var(--soft);padding-top:5px;display:flex;justify-content:space-around}
+  .kpi .s b{color:var(--ink)}
+  /* exceptions */
+  .exc{display:grid;grid-template-columns:repeat(3,1fr);border-radius:14px;overflow:hidden;background:#fff;box-shadow:0 1px 2px rgba(20,32,46,.06)}
+  .exc div{padding:10px 14px;display:flex;gap:10px;align-items:center}
+  .exc div+div{border-left:1px solid var(--line)}
+  .exc .bad{background:#f6e4de;color:#9b4434}.exc .ok{background:#dff0eb;color:#256e65}
+  .exc .n{font-size:20px;font-weight:800}
+  .exc small{display:block;opacity:.8;font-size:10px}
+  /* charts */
+  .row2{display:grid;grid-template-columns:1.6fr 1fr;gap:12px}
+  .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+  .cols{display:flex;align-items:flex-end;justify-content:space-around;height:150px;padding:0 6px;border-bottom:1px solid var(--line)}
+  .col{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:4px;width:9%;height:100%}
+  .col i{display:block;width:100%;background:var(--blue);border-radius:4px 4px 0 0}
+  .col.pin i{background:var(--navy)}
+  .col em{font-style:normal;font-weight:800;font-size:11px}
+  .labs{display:flex;justify-content:space-around;padding:5px 6px 0;color:var(--mute);font-size:10px}
+  .labs span{width:9%;text-align:center}
+  .donut{width:104px;height:104px;border-radius:50%;background:conic-gradient(var(--navy) 0 38%,var(--blue) 38% 58%,var(--saffron) 58% 70%,var(--teal) 70% 82%,var(--coral) 82% 92%,var(--grey) 92% 100%);display:grid;place-items:center;flex:none}
+  .donut::after{content:"";width:64px;height:64px;border-radius:50%;background:#fff;grid-area:1/1}
+  .donut b{grid-area:1/1;z-index:1;font-size:16px}
+  .legend{display:grid;gap:4px;font-size:11px;flex:1}
+  .legend div{display:flex;gap:6px;align-items:center}
+  .legend i{width:8px;height:8px;border-radius:2px;flex:none}
+  .legend b{margin-left:auto}
+  .hrow{display:grid;grid-template-columns:78px 1fr 28px;gap:8px;align-items:center;margin:7px 0}
+  .hrow .t{height:8px;background:var(--soft);border-radius:99px;overflow:hidden}.hrow .t i{display:block;height:100%;border-radius:99px;background:var(--blue)}
+  .hrow b{text-align:right}
+  .gauge{display:grid;place-items:center;padding-top:6px}
+  .arc{width:150px;height:75px;border-radius:150px 150px 0 0;background:conic-gradient(from -90deg at 50% 100%,var(--teal) 0 var(--p),var(--soft) var(--p) 180deg,transparent 180deg);position:relative;overflow:hidden}
+  .arc::after{content:"";position:absolute;left:25px;right:25px;top:25px;bottom:0;background:#fff;border-radius:100px 100px 0 0}
+  .gauge .g{font-size:22px;font-weight:800;margin-top:-26px;position:relative}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+  .two div{background:var(--soft);border-radius:10px;padding:8px;text-align:center}
+  .two b{display:block;font-size:18px}.two small{color:var(--mute);font-size:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p class="note"><b>Overview, dashboard style.</b> Inspired by the reference: a filter row on top, centred KPI tiles with a coloured edge, rounded cards with soft shadows, and real charts (bars, donut, gauge). Our navy/blue palette is kept, so you can still swap in a green one. Numbers are placeholders.</p>
+  <div class="shell">
+
+    <div class="card filters">
+      <div class="f"><b>Product</b><span>All</span></div>
+      <div class="f"><b>Campus</b><span>All</span></div>
+      <div class="f"><b>Capability Manager</b><span>All</span></div>
+      <div class="f"><b>Subject</b><span>All</span></div>
+      <div class="f"><b>Payroll</b><span>All</span></div>
+      <div class="reset">Reset</div>
+    </div>
+
+    <div class="exc">
+      <div class="bad"><span class="n">3</span><span><b>Needs review</b><small>Exception 1 · Capability Managers</small></span></div>
+      <div class="bad"><span class="n">12</span><span><b>Remove TeachOS access</b><small>Exception 2 · exit list</small></span></div>
+      <div class="ok"><span class="n">0</span><span><b>Approval pending</b><small>Exception 3 · HRBP action</small></span></div>
+    </div>
+
+    <div class="kpis">
+      <div class="card kpi" style="--c:var(--navy)"><div class="n">694</div><div class="l">Instructor Department</div><div class="s"><span>Both <b>610</b></span><span>Darwin <b>52</b></span><span>TeachOS <b>32</b></span></div></div>
+      <div class="card kpi" style="--c:var(--blue)"><div class="n">521</div><div class="l">Instructors</div><div class="s"><span>Both <b>470</b></span><span>Darwin <b>31</b></span><span>TeachOS <b>20</b></span></div></div>
+      <div class="card kpi" style="--c:var(--teal)"><div class="n">98</div><div class="l">Mentors</div><div class="s"><span>Both <b>90</b></span><span>Darwin <b>5</b></span><span>TeachOS <b>3</b></span></div></div>
+      <div class="card kpi" style="--c:var(--coral)"><div class="n">75</div><div class="l">Operations team</div><div class="s"><span>Both <b>50</b></span><span>Darwin <b>16</b></span><span>TeachOS <b>9</b></span></div></div>
+      <div class="card kpi" style="--c:var(--saffron)"><div class="n">64</div><div class="l">Approved exits</div><div class="s"><span>Pending <b>0</b></span></div></div>
+    </div>
+
+    <div class="row2">
+      <div class="card"><h4>Top campuses by instructors</h4>
+        <div class="cols">
+          <div class="col pin"><em>141</em><i style="height:100%"></i></div>
+          <div class="col"><em>38</em><i style="height:27%"></i></div>
+          <div class="col"><em>31</em><i style="height:22%"></i></div>
+          <div class="col"><em>28</em><i style="height:20%"></i></div>
+          <div class="col"><em>24</em><i style="height:17%"></i></div>
+          <div class="col"><em>22</em><i style="height:16%"></i></div>
+          <div class="col"><em>19</em><i style="height:13%"></i></div>
+          <div class="col"><em>17</em><i style="height:12%"></i></div>
+          <div class="col"><em>15</em><i style="height:11%"></i></div>
+          <div class="col"><em>12</em><i style="height:9%"></i></div>
+        </div>
+        <div class="labs"><span>Training</span><span>Aurora</span><span>ADYPU</span><span>AMET</span><span>CITY</span><span>NRI</span><span>NSRIT</span><span>CU</span><span>CDU</span><span>Annam.</span></div>
+      </div>
+      <div class="card"><h4>Product mix</h4>
+        <div style="display:flex;gap:14px;align-items:center;padding-top:4px">
+          <div class="donut"><b>694</b></div>
+          <div class="legend">
+            <div><i style="background:var(--navy)"></i>NIAT (Deployed)<b>264</b></div>
+            <div><i style="background:var(--blue)"></i>NIAT (Training)<b>139</b></div>
+            <div><i style="background:var(--saffron)"></i>Academy<b>83</b></div>
+            <div><i style="background:var(--teal)"></i>Intensive<b>83</b></div>
+            <div><i style="background:var(--coral)"></i>IIT X DSA<b>70</b></div>
+            <div><i style="background:var(--grey)"></i>Support<b>55</b></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row3">
+      <div class="card"><h4>Contribution of NIAT instructors</h4>
+        <div class="hrow"><span>NIAT 2024</span><div class="t"><i style="width:30%"></i></div><b>41</b></div>
+        <div class="hrow"><span>NIAT 2025</span><div class="t"><i style="width:70%"></i></div><b>96</b></div>
+        <div class="hrow"><span>NIAT 2026</span><div class="t"><i style="width:100%"></i></div><b>135</b></div>
+      </div>
+      <div class="card"><h4>Manager workload</h4>
+        <div class="hrow"><span>Riya Rai</span><div class="t"><i style="width:100%"></i></div><b>81</b></div>
+        <div class="hrow"><span>Sigatapu S.</span><div class="t"><i style="width:72%"></i></div><b>58</b></div>
+        <div class="hrow"><span>Vinitha N.</span><div class="t"><i style="width:67%"></i></div><b>54</b></div>
+        <div class="hrow"><span>Penumarthi S.</span><div class="t"><i style="width:65%"></i></div><b>53</b></div>
+      </div>
+      <div class="card"><h4>Exit data</h4>
+        <div class="gauge"><div class="arc" style="--p:90deg"></div><div class="g">100%</div></div>
+        <div style="text-align:center;color:var(--mute);font-size:10px;margin-top:2px">of raised exits are approved</div>
+        <div class="two"><div><b>64</b><small>Approved</small></div><div><b>0</b><small>Pending</small></div></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</body>
+</html>

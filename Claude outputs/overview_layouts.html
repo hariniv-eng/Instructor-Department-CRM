@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Overview layout options</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap">
+<style>
+  :root{
+    --bg:#f3f6f8; --card:#ffffff; --ink:#14202e; --mute:#64748b; --line:#e2e8ee; --soft:#eef2f5;
+    --navy:#1f3a5f; --blue:#4f86b8; --saffron:#e0a030; --teal:#2e8b7a; --coral:#c75b3f; --grey:#8a93a6;
+    --coral-bg:#f6e4de; --teal-bg:#dff0eb;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:"Plus Jakarta Sans",system-ui,sans-serif;font-size:13px}
+  .wrap{max-width:1180px;margin:0 auto;padding:28px 20px 60px}
+  h1{font-size:20px;margin:0 0 4px;letter-spacing:-.02em}
+  .lede{color:var(--mute);margin:0 0 28px;max-width:640px;line-height:1.5}
+  .opt{margin:0 0 44px}
+  .tag{display:flex;align-items:baseline;gap:10px;margin:0 0 10px}
+  .tag b{font-size:15px;letter-spacing:-.02em}
+  .tag span{color:var(--mute)}
+  .frame{background:var(--bg);border:1px dashed #c3ced8;border-radius:14px;padding:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
+  .card h4{margin:0 0 2px;font-size:13px;letter-spacing:-.01em}
+  .card small{color:var(--mute);font-size:11px}
+  .num{font-weight:800;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+  .grid{display:grid;gap:12px}
+  .bar{display:grid;grid-template-columns:3fr 3fr 3fr;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--card)}
+  .bar>div{padding:12px 14px;display:flex;gap:10px;align-items:center}
+  .bar>div+div{border-left:1px solid var(--line)}
+  .bar .bad{background:var(--coral-bg);color:#9b4434}
+  .bar .ok{background:var(--teal-bg);color:#256e65}
+  .bar .num{font-size:22px}
+  .row{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--soft)}
+  .row:last-child{border:0}
+  .hbar{height:7px;border-radius:99px;background:var(--soft);overflow:hidden;margin-top:4px}
+  .hbar i{display:block;height:100%;border-radius:99px;background:var(--blue)}
+  .donut{width:120px;height:120px;border-radius:50%;background:conic-gradient(var(--navy) 0 38%,var(--blue) 38% 58%,var(--saffron) 58% 70%,var(--teal) 70% 82%,var(--coral) 82% 92%,var(--grey) 92% 100%);display:grid;place-items:center;flex:none}
+  .donut::after{content:"";width:74px;height:74px;border-radius:50%;background:var(--card);grid-area:1/1}
+  .donut span{grid-area:1/1;z-index:1;font-weight:800;font-size:17px}
+  .legend{font-size:11px;color:var(--mute);display:grid;gap:3px}
+  .legend i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px}
+  .kpi .num{font-size:26px;display:block;margin-top:4px}
+  .kpi small{display:block}
+  .tabs{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+  .tabs span{padding:5px 12px;border-radius:99px;background:var(--soft);color:var(--mute);font-weight:600;font-size:12px}
+  .tabs .on{background:var(--navy);color:#fff}
+  .pill{display:inline-block;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em}
+  .note{margin-top:10px;color:var(--mute);font-size:12px;line-height:1.5}
+  .sample{font-size:11px;color:var(--mute);margin-bottom:6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Overview: three layout directions</h1>
+  <p class="lede">Same content in all three (exceptions, the four department cards, product mix, NIAT contribution, campuses, managers, exit data). Only the arrangement changes. Numbers are placeholders.</p>
+
+  <!-- A -->
+  <section class="opt">
+    <div class="tag"><b>A. Summary strip + two columns</b><span>closest to today, tidier</span></div>
+    <div class="frame">
+      <div class="bar" style="margin-bottom:12px">
+        <div class="bad"><span class="num">3</span><span><b>Needs review</b><br><small>Exception 1</small></span></div>
+        <div class="bad"><span class="num">12</span><span><b>Remove TeachOS access</b><br><small>Exception 2</small></span></div>
+        <div class="ok"><span class="num">0</span><span><b>Approval pending</b><br><small>Exception 3</small></span></div>
+      </div>
+      <div class="grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:12px">
+        <div class="card kpi"><small>Instructor Department</small><span class="num">694</span></div>
+        <div class="card kpi"><small>Instructors</small><span class="num">521</span></div>
+        <div class="card kpi"><small>Mentors</small><span class="num">98</span></div>
+        <div class="card kpi"><small>Operations team</small><span class="num">75</span></div>
+      </div>
+      <div class="grid" style="grid-template-columns:1fr 1fr">
+        <div class="card"><h4>Product mix</h4><small>Instructor Department</small>
+          <div style="display:flex;gap:16px;align-items:center;margin-top:10px"><div class="donut"><span>694</span></div>
+          <div class="legend"><div><i style="background:var(--navy)"></i>NIAT (Deployed) 38%</div><div><i style="background:var(--blue)"></i>NIAT (Training) 20%</div><div><i style="background:var(--saffron)"></i>Academy 12%</div><div><i style="background:var(--teal)"></i>Intensive 12%</div></div></div></div>
+        <div class="card"><h4>Contribution of NIAT instructors</h4><small>by cohort</small>
+          <div style="margin-top:8px"><div class="row"><span>NIAT 2024</span><b>41</b></div><div class="hbar"><i style="width:30%"></i></div><div class="row"><span>NIAT 2025</span><b>96</b></div><div class="hbar"><i style="width:70%"></i></div><div class="row"><span>NIAT 2026</span><b>135</b></div><div class="hbar"><i style="width:100%"></i></div></div></div>
+        <div class="card"><h4>Top campuses</h4><small>by headcount</small>
+          <div class="row"><span>Training Institute</span><b>141</b></div><div class="row"><span>Aurora</span><b>38</b></div><div class="row"><span>ADYPU</span><b>31</b></div></div>
+        <div class="card"><h4>Manager workload</h4><small>instructors per manager</small>
+          <div class="row"><span>Riya Rai</span><b>81</b></div><div class="row"><span>Sigatapu Sai Sankar</span><b>58</b></div><div class="row"><span>Vinitha Naraharisetti</span><b>54</b></div></div>
+      </div>
+    </div>
+    <p class="note">Exceptions stay the first thing you see, then headline numbers, then charts in an even 2×2. Least change; the page is just cleaner and more consistent.</p>
+  </section>
+
+  <!-- B -->
+  <section class="opt">
+    <div class="tag"><b>B. Tabbed sections</b><span>short page, one topic at a time</span></div>
+    <div class="frame">
+      <div class="bar" style="margin-bottom:12px">
+        <div class="bad"><span class="num">3</span><span><b>Needs review</b></span></div>
+        <div class="bad"><span class="num">12</span><span><b>Remove TeachOS access</b></span></div>
+        <div class="ok"><span class="num">0</span><span><b>Approval pending</b></span></div>
+      </div>
+      <div class="card" style="display:flex;gap:28px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+        <div><small>Instructor Department</small><span class="num" style="font-size:34px;display:block">694</span></div>
+        <div style="display:flex;gap:22px;flex-wrap:wrap"><div><small>Instructors</small><br><b class="num" style="font-size:20px">521</b></div><div><small>Mentors</small><br><b class="num" style="font-size:20px">98</b></div><div><small>Operations</small><br><b class="num" style="font-size:20px">75</b></div></div>
+      </div>
+      <div class="tabs"><span class="on">Product &amp; contribution</span><span>Campuses</span><span>Managers</span><span>Exits</span></div>
+      <div class="card" style="display:flex;gap:30px;align-items:center;flex-wrap:wrap">
+        <div style="display:flex;gap:16px;align-items:center"><div class="donut"><span>694</span></div>
+        <div class="legend"><div><i style="background:var(--navy)"></i>NIAT (Deployed) 38%</div><div><i style="background:var(--blue)"></i>NIAT (Training) 20%</div><div><i style="background:var(--saffron)"></i>Academy 12%</div></div></div>
+        <div style="flex:1;min-width:220px"><h4>Contribution of NIAT instructors</h4>
+          <div class="row"><span>NIAT 2024</span><b>41</b></div><div class="row"><span>NIAT 2025</span><b>96</b></div><div class="row"><span>NIAT 2026</span><b>135</b></div></div>
+      </div>
+    </div>
+    <p class="note">Only the exceptions and the four totals are always visible. Campuses, managers and exits sit behind tabs, so the page fits on one screen. Trade-off: one more click to see a list.</p>
+  </section>
+
+  <!-- C -->
+  <section class="opt">
+    <div class="tag"><b>C. Dashboard grid with a side column</b><span>everything visible, denser</span></div>
+    <div class="frame">
+      <div class="grid" style="grid-template-columns:2fr 1fr;align-items:start">
+        <div class="grid">
+          <div class="bar"><div class="bad"><span class="num">3</span><span><b>Needs review</b></span></div><div class="bad"><span class="num">12</span><span><b>Remove TeachOS</b></span></div><div class="ok"><span class="num">0</span><span><b>Approval pending</b></span></div></div>
+          <div class="grid" style="grid-template-columns:1fr 1fr">
+            <div class="card"><h4>Product mix</h4><div style="display:flex;gap:14px;align-items:center;margin-top:8px"><div class="donut" style="width:96px;height:96px"><span style="font-size:14px">694</span></div><div class="legend"><div><i style="background:var(--navy)"></i>Deployed 38%</div><div><i style="background:var(--blue)"></i>Training 20%</div><div><i style="background:var(--saffron)"></i>Academy 12%</div></div></div></div>
+            <div class="card"><h4>NIAT contribution</h4><div class="row"><span>NIAT 2024</span><b>41</b></div><div class="row"><span>NIAT 2025</span><b>96</b></div><div class="row"><span>NIAT 2026</span><b>135</b></div></div>
+            <div class="card"><h4>Top campuses</h4><div class="row"><span>Training Institute</span><b>141</b></div><div class="row"><span>Aurora</span><b>38</b></div><div class="row"><span>ADYPU</span><b>31</b></div></div>
+            <div class="card"><h4>Manager workload</h4><div class="row"><span>Riya Rai</span><b>81</b></div><div class="row"><span>Sigatapu Sai Sankar</span><b>58</b></div><div class="row"><span>Vinitha N.</span><b>54</b></div></div>
+          </div>
+        </div>
+        <div class="grid">
+          <div class="card kpi"><small>Instructor Department</small><span class="num">694</span></div>
+          <div class="card kpi"><small>Instructors</small><span class="num">521</span></div>
+          <div class="card kpi"><small>Mentors</small><span class="num">98</span></div>
+          <div class="card kpi"><small>Operations team</small><span class="num">75</span></div>
+          <div class="card"><h4>Exit data</h4><small>Approved vs pending</small><div class="row"><span>Approved</span><b>64</b></div><div class="row"><span>Pending</span><b>0</b></div></div>
+        </div>
+      </div>
+    </div>
+    <p class="note">Charts on the left, the four totals and exit data stacked in a right-hand column that is always in view. Most information per screen. Trade-off: busiest of the three.</p>
+  </section>
+</div>
+</body>
+</html>

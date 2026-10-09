@@ -24,10 +24,10 @@ export function TableSearchInput({ value, onChange, placeholder = 'Search by nam
   </div>;
 }
 
-export function PageIntro({ eyebrow, title, description, action }: { eyebrow: string; title: string; description?: string; action?: React.ReactNode }) {
+export function PageIntro({ eyebrow, title, description, action }: { eyebrow?: string; title: string; description?: string; action?: React.ReactNode }) {
   return <div className="mb-7 flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
     <div>
-      <p className="font-mono-ui mb-2 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{eyebrow}</p>
+      {eyebrow && <p className="font-mono-ui mb-2 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{eyebrow}</p>}
       <h1 className="text-[28px] font-extrabold tracking-[-0.045em] text-foreground sm:text-[34px]">{title}</h1>
       {description && <p className="mt-2 max-w-2xl text-[13px] leading-6 text-muted-foreground">{description}</p>}
     </div>
