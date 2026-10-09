@@ -124,9 +124,7 @@ export default function DashboardPage() {
 
   return <div className="mx-auto max-w-[1500px]">
     <PageIntro
-      eyebrow="Command center / 09:42 IST"
       title="Faculty Command Center (FCC)"
-      description="Instructor Department, Instructors, Mentors, and Operations team -- each broken down by which system actually has access: Darwin only, TeachOS only, or both."
       action={<button type="button" data-testid="button-refresh-dashboard" onClick={() => queryClient.invalidateQueries({ queryKey: getGetReportsInstructorsQueryKey() })} className="inline-flex items-center gap-2 self-start rounded-lg border border-border bg-card px-3.5 py-2.5 text-[12px] font-bold text-foreground transition-colors hover:bg-secondary lg:self-auto"><RefreshCw size={14} /> Refresh data</button>}
     />
 
@@ -140,12 +138,11 @@ export default function DashboardPage() {
 
     {reportQuery.isLoading && <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">{[1, 2, 3, 4].map((item) => <SkeletonBlock key={item} className="h-[126px]" />)}</div>}
     {reportQuery.isError && <QueryError message="Dashboard data is unavailable right now." />}
-    {report && <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5 animate-rise">
+    {report && <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 animate-rise">
       <KpiCard label="Instructor Department" value={formatKpi(report.kpis.department_total_count)} meta="Instructors + Mentors + Ops team" icon={<Building2 size={12} />} tone="saffron" breakdown={report.access_breakdown?.department} active={activeAccessCard === 'department'} onClick={() => toggleAccessCard('department')} />
       <KpiCard label="Instructors" value={formatKpi(report.kpis.total_instructor_count)} meta="Matched with Darwin + payroll" icon={<UsersRound size={12} />} tone="navy" breakdown={report.access_breakdown?.instructors} active={activeAccessCard === 'instructors'} onClick={() => toggleAccessCard('instructors')} />
       <KpiCard label="Mentors" value={formatKpi(report.kpis.mentors_count)} meta="Darwin — Mentors department" icon={<GraduationCap size={12} />} tone="teal" breakdown={report.access_breakdown?.mentors} active={activeAccessCard === 'mentors'} onClick={() => toggleAccessCard('mentors')} />
       <KpiCard label="Operations team" value={formatKpi(report.kpis.ops_team_count)} meta="Darwin — Delivery Support (Ops)" icon={<Briefcase size={12} />} tone="coral" breakdown={report.access_breakdown?.ops_team} active={activeAccessCard === 'ops_team'} onClick={() => toggleAccessCard('ops_team')} />
-      <ExitKpiCard pendingCount={pendingPeople.length} onViewApproved={() => { setRemoveInitialView('archive'); setActiveException('remove'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} onViewPending={() => { setActiveException('pending'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} />
     </section>}
 
 
@@ -443,39 +440,6 @@ function CapabilityManagersCard({ people }: { people: InstructorSummary[] }) {
       </div>
     </div>
     <div className="max-h-[340px] overflow-auto pr-1"><CompactCountList rows={managers} testPrefix="capability-manager" /></div>
-  </div>;
-}
-
-// Exit data as a tile in the KPI row (2026-10-09, per request: "show the exit as a card in the same row and way as
-// the instructor cards"). Big number = approved exits in the Instructor Archive (status Exited, exit record Approved);
-// Pending = exit requests still Pending With Approver (the same people as Exception 3). Each opens its full list.
-function ExitKpiCard({ pendingCount, onViewApproved, onViewPending }: { pendingCount: number; onViewApproved: () => void; onViewPending: () => void }) {
-  const archiveQuery = useQuery<{ people: ArchiveExitRow[] }>({
-    queryKey: ['reports', 'instructor-archive'],
-    queryFn: async () => {
-      const response = await fetch('/api/reports/instructor-archive');
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      return response.json();
-    },
-  });
-  const approvedCount = (archiveQuery.data?.people ?? []).filter(isApprovedExit).length;
-  const value = archiveQuery.isLoading ? '…' : archiveQuery.isError ? '—' : approvedCount.toLocaleString('en-IN');
-  return <div data-testid="card-exited" className="relative w-full overflow-hidden rounded-xl border border-border bg-card py-3.5 pl-5 pr-4 text-center shadow-sm">
-    <span aria-hidden className="absolute bottom-3 left-0 top-3 w-1.5 rounded-r-full" style={{ backgroundColor: '#c75b3f' }} />
-    <p className="flex items-center justify-center gap-1.5 text-[11px] font-bold text-muted-foreground"><span className="grid h-5 w-5 place-items-center rounded-md bg-[#f6e4de] text-[#9b4434]"><LogOut size={12} /></span>Exit data</p>
-    <p className="mt-2 text-[26px] font-extrabold leading-none tracking-[-0.04em]" data-testid="exit-approved-count">{value}</p>
-    <p className="mt-1.5 text-[10px] text-muted-foreground">{archiveQuery.isError ? 'Archive unavailable right now' : 'Approved exits · Instructor Archive'}</p>
-    <div className="mt-3 grid grid-cols-2 gap-2 border-t border-border/70 pt-2">
-      <button type="button" onClick={onViewApproved} data-testid="exit-approved-view-all" className="flex flex-col rounded-md py-0.5 transition-colors hover:bg-secondary">
-        <span className="min-h-[23px] font-mono-ui text-[9px] leading-[1.3] uppercase tracking-[0.07em] text-muted-foreground">Approved</span>
-        <span className="mt-1 text-[13px] font-bold tracking-[-0.02em]">{value}</span>
-      </button>
-      <button type="button" onClick={onViewPending} data-testid="exit-pending-view-all" className="flex flex-col rounded-md py-0.5 transition-colors hover:bg-secondary">
-        <span className="min-h-[23px] font-mono-ui text-[9px] leading-[1.3] uppercase tracking-[0.07em] text-muted-foreground">Pending approval</span>
-        <span className="mt-1 text-[13px] font-bold tracking-[-0.02em]">{pendingCount.toLocaleString('en-IN')}</span>
-      </button>
-    </div>
-    <p className="mt-2 text-[10px] font-bold uppercase tracking-[0.08em] text-primary">Tap a count to view the list ▼</p>
   </div>;
 }
 
