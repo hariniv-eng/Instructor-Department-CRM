@@ -149,15 +149,16 @@ export default function DashboardPage() {
     </section>}
 
 
-    {report && <section className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-[7fr_3fr] animate-rise" aria-label="Product mix and NIAT contribution">
+    {report && <section className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)] lg:items-stretch animate-rise" aria-label="Product mix, NIAT contribution and exit data">
       <ProductMixCard people={departmentPeople} />
       <NiatContributionCard people={departmentPeople} />
+      <ExitListCard pendingPeople={pendingPeople} onViewApproved={() => { setRemoveInitialView('archive'); setActiveException('remove'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} onViewPending={() => { setActiveException('pending'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} />
     </section>}
-    {report && <section className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-[3fr_2fr] animate-rise" aria-label="Top campuses and capability managers">
-      <TopCampusesCard people={instructorPeople} />
-      <CapabilityManagersCard people={instructorPeople} />
-    </section>}
-    {report && <section className="mt-3 animate-rise" aria-label="NIAT university locations">
+    {report && <section className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2 animate-rise" aria-label="Campuses, capability managers and NIAT university map">
+      <div className="flex min-w-0 flex-col gap-3">
+        <TopCampusesCard people={instructorPeople} />
+        <CapabilityManagersCard people={instructorPeople} />
+      </div>
       <NiatMapCard institutesByPerson={instructorPeople.filter((person) => productLabel(person) !== 'Support').map((person) => person.institutes)} />
     </section>}
 
@@ -283,7 +284,7 @@ function ProductMixCard({ people }: { people: InstructorSummary[] }) {
     return arc;
   });
   const active = hover ? slices.find((slice) => slice.name === hover) : null;
-  return <div data-testid="card-product-mix" className="rounded-xl border border-border bg-card p-4 shadow-sm">
+  return <div data-testid="card-product-mix" className="min-w-0 rounded-xl border border-border bg-card p-4 shadow-sm">
     <div className="mb-3 flex items-center gap-3">
       <span className="grid h-7 w-7 place-items-center rounded-lg bg-secondary text-muted-foreground"><PieChart size={14} /></span>
       <div>
@@ -304,7 +305,7 @@ function ProductMixCard({ people }: { people: InstructorSummary[] }) {
           </div>
         </div>
       </div>
-      <ul className="w-full min-w-0 flex-1 space-y-0.5">
+      <ul className="w-full min-w-0 max-w-[280px] space-y-0.5">
         {slices.map((slice) => <li key={slice.name} onMouseEnter={() => setHover(slice.name)} onMouseLeave={() => setHover(null)} data-testid={`row-product-${slugify(slice.name)}`} className={`flex items-center gap-2.5 rounded-md px-2 py-0.5 transition-colors ${hover === slice.name ? 'bg-secondary' : ''}`}>
           <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ backgroundColor: PRODUCT_COLORS[slice.name] ?? '#8a93a6' }} />
           <span className="min-w-0 flex-1 truncate text-[12px]">{slice.name}</span>
@@ -384,6 +385,16 @@ function RankedBarList({ rows, color, testPrefix }: { rows: [string, number][]; 
   </ol>;
 }
 
+// Plain two-column list, row by row (2026-10-09, per layout sketch): name on the left, count on the right.
+function CompactCountList({ rows, testPrefix }: { rows: [string, number][]; testPrefix: string }) {
+  return <ol className="grid grid-cols-1 gap-x-8 sm:grid-cols-2">
+    {rows.map(([name, count]) => <li key={name} data-testid={`row-${testPrefix}-${slugify(name)}`} className="flex items-baseline justify-between gap-3 border-b border-border/60 py-1.5">
+      <span className="min-w-0 truncate text-[12px] text-foreground" title={name}>{name}</span>
+      <span className="shrink-0 text-[12px] font-extrabold tabular-nums">{count.toLocaleString('en-IN')}</span>
+    </li>)}
+  </ol>;
+}
+
 function TopCampusesCard({ people }: { people: InstructorSummary[] }) {
   // Training Institute is left out of this chart (2026-10-09, per request): the 10 biggest real campuses only.
   const campuses = useMemo(() => {
@@ -396,12 +407,12 @@ function TopCampusesCard({ people }: { people: InstructorSummary[] }) {
     return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 10);
   }, [people]);
   const max = Math.max(1, ...campuses.map(([, count]) => count));
-  return <div data-testid="card-top-campuses" className="rounded-xl border border-border bg-card p-4 shadow-sm">
+  return <div data-testid="card-top-campuses" className="min-w-0 overflow-hidden rounded-xl border border-border bg-card p-4 shadow-sm">
     <h2 className="mb-3 text-center text-[12px] font-extrabold tracking-[-0.02em]">Top campuses by instructors</h2>
     <div className="flex h-[150px] items-end justify-between gap-2 border-b border-border px-1">
       {campuses.map(([campus, count]) => <div key={campus} data-testid={`row-campus-${slugify(campus)}`} title={`${campus}: ${count}`} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1">
         <span className="text-[11px] font-extrabold tabular-nums">{count.toLocaleString('en-IN')}</span>
-        <div className="w-full rounded-t-md bg-[#4f86b8]" style={{ height: `${Math.max(count > 0 ? 3 : 0, (count / max) * 100)}%`, maxHeight: 'calc(100% - 18px)' }} />
+        <div className="w-full max-w-[36px] rounded-t-md bg-[#4f86b8]" style={{ height: `${Math.max(count > 0 ? 3 : 0, (count / max) * 100)}%`, maxHeight: 'calc(100% - 18px)' }} />
       </div>)}
     </div>
     <div className="flex justify-between gap-2 px-1 pt-1.5">
@@ -423,7 +434,7 @@ function CapabilityManagersCard({ people }: { people: InstructorSummary[] }) {
     }
     return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
   }, [people]);
-  return <div data-testid="card-capability-managers" className="rounded-xl border border-border bg-card p-4 shadow-sm">
+  return <div data-testid="card-capability-managers" className="min-w-0 rounded-xl border border-border bg-card p-4 shadow-sm">
     <div className="mb-3 flex items-center gap-3">
       <span className="grid h-7 w-7 place-items-center rounded-lg bg-secondary text-muted-foreground"><UsersRound size={14} /></span>
       <div>
@@ -431,7 +442,7 @@ function CapabilityManagersCard({ people }: { people: InstructorSummary[] }) {
         <p className="text-[10px] text-muted-foreground">Instructors per Capability Manager</p>
       </div>
     </div>
-    <div className="max-h-[300px] overflow-auto pr-1"><RankedBarList rows={managers} color="#12b5cb" testPrefix="capability-manager" /></div>
+    <div className="max-h-[340px] overflow-auto pr-1"><CompactCountList rows={managers} testPrefix="capability-manager" /></div>
   </div>;
 }
 
@@ -466,6 +477,53 @@ function ExitKpiCard({ pendingCount, onViewApproved, onViewPending }: { pendingC
     </div>
     <p className="mt-2 text-[10px] font-bold uppercase tracking-[0.08em] text-primary">Tap a count to view the list ▼</p>
   </div>;
+}
+
+// Exit lists (2026-10-09, per request: use the spare room beside Product mix): the latest few approved exits and the
+// latest few waiting for approval, each with its total and a View all that opens the full list.
+function ExitListCard({ pendingPeople, onViewApproved, onViewPending }: { pendingPeople: InstructorSummary[]; onViewApproved: () => void; onViewPending: () => void }) {
+  const archiveQuery = useQuery<{ people: ArchiveExitRow[] }>({
+    queryKey: ['reports', 'instructor-archive'],
+    queryFn: async () => {
+      const response = await fetch('/api/reports/instructor-archive');
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json();
+    },
+  });
+  const approved = useMemo(() => (archiveQuery.data?.people ?? [])
+    .filter(isApprovedExit)
+    .sort((a, b) => (b.date_of_exit ?? '').localeCompare(a.date_of_exit ?? '') || a.full_name.localeCompare(b.full_name))
+    .map((row) => ({ key: `a${row.id}`, name: row.full_name, date: row.date_of_exit })), [archiveQuery.data]);
+  const pending = useMemo(() => [...pendingPeople]
+    .sort((a, b) => (b.exit_flag_date ?? '').localeCompare(a.exit_flag_date ?? '') || a.full_name.localeCompare(b.full_name))
+    .map((p) => ({ key: `p${p.id}`, name: p.full_name, date: p.date_of_exit ?? p.exit_flag_date ?? null })), [pendingPeople]);
+  const section = (testId: string, title: string, rows: { key: string; name: string; date: string | null }[], loading: boolean, onViewAll: () => void, empty: string) => <div data-testid={testId} className="min-w-0">
+    <div className="mb-1 flex items-center justify-between gap-2">
+      <h3 className="text-[11px] font-extrabold">{title} <span className="tabular-nums text-muted-foreground" data-testid={`${testId}-count`}>{loading ? '…' : rows.length.toLocaleString('en-IN')}</span></h3>
+      <button type="button" onClick={onViewAll} data-testid={`${testId}-view-all`} className="inline-flex items-center gap-1 text-[10px] font-bold text-primary hover:underline">View all <ArrowRight size={11} /></button>
+    </div>
+    <ul>
+      {rows.slice(0, 3).map((row) => <li key={row.key} className="flex items-center justify-between gap-2 border-b border-border/60 py-1">
+        <span className="min-w-0 flex-1 truncate text-[11px] font-semibold">{row.name}</span>
+        <span className="shrink-0 text-[10px] text-muted-foreground">{formatExitDate(row.date)}</span>
+      </li>)}
+      {!loading && rows.length === 0 && <li className="py-2 text-center text-[11px] text-muted-foreground">{empty}</li>}
+    </ul>
+  </div>;
+  return <section data-testid="card-exit-lists" className="min-w-0 rounded-xl border border-border bg-card p-4 shadow-sm">
+    <div className="mb-3 flex items-center gap-3">
+      <span className="grid h-7 w-7 place-items-center rounded-lg bg-secondary text-muted-foreground"><LogOut size={14} /></span>
+      <div>
+        <h2 className="text-[12px] font-extrabold tracking-[-0.03em]">Exit data</h2>
+        <p className="text-[10px] text-muted-foreground">Latest approved and pending exits</p>
+      </div>
+    </div>
+    {archiveQuery.isError && <p className="mb-2 text-[11px] text-muted-foreground">The archive is unavailable right now, so approved exits cannot be shown.</p>}
+    <div className="space-y-3">
+      {section('exit-list-approved', 'Approved', approved, archiveQuery.isLoading, onViewApproved, 'No approved exits yet.')}
+      {section('exit-list-pending', 'Pending approval', pending, false, onViewPending, 'Nothing waiting for approval.')}
+    </div>
+  </section>;
 }
 
 function KpiCard({ label, value, meta, icon, tone, alert = false, breakdown, active = false, onClick }: {
