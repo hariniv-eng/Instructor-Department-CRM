@@ -447,6 +447,12 @@ export function computeDepartmentAndExceptionRows(rawRows: InstructorRow[]) {
   // (servingNoticeRows below) and move to its Exit list after their date of
   // exit passes.
   const exceptionRows = exceptionQueueRows.filter((r) => !r.exitVerification);
+  // Overview "Exception 3" -- exit approval still pending (2026-10-09, per request). Built from allRows, NOT from
+  // exceptionQueueRows: the queue drops anyone a Capability Manager marked Payroll Converted, but a payroll-converted
+  // person whose raised exit is still "Pending With Approver" in Darwin must stay on this list until Darwin shows the
+  // decision. Serving-notice people stay too (they were never dropped). Only people filed under another team and
+  // people no longer in Darwin or TeachOS are left out.
+  const pendingApprovalRows = allRows.filter((r) => r.exitFlag && (r.inDarwin || r.inTeachos) && exitStatusLower(r).startsWith("pending") && !NOT_DEPARTMENT_CLASSIFICATIONS.has(r.classification ?? ""));
   // Payroll-converted instructors (2026-10-07): they carry a manual Exit entry
   // (default Payroll Converted) and usually have no Darwin exit record at all,
   // so when a Capability Manager later marks one Exited/Absconded/Serving
@@ -468,7 +474,7 @@ export function computeDepartmentAndExceptionRows(rawRows: InstructorRow[]) {
     manualPayrollRows(["serving_notice_period"]),
   );
 
-  return { mentors, opsTeamRows, darwinInstructorsForCount, payrollConvertedForCount, needsReviewForCount, countedInstructorRows, departmentRows, exceptionRows, exceptionRemoveRows, servingNoticeRows, exceptionQueueRows };
+  return { mentors, opsTeamRows, darwinInstructorsForCount, payrollConvertedForCount, needsReviewForCount, countedInstructorRows, departmentRows, exceptionRows, exceptionRemoveRows, servingNoticeRows, exceptionQueueRows, pendingApprovalRows };
 }
 
 // This is the single reporting surface for the breakdowns requested on top
@@ -484,7 +490,7 @@ export function computeDepartmentAndExceptionRows(rawRows: InstructorRow[]) {
 // Breakdown and TeachOS Breakdown below stay Admin-only.
 router.get("/reports/instructors", async (_req, res) => {
   const allRows = await db.select().from(instructorsTable);
-  const { mentors, opsTeamRows, darwinInstructorsForCount, payrollConvertedForCount, needsReviewForCount, countedInstructorRows, departmentRows, exceptionRows, exceptionRemoveRows, servingNoticeRows, exceptionQueueRows } = computeDepartmentAndExceptionRows(allRows);
+  const { mentors, opsTeamRows, darwinInstructorsForCount, payrollConvertedForCount, needsReviewForCount, countedInstructorRows, departmentRows, exceptionRows, exceptionRemoveRows, servingNoticeRows, exceptionQueueRows, pendingApprovalRows } = computeDepartmentAndExceptionRows(allRows);
 
   // NIAT cohort join (2026-09-29, per request -- see niat_cohorts' comment
   // on toApiInstructorSummary above): one extra query, keyed by
@@ -723,7 +729,7 @@ router.get("/reports/instructors", async (_req, res) => {
   // record whose status is "Pending With Approver". Review labels don't matter here: a person
   // stays on this list until Darwin shows the approval decision (it then leaves, or moves on
   // as Approved).
-  const pendingApprovalRows = exceptionQueueRows.filter((r) => (r.exitFlagStatus ?? "").trim().toLowerCase().startsWith("pending"));
+  // pendingApprovalRows comes from computeDepartmentAndExceptionRows above (it now also keeps payroll-converted people).
 
   const accessBreakdown = {
     department: buildAccessSplit(departmentRows),
