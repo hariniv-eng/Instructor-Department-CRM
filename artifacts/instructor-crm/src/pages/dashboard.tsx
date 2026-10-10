@@ -182,7 +182,7 @@ export default function DashboardPage() {
     </section>}
 
 
-    {report && <section className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:items-stretch animate-rise" aria-label="Product mix, NIAT contribution and exit data">
+    {report && <section className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:items-stretch animate-rise" aria-label="Product mix, NIAT contribution and exit data">
       <ProductMixCard people={departmentPeople} />
       <NiatContributionCard people={departmentPeople} />
     </section>}
@@ -287,14 +287,23 @@ const PRODUCT_COLORS: Record<string, string> = {
   Support: '#8a93a6',
 };
 function ProductMixCard({ people }: { people: InstructorSummary[] }) {
+  // Subject filter (2026-10-10, per request): the Subject list on the left narrows the donut and the product list to one
+  // subject -- the centre shows how many people teach it, the product rows show how many of them are in each product.
+  const [subject, setSubject] = useState<string | null>(null);
+  const subjects = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const person of people) if (person.dept_area) counts.set(person.dept_area, (counts.get(person.dept_area) ?? 0) + 1);
+    return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  }, [people]);
+  const scoped = useMemo(() => (subject ? people.filter((person) => person.dept_area === subject) : people), [people, subject]);
   const slices = useMemo(() => {
     const counts = new Map<string, number>(ALL_PRODUCTS.map((name) => [name, 0]));
-    for (const person of people) {
+    for (const person of scoped) {
       const label = productLabel(person);
       counts.set(label, (counts.get(label) ?? 0) + 1);
     }
     return [...counts.entries()].map(([name, count]) => ({ name, count }));
-  }, [people]);
+  }, [scoped]);
   const total = slices.reduce((sum, slice) => sum + slice.count, 0);
   const [hover, setHover] = useState<string | null>(null);
   // Donut drawn as stacked circle strokes: with r = 100 / (2 * pi) the circumference is exactly 100,
@@ -313,10 +322,21 @@ function ProductMixCard({ people }: { people: InstructorSummary[] }) {
       <span className="grid h-7 w-7 place-items-center rounded-lg bg-secondary text-muted-foreground"><PieChart size={14} /></span>
       <div>
         <h2 className="text-[12px] font-extrabold tracking-[-0.03em]">Product mix</h2>
-        <p className="text-[10px] text-muted-foreground">Instructor Department by Product</p>
+        <p className="text-[10px] text-muted-foreground">{subject ? `${subject} · by Product` : 'Instructor Department by Product'}</p>
       </div>
     </div>
-    <div className="flex flex-1 flex-col items-center justify-center gap-4 sm:flex-row sm:gap-10">
+    <div className="flex flex-1 flex-col items-center justify-center gap-5 lg:flex-row lg:items-center lg:gap-8">
+      <div className="w-full shrink-0 lg:w-[190px]" data-testid="product-mix-subjects">
+        <p className="mb-1 px-2 font-mono-ui text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Subject</p>
+        <ul className="space-y-0.5">
+          {[{ name: null as string | null, label: 'All subjects', count: people.length }, ...subjects.map(([name, count]) => ({ name: name as string | null, label: name, count }))].map((row) => <li key={row.label}>
+            <button type="button" onClick={() => setSubject(row.name === subject ? null : row.name)} aria-pressed={row.name === subject} data-testid={`button-subject-${slugify(row.label)}`} className={`flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-[12px] transition-colors ${row.name === subject ? 'bg-primary text-primary-foreground' : 'hover:bg-secondary'}`}>
+              <span className="min-w-0 flex-1 truncate" title={row.label}>{row.label}</span>
+              <span className="shrink-0 font-extrabold tabular-nums">{row.count.toLocaleString('en-IN')}</span>
+            </button>
+          </li>)}
+        </ul>
+      </div>
       <div className="relative h-[210px] w-[210px] shrink-0 lg:h-[250px] lg:w-[250px]">
         <svg viewBox="0 0 42 42" className="h-full w-full -rotate-0" role="img" aria-label="Instructor Department split by Product">
           <circle cx="21" cy="21" r={RADIUS} fill="none" strokeWidth="6" className="stroke-secondary" />
@@ -325,11 +345,11 @@ function ProductMixCard({ people }: { people: InstructorSummary[] }) {
         <div className="pointer-events-none absolute inset-0 grid place-items-center text-center">
           <div>
             <div className="text-[28px] font-extrabold leading-none tracking-[-0.03em] tabular-nums">{(active ? active.count : total).toLocaleString('en-IN')}</div>
-            <div className="mt-1 max-w-[120px] text-[12px] leading-tight text-muted-foreground">{active ? active.name : 'total'}</div>
+            <div className="mt-1 max-w-[120px] text-[12px] leading-tight text-muted-foreground">{active ? active.name : (subject ?? 'total')}</div>
           </div>
         </div>
       </div>
-      <ul className="w-full min-w-0 max-w-[300px] space-y-1">
+      <ul className="w-full min-w-0 max-w-[260px] space-y-1">
         {slices.map((slice) => <li key={slice.name} onMouseEnter={() => setHover(slice.name)} onMouseLeave={() => setHover(null)} data-testid={`row-product-${slugify(slice.name)}`} className={`flex items-center gap-2.5 rounded-md px-2 py-0.5 transition-colors ${hover === slice.name ? 'bg-secondary' : ''}`}>
           <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ backgroundColor: PRODUCT_COLORS[slice.name] ?? '#8a93a6' }} />
           <span className="min-w-0 flex-1 truncate text-[12px]">{slice.name}</span>
@@ -530,6 +550,14 @@ function ExitKpiCard({ exitCandidates }: { exitCandidates: InstructorSummary[] }
       .filter((person) => !(person.employee_id && approvedIds.has(person.employee_id)))
       .sort((a, b) => (b.date_of_exit ?? b.exit_flag_date ?? '').localeCompare(a.date_of_exit ?? a.exit_flag_date ?? '') || a.full_name.localeCompare(b.full_name));
   }, [exitCandidates, approved]);
+  // One combined list (2026-10-10, per request): approved exits and upcoming exits together, newest date first.
+  const combined = useMemo(() => {
+    const rows = [
+      ...approved.map((row) => ({ key: `a${row.id}`, name: row.full_name, employeeId: row.employee_id, subject: row.dept_area, manager: row.capability_manager, markedAs: 'Exited', approval: 'Approved', date: row.date_of_exit, dateIsRaised: false })),
+      ...upcoming.map((person) => ({ key: `u${person.id}`, name: person.full_name, employeeId: person.employee_id ?? null, subject: person.dept_area ?? null, manager: person.capability_manager ?? null, markedAs: REVIEW_LABELS[person.exit_verification ?? ''] ?? (person.exit_verification ?? '—'), approval: person.exit_flag_status ?? 'Pending', date: person.date_of_exit ?? person.exit_flag_date ?? null, dateIsRaised: !person.date_of_exit && !!person.exit_flag_date })),
+    ];
+    return rows.sort((a, b) => (b.date ?? '').localeCompare(a.date ?? '') || a.name.localeCompare(b.name));
+  }, [approved, upcoming]);
   const value = archiveQuery.isLoading ? '…' : archiveQuery.isError ? '—' : approved.length.toLocaleString('en-IN');
   const chip = (text: string, tone: 'amber' | 'blue') => <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${tone === 'amber' ? 'bg-[#fbeed3] text-[#8a5a0b]' : 'bg-[#e1eaf1] text-primary'}`}>{text}</span>;
   return <>
@@ -548,42 +576,31 @@ function ExitKpiCard({ exitCandidates }: { exitCandidates: InstructorSummary[] }
       <p className="relative mt-3 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.08em] text-primary-foreground/90">{archiveQuery.isError ? 'Archive unavailable right now' : 'View exit details'} <ArrowRight size={11} className="transition-transform group-hover:translate-x-0.5" /></p>
     </button>
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="max-w-xl" data-testid="dialog-exit-data">
+      <DialogContent className="max-w-3xl" data-testid="dialog-exit-data">
         <DialogHeader>
           <DialogTitle>Exit data</DialogTitle>
-          <DialogDescription>Approved exits recorded so far, and upcoming exits (marked by the Capability Manager, including those pending approval).</DialogDescription>
+          <DialogDescription>
+            {approved.length} approved · {upcoming.length} upcoming. Upcoming = marked Exited, Absconded or Serving notice by the Capability Manager, including exits still pending approval (payroll candidates not included).
+          </DialogDescription>
         </DialogHeader>
-        <div className="space-y-5">
-          <section data-testid="exit-dialog-approved">
-            <h3 className="mb-1 text-[12px] font-extrabold">Approved <span className="tabular-nums text-muted-foreground">{approved.length}</span></h3>
-            <ul>
-              {approved.map((row) => <li key={row.id} className="flex items-center justify-between gap-3 border-b border-border/60 py-1.5">
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-[12px] font-semibold">{row.full_name}</p>
-                  <p className="truncate text-[10px] text-muted-foreground">{[row.employee_id, row.dept_area, row.capability_manager ? `CM: ${row.capability_manager}` : null].filter(Boolean).join(' · ') || '—'}</p>
-                </div>
-                {row.is_payroll && chip('Payroll', 'blue')}
-                <span className="shrink-0 text-[11px] text-muted-foreground">{formatExitDate(row.date_of_exit)}</span>
-              </li>)}
-              {!archiveQuery.isLoading && approved.length === 0 && <li className="py-2 text-[12px] text-muted-foreground">No approved exits yet.</li>}
-            </ul>
-          </section>
-          <section data-testid="exit-dialog-upcoming">
-            <h3 className="mb-1 text-[12px] font-extrabold">Upcoming exits <span className="tabular-nums text-muted-foreground">{upcoming.length}</span></h3>
-            <p className="mb-1 text-[10px] text-muted-foreground">Marked Exited, Absconded or Serving notice by the Capability Manager (payroll candidates not included), including exits still pending approval.</p>
-            <ul>
-              {upcoming.map((person) => <li key={person.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-border/60 py-1.5">
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-[12px] font-semibold">{person.full_name}</p>
-                  <p className="truncate text-[10px] text-muted-foreground">{[person.employee_id, person.dept_area, person.capability_manager ? `CM: ${person.capability_manager}` : null].filter(Boolean).join(' · ') || '—'}</p>
-                </div>
-                {person.exit_verification && chip(REVIEW_LABELS[person.exit_verification] ?? person.exit_verification, 'amber')}
-                {person.exit_flag_status && chip(person.exit_flag_status, 'blue')}
-                <span className="shrink-0 text-[11px] text-muted-foreground" title={person.date_of_exit ? 'Date of exit' : 'Date the exit was raised (no date of exit on the record)'}>{person.date_of_exit ? formatExitDate(person.date_of_exit) : person.exit_flag_date ? `Raised ${formatExitDate(person.exit_flag_date)}` : '—'}</span>
-              </li>)}
-              {upcoming.length === 0 && <li className="py-2 text-[12px] text-muted-foreground">No upcoming exits.</li>}
-            </ul>
-          </section>
+        <div className="max-h-[60vh] overflow-auto rounded-lg border border-border" data-testid="exit-dialog-combined">
+          <table className="w-full text-left text-[12px]">
+            <thead className="sticky top-0 bg-secondary font-mono-ui text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
+              <tr><th className="px-3 py-2">Name</th><th className="px-3 py-2">Employee ID</th><th className="px-3 py-2">Subject</th><th className="px-3 py-2">Capability Manager</th><th className="px-3 py-2">Marked as</th><th className="px-3 py-2">Approval</th><th className="px-3 py-2">Date of exit</th></tr>
+            </thead>
+            <tbody>
+              {combined.map((row) => <tr key={row.key} className="border-t border-border/70" data-testid={`exit-row-${row.key}`}>
+                <td className="px-3 py-2 font-semibold">{row.name}</td>
+                <td className="px-3 py-2 font-mono-ui text-muted-foreground">{row.employeeId ?? '—'}</td>
+                <td className="px-3 py-2 text-muted-foreground">{row.subject ?? '—'}</td>
+                <td className="px-3 py-2 text-muted-foreground">{row.manager ?? '—'}</td>
+                <td className="px-3 py-2">{chip(row.markedAs, 'amber')}</td>
+                <td className="px-3 py-2">{chip(row.approval, row.approval === 'Approved' ? 'blue' : 'amber')}</td>
+                <td className="whitespace-nowrap px-3 py-2 text-muted-foreground" title={row.dateIsRaised ? 'Date the exit was raised (no date of exit on the record)' : undefined}>{row.date ? (row.dateIsRaised ? `Raised ${formatExitDate(row.date)}` : formatExitDate(row.date)) : '—'}</td>
+              </tr>)}
+              {!archiveQuery.isLoading && combined.length === 0 && <tr><td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">No exits yet.</td></tr>}
+            </tbody>
+          </table>
         </div>
       </DialogContent>
     </Dialog>
