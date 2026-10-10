@@ -303,23 +303,23 @@ function ProductMixCard({ people, instructors, mentors }: { people: InstructorSu
     return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([name]) => name);
   }, [people]);
   const stats = useMemo(() => {
-    if (!subject) return null;
     const rows = new Map<string, { instructors: number; mentors: number; ops: number }>(ALL_PRODUCTS.map((name) => [name, { instructors: 0, mentors: 0, ops: 0 }]));
     let instructorTotal = 0;
     let mentorTotal = 0;
     for (const person of people) {
-      if (person.dept_area !== subject) continue;
+      if (subject && person.dept_area !== subject) continue;
       const row = rows.get(productLabel(person)) ?? { instructors: 0, mentors: 0, ops: 0 };
       rows.set(productLabel(person), row);
       if (instructorIds.has(person.id)) { row.instructors += 1; instructorTotal += 1; }
       else if (mentorIds.has(person.id)) { row.mentors += 1; mentorTotal += 1; }
       else row.ops += 1;
     }
-    const slices = [...rows.entries()].map(([name, row]) => ({ name, ...row, count: row.instructors + row.mentors }));
+    const slices = [...rows.entries()].map(([name, row]) => ({ name, ...row, count: row.instructors + row.mentors + row.ops }));
     return { slices, instructorTotal, mentorTotal, total: instructorTotal + mentorTotal };
   }, [people, subject, instructorIds, mentorIds]);
-  const slices = stats?.slices ?? ALL_PRODUCTS.map((name) => ({ name, instructors: 0, mentors: 0, ops: 0, count: 0 }));
-  const total = stats?.total ?? 0;
+  const slices = stats.slices;
+  const total = stats.slices.reduce((sum, slice) => sum + slice.count, 0);
+  const pctOf = (count: number) => (total ? `${Math.round((count / total) * 1000) / 10}%` : '0%');
   // Donut drawn as stacked circle strokes: with r = 100 / (2 * pi) the circumference is exactly 100,
   // so a slice's dash length is simply its percentage.
   const RADIUS = 100 / (2 * Math.PI);
@@ -341,16 +341,16 @@ function ProductMixCard({ people, instructors, mentors }: { people: InstructorSu
         <span className="grid h-7 w-7 place-items-center rounded-lg bg-secondary text-muted-foreground"><PieChart size={14} /></span>
         <div>
           <h2 className="text-[12px] font-extrabold tracking-[-0.03em]">Product mix</h2>
-          <p className="text-[10px] text-muted-foreground">{subject ? `${subject} · instructors + mentors by Product` : 'Pick a subject to see its instructors and mentors'}</p>
+          <p className="text-[10px] text-muted-foreground">{subject ? `${subject} · share of each Product` : 'Instructor Department by Product · pick a subject to narrow it'}</p>
         </div>
       </div>
       <div className="flex items-center gap-2">
-        {chip('Instructors', stats ? stats.instructorTotal : null, 'text-product-mix-instructors')}
-        {chip('Mentors', stats ? stats.mentorTotal : null, 'text-product-mix-mentors')}
+        {chip('Instructors', stats.instructorTotal, 'text-product-mix-instructors')}
+        {chip('Mentors', stats.mentorTotal, 'text-product-mix-mentors')}
       </div>
     </div>
-    <div className="flex flex-1 flex-col items-center justify-center gap-5 lg:flex-row lg:items-center lg:gap-6">
-      <div className="w-full shrink-0 lg:w-[170px]" data-testid="product-mix-subjects">
+    <div className="grid flex-1 grid-cols-1 items-center gap-5 lg:grid-cols-[150px_minmax(0,1fr)] lg:gap-6">
+      <div className="min-w-0" data-testid="product-mix-subjects">
         <p className="mb-1 px-2 font-mono-ui text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Subject</p>
         <ul className="space-y-0.5">
           {subjects.map((name) => <li key={name}>
@@ -360,28 +360,30 @@ function ProductMixCard({ people, instructors, mentors }: { people: InstructorSu
           </li>)}
         </ul>
       </div>
-      <div className="relative h-[210px] w-[210px] shrink-0 lg:h-[230px] lg:w-[230px]">
+      <div className="flex min-w-0 flex-wrap items-center justify-center gap-x-6 gap-y-5">
+      <div className="relative h-[200px] w-[200px] shrink-0">
         <svg viewBox="0 0 42 42" className="h-full w-full" role="img" aria-label="Subject split by Product">
           <circle cx="21" cy="21" r={RADIUS} fill="none" strokeWidth="6" className="stroke-secondary" />
           {arcs.map((arc) => <circle key={arc.name} cx="21" cy="21" r={RADIUS} fill="none" strokeWidth={hover === arc.name ? 7 : 6} stroke={PRODUCT_COLORS[arc.name] ?? '#8a93a6'} strokeDasharray={`${Math.max(arc.pct - 0.4, 0)} ${100 - Math.max(arc.pct - 0.4, 0)}`} strokeDashoffset={arc.dashOffset} onMouseEnter={() => setHover(arc.name)} onMouseLeave={() => setHover(null)} data-testid={`slice-product-${slugify(arc.name)}`}><title>{`${arc.name}: ${arc.count}`}</title></circle>)}
         </svg>
         <div className="pointer-events-none absolute inset-0 grid place-items-center text-center">
-          {stats ? <div>
+          <div>
             <div className="text-[28px] font-extrabold leading-none tracking-[-0.03em] tabular-nums" data-testid="text-product-mix-total">{(active ? active.count : total).toLocaleString('en-IN')}</div>
-            <div className="mt-1 max-w-[120px] text-[12px] leading-tight text-muted-foreground">{active ? active.name : `${subject} · instructors + mentors`}</div>
-          </div> : <div className="max-w-[120px] text-[12px] leading-tight text-muted-foreground">Select a subject</div>}
+            <div className="mt-1 max-w-[120px] text-[12px] leading-tight text-muted-foreground">{active ? `${active.name} · ${pctOf(active.count)}` : (subject ? 'in this subject' : 'total')}</div>
+          </div>
         </div>
       </div>
-      <ul className="w-full shrink-0 space-y-1.5 lg:w-[200px]" data-testid="product-mix-products">
+      <ul className="w-full max-w-[220px] min-w-[170px] flex-1 space-y-1.5" data-testid="product-mix-products">
         {slices.map((slice) => <li key={slice.name} onMouseEnter={() => setHover(slice.name)} onMouseLeave={() => setHover(null)} data-testid={`row-product-${slugify(slice.name)}`} className={`rounded-md px-2 py-1 transition-colors ${hover === slice.name ? 'bg-secondary' : ''}`}>
           <div className="flex items-center gap-2.5">
             <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ backgroundColor: PRODUCT_COLORS[slice.name] ?? '#8a93a6' }} />
             <span className="min-w-0 flex-1 truncate text-[12px]">{slice.name}</span>
-            <span className="min-w-6 text-right text-[12px] font-extrabold tabular-nums">{stats ? slice.count.toLocaleString('en-IN') : '–'}</span>
+            <span className="min-w-6 text-right text-[12px] font-extrabold tabular-nums">{slice.count.toLocaleString('en-IN')}</span>
           </div>
-          {stats && <div className="ml-5 text-[10px] text-muted-foreground tabular-nums">{slice.name === 'Support' && slice.ops > 0 ? `Ops team ${slice.ops}` : `Instructors ${slice.instructors} · Mentors ${slice.mentors}`}</div>}
+          <div className="ml-5 text-[10px] text-muted-foreground tabular-nums">{pctOf(slice.count)} · {slice.name === 'Support' && slice.ops > 0 ? `Ops team ${slice.ops}` : `Instructors ${slice.instructors} · Mentors ${slice.mentors}`}</div>
         </li>)}
       </ul>
+      </div>
     </div>
   </div>;
 }
