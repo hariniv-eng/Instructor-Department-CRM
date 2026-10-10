@@ -1,6 +1,6 @@
 import { AlertTriangle, ArrowRight, Briefcase, Building2, Check, Clock, Copy, GraduationCap, LogOut, PieChart, RefreshCw, Trash2, UsersRound, X } from 'lucide-react';
 import { Link } from 'wouter';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useGetReportsInstructors, getGetReportsInstructorsQueryKey, type AccessSplit, type InstructorSummary } from '@workspace/api-client-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageIntro, QueryError, SkeletonBlock, DownloadCsvButton, TableSearchInput } from '@/components/ui-pieces';
@@ -178,7 +178,7 @@ export default function DashboardPage() {
     {reportQuery.isError && <QueryError message="Dashboard data is unavailable right now." />}
     {report && <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 animate-rise">
       <KpiCard label="Instructor Department" value={formatKpi(report.kpis.department_total_count)} meta="Instructors + Mentors + Ops team" icon={<Building2 size={12} />} tone="saffron" />
-      <KpiCard label="Instructors + Mentors" value={formatKpi(instructorMentorTotal)} meta="Instructors and Mentors combined" icon={<UsersRound size={12} />} tone="navy" />
+      <KpiCard label="Instructors + Mentors" value={formatKpi(instructorMentorTotal)} meta={`${instructorPeople.length.toLocaleString('en-IN')} Instructors · ${mentorPeople.length.toLocaleString('en-IN')} Mentors`} icon={<UsersRound size={12} />} tone="navy" />
       <KpiCard label="Operations team" value={formatKpi(report.kpis.ops_team_count)} meta="Darwin — Delivery Support (Ops)" icon={<Briefcase size={12} />} tone="coral" />
       <ExitKpiCard exitCandidates={exitCandidates} />
     </section>}
@@ -295,6 +295,18 @@ function ProductMixCard({ people, instructors, mentors }: { people: InstructorSu
   // Operations (Support) people are neither, so they are shown on the Support row but not in the donut.
   const [subject, setSubject] = useState<string | null>(null);
   const [hover, setHover] = useState<string | null>(null);
+  // Clicking anywhere other than a subject button (empty space in the card, another card, the page background) clears the
+  // subject and brings back the all-products view (2026-10-10, per request).
+  useEffect(() => {
+    if (!subject) return;
+    const onPointerDown = (event: MouseEvent) => {
+      if (event.target instanceof Element && event.target.closest('[data-subject-button]')) return;
+      setSubject(null);
+      setHover(null);
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    return () => document.removeEventListener('mousedown', onPointerDown);
+  }, [subject]);
   const instructorIds = useMemo(() => new Set(instructors.map((person) => person.id)), [instructors]);
   const mentorIds = useMemo(() => new Set(mentors.map((person) => person.id)), [mentors]);
   const subjects = useMemo(() => {
@@ -354,7 +366,7 @@ function ProductMixCard({ people, instructors, mentors }: { people: InstructorSu
         <p className="mb-1 px-2 font-mono-ui text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Subject</p>
         <ul className="space-y-0.5">
           {subjects.map((name) => <li key={name}>
-            <button type="button" onClick={() => { setSubject(name === subject ? null : name); setHover(null); }} aria-pressed={name === subject} data-testid={`button-subject-${slugify(name)}`} className={`flex w-full items-center rounded-md px-2 py-1 text-left text-[12px] transition-colors ${name === subject ? 'bg-primary font-semibold text-primary-foreground' : 'hover:bg-secondary'}`}>
+            <button type="button" onClick={() => { setSubject(name === subject ? null : name); setHover(null); }} aria-pressed={name === subject} data-subject-button data-testid={`button-subject-${slugify(name)}`} className={`flex w-full items-center rounded-md px-2 py-1 text-left text-[12px] transition-colors ${name === subject ? 'bg-primary font-semibold text-primary-foreground' : 'hover:bg-secondary'}`}>
               <span className="min-w-0 flex-1 truncate" title={name}>{name}</span>
             </button>
           </li>)}
