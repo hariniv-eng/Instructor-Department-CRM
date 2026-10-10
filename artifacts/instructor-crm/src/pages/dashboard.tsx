@@ -590,14 +590,14 @@ function ExitKpiCard({ exitCandidates }: { exitCandidates: InstructorSummary[] }
       .filter((person) => !(person.employee_id && approvedIds.has(person.employee_id)))
       .sort((a, b) => (b.date_of_exit ?? b.exit_flag_date ?? '').localeCompare(a.date_of_exit ?? a.exit_flag_date ?? '') || a.full_name.localeCompare(b.full_name));
   }, [exitCandidates, approved]);
-  // One combined list (2026-10-10, per request): approved exits and upcoming exits together, newest date first.
-  const combined = useMemo(() => {
-    const rows = [
-      ...approved.map((row) => ({ key: `a${row.id}`, name: row.full_name, employeeId: row.employee_id, subject: row.dept_area, manager: row.capability_manager, markedAs: 'Exited', approval: 'Approved', date: row.date_of_exit, dateIsRaised: false })),
-      ...upcoming.map((person) => ({ key: `u${person.id}`, name: person.full_name, employeeId: person.employee_id ?? null, subject: person.dept_area ?? null, manager: person.capability_manager ?? null, markedAs: REVIEW_LABELS[person.exit_verification ?? ''] ?? (person.exit_verification ?? '—'), approval: person.exit_flag_status ?? 'Pending', date: person.date_of_exit ?? person.exit_flag_date ?? null, dateIsRaised: !person.date_of_exit && !!person.exit_flag_date })),
-    ];
-    return rows.sort((a, b) => (b.date ?? '').localeCompare(a.date ?? '') || a.name.localeCompare(b.name));
-  }, [approved, upcoming]);
+  // Three clearly separate lists in the pop-up (2026-10-10, per request): actual exits (approved), upcoming exits that
+  // are Exited / Absconded and waiting for approval, and upcoming exits who are serving their notice period.
+  type ExitRowView = { key: string; name: string; employeeId: string | null; subject: string | null; manager: string | null; markedAs: string; approval: string; date: string | null; dateIsRaised: boolean };
+  const byDateDesc = (x: ExitRowView, y: ExitRowView) => (y.date ?? '').localeCompare(x.date ?? '') || x.name.localeCompare(y.name);
+  const fromPerson = (person: InstructorSummary): ExitRowView => ({ key: `u${person.id}`, name: person.full_name, employeeId: person.employee_id ?? null, subject: person.dept_area ?? null, manager: person.capability_manager ?? null, markedAs: REVIEW_LABELS[person.exit_verification ?? ''] ?? (person.exit_verification ?? '—'), approval: person.exit_flag_status ?? 'Pending', date: person.date_of_exit ?? person.exit_flag_date ?? null, dateIsRaised: !person.date_of_exit && !!person.exit_flag_date });
+  const exitRows = useMemo<ExitRowView[]>(() => approved.map((row) => ({ key: `a${row.id}`, name: row.full_name, employeeId: row.employee_id, subject: row.dept_area, manager: row.capability_manager, markedAs: 'Exited', approval: 'Approved', date: row.date_of_exit, dateIsRaised: false })).sort(byDateDesc), [approved]);
+  const pendingExitRows = useMemo<ExitRowView[]>(() => upcoming.filter((person) => person.exit_verification !== 'serving_notice_period').map(fromPerson).sort(byDateDesc), [upcoming]);
+  const noticeRows = useMemo<ExitRowView[]>(() => upcoming.filter((person) => person.exit_verification === 'serving_notice_period').map(fromPerson).sort(byDateDesc), [upcoming]);
   const value = archiveQuery.isLoading ? '…' : archiveQuery.isError ? '—' : approved.length.toLocaleString('en-IN');
   const chip = (text: string, tone: 'amber' | 'blue') => <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${tone === 'amber' ? 'bg-[#fbeed3] text-[#8a5a0b]' : 'bg-[#e1eaf1] text-primary'}`}>{text}</span>;
   return <>
@@ -620,27 +620,42 @@ function ExitKpiCard({ exitCandidates }: { exitCandidates: InstructorSummary[] }
         <DialogHeader>
           <DialogTitle>Exit data</DialogTitle>
           <DialogDescription>
-            {approved.length} approved · {upcoming.length} upcoming. Upcoming = marked Exited, Absconded or Serving notice by the Capability Manager, including exits still pending approval (payroll candidates not included).
+            {exitRows.length} exits · {pendingExitRows.length} upcoming (Exited / Absconded, pending approval) · {noticeRows.length} serving notice period. Payroll candidates are not included.
           </DialogDescription>
         </DialogHeader>
-        <div className="max-h-[60vh] overflow-auto rounded-lg border border-border" data-testid="exit-dialog-combined">
-          <table className="w-full text-left text-[12px]">
-            <thead className="sticky top-0 bg-secondary font-mono-ui text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
-              <tr><th className="px-3 py-2">Name</th><th className="px-3 py-2">Employee ID</th><th className="px-3 py-2">Subject</th><th className="px-3 py-2">Capability Manager</th><th className="px-3 py-2">Marked as</th><th className="px-3 py-2">Approval</th><th className="px-3 py-2">Date of exit</th></tr>
-            </thead>
-            <tbody>
-              {combined.map((row) => <tr key={row.key} className="border-t border-border/70" data-testid={`exit-row-${row.key}`}>
-                <td className="px-3 py-2 font-semibold">{row.name}</td>
-                <td className="px-3 py-2 font-mono-ui text-muted-foreground">{row.employeeId ?? '—'}</td>
-                <td className="px-3 py-2 text-muted-foreground">{row.subject ?? '—'}</td>
-                <td className="px-3 py-2 text-muted-foreground">{row.manager ?? '—'}</td>
-                <td className="px-3 py-2">{chip(row.markedAs, 'amber')}</td>
-                <td className="px-3 py-2">{chip(row.approval, row.approval === 'Approved' ? 'blue' : 'amber')}</td>
-                <td className="whitespace-nowrap px-3 py-2 text-muted-foreground" title={row.dateIsRaised ? 'Date the exit was raised (no date of exit on the record)' : undefined}>{row.date ? (row.dateIsRaised ? `Raised ${formatExitDate(row.date)}` : formatExitDate(row.date)) : '—'}</td>
-              </tr>)}
-              {!archiveQuery.isLoading && combined.length === 0 && <tr><td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">No exits yet.</td></tr>}
-            </tbody>
-          </table>
+        <div className="max-h-[65vh] space-y-5 overflow-auto pr-1" data-testid="exit-dialog-combined">
+          {([
+            { key: 'exits', title: 'Exits', note: 'Approved exits', rows: exitRows, showMarked: false, empty: 'No approved exits yet.' },
+            { key: 'pending', title: 'Upcoming exits — Exited / Absconded', note: 'Marked by the Capability Manager, waiting for approval', rows: pendingExitRows, showMarked: true, empty: 'No exits are waiting for approval.' },
+            { key: 'notice', title: 'Upcoming exits — Serving notice period', note: 'Still working their notice period', rows: noticeRows, showMarked: false, empty: 'Nobody is serving a notice period.' },
+          ]).map((section) => <section key={section.key} data-testid={`exit-section-${section.key}`}>
+            <div className="mb-1.5 flex items-baseline justify-between gap-3">
+              <div>
+                <h3 className="text-[13px] font-extrabold">{section.title}</h3>
+                <p className="text-[11px] text-muted-foreground">{section.note}</p>
+              </div>
+              <span className="text-[20px] font-extrabold leading-none tabular-nums" data-testid={`exit-section-count-${section.key}`}>{section.rows.length}</span>
+            </div>
+            <div className="overflow-auto rounded-lg border border-border">
+              <table className="w-full text-left text-[12px]">
+                <thead className="bg-secondary font-mono-ui text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
+                  <tr><th className="px-3 py-2">Name</th><th className="px-3 py-2">Employee ID</th><th className="px-3 py-2">Subject</th><th className="px-3 py-2">Capability Manager</th>{section.showMarked && <th className="px-3 py-2">Marked as</th>}{section.key !== 'exits' && <th className="px-3 py-2">Approval</th>}<th className="px-3 py-2">Date of exit</th></tr>
+                </thead>
+                <tbody>
+                  {section.rows.map((row) => <tr key={row.key} className="border-t border-border/70" data-testid={`exit-row-${row.key}`}>
+                    <td className="px-3 py-2 font-semibold">{row.name}</td>
+                    <td className="px-3 py-2 font-mono-ui text-muted-foreground">{row.employeeId ?? '—'}</td>
+                    <td className="px-3 py-2 text-muted-foreground">{row.subject ?? '—'}</td>
+                    <td className="px-3 py-2 text-muted-foreground">{row.manager ?? '—'}</td>
+                    {section.showMarked && <td className="px-3 py-2">{chip(row.markedAs, 'amber')}</td>}
+                    {section.key !== 'exits' && <td className="px-3 py-2">{chip(row.approval, 'amber')}</td>}
+                    <td className="whitespace-nowrap px-3 py-2 text-muted-foreground" title={row.dateIsRaised ? 'Date the exit was raised (no date of exit on the record)' : undefined}>{row.date ? (row.dateIsRaised ? `Raised ${formatExitDate(row.date)}` : formatExitDate(row.date)) : '—'}</td>
+                  </tr>)}
+                  {!archiveQuery.isLoading && section.rows.length === 0 && <tr><td colSpan={7} className="px-3 py-5 text-center text-muted-foreground">{section.empty}</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </section>)}
         </div>
       </DialogContent>
     </Dialog>
