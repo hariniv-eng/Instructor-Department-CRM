@@ -82,6 +82,9 @@ export default function DashboardPage() {
     return [...(mentorSplit?.both?.people ?? []), ...(mentorSplit?.darwin_only?.people ?? []), ...(mentorSplit?.teachos_only?.people ?? [])]
       .filter((p) => (seen.has(p.id) ? false : (seen.add(p.id), true)));
   }, [mentorSplit]);
+  // Instructors and Mentors share one KPI card (2026-10-10, per request). The two lists never overlap (reports.ts builds
+  // them from different classifications); the Set is only a guard so nobody could be counted twice.
+  const instructorMentorTotal = useMemo(() => new Set([...instructorPeople, ...mentorPeople].map((person) => person.id)).size, [instructorPeople, mentorPeople]);
   // Whole Instructor Department (instructors + mentors + Operations team), each person once -- the population
   // the Product pie chart splits (Operations team rows are the Support product).
   const departmentSplit = report?.access_breakdown?.department;
@@ -173,17 +176,16 @@ export default function DashboardPage() {
 
     {reportQuery.isLoading && <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">{[1, 2, 3, 4].map((item) => <SkeletonBlock key={item} className="h-[126px]" />)}</div>}
     {reportQuery.isError && <QueryError message="Dashboard data is unavailable right now." />}
-    {report && <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5 animate-rise">
+    {report && <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 animate-rise">
       <KpiCard label="Instructor Department" value={formatKpi(report.kpis.department_total_count)} meta="Instructors + Mentors + Ops team" icon={<Building2 size={12} />} tone="saffron" />
-      <KpiCard label="Instructors" value={formatKpi(report.kpis.total_instructor_count)} meta="Matched with Darwin + payroll" icon={<UsersRound size={12} />} tone="navy" />
-      <KpiCard label="Mentors" value={formatKpi(report.kpis.mentors_count)} meta="Darwin — Mentors department" icon={<GraduationCap size={12} />} tone="teal" />
+      <KpiCard label="Instructors + Mentors" value={formatKpi(instructorMentorTotal)} meta="Instructors and Mentors combined" icon={<UsersRound size={12} />} tone="navy" />
       <KpiCard label="Operations team" value={formatKpi(report.kpis.ops_team_count)} meta="Darwin — Delivery Support (Ops)" icon={<Briefcase size={12} />} tone="coral" />
       <ExitKpiCard exitCandidates={exitCandidates} />
     </section>}
 
 
     {report && <section className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:items-stretch animate-rise" aria-label="Product mix, NIAT contribution and exit data">
-      <ProductMixCard people={departmentPeople} />
+      <ProductMixCard people={departmentPeople} instructors={instructorPeople} mentors={mentorPeople} />
       <NiatContributionCard people={departmentPeople} />
     </section>}
     {report && <section className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2 animate-rise" aria-label="Campuses, capability managers and NIAT university map">
@@ -286,26 +288,38 @@ const PRODUCT_COLORS: Record<string, string> = {
   'IIT X DSA': '#c75b3f',
   Support: '#8a93a6',
 };
-function ProductMixCard({ people }: { people: InstructorSummary[] }) {
-  // Subject filter (2026-10-10, per request): the Subject list on the left narrows the donut and the product list to one
-  // subject -- the centre shows how many people teach it, the product rows show how many of them are in each product.
+function ProductMixCard({ people, instructors, mentors }: { people: InstructorSummary[]; instructors: InstructorSummary[]; mentors: InstructorSummary[] }) {
+  // Interactive version (2026-10-10, per request): nothing is counted until a subject is picked. Picking a subject fills
+  // the donut with that subject's instructors + mentors, shows the instructor and mentor counts at the top, and lists
+  // every product (zeros included) with its instructor / mentor split. The instructor and mentor lists never overlap, so nobody is counted twice;
+  // Operations (Support) people are neither, so they are shown on the Support row but not in the donut.
   const [subject, setSubject] = useState<string | null>(null);
+  const [hover, setHover] = useState<string | null>(null);
+  const instructorIds = useMemo(() => new Set(instructors.map((person) => person.id)), [instructors]);
+  const mentorIds = useMemo(() => new Set(mentors.map((person) => person.id)), [mentors]);
   const subjects = useMemo(() => {
     const counts = new Map<string, number>();
     for (const person of people) if (person.dept_area) counts.set(person.dept_area, (counts.get(person.dept_area) ?? 0) + 1);
-    return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+    return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([name]) => name);
   }, [people]);
-  const scoped = useMemo(() => (subject ? people.filter((person) => person.dept_area === subject) : people), [people, subject]);
-  const slices = useMemo(() => {
-    const counts = new Map<string, number>(ALL_PRODUCTS.map((name) => [name, 0]));
-    for (const person of scoped) {
-      const label = productLabel(person);
-      counts.set(label, (counts.get(label) ?? 0) + 1);
+  const stats = useMemo(() => {
+    if (!subject) return null;
+    const rows = new Map<string, { instructors: number; mentors: number; ops: number }>(ALL_PRODUCTS.map((name) => [name, { instructors: 0, mentors: 0, ops: 0 }]));
+    let instructorTotal = 0;
+    let mentorTotal = 0;
+    for (const person of people) {
+      if (person.dept_area !== subject) continue;
+      const row = rows.get(productLabel(person)) ?? { instructors: 0, mentors: 0, ops: 0 };
+      rows.set(productLabel(person), row);
+      if (instructorIds.has(person.id)) { row.instructors += 1; instructorTotal += 1; }
+      else if (mentorIds.has(person.id)) { row.mentors += 1; mentorTotal += 1; }
+      else row.ops += 1;
     }
-    return [...counts.entries()].map(([name, count]) => ({ name, count }));
-  }, [scoped]);
-  const total = slices.reduce((sum, slice) => sum + slice.count, 0);
-  const [hover, setHover] = useState<string | null>(null);
+    const slices = [...rows.entries()].map(([name, row]) => ({ name, ...row, count: row.instructors + row.mentors }));
+    return { slices, instructorTotal, mentorTotal, total: instructorTotal + mentorTotal };
+  }, [people, subject, instructorIds, mentorIds]);
+  const slices = stats?.slices ?? ALL_PRODUCTS.map((name) => ({ name, instructors: 0, mentors: 0, ops: 0, count: 0 }));
+  const total = stats?.total ?? 0;
   // Donut drawn as stacked circle strokes: with r = 100 / (2 * pi) the circumference is exactly 100,
   // so a slice's dash length is simply its percentage.
   const RADIUS = 100 / (2 * Math.PI);
@@ -317,43 +331,55 @@ function ProductMixCard({ people }: { people: InstructorSummary[] }) {
     return arc;
   });
   const active = hover ? slices.find((slice) => slice.name === hover) : null;
+  const chip = (label: string, value: number | null, testId: string) => <div data-testid={testId} className="rounded-lg border border-border bg-secondary/60 px-3 py-1.5 text-center">
+    <div className="text-[18px] font-extrabold leading-none tracking-[-0.03em] tabular-nums">{value === null ? '–' : value.toLocaleString('en-IN')}</div>
+    <div className="mt-1 text-[10px] uppercase tracking-[0.12em] text-muted-foreground">{label}</div>
+  </div>;
   return <div data-testid="card-product-mix" className="flex h-full min-w-0 flex-col rounded-xl border border-border bg-card p-4 shadow-sm">
-    <div className="mb-3 flex items-center gap-3">
-      <span className="grid h-7 w-7 place-items-center rounded-lg bg-secondary text-muted-foreground"><PieChart size={14} /></span>
-      <div>
-        <h2 className="text-[12px] font-extrabold tracking-[-0.03em]">Product mix</h2>
-        <p className="text-[10px] text-muted-foreground">{subject ? `${subject} · by Product` : 'Instructor Department by Product'}</p>
+    <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+      <div className="flex items-center gap-3">
+        <span className="grid h-7 w-7 place-items-center rounded-lg bg-secondary text-muted-foreground"><PieChart size={14} /></span>
+        <div>
+          <h2 className="text-[12px] font-extrabold tracking-[-0.03em]">Product mix</h2>
+          <p className="text-[10px] text-muted-foreground">{subject ? `${subject} · instructors + mentors by Product` : 'Pick a subject to see its instructors and mentors'}</p>
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        {chip('Instructors', stats ? stats.instructorTotal : null, 'text-product-mix-instructors')}
+        {chip('Mentors', stats ? stats.mentorTotal : null, 'text-product-mix-mentors')}
       </div>
     </div>
-    <div className="flex flex-1 flex-col items-center justify-center gap-5 lg:flex-row lg:items-center lg:gap-8">
-      <div className="w-full shrink-0 lg:w-[190px]" data-testid="product-mix-subjects">
+    <div className="flex flex-1 flex-col items-center justify-center gap-5 lg:flex-row lg:items-center lg:gap-6">
+      <div className="w-full shrink-0 lg:w-[170px]" data-testid="product-mix-subjects">
         <p className="mb-1 px-2 font-mono-ui text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Subject</p>
         <ul className="space-y-0.5">
-          {[{ name: null as string | null, label: 'All subjects', count: people.length }, ...subjects.map(([name, count]) => ({ name: name as string | null, label: name, count }))].map((row) => <li key={row.label}>
-            <button type="button" onClick={() => setSubject(row.name === subject ? null : row.name)} aria-pressed={row.name === subject} data-testid={`button-subject-${slugify(row.label)}`} className={`flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-[12px] transition-colors ${row.name === subject ? 'bg-primary text-primary-foreground' : 'hover:bg-secondary'}`}>
-              <span className="min-w-0 flex-1 truncate" title={row.label}>{row.label}</span>
-              <span className="shrink-0 font-extrabold tabular-nums">{row.count.toLocaleString('en-IN')}</span>
+          {subjects.map((name) => <li key={name}>
+            <button type="button" onClick={() => { setSubject(name === subject ? null : name); setHover(null); }} aria-pressed={name === subject} data-testid={`button-subject-${slugify(name)}`} className={`flex w-full items-center rounded-md px-2 py-1 text-left text-[12px] transition-colors ${name === subject ? 'bg-primary font-semibold text-primary-foreground' : 'hover:bg-secondary'}`}>
+              <span className="min-w-0 flex-1 truncate" title={name}>{name}</span>
             </button>
           </li>)}
         </ul>
       </div>
-      <div className="relative h-[210px] w-[210px] shrink-0 lg:h-[250px] lg:w-[250px]">
-        <svg viewBox="0 0 42 42" className="h-full w-full -rotate-0" role="img" aria-label="Instructor Department split by Product">
+      <div className="relative h-[210px] w-[210px] shrink-0 lg:h-[230px] lg:w-[230px]">
+        <svg viewBox="0 0 42 42" className="h-full w-full" role="img" aria-label="Subject split by Product">
           <circle cx="21" cy="21" r={RADIUS} fill="none" strokeWidth="6" className="stroke-secondary" />
           {arcs.map((arc) => <circle key={arc.name} cx="21" cy="21" r={RADIUS} fill="none" strokeWidth={hover === arc.name ? 7 : 6} stroke={PRODUCT_COLORS[arc.name] ?? '#8a93a6'} strokeDasharray={`${Math.max(arc.pct - 0.4, 0)} ${100 - Math.max(arc.pct - 0.4, 0)}`} strokeDashoffset={arc.dashOffset} onMouseEnter={() => setHover(arc.name)} onMouseLeave={() => setHover(null)} data-testid={`slice-product-${slugify(arc.name)}`}><title>{`${arc.name}: ${arc.count}`}</title></circle>)}
         </svg>
         <div className="pointer-events-none absolute inset-0 grid place-items-center text-center">
-          <div>
-            <div className="text-[28px] font-extrabold leading-none tracking-[-0.03em] tabular-nums">{(active ? active.count : total).toLocaleString('en-IN')}</div>
-            <div className="mt-1 max-w-[120px] text-[12px] leading-tight text-muted-foreground">{active ? active.name : (subject ?? 'total')}</div>
-          </div>
+          {stats ? <div>
+            <div className="text-[28px] font-extrabold leading-none tracking-[-0.03em] tabular-nums" data-testid="text-product-mix-total">{(active ? active.count : total).toLocaleString('en-IN')}</div>
+            <div className="mt-1 max-w-[120px] text-[12px] leading-tight text-muted-foreground">{active ? active.name : `${subject} · instructors + mentors`}</div>
+          </div> : <div className="max-w-[120px] text-[12px] leading-tight text-muted-foreground">Select a subject</div>}
         </div>
       </div>
-      <ul className="w-full min-w-0 max-w-[260px] space-y-1">
-        {slices.map((slice) => <li key={slice.name} onMouseEnter={() => setHover(slice.name)} onMouseLeave={() => setHover(null)} data-testid={`row-product-${slugify(slice.name)}`} className={`flex items-center gap-2.5 rounded-md px-2 py-0.5 transition-colors ${hover === slice.name ? 'bg-secondary' : ''}`}>
-          <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ backgroundColor: PRODUCT_COLORS[slice.name] ?? '#8a93a6' }} />
-          <span className="min-w-0 flex-1 truncate text-[12px]">{slice.name}</span>
-          <span className="min-w-10 text-right text-[12px] font-extrabold tabular-nums">{slice.count.toLocaleString('en-IN')}</span>
+      <ul className="w-full shrink-0 space-y-1.5 lg:w-[200px]" data-testid="product-mix-products">
+        {slices.map((slice) => <li key={slice.name} onMouseEnter={() => setHover(slice.name)} onMouseLeave={() => setHover(null)} data-testid={`row-product-${slugify(slice.name)}`} className={`rounded-md px-2 py-1 transition-colors ${hover === slice.name ? 'bg-secondary' : ''}`}>
+          <div className="flex items-center gap-2.5">
+            <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ backgroundColor: PRODUCT_COLORS[slice.name] ?? '#8a93a6' }} />
+            <span className="min-w-0 flex-1 truncate text-[12px]">{slice.name}</span>
+            <span className="min-w-6 text-right text-[12px] font-extrabold tabular-nums">{stats ? slice.count.toLocaleString('en-IN') : '–'}</span>
+          </div>
+          {stats && <div className="ml-5 text-[10px] text-muted-foreground tabular-nums">{slice.name === 'Support' && slice.ops > 0 ? `Ops team ${slice.ops}` : `Instructors ${slice.instructors} · Mentors ${slice.mentors}`}</div>}
         </li>)}
       </ul>
     </div>
