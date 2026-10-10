@@ -112,9 +112,15 @@ export function parseLooseDate(value: string | null): number {
 // a recognizable calendar date, so a bad value is dropped, not crashed on.
 export function toISODate(value: string | null): string | null {
   if (!value) return null;
-  const trimmed = value.trim();
+  // A trailing time ("31-08-2025 00:00:00", "2025-08-31T00:00:00Z") is ignored.
+  const trimmed = value.trim().replace(/[T\s]+\d{1,2}:\d{2}(:\d{2})?(\.\d+)?\s*(am|pm|z)?$/i, "");
   if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) return trimmed.slice(0, 10);
-  const dmy = /^(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})$/.exec(trimmed);
+  // Month-name dates ("05-Oct-2026", "5 Oct 2026", "Oct 5, 2026") -- 2026-10-10, per request to read the exit data's Date Of Exit whatever its format.
+  if (/[A-Za-z]{3}/.test(trimmed)) {
+    const named = Date.parse(`${trimmed.replace(/(\d)(st|nd|rd|th)\b/i, "$1").replace(/-/g, " ")} UTC`);
+    if (!Number.isNaN(named)) return new Date(named).toISOString().slice(0, 10);
+  }
+  const dmy = /^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})$/.exec(trimmed);
   if (!dmy) return null;
   const [, d, m, y] = dmy;
   const day = Number(d);
@@ -160,6 +166,10 @@ function lastWorkingDateOf(rawData: Record<string, unknown>): string | null {
 async function loadLatestExitsByPerson(): Promise<{ byEmployeeId: Map<string, ExitInfo> }> {
   const exits = await db.select().from(darwinboxExitsTable);
   const byEmployeeId = new Map<string, { info: ExitInfo; rank: number; id: number }>();
+  // Date Of Exit fallback (2026-10-10, per request): when the winning record has no "Date Of Exit" value (the
+  // enrichment report only merged it onto another record of the same person), use the newest other non-Revoked /
+  // non-Rejected record of that employee that does have one.
+  const lastWorkingFallback = new Map<string, { value: string; rank: number; id: number }>();
   for (const exit of exits) {
     if (!exit.employeeId) continue;
     const status = cell(exit.rawData, "Status", "status");
@@ -180,6 +190,11 @@ async function loadLatestExitsByPerson(): Promise<{ byEmployeeId: Map<string, Ex
     const info: ExitInfo = { status, exitDate, lastWorkingDate, department, designation, gender };
     const rank = parseLooseDate(exitDate);
     const candidate = { info, rank, id: exit.id };
+    const normalizedForFallback = (status ?? "").trim().toLowerCase();
+    if (lastWorkingDate && normalizedForFallback !== "revoked" && normalizedForFallback !== "rejected") {
+      const existingFallback = lastWorkingFallback.get(exit.employeeId);
+      if (!existingFallback || rank > existingFallback.rank || (rank === existingFallback.rank && exit.id > existingFallback.id)) lastWorkingFallback.set(exit.employeeId, { value: lastWorkingDate, rank, id: exit.id });
+    }
     // "Most recent record wins" is decided across EVERY status here,
     // including Revoked/Rejected -- see the Revoked/Rejected check below for
     // why those two are excluded only AFTER this ranking, not before it.
@@ -208,7 +223,7 @@ async function loadLatestExitsByPerson(): Promise<{ byEmployeeId: Map<string, Ex
   for (const [employeeId, candidate] of byEmployeeId) {
     const normalizedStatus = (candidate.info.status ?? "").trim().toLowerCase();
     if (normalizedStatus === "revoked" || normalizedStatus === "rejected") continue;
-    byEmployeeIdFiltered.set(employeeId, candidate.info);
+    byEmployeeIdFiltered.set(employeeId, candidate.info.lastWorkingDate ? candidate.info : { ...candidate.info, lastWorkingDate: lastWorkingFallback.get(employeeId)?.value ?? null });
   }
   return { byEmployeeId: byEmployeeIdFiltered };
 }
