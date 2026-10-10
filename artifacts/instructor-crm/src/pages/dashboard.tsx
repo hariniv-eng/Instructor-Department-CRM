@@ -106,6 +106,9 @@ export default function DashboardPage() {
     const seen = new Set<number>();
     return [...(instructorSplit?.darwin_only?.people ?? []), ...(mentorSplit?.darwin_only?.people ?? [])]
       .filter((person) => !['Support', 'IIT X DSA'].includes(productLabel(person)))
+      // Leaving anyway: anyone with an exit record whose Capability Manager marked it Exited or Absconded needs no access
+      // (2026-10-10, per request).
+      .filter((person) => !(person.exit_flag && (person.exit_verification === 'exited' || person.exit_verification === 'absconded')))
       .filter((person) => (seen.has(person.id) ? false : (seen.add(person.id), true)))
       .sort((a, b) => a.full_name.localeCompare(b.full_name));
   }, [instructorSplit, mentorSplit]);
@@ -120,7 +123,7 @@ export default function DashboardPage() {
       action={<button type="button" data-testid="button-refresh-dashboard" onClick={() => queryClient.invalidateQueries({ queryKey: getGetReportsInstructorsQueryKey() })} className="inline-flex items-center gap-2 self-start rounded-lg border border-border bg-card px-3.5 py-2.5 text-[12px] font-bold text-foreground transition-colors hover:bg-secondary lg:self-auto"><RefreshCw size={14} /> Refresh data</button>}
     />
 
-    {report && <section aria-label="Exceptions" data-testid="banner-exceptions" className="mb-4 grid grid-cols-1 divide-y divide-border overflow-hidden rounded-xl border border-border bg-card animate-rise sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+    {report && <section aria-label="Exceptions" data-testid="banner-exceptions" className="mb-4 grid grid-cols-1 gap-3 animate-rise sm:grid-cols-3">
       <ExceptionSegment label="CM actions" title="Needs review" meta="Exit record not reviewed yet — Capability Managers" count={reviewPeople.length} icon={<AlertTriangle size={16} />} href="/instructors?category=exception" testId="exception-1" />
       <ExceptionSegment label="Admin team actions" title="TeachOS access actions" meta={`${removeCount} remove · ${giveCount} give · ${movementCount} movement changes`} count={exception2Total} icon={<Trash2 size={16} />} active={activeException === 'remove'} onClick={() => setException2Open(true)} testId="exception-2" />
       <ExceptionSegment label="HRBP actions" title="Approval pending" meta="Exit approval pending — HRBP action" count={pendingPeople.length} icon={<Clock size={16} />} active={activeException === 'pending'} onClick={() => setActiveException(activeException === 'pending' ? null : 'pending')} testId="exception-3" />
@@ -135,7 +138,7 @@ export default function DashboardPage() {
         <div className="space-y-3">
           {([
             { key: 'exit' as const, title: 'Remove TeachOS access', note: 'Exited instructors and mentors who still have a TeachOS record.', count: removeCount, detail: null as string | null },
-            { key: 'give' as const, title: 'Give TeachOS access', note: 'Instructors and mentors who are in Darwin only, so TeachOS access has to be given (Support and IIT X DSA left out).', count: giveCount, detail: giveCount > 0 ? `${giveCount - giveMentorCount} Instructors · ${giveMentorCount} Mentors` : null },
+            { key: 'give' as const, title: 'Give TeachOS access', note: 'Instructors and mentors who are in Darwin only, so TeachOS access has to be given (Support, IIT X DSA and people marked as exited left out).', count: giveCount, detail: giveCount > 0 ? `${giveCount - giveMentorCount} Instructors · ${giveMentorCount} Mentors` : null },
             { key: 'movements' as const, title: 'Movement Tracker changes', note: 'Changes logged on the Instructors tab that still need action.', count: movementCount, detail: movementTypeCounts.map((row) => `${row.count} ${row.label}`).join(' · ') || null },
           ]).map((row) => <button key={row.key} type="button" data-testid={`exception-2-bucket-${row.key}`} onClick={() => { setRemoveInitialView(row.key); setActiveException('remove'); setException2Open(false); }} className="flex w-full items-start justify-between gap-4 rounded-lg border border-border p-3 text-left transition-colors hover:bg-secondary">
             <div className="min-w-0">
@@ -202,13 +205,14 @@ function ExceptionSegment({ label, title, meta, count, icon, href, active = fals
         <span className="text-[22px] font-extrabold leading-tight tracking-[-0.03em]">{count.toLocaleString('en-IN')}</span>
         <span className="truncate text-[13px] font-bold">{title}</span>
       </span>
-      <span className="block truncate text-[11px] opacity-80">{meta}</span>
+      <span className="block truncate text-[11px] opacity-80" title={meta}>{meta}</span>
     </span>
     <span className="inline-flex shrink-0 items-center gap-1 text-[12px] font-bold">Check <ArrowRight size={14} /></span>
   </>;
-  const cls = `flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors ${clear
-    ? `text-[#256e65] hover:bg-[#d2e8e1] ${active ? 'bg-[#d2e8e1]' : 'bg-[#dff0eb]'}`
-    : `text-[#9b4434] hover:bg-[#f0d6cd] ${active ? 'bg-[#f0d6cd]' : 'bg-[#f6e4de]'}`}`;
+  // Each exception is its own card with a gap between them (2026-10-10, per request), not one joined bar.
+  const cls = `flex w-full items-center gap-3 rounded-xl border px-4 py-3.5 text-left shadow-sm transition-colors ${clear
+    ? `border-[#c3e0d7] text-[#256e65] hover:bg-[#d2e8e1] ${active ? 'bg-[#d2e8e1]' : 'bg-[#dff0eb]'}`
+    : `border-[#ebc9bd] text-[#9b4434] hover:bg-[#f0d6cd] ${active ? 'bg-[#f0d6cd]' : 'bg-[#f6e4de]'}`}`;
   if (href) return <Link href={href} data-testid={`link-${testId}`} className={cls}>{body}</Link>;
   return <button type="button" data-testid={`button-${testId}`} onClick={onClick} aria-pressed={active} className={cls}>{body}</button>;
 }
@@ -704,7 +708,7 @@ function ExceptionRemovePanel({ exitPeople, noticePeople, givePeople, movementsB
         <p className="mt-1 max-w-[640px] text-[12px] text-muted-foreground">{view === 'exit'
           ? 'Instructors and Mentors who have exited (or whose notice period has ended) and still have a TeachOS record. Copy the user ID, remove the person in TeachOS, and they drop off this list after the next sync.'
           : view === 'give'
-            ? 'Instructors and mentors who are in Darwin only (no TeachOS record yet), leaving out the Support and IIT X DSA products. Give them TeachOS access; they drop off this list once they appear in TeachOS after the next sync.'
+            ? 'Instructors and mentors who are in Darwin only (no TeachOS record yet), leaving out the Support and IIT X DSA products and anyone whose exit record is marked Exited or Absconded by their Capability Manager. Give them TeachOS access; they drop off this list once they appear in TeachOS after the next sync.'
             : view === 'notice'
             ? 'Instructors and Mentors serving their notice period. The day after their date of exit passes, they move to the Exit list automatically.'
             : 'Changes logged in the Movement Tracker on the Instructors tab (CM change, team and product moves, deployments, recalls). Set Action Taken to Yes once it is done; the row clears 24 hours later.'}</p>
