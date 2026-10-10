@@ -99,6 +99,15 @@ export default function DashboardPage() {
   const movementTypeCounts = useMemo(() => MOVEMENT_TYPES.map((type) => ({ label: type.label, count: openMovementChanges.filter((movement) => movement.movement_type === type.value).length })).filter((row) => row.count > 0), [openMovementChanges]);
   // Exception 2 now has three buckets (2026-10-10, per request): remove TeachOS access (exited), give TeachOS access
   // (Darwin-only instructors + mentors, not Support / IIT X DSA) and Movement Tracker changes.
+  // Everyone who may be on their way out (2026-10-10, per request): marked Exited, Absconded or Serving Notice Period by a
+  // Capability Manager, whatever the approval status -- the Remove-access, Serving-notice and Pending lists together,
+  // each person once. Payroll candidates are not included. The Exit card drops the ones already counted as approved.
+  const exitCandidates = useMemo(() => {
+    const seen = new Set<number>();
+    return [...removePeople, ...noticePeople, ...pendingPeople]
+      .filter((person) => !person.is_payroll && person.exit_verification !== 'payroll_converted' && ['exited', 'absconded', 'serving_notice_period'].includes(person.exit_verification ?? ''))
+      .filter((person) => (seen.has(person.id) ? false : (seen.add(person.id), true)));
+  }, [removePeople, noticePeople, pendingPeople]);
   const removeCount = removePeople.length;
   // Give TeachOS access (rule set 2026-10-10): instructors + mentors who are in Darwin only (no TeachOS record yet),
   // leaving out the Support and IIT X DSA products. Each person once.
@@ -106,9 +115,15 @@ export default function DashboardPage() {
     const seen = new Set<number>();
     return [...(instructorSplit?.darwin_only?.people ?? []), ...(mentorSplit?.darwin_only?.people ?? [])]
       .filter((person) => !['Support', 'IIT X DSA'].includes(productLabel(person)))
-      // Leaving anyway: anyone with an exit record whose Capability Manager marked it Exited or Absconded needs no access
-      // (2026-10-10, per request).
-      .filter((person) => !(person.exit_flag && (person.exit_verification === 'exited' || person.exit_verification === 'absconded')))
+      // Leaving anyway (2026-10-10, per request): anyone with an exit record that is Approved or still Pending With
+      // Approver needs no access, whether or not a Capability Manager has reviewed it; so does anyone a Capability
+      // Manager marked Exited or Absconded. Revoked / Rejected exit records do not count.
+      .filter((person) => {
+        const status = (person.exit_flag_status ?? '').trim().toLowerCase();
+        const liveExit = !!person.exit_flag && (status === 'approved' || status.startsWith('pending'));
+        const markedExit = person.exit_verification === 'exited' || person.exit_verification === 'absconded';
+        return !liveExit && !markedExit;
+      })
       .filter((person) => (seen.has(person.id) ? false : (seen.add(person.id), true)))
       .sort((a, b) => a.full_name.localeCompare(b.full_name));
   }, [instructorSplit, mentorSplit]);
@@ -138,7 +153,7 @@ export default function DashboardPage() {
         <div className="space-y-3">
           {([
             { key: 'exit' as const, title: 'Remove TeachOS access', note: 'Exited instructors and mentors who still have a TeachOS record.', count: removeCount, detail: null as string | null },
-            { key: 'give' as const, title: 'Give TeachOS access', note: 'Instructors and mentors who are in Darwin only, so TeachOS access has to be given (Support, IIT X DSA and people marked as exited left out).', count: giveCount, detail: giveCount > 0 ? `${giveCount - giveMentorCount} Instructors · ${giveMentorCount} Mentors` : null },
+            { key: 'give' as const, title: 'Give TeachOS access', note: 'Instructors and mentors who are in Darwin only, so TeachOS access has to be given (Support, IIT X DSA and anyone with an approved or pending exit left out).', count: giveCount, detail: giveCount > 0 ? `${giveCount - giveMentorCount} Instructors · ${giveMentorCount} Mentors` : null },
             { key: 'movements' as const, title: 'Movement Tracker changes', note: 'Changes logged on the Instructors tab that still need action.', count: movementCount, detail: movementTypeCounts.map((row) => `${row.count} ${row.label}`).join(' · ') || null },
           ]).map((row) => <button key={row.key} type="button" data-testid={`exception-2-bucket-${row.key}`} onClick={() => { setRemoveInitialView(row.key); setActiveException('remove'); setException2Open(false); }} className="flex w-full items-start justify-between gap-4 rounded-lg border border-border p-3 text-left transition-colors hover:bg-secondary">
             <div className="min-w-0">
@@ -163,7 +178,7 @@ export default function DashboardPage() {
       <KpiCard label="Instructors" value={formatKpi(report.kpis.total_instructor_count)} meta="Matched with Darwin + payroll" icon={<UsersRound size={12} />} tone="navy" />
       <KpiCard label="Mentors" value={formatKpi(report.kpis.mentors_count)} meta="Darwin — Mentors department" icon={<GraduationCap size={12} />} tone="teal" />
       <KpiCard label="Operations team" value={formatKpi(report.kpis.ops_team_count)} meta="Darwin — Delivery Support (Ops)" icon={<Briefcase size={12} />} tone="coral" />
-      <ExitKpiCard pendingPeople={pendingPeople} />
+      <ExitKpiCard exitCandidates={exitCandidates} />
     </section>}
 
 
@@ -492,7 +507,7 @@ function CapabilityManagersCard({ people }: { people: InstructorSummary[] }) {
 // (Instructor Archive: status Exited, exit record Approved). Clicking it opens a pop-up with every approved name and
 // every name still pending approval (Exception 3's list), so the counts can be checked against real people.
 const REVIEW_LABELS: Record<string, string> = { exited: 'Exited', absconded: 'Absconded', serving_notice_period: 'Serving notice', payroll_converted: 'Payroll converted' };
-function ExitKpiCard({ pendingPeople }: { pendingPeople: InstructorSummary[] }) {
+function ExitKpiCard({ exitCandidates }: { exitCandidates: InstructorSummary[] }) {
   const [open, setOpen] = useState(false);
   const archiveQuery = useQuery<{ people: ArchiveExitRow[] }>({
     queryKey: ['reports', 'instructor-archive'],
@@ -506,11 +521,15 @@ function ExitKpiCard({ pendingPeople }: { pendingPeople: InstructorSummary[] }) 
   const approved = useMemo(() => (archiveQuery.data?.people ?? [])
     .filter((row) => isApprovedExit(row) && !row.is_payroll)
     .sort((a, b) => (b.date_of_exit ?? '').localeCompare(a.date_of_exit ?? '') || a.full_name.localeCompare(b.full_name)), [archiveQuery.data]);
-  // Upcoming exits (2026-10-09, per request): only people a Capability Manager has marked Exited or Absconded whose
-  // exit is still pending approval. Serving-notice and payroll candidates stay in Exception 3 only.
-  const upcoming = useMemo(() => pendingPeople
-    .filter((person) => !person.is_payroll && (person.exit_verification === 'exited' || person.exit_verification === 'absconded'))
-    .sort((a, b) => (b.exit_flag_date ?? '').localeCompare(a.exit_flag_date ?? '') || a.full_name.localeCompare(b.full_name)), [pendingPeople]);
+  // Upcoming exits (2026-10-10, per request): everyone a Capability Manager marked Exited, Absconded or Serving Notice
+  // Period (payroll candidates excluded), even while the exit is still pending approval -- except people already
+  // counted in the approved list above.
+  const upcoming = useMemo(() => {
+    const approvedIds = new Set(approved.map((row) => row.employee_id).filter((id): id is string => !!id));
+    return exitCandidates
+      .filter((person) => !(person.employee_id && approvedIds.has(person.employee_id)))
+      .sort((a, b) => (b.date_of_exit ?? b.exit_flag_date ?? '').localeCompare(a.date_of_exit ?? a.exit_flag_date ?? '') || a.full_name.localeCompare(b.full_name));
+  }, [exitCandidates, approved]);
   const value = archiveQuery.isLoading ? '…' : archiveQuery.isError ? '—' : approved.length.toLocaleString('en-IN');
   const chip = (text: string, tone: 'amber' | 'blue') => <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${tone === 'amber' ? 'bg-[#fbeed3] text-[#8a5a0b]' : 'bg-[#e1eaf1] text-primary'}`}>{text}</span>;
   return <>
@@ -532,7 +551,7 @@ function ExitKpiCard({ pendingPeople }: { pendingPeople: InstructorSummary[] }) 
       <DialogContent className="max-w-xl" data-testid="dialog-exit-data">
         <DialogHeader>
           <DialogTitle>Exit data</DialogTitle>
-          <DialogDescription>Approved exits recorded so far, and upcoming exits still waiting for approval.</DialogDescription>
+          <DialogDescription>Approved exits recorded so far, and upcoming exits (marked by the Capability Manager, including those pending approval).</DialogDescription>
         </DialogHeader>
         <div className="space-y-5">
           <section data-testid="exit-dialog-approved">
@@ -551,7 +570,7 @@ function ExitKpiCard({ pendingPeople }: { pendingPeople: InstructorSummary[] }) 
           </section>
           <section data-testid="exit-dialog-upcoming">
             <h3 className="mb-1 text-[12px] font-extrabold">Upcoming exits <span className="tabular-nums text-muted-foreground">{upcoming.length}</span></h3>
-            <p className="mb-1 text-[10px] text-muted-foreground">Marked Exited or Absconded by the Capability Manager; approval is still pending.</p>
+            <p className="mb-1 text-[10px] text-muted-foreground">Marked Exited, Absconded or Serving notice by the Capability Manager (payroll candidates not included), including exits still pending approval.</p>
             <ul>
               {upcoming.map((person) => <li key={person.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-border/60 py-1.5">
                 <div className="min-w-0 flex-1">
@@ -559,7 +578,8 @@ function ExitKpiCard({ pendingPeople }: { pendingPeople: InstructorSummary[] }) 
                   <p className="truncate text-[10px] text-muted-foreground">{[person.employee_id, person.dept_area, person.capability_manager ? `CM: ${person.capability_manager}` : null].filter(Boolean).join(' · ') || '—'}</p>
                 </div>
                 {person.exit_verification && chip(REVIEW_LABELS[person.exit_verification] ?? person.exit_verification, 'amber')}
-                <span className="shrink-0 text-[11px] text-muted-foreground">{formatExitDate(person.date_of_exit ?? person.exit_flag_date)}</span>
+                {person.exit_flag_status && chip(person.exit_flag_status, 'blue')}
+                <span className="shrink-0 text-[11px] text-muted-foreground" title={person.date_of_exit ? 'Date of exit' : 'Date the exit was raised (no date of exit on the record)'}>{person.date_of_exit ? formatExitDate(person.date_of_exit) : person.exit_flag_date ? `Raised ${formatExitDate(person.exit_flag_date)}` : '—'}</span>
               </li>)}
               {upcoming.length === 0 && <li className="py-2 text-[12px] text-muted-foreground">No upcoming exits.</li>}
             </ul>
@@ -708,7 +728,7 @@ function ExceptionRemovePanel({ exitPeople, noticePeople, givePeople, movementsB
         <p className="mt-1 max-w-[640px] text-[12px] text-muted-foreground">{view === 'exit'
           ? 'Instructors and Mentors who have exited (or whose notice period has ended) and still have a TeachOS record. Copy the user ID, remove the person in TeachOS, and they drop off this list after the next sync.'
           : view === 'give'
-            ? 'Instructors and mentors who are in Darwin only (no TeachOS record yet), leaving out the Support and IIT X DSA products and anyone whose exit record is marked Exited or Absconded by their Capability Manager. Give them TeachOS access; they drop off this list once they appear in TeachOS after the next sync.'
+            ? 'Instructors and mentors who are in Darwin only (no TeachOS record yet), leaving out the Support and IIT X DSA products and anyone with an approved or pending exit record. Give them TeachOS access; they drop off this list once they appear in TeachOS after the next sync.'
             : view === 'notice'
             ? 'Instructors and Mentors serving their notice period. The day after their date of exit passes, they move to the Exit list automatically.'
             : 'Changes logged in the Movement Tracker on the Instructors tab (CM change, team and product moves, deployments, recalls). Set Action Taken to Yes once it is done; the row clears 24 hours later.'}</p>
