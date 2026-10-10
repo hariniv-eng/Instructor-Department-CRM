@@ -7,6 +7,7 @@ import { PageIntro, QueryError, SkeletonBlock, DownloadCsvButton, TableSearchInp
 import { downloadCsv, slugify, toCsv } from '@/lib/csv';
 import { ALL_PRODUCTS, productLabel } from './instructors';
 import { NiatMapCard } from '@/components/niat-map';
+import { ActionTakenCell, MOVEMENT_TYPES, currentMovements, movementLabel, useMovementsByInstructor, type Movement } from '@/components/movement-tracker';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 function formatKpi(value: number | undefined) {
@@ -44,7 +45,7 @@ export default function DashboardPage() {
   //     from TeachOS, since the queue only holds people still present in
   //     Darwin or TeachOS and this view additionally needs TeachOS presence.
   const [activeException, setActiveException] = useState<'remove' | 'pending' | null>(null);
-  const [removeInitialView, setRemoveInitialView] = useState<'exit' | 'notice'>('exit');
+  const [removeInitialView, setRemoveInitialView] = useState<'exit' | 'give' | 'notice' | 'movements'>('exit');
   const exceptionSplit = report?.access_breakdown?.exception;
   const reviewPeople = useMemo(() => [...(exceptionSplit?.darwin_only?.people ?? []), ...(exceptionSplit?.both?.people ?? []), ...(exceptionSplit?.teachos_only?.people ?? [])]
     .filter((p) => !p.exit_verification)
@@ -89,6 +90,30 @@ export default function DashboardPage() {
     return [...(departmentSplit?.both?.people ?? []), ...(departmentSplit?.darwin_only?.people ?? []), ...(departmentSplit?.teachos_only?.people ?? [])]
       .filter((p) => (seen.has(p.id) ? false : (seen.add(p.id), true)));
   }, [departmentSplit]);
+  // Movement Tracker action items (2026-10-10, per request): logged movements are action items, so Exception 2 lists
+  // them too. One row per instructor with a current (not yet cleared) movement group.
+  const movementsByInstructor = useMovementsByInstructor();
+  // Open action items = changes whose Action Taken is not Yes yet (Yes ones stay visible in the table for 24 hours, but
+  // they are done, so they are not counted).
+  const openMovementChanges = useMemo(() => [...movementsByInstructor.values()].flatMap((list) => currentMovements(list)).filter((movement) => movement.action_taken !== 'yes'), [movementsByInstructor]);
+  const movementTypeCounts = useMemo(() => MOVEMENT_TYPES.map((type) => ({ label: type.label, count: openMovementChanges.filter((movement) => movement.movement_type === type.value).length })).filter((row) => row.count > 0), [openMovementChanges]);
+  // Exception 2 now has three buckets (2026-10-10, per request): remove TeachOS access (exited), give TeachOS access
+  // (Darwin-only instructors + mentors, not Support / IIT X DSA) and Movement Tracker changes.
+  const removeCount = removePeople.length;
+  // Give TeachOS access (rule set 2026-10-10): instructors + mentors who are in Darwin only (no TeachOS record yet),
+  // leaving out the Support and IIT X DSA products. Each person once.
+  const givePeople = useMemo(() => {
+    const seen = new Set<number>();
+    return [...(instructorSplit?.darwin_only?.people ?? []), ...(mentorSplit?.darwin_only?.people ?? [])]
+      .filter((person) => !['Support', 'IIT X DSA'].includes(productLabel(person)))
+      .filter((person) => (seen.has(person.id) ? false : (seen.add(person.id), true)))
+      .sort((a, b) => a.full_name.localeCompare(b.full_name));
+  }, [instructorSplit, mentorSplit]);
+  const giveMentorCount = useMemo(() => { const ids = new Set((mentorSplit?.darwin_only?.people ?? []).map((person) => person.id)); return givePeople.filter((person) => ids.has(person.id)).length; }, [givePeople, mentorSplit]);
+  const giveCount = givePeople.length;
+  const movementCount = openMovementChanges.length;
+  const exception2Total = removeCount + giveCount + movementCount;
+  const [exception2Open, setException2Open] = useState(false);
   return <div className="mx-auto max-w-[1500px]">
     <PageIntro
       title="Faculty Command Center (FCC)"
@@ -96,12 +121,37 @@ export default function DashboardPage() {
     />
 
     {report && <section aria-label="Exceptions" data-testid="banner-exceptions" className="mb-4 grid grid-cols-1 divide-y divide-border overflow-hidden rounded-xl border border-border bg-card animate-rise sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-      <ExceptionSegment label="Exception 1" title="Needs review" meta="Exit record not reviewed yet — Capability Managers" count={reviewPeople.length} icon={<AlertTriangle size={16} />} href="/instructors?category=exception" testId="exception-1" />
-      <ExceptionSegment label="Exception 2" title="Remove TeachOS access" meta={`Exit list · ${noticePeople.length} serving notice`} count={removePeople.length} icon={<Trash2 size={16} />} active={activeException === 'remove'} onClick={() => { setRemoveInitialView('exit'); setActiveException(activeException === 'remove' ? null : 'remove'); }} testId="exception-2" />
-      <ExceptionSegment label="Exception 3" title="Approval pending" meta="Exit approval pending — HRBP action" count={pendingPeople.length} icon={<Clock size={16} />} active={activeException === 'pending'} onClick={() => setActiveException(activeException === 'pending' ? null : 'pending')} testId="exception-3" />
+      <ExceptionSegment label="CM actions" title="Needs review" meta="Exit record not reviewed yet — Capability Managers" count={reviewPeople.length} icon={<AlertTriangle size={16} />} href="/instructors?category=exception" testId="exception-1" />
+      <ExceptionSegment label="Admin team actions" title="TeachOS access actions" meta={`${removeCount} remove · ${giveCount} give · ${movementCount} movement changes`} count={exception2Total} icon={<Trash2 size={16} />} active={activeException === 'remove'} onClick={() => setException2Open(true)} testId="exception-2" />
+      <ExceptionSegment label="HRBP actions" title="Approval pending" meta="Exit approval pending — HRBP action" count={pendingPeople.length} icon={<Clock size={16} />} active={activeException === 'pending'} onClick={() => setActiveException(activeException === 'pending' ? null : 'pending')} testId="exception-3" />
     </section>}
     {report && activeException === 'pending' && <ExceptionPendingPanel people={pendingPeople} onClose={() => setActiveException(null)} />}
-    {report && activeException === 'remove' && <ExceptionRemovePanel key={removeInitialView} initialView={removeInitialView} exitPeople={removePeople} noticePeople={noticePeople} onClose={() => setActiveException(null)} />}
+    <Dialog open={exception2Open} onOpenChange={setException2Open}>
+      <DialogContent className="max-w-lg" data-testid="dialog-exception-2">
+        <DialogHeader>
+          <DialogTitle>Admin team actions — {exception2Total} {exception2Total === 1 ? 'action' : 'actions'} to do</DialogTitle>
+          <DialogDescription>What needs doing in TeachOS right now. Open a list to work through it.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          {([
+            { key: 'exit' as const, title: 'Remove TeachOS access', note: 'Exited instructors and mentors who still have a TeachOS record.', count: removeCount, detail: null as string | null },
+            { key: 'give' as const, title: 'Give TeachOS access', note: 'Instructors and mentors who are in Darwin only, so TeachOS access has to be given (Support and IIT X DSA left out).', count: giveCount, detail: giveCount > 0 ? `${giveCount - giveMentorCount} Instructors · ${giveMentorCount} Mentors` : null },
+            { key: 'movements' as const, title: 'Movement Tracker changes', note: 'Changes logged on the Instructors tab that still need action.', count: movementCount, detail: movementTypeCounts.map((row) => `${row.count} ${row.label}`).join(' · ') || null },
+          ]).map((row) => <button key={row.key} type="button" data-testid={`exception-2-bucket-${row.key}`} onClick={() => { setRemoveInitialView(row.key); setActiveException('remove'); setException2Open(false); }} className="flex w-full items-start justify-between gap-4 rounded-lg border border-border p-3 text-left transition-colors hover:bg-secondary">
+            <div className="min-w-0">
+              <p className="text-[13px] font-extrabold">{row.title}</p>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">{row.note}</p>
+              {row.detail && <p className="mt-1 text-[11px] font-semibold text-primary">{row.detail}</p>}
+            </div>
+            <span className="shrink-0 text-[24px] font-extrabold leading-none tabular-nums" data-testid={`exception-2-count-${row.key}`}>{row.count.toLocaleString('en-IN')}</span>
+          </button>)}
+          <button type="button" data-testid="exception-2-bucket-notice" onClick={() => { setRemoveInitialView('notice'); setActiveException('remove'); setException2Open(false); }} className="w-full rounded-md px-1 py-1 text-left text-[11px] text-muted-foreground hover:text-foreground">
+            Also serving notice (not counted above): <span className="font-bold tabular-nums">{noticePeople.length}</span> — view list
+          </button>
+        </div>
+      </DialogContent>
+    </Dialog>
+    {report && activeException === 'remove' && <ExceptionRemovePanel key={removeInitialView} initialView={removeInitialView} exitPeople={removePeople} noticePeople={noticePeople} givePeople={givePeople} movementsByInstructor={movementsByInstructor} onClose={() => setActiveException(null)} />}
 
     {reportQuery.isLoading && <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">{[1, 2, 3, 4].map((item) => <SkeletonBlock key={item} className="h-[126px]" />)}</div>}
     {reportQuery.isError && <QueryError message="Dashboard data is unavailable right now." />}
@@ -171,7 +221,7 @@ function ExceptionPendingPanel({ people, onClose }: { people: InstructorSummary[
   return <section className="mb-4 rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6 animate-rise">
     <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
       <div>
-        <p className="font-mono-ui text-[10px] uppercase tracking-[0.17em] text-muted-foreground">Exception 3 — for the HRBP</p>
+        <p className="font-mono-ui text-[10px] uppercase tracking-[0.17em] text-muted-foreground">HRBP actions</p>
         <h2 className="mt-1 text-[16px] font-extrabold tracking-[-0.03em]">Exit approval pending</h2>
         <p className="mt-1 max-w-[640px] text-[12px] text-muted-foreground">These people have raised an exit request that is still Pending With Approver in Darwinbox. Each one needs an approval decision. They leave this list once Darwinbox shows the decision.</p>
       </div>
@@ -613,15 +663,22 @@ type ArchiveExitRow = { id: number; full_name: string; employee_id: string | nul
 const isApprovedExit = (row: ArchiveExitRow) => row.status === 'Exited' && (row.exit_status ?? '').trim().toLowerCase() === 'approved';
 const toExitRow = (p: InstructorSummary): ExitRow => ({ id: String(p.id), full_name: p.full_name, employee_id: p.employee_id ?? null, teachos_user_id: p.teachos_user_id ?? null, dept_area: p.dept_area ?? null, capability_manager: p.capability_manager ?? null, is_payroll: !!p.is_payroll, date_of_exit: p.date_of_exit ?? null, exit_flag_status: p.exit_flag_status ?? null, exit_flag_date: p.exit_flag_date ?? null });
 
-function ExceptionRemovePanel({ exitPeople, noticePeople, onClose, initialView = 'exit' }: { exitPeople: InstructorSummary[]; noticePeople: InstructorSummary[]; onClose: () => void; initialView?: 'exit' | 'notice' }) {
+function ExceptionRemovePanel({ exitPeople, noticePeople, givePeople, movementsByInstructor, onClose, initialView = 'exit' }: { exitPeople: InstructorSummary[]; noticePeople: InstructorSummary[]; givePeople: InstructorSummary[]; movementsByInstructor: Map<number, Movement[]>; onClose: () => void; initialView?: 'exit' | 'give' | 'notice' | 'movements' }) {
   // Exception 2 is only the two worklists (2026-10-09, per request): who must be removed from TeachOS, and who is
   // serving notice. The approved-exit records live on the Overview's Exit data card, not here.
-  const [view, setView] = useState<'exit' | 'notice'>(initialView);
+  const [view, setView] = useState<'exit' | 'give' | 'notice' | 'movements'>(initialView);
+  // Movement action items: one row per instructor, with every change in their latest group and its Action Taken.
+  const movementRows = useMemo(() => [...movementsByInstructor.entries()]
+    .map(([instructorId, list]) => ({ instructorId, group: currentMovements(list) }))
+    .filter((row) => row.group.length > 0)
+    .sort((a, b) => b.group[0].requested_at.localeCompare(a.group[0].requested_at) || a.group[0].full_name.localeCompare(b.group[0].full_name)), [movementsByInstructor]);
   const liveExit = useMemo(() => exitPeople.map(toExitRow), [exitPeople]);
   const liveNotice = useMemo(() => noticePeople.map(toExitRow), [noticePeople]);
   const [search, setSearch] = useState('');
   const [copiedAll, setCopiedAll] = useState(false);
   const people = view === 'exit' ? liveExit : liveNotice;
+  const filteredGive = useMemo(() => givePeople.filter((person) => matchesSearch(person, search)), [givePeople, search]);
+  const filteredMovementRows = useMemo(() => movementRows.filter((row) => matchesSearch({ full_name: row.group[0].full_name, employee_id: row.group[0].employee_id }, search)), [movementRows, search]);
   const filtered = useMemo(() => people.filter((p) => matchesSearch(p, search)), [people, search]);
   const userIds = filtered.map((p) => p.teachos_user_id).filter((id): id is string => !!id);
   const copyAllIds = async () => {
@@ -630,35 +687,83 @@ function ExceptionRemovePanel({ exitPeople, noticePeople, onClose, initialView =
       window.setTimeout(() => setCopiedAll(false), 1500);
     }
   };
+  const handleGiveDownload = () => downloadCsv('exception-2-give-teachos-access.csv', toCsv(['Name', 'Employee ID', 'Email', 'Subject', 'Product', 'Darwin manager', 'Date of joining'], filteredGive.map((p) => [p.full_name, p.employee_id ?? '', p.org_email ?? '', p.dept_area ?? '', productLabel(p), p.darwin_manager ?? '', p.date_of_joining ?? ''])));
+  const handleMovementDownload = () => downloadCsv('exception-2-movement-actions.csv', toCsv(['Name', 'Employee ID', 'Movement', 'Remark', 'Logged on', 'Action Taken'], filteredMovementRows.flatMap((row) => row.group.map((movement) => [movement.full_name, movement.employee_id ?? '', movementLabel(movement.movement_type), movement.remark, movement.requested_at.slice(0, 10), movement.action_taken === 'yes' ? 'Yes' : movement.action_taken === 'no' ? 'No' : '']))));
   const handleDownload = () => downloadCsv(view === 'exit' ? 'exception-2-exit-remove-from-teachos.csv' : 'exception-2-serving-notice-period.csv', toCsv(['Name', 'Employee ID', 'TeachOS User ID', 'Subject', 'Capability Manager', 'Payroll / Nxtwave', 'date_of_exit', 'exit_status', 'exit_date'], filtered.map((p) => [p.full_name, p.employee_id ?? '', p.teachos_user_id ?? '', p.dept_area ?? '', p.capability_manager ?? '', payrollLabel(p), p.date_of_exit ?? '', p.exit_flag_status ?? '', p.exit_flag_date ?? ''])));
-  const views: { key: 'exit' | 'notice'; label: string; count: number }[] = [
-    { key: 'exit', label: 'Exit', count: exitPeople.length },
+  const views: { key: 'exit' | 'give' | 'notice' | 'movements'; label: string; count: number }[] = [
+    { key: 'exit', label: 'Remove access', count: exitPeople.length },
+    { key: 'give', label: 'Give access', count: givePeople.length },
+    { key: 'movements', label: 'Movement actions', count: movementRows.length },
     { key: 'notice', label: 'Serving notice period', count: noticePeople.length },
   ];
   return <section className="mb-4 rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6 animate-rise">
     <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
       <div>
-        <p className="font-mono-ui text-[10px] uppercase tracking-[0.17em] text-muted-foreground">Exception 2 — TeachOS clean-up</p>
-        <h2 className="mt-1 text-[16px] font-extrabold tracking-[-0.03em]">{view === 'exit' ? 'Exited — remove TeachOS access' : 'Serving notice period'}</h2>
+        <p className="font-mono-ui text-[10px] uppercase tracking-[0.17em] text-muted-foreground">Admin team actions — TeachOS</p>
+        <h2 className="mt-1 text-[16px] font-extrabold tracking-[-0.03em]">{view === 'exit' ? 'Exited — remove TeachOS access' : view === 'give' ? 'Darwin only — give TeachOS access' : view === 'notice' ? 'Serving notice period' : 'Movement actions'}</h2>
         <p className="mt-1 max-w-[640px] text-[12px] text-muted-foreground">{view === 'exit'
           ? 'Instructors and Mentors who have exited (or whose notice period has ended) and still have a TeachOS record. Copy the user ID, remove the person in TeachOS, and they drop off this list after the next sync.'
-          : 'Instructors and Mentors serving their notice period. The day after their date of exit passes, they move to the Exit list automatically.'}</p>
+          : view === 'give'
+            ? 'Instructors and mentors who are in Darwin only (no TeachOS record yet), leaving out the Support and IIT X DSA products. Give them TeachOS access; they drop off this list once they appear in TeachOS after the next sync.'
+            : view === 'notice'
+            ? 'Instructors and Mentors serving their notice period. The day after their date of exit passes, they move to the Exit list automatically.'
+            : 'Changes logged in the Movement Tracker on the Instructors tab (CM change, team and product moves, deployments, recalls). Set Action Taken to Yes once it is done; the row clears 24 hours later.'}</p>
         <div className="mt-3 flex flex-wrap gap-1.5">
           {views.map((v) => <button key={v.key} type="button" data-testid={`button-exception-view-${v.key}`} onClick={() => setView(v.key)} className={`rounded-full px-3 py-1 text-[11px] font-bold transition-colors ${view === v.key ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground hover:bg-secondary/70'}`}>{v.label} ({v.count})</button>)}
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        {people.length > 0 && <TableSearchInput value={search} onChange={setSearch} placeholder="Search name, employee ID or user ID..." testId="input-search-exception-remove" />}
-        <button type="button" onClick={copyAllIds} disabled={userIds.length === 0} data-testid="button-copy-all-user-ids" className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-[11px] font-bold text-foreground transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50">
+        {view === 'movements' || view === 'give'
+          ? (view === 'give' ? givePeople.length : movementRows.length) > 0 && <TableSearchInput value={search} onChange={setSearch} placeholder="Search name or employee ID..." testId="input-search-exception-movements" />
+          : people.length > 0 && <TableSearchInput value={search} onChange={setSearch} placeholder="Search name, employee ID or user ID..." testId="input-search-exception-remove" />}
+        {view !== 'movements' && view !== 'give' && <button type="button" onClick={copyAllIds} disabled={userIds.length === 0} data-testid="button-copy-all-user-ids" className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-[11px] font-bold text-foreground transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50">
           {copiedAll ? <Check size={13} className="text-[#256e65]" /> : <Copy size={13} />} {copiedAll ? 'Copied' : `Copy all user IDs (${userIds.length})`}
-        </button>
-        <DownloadCsvButton onClick={handleDownload} disabled={filtered.length === 0} testId="button-download-exception-remove" />
+        </button>}
+        <DownloadCsvButton onClick={view === 'give' ? handleGiveDownload : view === 'movements' ? handleMovementDownload : handleDownload} disabled={(view === 'give' ? filteredGive.length : view === 'movements' ? filteredMovementRows.length : filtered.length) === 0} testId="button-download-exception-remove" />
         <button type="button" data-testid="button-close-exception-remove" onClick={onClose} className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-[11px] font-bold text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
           <X size={13} /> Close
         </button>
       </div>
     </div>
-    <div className="max-h-[420px] overflow-auto rounded-lg border border-border">
+    {view === 'give' ? <div className="max-h-[420px] overflow-auto rounded-lg border border-border" data-testid="exception-give-access">
+      <table className="w-full text-left text-[12px]">
+        <thead className="sticky top-0 bg-secondary font-mono-ui text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
+          <tr><th className="px-3 py-2">Name</th><th className="px-3 py-2">Employee ID</th><th className="px-3 py-2">Email</th><th className="px-3 py-2">Subject</th><th className="px-3 py-2">Product</th><th className="px-3 py-2">Darwin manager</th><th className="px-3 py-2">Date of joining</th></tr>
+        </thead>
+        <tbody>
+          {filteredGive.map((p) => <tr key={p.id} className="border-t border-border/70">
+            <td className="px-3 py-2 font-semibold"><CopyValue value={p.full_name} testId={`button-copy-give-name-${p.id}`} /></td>
+            <td className="px-3 py-2 text-muted-foreground"><CopyValue value={p.employee_id} mono testId={`button-copy-give-employee-id-${p.id}`} /></td>
+            <td className="px-3 py-2 text-muted-foreground"><CopyValue value={p.org_email} testId={`button-copy-give-email-${p.id}`} /></td>
+            <td className="px-3 py-2 text-muted-foreground">{p.dept_area ?? '—'}</td>
+            <td className="px-3 py-2 text-muted-foreground">{productLabel(p)}</td>
+            <td className="px-3 py-2 text-muted-foreground">{p.darwin_manager ?? '—'}</td>
+            <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{formatExitDate(p.date_of_joining)}</td>
+          </tr>)}
+          {filteredGive.length === 0 && <tr><td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">{givePeople.length === 0 ? 'No one is waiting for TeachOS access.' : 'No one matches this search.'}</td></tr>}
+        </tbody>
+      </table>
+    </div> : view === 'movements' ? <div className="max-h-[420px] overflow-auto rounded-lg border border-border" data-testid="exception-movement-actions">
+      <table className="w-full text-left text-[12px]">
+        <thead className="sticky top-0 bg-secondary font-mono-ui text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
+          <tr><th className="px-3 py-2">Name</th><th className="px-3 py-2">Employee ID</th><th className="px-3 py-2">Changes</th><th className="px-3 py-2">Logged on</th><th className="w-[130px] px-3 py-2">Action Taken</th></tr>
+        </thead>
+        <tbody>
+          {filteredMovementRows.map((row) => <tr key={row.instructorId} className="border-t border-border/70 align-top">
+            <td className="px-3 py-2 font-semibold">{row.group[0].full_name}</td>
+            <td className="px-3 py-2 font-mono-ui text-muted-foreground">{row.group[0].employee_id ?? '—'}</td>
+            <td className="px-3 py-2">
+              <ul className="space-y-1">
+                {row.group.map((movement) => <li key={movement.id}><span className="font-bold">{movementLabel(movement.movement_type)}</span><span className="text-muted-foreground"> — {movement.remark}</span></li>)}
+              </ul>
+            </td>
+            <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{formatExitDate(row.group[0].requested_at)}</td>
+            <td className="px-3 py-2"><ActionTakenCell movements={movementsByInstructor.get(row.instructorId) ?? []} /></td>
+          </tr>)}
+          {filteredMovementRows.length === 0 && <tr><td colSpan={5} className="px-3 py-8 text-center text-muted-foreground">{movementRows.length === 0 ? 'No movement actions are open.' : 'No one matches this search.'}</td></tr>}
+        </tbody>
+      </table>
+    </div> : <div className="max-h-[420px] overflow-auto rounded-lg border border-border">
       <table className="w-full text-left text-[12px]">
         <thead className="sticky top-0 bg-secondary font-mono-ui text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
           <tr><th className="px-3 py-2">Name</th><th className="px-3 py-2">Employee ID</th><th className="px-3 py-2">TeachOS user ID</th><th className="px-3 py-2">Subject</th><th className="px-3 py-2">Capability Manager</th><th className="px-3 py-2">Payroll / Nxtwave</th><th className="px-3 py-2">date_of_exit</th><th className="px-3 py-2">exit_status</th><th className="px-3 py-2">exit_date</th></tr>
@@ -678,6 +783,6 @@ function ExceptionRemovePanel({ exitPeople, noticePeople, onClose, initialView =
           {filtered.length === 0 && <tr><td colSpan={9} className="px-3 py-8 text-center text-muted-foreground">{people.length === 0 ? (view === 'exit' ? 'No one is waiting to be removed from TeachOS.' : 'No one is serving a notice period.') : 'No one matches this search.'}</td></tr>}
         </tbody>
       </table>
-    </div>
+    </div>}
   </section>;
 }
