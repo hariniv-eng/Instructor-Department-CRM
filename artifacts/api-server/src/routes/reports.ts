@@ -1379,7 +1379,7 @@ router.get("/reports/instructor-contribution", requireAuth, requireRole("admin")
 // between instructorsTable and instructorArchiveTable even though the
 // column names line up). Admin-only, same gating as Darwin Exit Details
 // and Contribution -- this surfaces exit history, not just a live roster.
-router.get("/reports/instructor-archive", requireAuth, requireRole("admin"), async (_req, res) => {
+async function loadArchivePeople() {
   let allRows = await db.select().from(instructorArchiveTable);
   // Self-healing baseline (2026-10-06): if no row has the inArchiveScope
   // marker yet (first load after the column was added, or a startup seed
@@ -1444,7 +1444,11 @@ router.get("/reports/instructor-archive", requireAuth, requireRole("admin"), asy
     .filter((r) => r.inArchiveScope && !NOT_DEPARTMENT_CLASSIFICATIONS.has(r.classification ?? ""))
     .map((r) => toApiArchiveSummary(r, r.employeeId ? archiveExitByEmployee.get(r.employeeId) : undefined))
     .sort((a, b) => a.full_name.localeCompare(b.full_name));
+  return people;
+}
 
+router.get("/reports/instructor-archive", requireAuth, requireRole("admin"), async (_req, res) => {
+  const people = await loadArchivePeople();
   res.json({
     people,
     total: people.length,
@@ -1452,6 +1456,29 @@ router.get("/reports/instructor-archive", requireAuth, requireRole("admin"), asy
     exited_count: people.filter((p) => p.status === "Exited").length,
     snp_count: people.filter((p) => p.status === "SNP").length,
   });
+});
+
+// Approved exits for the Overview's Exit data card (2026-10-10, per request: "why in the manager access no exit data is
+// visible"). Manager view has no login, and the full archive route above is Admin-only, so the card got a 401 there.
+// This public route returns ONLY the approved, non-payroll exits and only the few fields the card shows (no emails, no
+// TeachOS ids) -- the same names, Capability Managers and exit dates Manager view already sees in the Exceptions lists.
+router.get("/reports/approved-exits", async (_req, res) => {
+  const people = (await loadArchivePeople())
+    .filter((p) => p.status === "Exited" && (p.exit_status ?? "").trim().toLowerCase() === "approved" && !p.is_payroll)
+    .map((p) => ({
+      id: p.id,
+      full_name: p.full_name,
+      employee_id: p.employee_id,
+      teachos_user_id: null,
+      dept_area: p.dept_area,
+      capability_manager: p.capability_manager,
+      is_payroll: p.is_payroll,
+      date_of_exit: p.date_of_exit,
+      exit_status: p.exit_status,
+      exit_date: p.exit_date,
+      status: p.status,
+    }));
+  res.json({ people, total: people.length });
 });
 
 export default router;

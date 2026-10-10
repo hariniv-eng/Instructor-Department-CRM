@@ -570,12 +570,14 @@ const REVIEW_LABELS: Record<string, string> = { exited: 'Exited', absconded: 'Ab
 function ExitKpiCard({ exitCandidates }: { exitCandidates: InstructorSummary[] }) {
   const [open, setOpen] = useState(false);
   const archiveQuery = useQuery<{ people: ArchiveExitRow[] }>({
-    queryKey: ['reports', 'instructor-archive'],
+    queryKey: ['reports', 'approved-exits'],
     queryFn: async () => {
-      const response = await fetch('/api/reports/instructor-archive');
+      const response = await fetch('/api/reports/approved-exits');
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       return response.json();
     },
+    // Fail fast instead of showing "…" through react-query's default retries, and refresh when the card is revisited.
+    retry: false,
   });
   // Payroll candidates are never shown here (2026-10-09, per request) -- they are handled in the Exceptions.
   const approved = useMemo(() => (archiveQuery.data?.people ?? [])
