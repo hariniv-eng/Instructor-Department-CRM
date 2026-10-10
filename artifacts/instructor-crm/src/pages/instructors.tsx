@@ -812,14 +812,14 @@ function gridColsClass(category: CategoryKey): string {
   // mixed into Department/Exception just reads "Nxtwave" in this column,
   // same as any non-payroll instructor. Never wrong, just not usually the
   // interesting value there.
-  if (category === 'instructors' || category === 'mentors' || category === 'instructors_mentors' || category === 'department' || category === 'exception') return 'grid-cols-[260px_190px_130px_280px_220px_150px_160px_170px_220px_160px_110px_140px_190px_190px_160px_130px_130px_150px_190px_150px_170px_140px_170px_260px_150px]';
+  if (category === 'instructors' || category === 'mentors' || category === 'instructors_mentors' || category === 'department' || category === 'exception') return 'grid-cols-[260px_190px_130px_280px_220px_150px_160px_170px_220px_160px_110px_140px_190px_190px_160px_130px_130px_150px_170px_140px_170px_190px_150px_260px_150px]';
   // Operations team keeps its own shape (2026-09-21: not part of the above
   // request) -- no Campus column (ops rows aren't deployed to a teaching
   // campus the way instructors and mentors are), a single Department
   // column instead of Subject+Department, and no Payroll either (same
   // reason it's never meaningful for Mentors: payroll_converted can't be
   // assigned to an ops row).
-  return 'grid-cols-[260px_190px_130px_280px_220px_150px_280px_140px_190px_190px_160px_130px_150px_190px_150px_170px_140px_170px_260px_150px]';
+  return 'grid-cols-[260px_190px_130px_280px_220px_150px_280px_140px_190px_190px_160px_130px_150px_170px_140px_170px_190px_150px_260px_150px]';
 }
 
 // Manager (Darwin) (2026-09-22, per request: "in the overview table we have
@@ -952,11 +952,11 @@ export function downloadInstructorsCsv(category: CategoryKey, people: PersonWith
   headers.push('Access');
   if (category !== 'ops_team') headers.push('Payroll');
   headers.push('Gender');
-  headers.push('Employee Status');
-  headers.push('date_of_exit');
   headers.push('Enrolled Plan');
   headers.push('Product');
   headers.push('Contribution');
+  headers.push('Employee Status');
+  headers.push('date_of_exit');
   headers.push('Movement Tracker');
   headers.push('Action Taken');
   const knownMovements = getKnownMovements();
@@ -972,14 +972,14 @@ export function downloadInstructorsCsv(category: CategoryKey, people: PersonWith
     row.push(ACCESS_LABELS[person.access]);
     if (category !== 'ops_team') row.push(person.is_payroll ? 'Payroll' : 'Nxtwave');
     row.push(person.gender ?? '');
+    row.push(person.enrolled_plans ?? '');
+    row.push(productLabel(person));
+    row.push(person.niat_cohorts?.join(', ') ?? '');
     // Blank when there's no exit record at all; "Not reviewed" when one
     // exists but no Capability Manager has verified it yet; otherwise the
     // reviewed label -- mirrors ExitCell's dash-vs-dropdown split below.
     row.push(person.exit_flag ? EXIT_VERIFICATION_LABELS[person.exit_verification ?? ''] ?? 'Not reviewed' : '');
     row.push(person.date_of_exit ?? '');
-    row.push(person.enrolled_plans ?? '');
-    row.push(productLabel(person));
-    row.push(person.niat_cohorts?.join(', ') ?? '');
     // Latest logged movement (type + remark) and its Action Taken -- see components/movement-tracker.tsx.
     const latestMovements = currentMovements(knownMovements.get(person.id) ?? []);
     row.push(latestMovements.map((movement) => `${movementLabel(movement.movement_type)}: ${movement.remark}`).join(' | '));
@@ -1021,11 +1021,11 @@ export function CategoryTable({ category, people, backQuery, linkMode = 'row', b
           <span>Access</span>
           {category !== 'ops_team' && <span>Payroll</span>}
           <span>Gender</span>
-          <span>Employee Status</span>
-          <span>date_of_exit</span>
           <span>Enrolled Plan</span>
           <span>Product</span>
           <span>Contribution</span>
+          <span>Employee Status</span>
+          <span>date_of_exit</span>
           <span>Movement Tracker</span>
           <span>Action Taken</span>
         </div>
@@ -1100,11 +1100,11 @@ function PersonRow({ category, person, columns, backQuery, linkMode = 'row', bac
     <AccessCell access={person.access} />
     {category !== 'ops_team' && <div>{person.is_payroll ? <span className="inline-flex rounded-full bg-[#e6e9fb] px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] text-[#4a4fb0]">Payroll</span> : <span className="inline-flex rounded-full bg-secondary px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] text-muted-foreground">Nxtwave</span>}</div>}
     <GenderCell person={person} />
-    <ExitCell person={person} />
-    <DateOfExitCell person={person} />
     <div className="truncate text-[12px] text-muted-foreground">{person.enrolled_plans || '—'}</div>
     <div className="truncate text-[12px] text-muted-foreground">{productLabel(person)}</div>
     <div className="truncate text-[12px] text-muted-foreground">{person.niat_cohorts && person.niat_cohorts.length > 0 ? person.niat_cohorts.join(', ') : '—'}</div>
+    <ExitCell person={person} />
+    <DateOfExitCell person={person} />
     <MovementCell instructorId={person.id} fullName={person.full_name} movements={movements} />
     <ActionTakenCell movements={movements} />
   </>;
