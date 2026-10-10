@@ -1415,24 +1415,28 @@ router.get("/reports/instructor-archive", requireAuth, requireRole("admin"), asy
   const newer = (a: Seen, existing?: Seen) => !existing || a.rank > existing.rank || (a.rank === existing.rank && a.id > existing.id);
   const latestByEmployee = new Map<string, Seen>();
   const approvedByEmployee = new Map<string, Seen>();
+  // Newest "Date Of Exit" on any non-Revoked / non-Rejected record of the person (2026-10-10, per request), used when the
+  // record that decides their archive status has none.
+  const lwdFallbackByEmployee = new Map<string, Seen>();
   for (const exit of exitRows) {
     if (!exit.employeeId) continue;
     const status = (cell(exit.rawData, "Status", "status") ?? "").trim();
     const iso = toISODate(cell(exit.rawData, "Exit Date", "exit_date"));
     const seen: Seen = { rank: iso ? parseLooseDate(iso) : -Infinity, id: exit.id, status, iso, lwd: toISODate(cell(exit.rawData, "Date Of Exit", "date_of_exit")) };
     if (newer(seen, latestByEmployee.get(exit.employeeId))) latestByEmployee.set(exit.employeeId, seen);
+    if (seen.lwd && !["revoked", "rejected"].includes(status.toLowerCase()) && newer(seen, lwdFallbackByEmployee.get(exit.employeeId))) lwdFallbackByEmployee.set(exit.employeeId, seen);
     if (status.toLowerCase() === "approved" && iso && newer(seen, approvedByEmployee.get(exit.employeeId))) approvedByEmployee.set(exit.employeeId, seen);
   }
   const archiveExitByEmployee = new Map<string, ApprovedExitFallback>();
   for (const [employeeId, latest] of latestByEmployee) {
     const lower = latest.status.toLowerCase();
     if (lower === "approved" && latest.iso) {
-      archiveExitByEmployee.set(employeeId, { status: "Approved", date: latest.iso, lastWorkingDate: latest.lwd });
+      archiveExitByEmployee.set(employeeId, { status: "Approved", date: latest.iso, lastWorkingDate: latest.lwd ?? lwdFallbackByEmployee.get(employeeId)?.lwd ?? null });
     } else if (lower.startsWith("pending") && latest.iso) {
-      archiveExitByEmployee.set(employeeId, { status: latest.status, date: latest.iso, lastWorkingDate: latest.lwd });
+      archiveExitByEmployee.set(employeeId, { status: latest.status, date: latest.iso, lastWorkingDate: latest.lwd ?? lwdFallbackByEmployee.get(employeeId)?.lwd ?? null });
     } else {
       const approved = approvedByEmployee.get(employeeId);
-      if (approved?.iso) archiveExitByEmployee.set(employeeId, { status: "Approved", date: approved.iso, lastWorkingDate: approved.lwd });
+      if (approved?.iso) archiveExitByEmployee.set(employeeId, { status: "Approved", date: approved.iso, lastWorkingDate: approved.lwd ?? lwdFallbackByEmployee.get(employeeId)?.lwd ?? null });
     }
   }
 
