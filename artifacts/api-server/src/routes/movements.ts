@@ -8,7 +8,7 @@
 // Admin-only. Because there is no session, who logged / actioned a movement is a name typed into the form.
 
 import { Router, type IRouter } from "express";
-import { desc, eq } from "drizzle-orm";
+import { asc, desc, eq } from "drizzle-orm";
 import { db, instructorsTable, instructorMovementsTable } from "@workspace/db";
 
 const router: IRouter = Router();
@@ -34,21 +34,35 @@ const cleanText = (value: unknown, max: number): string => (typeof value === "st
 
 // Newest first. Small table (one row per logged movement), so no paging.
 router.get("/instructor-movements", async (_req, res): Promise<void> => {
-  const rows = await db.select().from(instructorMovementsTable).orderBy(desc(instructorMovementsTable.requestedAt), desc(instructorMovementsTable.id));
+  const rows = await db.select().from(instructorMovementsTable).orderBy(desc(instructorMovementsTable.requestedAt), asc(instructorMovementsTable.id));
   res.json({ movements: rows.map(toApiMovement) });
 });
 
+// One request can log several changes at once (2026-10-10, per request: e.g. a product move that also changes the
+// Capability Manager). They are saved as separate rows with the SAME requested_at, which is how the table knows they
+// belong together. The old single { movement_type, remark } body still works.
 router.post("/instructors/:id/movements", async (req, res): Promise<void> => {
-  const body = req.body as { movement_type?: unknown; remark?: unknown; requested_by?: unknown };
-  const movementType = typeof body.movement_type === "string" ? body.movement_type : "";
-  if (!MOVEMENT_TYPES.includes(movementType as (typeof MOVEMENT_TYPES)[number])) {
-    res.status(400).json({ error: `movement_type must be one of: ${MOVEMENT_TYPES.join(", ")}` });
+  const body = req.body as { movement_type?: unknown; remark?: unknown; requested_by?: unknown; changes?: unknown };
+  const rawChanges: { movement_type?: unknown; remark?: unknown }[] = Array.isArray(body.changes)
+    ? (body.changes as { movement_type?: unknown; remark?: unknown }[])
+    : [{ movement_type: body.movement_type, remark: body.remark }];
+  if (rawChanges.length === 0 || rawChanges.length > 10) {
+    res.status(400).json({ error: "Log between 1 and 10 changes at a time." });
     return;
   }
-  const remark = cleanText(body.remark, 1000);
-  if (!remark) {
-    res.status(400).json({ error: "Write a remark (for a CM change, which Capability Manager it should change to)." });
-    return;
+  const changes: { movementType: string; remark: string }[] = [];
+  for (const raw of rawChanges) {
+    const movementType = typeof raw?.movement_type === "string" ? raw.movement_type : "";
+    if (!MOVEMENT_TYPES.includes(movementType as (typeof MOVEMENT_TYPES)[number])) {
+      res.status(400).json({ error: `movement_type must be one of: ${MOVEMENT_TYPES.join(", ")}` });
+      return;
+    }
+    const remark = cleanText(raw?.remark, 1000);
+    if (!remark) {
+      res.status(400).json({ error: "Write a remark for every change (for a CM change, which Capability Manager it should change to)." });
+      return;
+    }
+    changes.push({ movementType, remark });
   }
   // No "your name" field any more (2026-10-09, per request): the form doesn't ask who is logging it.
   const requestedBy = cleanText(body.requested_by, 120) || "Capability Manager";
@@ -57,11 +71,12 @@ router.post("/instructors/:id/movements", async (req, res): Promise<void> => {
     res.status(404).json({ error: "Instructor not found" });
     return;
   }
-  const [created] = await db
+  const requestedAt = new Date();
+  const created = await db
     .insert(instructorMovementsTable)
-    .values({ instructorId: instructor.id, employeeId: instructor.employeeId, fullName: instructor.fullName, movementType, remark, requestedBy })
+    .values(changes.map((change) => ({ instructorId: instructor.id, employeeId: instructor.employeeId, fullName: instructor.fullName, movementType: change.movementType, remark: change.remark, requestedBy, requestedAt })))
     .returning();
-  res.status(201).json(toApiMovement(created));
+  res.status(201).json({ movements: created.map(toApiMovement) });
 });
 
 // "Action Taken": yes / no, or null to clear it back to blank (not actioned yet).

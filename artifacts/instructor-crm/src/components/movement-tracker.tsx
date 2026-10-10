@@ -11,7 +11,7 @@
 // the React tree, so the wrapper also keeps clicks inside the dialog from reaching the row's link.
 
 import { useMemo, useState } from 'react';
-import { History, Plus } from 'lucide-react';
+import { History, Plus, X } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from '@/hooks/use-toast';
@@ -44,15 +44,17 @@ export const movementLabel = (value: string) => MOVEMENT_TYPES.find((type) => ty
 // hours have passed (2026-10-09, per request), so the same instructor can be given a fresh movement. The movement
 // itself is never deleted -- the dialog's History keeps everything. A "No" or a not-yet-actioned movement stays put.
 export const ACTION_RESET_MS = 24 * 60 * 60 * 1000;
-export function currentMovement(movements: Movement[], now: number = Date.now()): Movement | undefined {
+// Changes logged together (same requested_at) form one group; the cells show the whole latest group.
+export function currentMovements(movements: Movement[], now: number = Date.now()): Movement[] {
   const latest = movements[0];
-  if (!latest) return undefined;
-  if (latest.action_taken === 'yes' && latest.action_at) {
-    const actedAt = new Date(latest.action_at).getTime();
-    if (!Number.isNaN(actedAt) && now - actedAt >= ACTION_RESET_MS) return undefined;
-  }
-  return latest;
+  if (!latest) return [];
+  const group = movements.filter((movement) => movement.requested_at === latest.requested_at);
+  const actedAt = group.map((movement) => (movement.action_taken === 'yes' && movement.action_at ? new Date(movement.action_at).getTime() : NaN));
+  // Cleared once EVERY change in the group is Yes and the last of them is 24h old.
+  if (actedAt.every((time) => !Number.isNaN(time)) && now - Math.max(...actedAt) >= ACTION_RESET_MS) return [];
+  return group;
 }
+export const currentMovement = (movements: Movement[], now: number = Date.now()): Movement | undefined => currentMovements(movements, now)[0];
 export const actionLabel = (value: string | null | undefined) => (value === 'yes' ? 'Yes' : value === 'no' ? 'No' : '');
 
 const QUERY_KEY = ['instructor-movements'];
@@ -109,17 +111,19 @@ const stopPropagationOnly = (event: React.SyntheticEvent) => event.stopPropagati
 
 export function MovementCell({ instructorId, fullName, movements }: { instructorId: number; fullName: string; movements: Movement[] }) {
   const [open, setOpen] = useState(false);
-  const latest = currentMovement(movements);
+  const group = currentMovements(movements);
   return <div onClick={stopRowClick} onKeyDown={(event) => event.stopPropagation()} className="min-w-0 text-[12px]">
     <div className="flex items-center gap-2">
-      {latest
-        ? <div className="min-w-0 flex-1" title={`${movementLabel(latest.movement_type)}: ${latest.remark} -- logged by ${latest.requested_by} on ${formatWhen(latest.requested_at)}`}>
-          <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-[0.05em] ${TYPE_TONES[latest.movement_type] ?? 'bg-secondary text-muted-foreground'}`}>{movementLabel(latest.movement_type)}</span>
-          <div className="truncate text-muted-foreground">{latest.remark}</div>
+      {group.length > 0
+        ? <div className="min-w-0 flex-1 space-y-1.5">
+          {group.map((movement) => <div key={movement.id} title={`${movementLabel(movement.movement_type)}: ${movement.remark} -- logged on ${formatWhen(movement.requested_at)}`}>
+            <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-[0.05em] ${TYPE_TONES[movement.movement_type] ?? 'bg-secondary text-muted-foreground'}`}>{movementLabel(movement.movement_type)}</span>
+            <div className="truncate text-muted-foreground">{movement.remark}</div>
+          </div>)}
         </div>
         : <span className="flex-1 text-muted-foreground">—</span>}
-      <button type="button" onClick={() => setOpen(true)} data-testid={`button-movement-${instructorId}`} className="inline-flex shrink-0 items-center gap-1 rounded-md border border-border bg-card px-2 py-1 text-[11px] font-bold text-foreground transition-colors hover:bg-secondary" title={latest ? 'Log another movement or see the history' : 'Log a movement'}>
-        {latest ? <><History size={12} />{movements.length > 1 ? movements.length : ''}</> : <Plus size={12} />}
+      <button type="button" onClick={() => setOpen(true)} data-testid={`button-movement-${instructorId}`} className="inline-flex shrink-0 items-center gap-1 rounded-md border border-border bg-card px-2 py-1 text-[11px] font-bold text-foreground transition-colors hover:bg-secondary" title={group.length ? 'Log another movement or see the history' : 'Log a movement'}>
+        {group.length ? <><History size={12} />{movements.length > 1 ? movements.length : ''}</> : <Plus size={12} />}
       </button>
     </div>
     <MovementDialog open={open} onOpenChange={setOpen} instructorId={instructorId} fullName={fullName} movements={movements} />
@@ -128,18 +132,23 @@ export function MovementCell({ instructorId, fullName, movements }: { instructor
 
 function MovementDialog({ open, onOpenChange, instructorId, fullName, movements }: { open: boolean; onOpenChange: (open: boolean) => void; instructorId: number; fullName: string; movements: Movement[] }) {
   const queryClient = useQueryClient();
-  const [type, setType] = useState('cm_change');
-  const [remark, setRemark] = useState('');
+  // Several changes can be logged in one go (2026-10-10, per request): e.g. a product move that also changes the
+  // Capability Manager. Each "+" adds another Movement + Remark pair.
+  const MAX_CHANGES = 6;
+  const blankChange = () => ({ type: 'cm_change', remark: '' });
+  const [changes, setChanges] = useState([blankChange()]);
+  const updateChange = (index: number, patch: Partial<{ type: string; remark: string }>) => setChanges((list) => list.map((change, i) => (i === index ? { ...change, ...patch } : change)));
   const log = useMutation({
-    mutationFn: async () => readJson<Movement>(await fetch(`/api/instructors/${instructorId}/movements`, {
+    mutationFn: async () => readJson<{ movements: Movement[] }>(await fetch(`/api/instructors/${instructorId}/movements`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ movement_type: type, remark }),
+      body: JSON.stringify({ changes: changes.map((change) => ({ movement_type: change.type, remark: change.remark })) }),
     })),
     onSuccess: () => {
-      setRemark('');
+      const count = changes.length;
+      setChanges([blankChange()]);
       queryClient.invalidateQueries({ queryKey: QUERY_KEY });
-      toast({ title: 'Movement logged', description: `${movementLabel(type)} recorded for ${fullName}.` });
+      toast({ title: count > 1 ? 'Movements logged' : 'Movement logged', description: `${count} ${count > 1 ? 'changes' : 'change'} recorded for ${fullName}.` });
     },
     onError: (error) => toast({ variant: 'destructive', title: "Couldn't log the movement", description: error instanceof Error ? error.message : 'Try again.' }),
   });
@@ -148,19 +157,26 @@ function MovementDialog({ open, onOpenChange, instructorId, fullName, movements 
     <DialogContent className="max-h-[88vh] overflow-y-auto sm:max-w-[560px]" onClick={stopPropagationOnly}>
       <DialogHeader>
         <DialogTitle>Movement tracker — {fullName}</DialogTitle>
-        <DialogDescription>Log a change for this instructor. Mark it Yes in the Action Taken column once it is done; the two columns clear 24 hours after that.</DialogDescription>
+        <DialogDescription>Log a change for this instructor, and use + if more than one thing changes (for example a product move that also changes the Capability Manager). Mark it Yes in the Action Taken column once it is done; the two columns clear 24 hours after that.</DialogDescription>
       </DialogHeader>
       <form className="space-y-3" onSubmit={(event) => { event.preventDefault(); log.mutate(); }}>
-        <label className="block text-[12px] font-bold">Movement
-          <select value={type} onChange={(event) => setType(event.target.value)} data-testid="select-movement-type" className={`${inputClass} mt-1`}>
-            {MOVEMENT_TYPES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-          </select>
-        </label>
-        <label className="block text-[12px] font-bold">Remark
-          <textarea value={remark} onChange={(event) => setRemark(event.target.value)} rows={3} maxLength={1000} data-testid="input-movement-remark" placeholder={type === 'cm_change' ? 'Which Capability Manager should this instructor move to?' : 'What is changing, and to what?'} className={`${inputClass} mt-1 resize-y`} />
-        </label>
+        {changes.map((change, index) => <div key={index} className="space-y-2 rounded-lg border border-border/70 p-3" data-testid={`movement-change-${index}`}>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] font-extrabold uppercase tracking-[0.08em] text-muted-foreground">Change {index + 1}</span>
+            {changes.length > 1 && <button type="button" onClick={() => setChanges((list) => list.filter((_, i) => i !== index))} aria-label={`Remove change ${index + 1}`} data-testid={`button-remove-change-${index}`} className="rounded-md p-1 text-muted-foreground hover:bg-secondary hover:text-foreground"><X size={14} /></button>}
+          </div>
+          <label className="block text-[12px] font-bold">Movement
+            <select value={change.type} onChange={(event) => updateChange(index, { type: event.target.value })} data-testid={`select-movement-type-${index}`} className={`${inputClass} mt-1`}>
+              {MOVEMENT_TYPES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+          </label>
+          <label className="block text-[12px] font-bold">Remark
+            <textarea value={change.remark} onChange={(event) => updateChange(index, { remark: event.target.value })} rows={2} maxLength={1000} data-testid={`input-movement-remark-${index}`} placeholder={change.type === 'cm_change' ? 'Which Capability Manager should this instructor move to?' : 'What is changing, and to what?'} className={`${inputClass} mt-1 resize-y`} />
+          </label>
+          {index === changes.length - 1 && changes.length < MAX_CHANGES && <button type="button" onClick={() => setChanges((list) => [...list, blankChange()])} data-testid="button-add-change" className="inline-flex items-center gap-1 rounded-md border border-dashed border-border px-2.5 py-1 text-[11px] font-bold text-primary transition-colors hover:bg-secondary"><Plus size={12} /> Add another change</button>}
+        </div>)}
         <div className="flex justify-end">
-          <button type="submit" disabled={log.isPending || !remark.trim()} data-testid="button-submit-movement" className="rounded-lg bg-primary px-4 py-2 text-[12px] font-bold text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50">{log.isPending ? 'Saving…' : 'Log movement'}</button>
+          <button type="submit" disabled={log.isPending || changes.some((change) => !change.remark.trim())} data-testid="button-submit-movement" className="rounded-lg bg-primary px-4 py-2 text-[12px] font-bold text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50">{log.isPending ? 'Saving…' : changes.length > 1 ? `Log ${changes.length} movements` : 'Log movement'}</button>
         </div>
       </form>
       <div>
@@ -181,23 +197,24 @@ function MovementDialog({ open, onOpenChange, instructorId, fullName, movements 
   </Dialog>;
 }
 
-// Action Taken applies to the LATEST movement: blank until someone actions it, then Yes or No.
+// Action Taken applies to the latest group of changes: blank until someone actions it, then Yes or No for all of them.
 export function ActionTakenCell({ movements }: { movements: Movement[] }) {
   const queryClient = useQueryClient();
-  const latest = currentMovement(movements);
+  const group = currentMovements(movements);
+  const latest = group[0];
   const update = useMutation({
-    mutationFn: async (action: 'yes' | 'no' | null) => readJson<Movement>(await fetch(`/api/instructor-movements/${latest?.id}/action`, {
+    mutationFn: async (action: 'yes' | 'no' | null) => Promise.all(group.map(async (movement) => readJson<Movement>(await fetch(`/api/instructor-movements/${movement.id}/action`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action_taken: action }),
-    })),
+    })))),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: QUERY_KEY }),
     onError: (error) => toast({ variant: 'destructive', title: "Couldn't save Action Taken", description: error instanceof Error ? error.message : 'Try again.' }),
   });
   if (!latest) return <div className="text-[12px] text-muted-foreground">—</div>;
   return <div onClick={stopRowClick} className="text-[12px]">
     <select
-      value={latest.action_taken ?? ''}
+      value={group.every((movement) => movement.action_taken === latest.action_taken) ? (latest.action_taken ?? '') : ''}
       onChange={(event) => update.mutate(event.target.value === '' ? null : (event.target.value as 'yes' | 'no'))}
       disabled={update.isPending}
       data-testid={`select-action-taken-${latest.instructor_id}`}
