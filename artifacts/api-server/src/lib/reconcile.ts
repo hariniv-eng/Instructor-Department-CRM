@@ -9,7 +9,7 @@ import { instructorsTable, darwinboxExitsTable, teachosIdReferenceTable } from "
 import { sdb as db, inSavepoint } from "./syncContext";
 import { hasConfirmedInstructorDesignation, EXCLUDED_EMPLOYEES, type ExcludedOverride, OTHER_DEPARTMENT_EMPLOYEES, type OtherDepartmentOverride } from "../data/classificationOverrides";
 import { VALID_CAPABILITY_MANAGERS, CAPABILITY_MANAGER_ALIASES } from "../data/validCapabilityManagers";
-import { classifyDepartment, classifyDeployment } from "./departmentTaxonomy";
+import { classifyDepartment, classifyDeployment, subjectFromDesignation, subjectFromTeachosCategory } from "./departmentTaxonomy";
 import { archiveInstructors } from "./archiveInstructors";
 
 export type SheetRow = Record<string, unknown>;
@@ -389,7 +389,14 @@ export const recomputeStatuses = async (options: { grantTeachosOnlyScope?: boole
       exitDesignation: isTeachosOnlyLeftover ? (exit?.designation ?? null) : null,
       exitGender: isTeachosOnlyLeftover ? (exit?.gender ?? null) : null,
       deptBucket: isDeptExclusion ? null : deptInfo.bucket,
-      deptArea: isAreaExclusion ? null : (deptInfo.area || exitDeptInfo?.area || null),
+      // Subject rule (2026-10-13, per request): payroll-converted instructors take it from TeachOS (its ENGLISH / APTITUDE /
+      // MATH category; TECH has no sub-area there, so the exit record's department fills the gap as before). Everyone else:
+      // DESIGNATION first, and only when the designation names no subject, the DEPARTMENT. Ops / Instructor-Ops stay null.
+      deptArea: isAreaExclusion
+        ? null
+        : classification === "payroll_converted"
+          ? (subjectFromTeachosCategory(row.teachosCategory) || deptInfo.area || exitDeptInfo?.area || null)
+          : (subjectFromDesignation(row.designation) || deptInfo.area || exitDeptInfo?.area || null),
       deploymentStatus,
     }).where(eq(instructorsTable.id, row.id));
   }));
