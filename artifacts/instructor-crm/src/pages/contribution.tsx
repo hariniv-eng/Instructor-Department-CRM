@@ -89,8 +89,10 @@ function RoleBadge({ role }: { role: ContributionRow['role'] }) {
 // Role by sessions (2026-10-13, per request): a second Instructor / Mentor bifurcation that lives ONLY on this table and
 // changes nothing else (the Instructors tab and everywhere else keep the designation-based Role above). It is read from
 // what the person actually taught: any completed Lecture session -> Instructor (lecture only, or lecture + practice);
-// everyone else (Practice only, Other only, or no completed sessions / no data at all) -> Mentor, so every row has a value.
-function sessionRole(row: ContributionRow): ContributionRow['role'] {
+// anyone who has taught but never a Lecture (Practice only, Practice / Other, or Other only such as exams) -> Mentor;
+// no session data at all (no data, or zero completed hours) -> blank.
+function sessionRole(row: ContributionRow): ContributionRow['role'] | null {
+  if (!row.has_contribution_data || row.total_hours <= 0) return null;
   return row.lecture_hours > 0 ? 'Instructor' : 'Mentor';
 }
 
@@ -185,7 +187,7 @@ export default function ContributionPage() {
                 <th className="sticky left-0 z-10 whitespace-nowrap border-r border-border bg-[#f4f7f9] px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Employee ID</th>
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Name</th>
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Role</th>
-                <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Instructor if they took any Lecture session; otherwise Mentor">Role (by sessions)</th>
+                <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Instructor if they took any Lecture session; Mentor if they took sessions but no Lecture; blank if no session data">Role (by sessions)</th>
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Department</th>
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Capability Manager</th>
                 <th className="whitespace-nowrap border-l border-border px-4 py-3 text-right font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Lecture Hrs</th>
@@ -203,7 +205,7 @@ export default function ContributionPage() {
                 <td className="sticky left-0 z-10 whitespace-nowrap border-r border-border bg-card px-4 py-3 font-mono-ui text-[11px] text-foreground">{row.employee_id || '—'}</td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] font-semibold text-foreground">{row.full_name}</td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3"><RoleBadge role={row.role} /></td>
-                <td className="whitespace-nowrap border-r border-border px-4 py-3" data-testid={`cell-session-role-${row.employee_id ?? row.full_name}`}><RoleBadge role={sessionRole(row)} /></td>
+                <td className="whitespace-nowrap border-r border-border px-4 py-3" data-testid={`cell-session-role-${row.employee_id ?? row.full_name}`}>{(() => { const derived = sessionRole(row); return derived ? <RoleBadge role={derived} /> : null; })()}</td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-muted-foreground">{row.department || '—'}</td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-muted-foreground">{row.capability_manager || '—'}</td>
                 {row.has_contribution_data
