@@ -301,6 +301,10 @@ export type ContributionRow = {
   practice_minutes: number;
   other_minutes: number;
   sessions_completed: number;
+  // Per request 2026-10-12: Lecture / Practice session counts, and distinct days on which those sessions happened.
+  lecture_sessions: number;
+  practice_sessions: number;
+  session_days: number;
   // Batch coverage (2026-09-28, per request: "in one column add all the
   // batches that are associated with all the instructors, and in other
   // column only put batch_names which he have been taking from past 1
@@ -355,7 +359,11 @@ export async function fetchContributionRows(): Promise<ContributionRow[]> {
       SUM(CASE WHEN session_type = 'LECTURE' THEN session_duration_in_mins_from_schedule_time ELSE 0 END) AS lecture_minutes,
       SUM(CASE WHEN session_type = 'PRACTICE' THEN session_duration_in_mins_from_schedule_time ELSE 0 END) AS practice_minutes,
       SUM(CASE WHEN session_type NOT IN ('LECTURE', 'PRACTICE') THEN session_duration_in_mins_from_schedule_time ELSE 0 END) AS other_minutes,
-      COUNT(*) AS sessions_completed,
+      -- Lecture + Practice sessions only (2026-10-12, per request); Exam / other types still count in the hours columns.
+      COUNTIF(session_type IN ('LECTURE', 'PRACTICE')) AS sessions_completed,
+      COUNTIF(session_type = 'LECTURE') AS lecture_sessions,
+      COUNTIF(session_type = 'PRACTICE') AS practice_sessions,
+      COUNT(DISTINCT IF(session_type IN ('LECTURE', 'PRACTICE'), DATE(session_start_datetime), NULL)) AS session_days,
       ARRAY_AGG(DISTINCT batch_name IGNORE NULLS) AS all_batches,
       ARRAY_AGG(DISTINCT CASE WHEN session_start_datetime >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 30 DAY) THEN batch_name END IGNORE NULLS) AS recent_batches,
       ARRAY_AGG(DISTINCT CASE WHEN session_start_datetime >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 60 DAY) THEN batch_name END IGNORE NULLS) AS last_two_months_batches
@@ -377,6 +385,9 @@ export async function fetchContributionRows(): Promise<ContributionRow[]> {
           practice_minutes: Number(r.practice_minutes ?? 0),
           other_minutes: Number(r.other_minutes ?? 0),
           sessions_completed: Number(r.sessions_completed ?? 0),
+          lecture_sessions: Number(r.lecture_sessions ?? 0),
+          practice_sessions: Number(r.practice_sessions ?? 0),
+          session_days: Number(r.session_days ?? 0),
           all_batches: allBatches,
           recent_batches: recentBatches,
           // Derived from recent_batches (last 30 days), not all_batches
@@ -403,6 +414,55 @@ export async function fetchContributionRows(): Promise<ContributionRow[]> {
   } catch (e) {
     if (e instanceof HardTimeout) throw new InstructorContributionError(`Query against ${ref} failed: ${e.message}`);
     throw new InstructorContributionError(`Query against ${ref} failed: ${(e as Error).message}`);
+  }
+}
+
+export type ContributionDailyRow = {
+  instructor_user_id: string;
+  session_date: string; // YYYY-MM-DD
+  lecture_minutes: number;
+  practice_minutes: number;
+  other_minutes: number;
+  lecture_sessions: number;
+  practice_sessions: number;
+};
+
+/**
+ * Same COMPLETED-session data as fetchContributionRows(), but one row per instructor per calendar day
+ * (2026-10-12, per request: date filter on the Contribution tab), so the page can total any from/to range.
+ */
+export async function fetchContributionDailyRows(): Promise<ContributionDailyRow[]> {
+  const bq = client();
+  const ref = tableRef(SESSION_SCHEDULE_TABLE);
+  const query = `
+    SELECT
+      instructor_user_id,
+      FORMAT_DATE('%Y-%m-%d', DATE(session_start_datetime)) AS session_date,
+      SUM(CASE WHEN session_type = 'LECTURE' THEN session_duration_in_mins_from_schedule_time ELSE 0 END) AS lecture_minutes,
+      SUM(CASE WHEN session_type = 'PRACTICE' THEN session_duration_in_mins_from_schedule_time ELSE 0 END) AS practice_minutes,
+      SUM(CASE WHEN session_type NOT IN ('LECTURE', 'PRACTICE') THEN session_duration_in_mins_from_schedule_time ELSE 0 END) AS other_minutes,
+      COUNTIF(session_type = 'LECTURE') AS lecture_sessions,
+      COUNTIF(session_type = 'PRACTICE') AS practice_sessions
+    FROM \`${ref}\`
+    WHERE session_status = 'COMPLETED' AND instructor_user_id IS NOT NULL AND session_start_datetime IS NOT NULL
+    GROUP BY instructor_user_id, session_date
+  `;
+  try {
+    const [rows] = await runWithHardTimeout(() => bq.query({ query }), API_TIMEOUT_MS * 3 + 10000);
+    return (rows as Array<Record<string, unknown>>)
+      .map((r) => ({
+        instructor_user_id: String(r.instructor_user_id ?? ""),
+        session_date: String(r.session_date ?? ""),
+        lecture_minutes: Number(r.lecture_minutes ?? 0),
+        practice_minutes: Number(r.practice_minutes ?? 0),
+        other_minutes: Number(r.other_minutes ?? 0),
+        lecture_sessions: Number(r.lecture_sessions ?? 0),
+        practice_sessions: Number(r.practice_sessions ?? 0),
+      }))
+      .filter((r) => r.instructor_user_id && /^\d{4}-\d{2}-\d{2}$/.test(r.session_date));
+  } catch (e) {
+    if (e instanceof HardTimeout) throw new InstructorContributionError(`Daily query against ${ref} failed: ${e.message}`);
+    throw new InstructorContributionError(`Daily query against ${ref} failed: ${(e as Error).message}`);
   }
 }
 

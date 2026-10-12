@@ -13,9 +13,9 @@ import { fetchExitRows, DarwinboxExitsError } from "../lib/connectors/darwinboxE
 import { fetchNiatInstructorDetailsRows, NiatInstructorDetailsError } from "../lib/connectors/niatInstructorDetails";
 import { fetchCapabilityManagerRows } from "../lib/connectors/capabilityManager";
 import { fetchCourseStatusRows, InstructorLearningStatusError } from "../lib/connectors/instructorLearningStatus";
-import { fetchContributionRows, InstructorContributionError } from "../lib/connectors/instructorContribution";
+import { fetchContributionRows, fetchContributionDailyRows, InstructorContributionError } from "../lib/connectors/instructorContribution";
 import { resolvedCourseDefs } from "../data/trainingCourseTaxonomy";
-import { storeDarwinboxActive, storeDarwinboxExits, storeDarwinboxFullRoster, storeTeachosDeployment, storeTrainingStatus, storeContribution } from "../lib/storeRaw";
+import { storeDarwinboxActive, storeDarwinboxExits, storeDarwinboxFullRoster, storeTeachosDeployment, storeTrainingStatus, storeContribution, storeContributionDaily } from "../lib/storeRaw";
 import { reconcileDarwin, reconcileDarwinFullRosterFallback, reconcileTeachos, reconcileTeachosEmployeeIdReference, reconcileCapabilityManager, recomputeStatuses } from "../lib/reconcile";
 import { sdb, inSyncTransaction, inSavepoint, withSyncLock } from "../lib/syncContext";
 import { LAST_SYNC, LAST_CAPABILITY_MANAGER_SYNC, setLastCapabilityManagerSync, DAILY_AUTO_SYNC_INTERVAL_HOURS, type SyncResult } from "../lib/syncState";
@@ -242,6 +242,8 @@ async function runContributionSync(): Promise<SyncResult> {
   try {
     const rows = await fetchContributionRows();
     const stored = await storeContribution(rows);
+    // Per-day rows for the Contribution tab's date filter (2026-10-12).
+    await storeContributionDaily(await fetchContributionDailyRows());
     await db.insert(uploadsTable).values({ source: "Instructor Contribution", filename: "BigQuery sync (niat_instructor_session_schedule_details, aggregated per instructor)", rowCount: stored });
     return { ok: true, source: "contribution_live", stored, synced_at: new Date().toISOString() };
   } catch (e) {

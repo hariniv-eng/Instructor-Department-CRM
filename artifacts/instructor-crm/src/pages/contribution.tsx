@@ -39,6 +39,9 @@ type ContributionRow = {
   other_hours: number;
   total_hours: number;
   sessions_completed: number;
+  lecture_sessions: number;
+  practice_sessions: number;
+  session_days: number;
   // Batch coverage (2026-09-28, per request: "add all the batches that are
   // associated with all the instructors, and in other column only put
   // batch_names which he have been taking from past 1 month") -- both
@@ -59,15 +62,31 @@ type ContributionResponse = {
   count: number;
   rows: ContributionRow[];
   synced_at: string | null;
+  range?: { from: string | null; to: string | null } | null;
 };
 
 const QUERY_KEY = ['reports', 'instructor-contribution'];
 
-function useContribution() {
+// Date filter (2026-10-12, per request): hours and session counts are totalled for the chosen days only. Both ends are
+// inclusive; either can be left empty. Empty both = all time.
+const toIsoDay = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+const daysAgo = (days: number) => { const date = new Date(); date.setDate(date.getDate() - (days - 1)); return toIsoDay(date); };
+const PRESETS: { label: string; days: number | null }[] = [
+  { label: 'Last 7 days', days: 7 },
+  { label: 'Last 30 days', days: 30 },
+  { label: 'Last 90 days', days: 90 },
+  { label: 'All time', days: null },
+];
+const formatDay = (iso: string) => new Date(`${iso}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+
+function useContribution(from: string, to: string) {
   return useQuery<ContributionResponse>({
-    queryKey: QUERY_KEY,
+    queryKey: [...QUERY_KEY, from, to],
     queryFn: async () => {
-      const response = await fetch('/api/reports/instructor-contribution');
+      const params = new URLSearchParams();
+      if (from) params.set('from', from);
+      if (to) params.set('to', to);
+      const response = await fetch(`/api/reports/instructor-contribution${params.toString() ? `?${params}` : ''}`);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       return response.json();
     },
@@ -98,7 +117,9 @@ function sessionRole(row: ContributionRow): ContributionRow['role'] | null {
 
 export default function ContributionPage() {
   const queryClient = useQueryClient();
-  const query = useContribution();
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const query = useContribution(dateFrom, dateTo);
   const data = query.data;
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState<{ ok: boolean; text: string } | null>(null);
@@ -154,6 +175,24 @@ export default function ContributionPage() {
     {query.isLoading && <SkeletonBlock className="h-[520px]" />}
     {query.isError && <QueryError message="Contribution is unavailable right now." />}
 
+    {data && <div data-testid="contribution-date-filter" className="mb-4 flex flex-wrap items-end gap-3 rounded-lg border border-border bg-card px-4 py-3">
+      <label className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">From
+        <input type="date" value={dateFrom} max={dateTo || toIsoDay(new Date())} onChange={(event) => setDateFrom(event.target.value)} data-testid="input-contribution-from" className="mt-1 block h-9 rounded-md border border-border bg-background px-2 text-[12px] font-semibold normal-case tracking-normal text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-ring/25" />
+      </label>
+      <label className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">To
+        <input type="date" value={dateTo} min={dateFrom || undefined} max={toIsoDay(new Date())} onChange={(event) => setDateTo(event.target.value)} data-testid="input-contribution-to" className="mt-1 block h-9 rounded-md border border-border bg-background px-2 text-[12px] font-semibold normal-case tracking-normal text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-ring/25" />
+      </label>
+      <div className="flex flex-wrap gap-1.5">
+        {PRESETS.map((preset) => {
+          const active = preset.days === null ? !dateFrom && !dateTo : dateFrom === daysAgo(preset.days) && dateTo === toIsoDay(new Date());
+          return <button key={preset.label} type="button" data-testid={`button-contribution-range-${preset.days ?? 'all'}`} onClick={() => { if (preset.days === null) { setDateFrom(''); setDateTo(''); } else { setDateFrom(daysAgo(preset.days)); setDateTo(toIsoDay(new Date())); } }} className={`rounded-full px-3 py-1.5 text-[11px] font-bold transition-colors ${active ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground hover:text-foreground'}`}>{preset.label}</button>;
+        })}
+      </div>
+      <p className="text-[11px] text-muted-foreground">{dateFrom || dateTo ? `Showing sessions from ${dateFrom ? formatDay(dateFrom) : 'the start'} to ${dateTo ? formatDay(dateTo) : 'today'} (both days included).` : 'Showing all sessions. Pick a range to see Lecture, Practice and total sessions for just those days.'}</p>
+    </div>}
+
+    {data && (dateFrom || dateTo) && data.count > 0 && totalHoursAllInstructors === 0 && <p data-testid="note-contribution-empty-range" className="mb-4 max-w-3xl rounded-lg bg-[#fff3d6] px-3 py-2 text-[12px] font-semibold text-[#8a6a12]">No completed sessions in this range. If the date filter was only just added, click Sync Now once to load the day-by-day data.</p>}
+
     {data && <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
       <div className="grid max-w-md grid-cols-1 gap-3 sm:grid-cols-2">
         <TopStat
@@ -166,7 +205,7 @@ export default function ContributionPage() {
         <TopStat
           label="Total hours delivered"
           value={formatHours(totalHoursAllInstructors)}
-          meta="Across every instructor and mentor, all-time"
+          meta={dateFrom || dateTo ? `Across every instructor and mentor, ${dateFrom ? formatDay(dateFrom) : 'the start'} to ${dateTo ? formatDay(dateTo) : 'today'}` : 'Across every instructor and mentor, all-time'}
           icon={<Clock size={16} />}
           tone="teal"
         />
@@ -190,11 +229,11 @@ export default function ContributionPage() {
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Instructor if they took any Lecture session; Mentor if they took sessions but no Lecture; blank if no session data">Role (by sessions)</th>
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Department</th>
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Capability Manager</th>
-                <th className="whitespace-nowrap border-l border-border px-4 py-3 text-right font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Lecture Hrs</th>
-                <th className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Practice Hrs</th>
+                <th className="whitespace-nowrap border-l border-border px-4 py-3 text-right font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Hours, with the number of Lecture sessions in brackets">Lecture Hrs (sessions)</th>
+                <th className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Hours, with the number of Practice sessions in brackets">Practice Hrs (sessions)</th>
                 <th className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Other Hrs</th>
                 <th className="whitespace-nowrap border-l border-border px-4 py-3 text-right font-mono-ui text-[10px] font-bold uppercase tracking-[0.12em] text-foreground">Total Hrs</th>
-                <th className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Sessions</th>
+                <th className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Completed Lecture and Practice sessions only. Exams and other session types are not counted here (they still count in Other hours).">Sessions (days)</th>
                 <th className="whitespace-nowrap border-l border-border px-4 py-3 text-left font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Contribution</th>
                 <th className="whitespace-nowrap border-l border-border px-4 py-3 text-left font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">All Batches</th>
                 <th className="whitespace-nowrap px-4 py-3 text-left font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Batches (Last 30 Days)</th>
@@ -210,11 +249,11 @@ export default function ContributionPage() {
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-muted-foreground">{row.capability_manager || '—'}</td>
                 {row.has_contribution_data
                   ? <>
-                    <td className="whitespace-nowrap border-l border-border px-4 py-3 text-right font-mono-ui text-[12px] tabular-nums text-foreground">{formatHours(row.lecture_hours)}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[12px] tabular-nums text-foreground">{formatHours(row.practice_hours)}</td>
+                    <td className="whitespace-nowrap border-l border-border px-4 py-3 text-right font-mono-ui text-[12px] tabular-nums text-foreground">{formatHours(row.lecture_hours)} <span className="text-muted-foreground" title="Lecture sessions">({formatKpi(row.lecture_sessions ?? 0)})</span></td>
+                    <td className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[12px] tabular-nums text-foreground">{formatHours(row.practice_hours)} <span className="text-muted-foreground" title="Practice sessions">({formatKpi(row.practice_sessions ?? 0)})</span></td>
                     <td className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[12px] tabular-nums text-foreground">{formatHours(row.other_hours)}</td>
                     <td className="whitespace-nowrap border-l border-border px-4 py-3 text-right font-mono-ui text-[12px] font-bold tabular-nums text-foreground">{formatHours(row.total_hours)}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[12px] tabular-nums text-muted-foreground">{formatKpi(row.sessions_completed)}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[12px] tabular-nums text-muted-foreground">{formatKpi(row.sessions_completed)} <span className="text-[11px]" title="Distinct days on which these Lecture and Practice sessions were taken">(in {formatKpi(row.session_days ?? 0)} {row.session_days === 1 ? 'day' : 'days'})</span></td>
                     <td className="whitespace-nowrap border-l border-border px-4 py-3 text-[12px] text-foreground">{row.niat_cohorts.length > 0 ? row.niat_cohorts.join(', ') : '—'}</td>
                     <td className="max-w-[280px] truncate border-l border-border px-4 py-3 text-[12px] text-muted-foreground" title={row.all_batches.join(', ')}>{row.all_batches.length > 0 ? row.all_batches.join(', ') : '—'}</td>
                     <td className="max-w-[280px] truncate px-4 py-3 text-[12px] text-muted-foreground" title={row.recent_batches.join(', ')}>{row.recent_batches.length > 0 ? row.recent_batches.join(', ') : '—'}</td>

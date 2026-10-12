@@ -17,11 +17,12 @@ import {
   teachosDeploymentTable,
   instructorTrainingStatusTable,
   instructorContributionTable,
+  instructorContributionDailyTable,
 } from "@workspace/db";
 import { sdb as db } from "./syncContext";
 import { cell, type SheetRow } from "./reconcile";
 import type { CourseStatusRow } from "./connectors/instructorLearningStatus";
-import type { ContributionRow } from "./connectors/instructorContribution";
+import type { ContributionRow, ContributionDailyRow } from "./connectors/instructorContribution";
 
 const CHUNK = 500;
 
@@ -120,11 +121,34 @@ export async function storeContribution(rows: ContributionRow[]): Promise<number
         practiceMinutes: row.practice_minutes,
         otherMinutes: row.other_minutes,
         sessionsCompleted: row.sessions_completed,
+        lectureSessions: row.lecture_sessions,
+        practiceSessions: row.practice_sessions,
+        sessionDays: row.session_days,
         allBatches: row.all_batches,
         recentBatches: row.recent_batches,
         niatCohorts: row.niat_cohorts,
       }));
       if (batch.length) await tx.insert(instructorContributionTable).values(batch);
+    }
+  });
+  return rows.length;
+}
+
+// Per-day contribution rows (2026-10-12) -- backs the Contribution tab's date filter. Full replace, like the table above.
+export async function storeContributionDaily(rows: ContributionDailyRow[]): Promise<number> {
+  await db.transaction(async (tx) => {
+    await tx.delete(instructorContributionDailyTable);
+    for (let i = 0; i < rows.length; i += CHUNK) {
+      const batch = rows.slice(i, i + CHUNK).map((row) => ({
+        instructorUserId: row.instructor_user_id,
+        sessionDate: row.session_date,
+        lectureMinutes: row.lecture_minutes,
+        practiceMinutes: row.practice_minutes,
+        otherMinutes: row.other_minutes,
+        lectureSessions: row.lecture_sessions,
+        practiceSessions: row.practice_sessions,
+      }));
+      if (batch.length) await tx.insert(instructorContributionDailyTable).values(batch);
     }
   });
   return rows.length;
