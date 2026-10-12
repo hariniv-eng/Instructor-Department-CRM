@@ -113,6 +113,38 @@ const CATEGORY_FALLBACK: Record<string, { bucket: Exclude<DeptBucket, null>; are
   MATH: { bucket: "non_tech", area: "Maths" },
 };
 
+// Subject from the DESIGNATION (2026-10-13, per request): the first place a non-payroll person's Subject is read from.
+// The title's own words name the subject ("Mathematics Instructor", "Associate Aptitude Instructor", "Tech Instructor -
+// DSA", "Physics Trainer", "Software Development Instructor / Artificial Intelligence & Emerging Technologies"). The code
+// in brackets, e.g. "(NWD_ID_BS_SDI)", is dropped before matching -- it only repeats the department. Returns null when the
+// title names no subject ("Software Development Instructor", "Faculty Trainee", ...), and the caller then falls back to
+// the department (classifyDepartment). To teach it a new subject word, add a line below.
+const DESIGNATION_SUBJECT_RULES: { match: RegExp; area: string }[] = [
+  { match: /artificial intelligence.*emerging technologies|\bAI\s*&\s*ET\b/i, area: "Artificial Intelligence & Emerging Technologies" },
+  { match: /interdisciplinary|applied sciences|physics|chemistry|biology|german|french/i, area: "Interdisciplinary & Applied Sciences" },
+  { match: /english/i, area: "English" },
+  { match: /aptitude|quantitative|logical reasoning/i, area: "Aptitude" },
+  { match: /mathematic|\bmaths?\b/i, area: "Maths" },
+  { match: /\bDSA\b|data structures|competitive programming/i, area: "DSA" },
+  { match: /gen\s*ai\b/i, area: "GenAI" },
+  { match: /front\s*-?\s*end/i, area: "Frontend" },
+  { match: /back\s*-?\s*end/i, area: "Backend" },
+];
+
+export function subjectFromDesignation(designation: string | null | undefined): string | null {
+  const title = (designation ?? "").replace(/\([^)]*\)\s*$/, "").trim();
+  if (!title) return null;
+  for (const rule of DESIGNATION_SUBJECT_RULES) if (rule.match.test(title)) return rule.area;
+  return null;
+}
+
+// Subject from TeachOS's own category (ENGLISH / APTITUDE / MATH) -- used for payroll instructors (2026-10-13, per
+// request). TECH has no sub-area in TeachOS, so it returns null.
+export function subjectFromTeachosCategory(teachosCategory: string | null | undefined): string | null {
+  const category = (teachosCategory ?? "").trim().toUpperCase();
+  return (category && CATEGORY_FALLBACK[category]?.area) || null;
+}
+
 export function classifyDepartment(
   department: string | null,
   teachosCategory: string | null,
