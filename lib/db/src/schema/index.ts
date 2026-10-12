@@ -445,7 +445,7 @@ export const instructorTrainingStatusTable = pgTable("instructor_training_status
   courseKey: text("course_key").notNull(),
   trackGroup: text("track_group").notNull(),
   // "COMPLETED" | "IN_PROGRESS" | "NOT_STARTED" -- derived per (instructor,
-  // course) from the unit-level completion_status rows: >=95% COMPLETED ->
+  // course) from the unit-level completion_status rows: >=85% COMPLETED (was 95% until 2026-10-12) ->
   // COMPLETED (2026-09-23, per request, after real data showed the earlier
   // "literally every unit" rule producing near-zero completions -- see
   // fetchCourseStatusRows()'s own comment in instructorLearningStatus.ts),

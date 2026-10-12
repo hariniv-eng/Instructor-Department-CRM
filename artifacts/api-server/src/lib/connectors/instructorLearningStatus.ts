@@ -179,7 +179,8 @@ function bqStringLiteral(value: string): string {
  * happens, so only ~1 result row per (instructor, tracked course) actually
  * comes back over the wire.
  *
- * Status per (instructor, course_key): COMPLETED if >=95% of matching unit
+ * Status per (instructor, course_key): COMPLETED if >=85% (COMPLETED_THRESHOLD, changed from 95% on
+ * 2026-10-12, per request: "around 85% of his learnings in one subject = completed") of matching unit
  * rows are completion_status='COMPLETED'; NOT_STARTED if every one is
  * 'YET_TO_START' (zero progress at all); IN_PROGRESS otherwise. The 95%
  * threshold (2026-09-23, per request, after reviewing real data via
@@ -204,6 +205,10 @@ function matchCondition(c: TrainingCourseDef): string {
   return courseCond;
 }
 
+// Share of a course's units that must be COMPLETED for the course to count as Completed (2026-10-12: 95% -> 85%).
+// Below it: In Progress; zero progress at all: Not Started.
+export const COMPLETED_THRESHOLD = 0.85;
+
 export async function fetchCourseStatusRows(courseDefs: TrainingCourseDef[]): Promise<CourseStatusRow[]> {
   const resolved = courseDefs.filter((c) => c.courseTitles.length > 0);
   if (resolved.length === 0) return [];
@@ -227,7 +232,7 @@ export async function fetchCourseStatusRows(courseDefs: TrainingCourseDef[]): Pr
       ${groupBranches}
       END AS track_group,
       CASE
-        WHEN SAFE_DIVIDE(COUNTIF(completion_status = 'COMPLETED'), COUNT(*)) >= 0.95 THEN 'COMPLETED'
+        WHEN SAFE_DIVIDE(COUNTIF(completion_status = 'COMPLETED'), COUNT(*)) >= ${COMPLETED_THRESHOLD} THEN 'COMPLETED'
         WHEN COUNTIF(completion_status != 'YET_TO_START') = 0 THEN 'NOT_STARTED'
         ELSE 'IN_PROGRESS'
       END AS status,

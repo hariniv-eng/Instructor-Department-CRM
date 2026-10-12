@@ -252,7 +252,7 @@ export default function TrainingStatsPage() {
     </p>}
 
     {data && activeTaxonomy.length > 0 && <p data-testid="note-subject-completion" className="mb-6 max-w-3xl text-[12px] leading-relaxed text-muted-foreground">
-      <strong className="font-semibold text-foreground">Subject completion %</strong> averages each course in the subject: Completed = 100%, In Progress = 50%, Not Started or no data = 0%. Courses still showing "Mapping pending" are left out. For example, Frontend with 5 courses completed and React JS in progress is (5 x 100 + 50) / 6 = 91.7%.
+      <strong className="font-semibold text-foreground">Subject completion %</strong> averages each course in the subject. A course counts as Completed once 85% or more of its units are done, In Progress below that, and Not Started at zero progress. Scores: Completed = 100%, In Progress = 50%, Not Started or no data = 0%. Courses still showing "Mapping pending" are left out. For example, Frontend with 5 courses completed and React JS in progress is (5 x 100 + 50) / 6 = 91.7%.
     </p>}
 
     {data && activeTaxonomy.length === 0 && <EmptyState
