@@ -7,6 +7,7 @@ import { PageIntro, QueryError, SkeletonBlock, DownloadCsvButton, TableSearchInp
 import { downloadCsv, slugify, toCsv } from '@/lib/csv';
 import { ALL_PRODUCTS, productLabel } from './instructors';
 import { NiatMapCard } from '@/components/niat-map';
+import { SopNote, SopNoteList } from '@/components/sop-note';
 import { ActionTakenCell, MOVEMENT_TYPES, currentMovements, movementLabel, useMovementsByInstructor, type Movement } from '@/components/movement-tracker';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
@@ -823,6 +824,8 @@ function ExceptionRemovePanel({ exitPeople, noticePeople, givePeople, movementsB
         </button>
       </div>
     </div>
+    {view === 'give' && <SopNote id="new_joiner" focus="admin" className="mb-3" />}
+    {view === 'movements' && <SopNoteList ids={Array.from(new Set(movementRows.flatMap((row) => row.group.map((movement) => movement.movement_type))))} focus="admin" className="mb-3" />}
     {view === 'give' ? <div className="max-h-[420px] overflow-auto rounded-lg border border-border" data-testid="exception-give-access">
       <table className="w-full text-left text-[12px]">
         <thead className="sticky top-0 bg-secondary font-mono-ui text-[10px] uppercase tracking-[0.08em] text-muted-foreground">

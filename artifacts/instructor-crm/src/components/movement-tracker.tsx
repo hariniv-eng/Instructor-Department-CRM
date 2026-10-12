@@ -15,6 +15,7 @@ import { History, Plus, X } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from '@/hooks/use-toast';
+import { SopNote } from '@/components/sop-note';
 
 export type Movement = {
   id: number;
@@ -170,6 +171,7 @@ function MovementDialog({ open, onOpenChange, instructorId, fullName, movements 
               {MOVEMENT_TYPES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
           </label>
+          <SopNote id={change.type} focus="cm" />
           <label className="block text-[12px] font-bold">Remark
             <textarea value={change.remark} onChange={(event) => updateChange(index, { remark: event.target.value })} rows={2} maxLength={1000} data-testid={`input-movement-remark-${index}`} placeholder={change.type === 'cm_change' ? 'Which Capability Manager should this instructor move to?' : 'What is changing, and to what?'} className={`${inputClass} mt-1 resize-y`} />
           </label>
