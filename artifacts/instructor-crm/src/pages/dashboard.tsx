@@ -235,11 +235,22 @@ function ExceptionSegment({ label, title, meta, count, icon, href, active = fals
   return <button type="button" data-testid={`button-${testId}`} onClick={onClick} aria-pressed={active} className={cls}>{body}</button>;
 }
 
+// Employee Status as set by the Capability Manager on the Instructors tab (2026-10-12, per request: shown to the HRBP too).
+// Same wording as EXIT_VERIFICATION_LABELS in instructors.tsx; no value yet means the CM has not reviewed the person.
+const EMPLOYEE_STATUS_LABELS: Record<string, string> = {
+  exited: 'Exited',
+  serving_notice_period: 'Serving Notice Period',
+  payroll_converted: 'Payroll Converted',
+  absconded: 'Absconded',
+  revoked: 'Revoked',
+};
+const employeeStatusLabel = (value: string | null | undefined) => (value ? EMPLOYEE_STATUS_LABELS[value] ?? value : 'Not reviewed');
+
 // Exception 3: exit approval still pending. Read-only worklist for the HRBP.
 function ExceptionPendingPanel({ people, onClose }: { people: InstructorSummary[]; onClose: () => void }) {
   const [search, setSearch] = useState('');
   const filtered = useMemo(() => people.filter((p) => matchesSearch(p, search)), [people, search]);
-  const handleDownload = () => downloadCsv('exception-3-exit-approval-pending.csv', toCsv(['Name', 'Employee ID', 'Subject', 'Capability Manager', 'Manager (Darwin)', 'Payroll / Nxtwave', 'exit_status', 'exit_date', 'date_of_exit'], filtered.map((p) => [p.full_name, p.employee_id ?? '', p.dept_area ?? '', p.capability_manager ?? '', p.darwin_manager ?? '', payrollLabel(p), p.exit_flag_status ?? '', p.exit_flag_date ?? '', p.date_of_exit ?? ''])));
+  const handleDownload = () => downloadCsv('exception-3-exit-approval-pending.csv', toCsv(['Name', 'Employee ID', 'Subject', 'Capability Manager', 'Manager (Darwin)', 'Payroll / Nxtwave', 'employee_status', 'exit_status', 'exit_date', 'date_of_exit'], filtered.map((p) => [p.full_name, p.employee_id ?? '', p.dept_area ?? '', p.capability_manager ?? '', p.darwin_manager ?? '', payrollLabel(p), employeeStatusLabel(p.exit_verification), p.exit_flag_status ?? '', p.exit_flag_date ?? '', p.date_of_exit ?? ''])));
   return <section className="mb-4 rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6 animate-rise">
     <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
       <div>
@@ -258,7 +269,7 @@ function ExceptionPendingPanel({ people, onClose }: { people: InstructorSummary[
     <div className="max-h-[420px] overflow-auto rounded-lg border border-border">
       <table className="w-full text-left text-[12px]">
         <thead className="sticky top-0 bg-secondary font-mono-ui text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
-          <tr><th className="px-3 py-2">Name</th><th className="px-3 py-2">Employee ID</th><th className="px-3 py-2">Subject</th><th className="px-3 py-2">Capability Manager</th><th className="px-3 py-2">Manager (Darwin)</th><th className="px-3 py-2">Payroll / Nxtwave</th><th className="px-3 py-2">exit_status</th><th className="px-3 py-2">exit_date</th><th className="px-3 py-2">date_of_exit</th></tr>
+          <tr><th className="px-3 py-2">Name</th><th className="px-3 py-2">Employee ID</th><th className="px-3 py-2">Subject</th><th className="px-3 py-2">Capability Manager</th><th className="px-3 py-2">Manager (Darwin)</th><th className="px-3 py-2">Payroll / Nxtwave</th><th className="px-3 py-2" title="Set by the Capability Manager on the Instructors tab">employee_status</th><th className="px-3 py-2">exit_status</th><th className="px-3 py-2">exit_date</th><th className="px-3 py-2">date_of_exit</th></tr>
         </thead>
         <tbody>
           {filtered.map((p) => <tr key={p.id} className="border-t border-border/70">
@@ -268,11 +279,12 @@ function ExceptionPendingPanel({ people, onClose }: { people: InstructorSummary[
             <td className="px-3 py-2 text-muted-foreground">{p.capability_manager ?? '—'}</td>
             <td className="px-3 py-2 text-muted-foreground">{p.darwin_manager ?? '—'}</td>
             <td className="px-3 py-2"><PayrollBadge person={p} /></td>
+            <td className="whitespace-nowrap px-3 py-2 font-semibold" data-testid={`cell-employee-status-${p.id}`}>{p.exit_verification ? employeeStatusLabel(p.exit_verification) : <span className="font-normal text-muted-foreground">Not reviewed</span>}</td>
             <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{p.exit_flag_status || '—'}</td>
             <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{formatExitDate(p.exit_flag_date)}</td>
             <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{formatExitDate(p.date_of_exit)}</td>
           </tr>)}
-          {filtered.length === 0 && <tr><td colSpan={9} className="px-3 py-8 text-center text-muted-foreground">{people.length === 0 ? 'No exit approvals are pending.' : 'No one matches this search.'}</td></tr>}
+          {filtered.length === 0 && <tr><td colSpan={10} className="px-3 py-8 text-center text-muted-foreground">{people.length === 0 ? 'No exit approvals are pending.' : 'No one matches this search.'}</td></tr>}
         </tbody>
       </table>
     </div>

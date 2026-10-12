@@ -497,7 +497,9 @@ router.get("/reports/instructors", async (_req, res) => {
   // on toApiInstructorSummary above): one extra query, keyed by
   // instructor_user_id (== instructorsTable.teachosUserId), same shape as
   // every other TeachOS-sourced join this report already does at read time.
-  const contributionRows = await db.select().from(instructorContributionTable);
+  // Only the two columns this needs (2026-10-12): selecting every column would make the Instructors tab fail to load
+  // whenever the contribution table gains a column that the database has not been pushed yet.
+  const contributionRows = await db.select({ instructorUserId: instructorContributionTable.instructorUserId, niatCohorts: instructorContributionTable.niatCohorts }).from(instructorContributionTable);
   const contributionByTeachosId = new Map(contributionRows.map((c) => [c.instructorUserId, c.niatCohorts]));
   const summarize = (row: InstructorRow) => toApiInstructorSummary(row, contributionByTeachosId);
 
