@@ -501,6 +501,11 @@ export const instructorContributionTable = pgTable("instructor_contribution", {
   practiceMinutes: integer("practice_minutes").notNull().default(0),
   otherMinutes: integer("other_minutes").notNull().default(0),
   sessionsCompleted: integer("sessions_completed").notNull().default(0),
+  // 2026-10-12, per request: how many of those sessions were Lecture vs Practice, and on how many distinct calendar days
+  // the (Lecture + Practice) sessions were taken. Needs `pnpm --filter @workspace/db run push` after deploying.
+  lectureSessions: integer("lecture_sessions").notNull().default(0),
+  practiceSessions: integer("practice_sessions").notNull().default(0),
+  sessionDays: integer("session_days").notNull().default(0),
   // Batch coverage (2026-09-28, per request) -- every distinct batch_name
   // this instructor has taught a COMPLETED session for, all-time vs. the
   // last 30 days. Same array-column convention as instructorsTable's
@@ -514,6 +519,24 @@ export const instructorContributionTable = pgTable("instructor_contribution", {
   niatCohorts: text("niat_cohorts").array().notNull().default([]),
   syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// Per-day contribution (2026-10-12, per request: a date filter on the Contribution tab). One row per instructor per
+// calendar day on which they completed at least one session, so any from/to range can be summed at read time (see
+// /reports/instructor-contribution?from=&to=). Same full delete-then-insert on every sync as the table above.
+// Needs `pnpm --filter @workspace/db run push` after deploying.
+export const instructorContributionDailyTable = pgTable("instructor_contribution_daily", {
+  id: serial("id").primaryKey(),
+  instructorUserId: text("instructor_user_id").notNull(),
+  sessionDate: date("session_date").notNull(),
+  lectureMinutes: integer("lecture_minutes").notNull().default(0),
+  practiceMinutes: integer("practice_minutes").notNull().default(0),
+  otherMinutes: integer("other_minutes").notNull().default(0),
+  lectureSessions: integer("lecture_sessions").notNull().default(0),
+  practiceSessions: integer("practice_sessions").notNull().default(0),
+  syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type InstructorContributionDaily = typeof instructorContributionDailyTable.$inferSelect;
 
 export const insertInstructorContributionSchema = createInsertSchema(instructorContributionTable);
 export type InstructorContribution = typeof instructorContributionTable.$inferSelect;

@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
-import { db, instructorsTable, instructorArchiveTable, darwinboxActiveTable, darwinboxFullRosterTable, darwinboxExitsTable, instructorTrainingStatusTable, instructorContributionTable } from "@workspace/db";
+import { db, instructorsTable, instructorArchiveTable, darwinboxActiveTable, darwinboxFullRosterTable, darwinboxExitsTable, instructorTrainingStatusTable, instructorContributionTable, instructorContributionDailyTable } from "@workspace/db";
+import { and, gte, lte } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/auth";
 import { cell, parseLooseDate, toISODate } from "../lib/reconcile";
 import { archiveInstructors } from "../lib/archiveInstructors";
@@ -1308,7 +1309,14 @@ router.get("/reports/training-stats", requireAuth, requireRole("admin"), async (
 // data of instructors as well mentor data there") -- reuses
 // TRAINING_STATS_EXCLUDED_CLASSIFICATIONS since the population rule is
 // identical, just for a different metric.
-router.get("/reports/instructor-contribution", requireAuth, requireRole("admin"), async (_req, res) => {
+// Date filter (2026-10-12, per request): optional ?from=YYYY-MM-DD&to=YYYY-MM-DD (either may be given). When present,
+// hours and session counts are totalled from the per-day table (instructorContributionDailyTable) for that inclusive
+// range; with no range it is the all-time aggregate as before. Batches and NIAT cohort stay all-time / last-30-days.
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+router.get("/reports/instructor-contribution", requireAuth, requireRole("admin"), async (req, res) => {
+  const fromParam = typeof req.query.from === "string" && ISO_DAY.test(req.query.from) ? req.query.from : null;
+  const toParam = typeof req.query.to === "string" && ISO_DAY.test(req.query.to) ? req.query.to : null;
+  const ranged = !!(fromParam || toParam);
   const allRows = await db.select().from(instructorsTable);
   const people = allRows
     .filter((r) => r.inTeachos && !TRAINING_STATS_EXCLUDED_CLASSIFICATIONS.has(r.classification ?? ""))
@@ -1322,11 +1330,29 @@ router.get("/reports/instructor-contribution", requireAuth, requireRole("admin")
   const byInstructor = new Map<string, (typeof contributionRows)[number]>();
   for (const row of contributionRows) byInstructor.set(row.instructorUserId, row);
 
+  // Per-instructor totals for the chosen range, summed from the per-day rows.
+  type RangeTotals = { lectureMinutes: number; practiceMinutes: number; otherMinutes: number; lectureSessions: number; practiceSessions: number; days: number };
+  const rangeByInstructor = new Map<string, RangeTotals>();
+  if (ranged) {
+    const conditions = [fromParam ? gte(instructorContributionDailyTable.sessionDate, fromParam) : undefined, toParam ? lte(instructorContributionDailyTable.sessionDate, toParam) : undefined].filter((c) => c !== undefined);
+    const dailyRows = await db.select().from(instructorContributionDailyTable).where(and(...conditions));
+    for (const d of dailyRows) {
+      const t = rangeByInstructor.get(d.instructorUserId) ?? { lectureMinutes: 0, practiceMinutes: 0, otherMinutes: 0, lectureSessions: 0, practiceSessions: 0, days: 0 };
+      t.lectureMinutes += d.lectureMinutes; t.practiceMinutes += d.practiceMinutes; t.otherMinutes += d.otherMinutes;
+      t.lectureSessions += d.lectureSessions; t.practiceSessions += d.practiceSessions;
+      if (d.lectureSessions + d.practiceSessions > 0) t.days += 1; // one row per instructor per day
+      rangeByInstructor.set(d.instructorUserId, t);
+    }
+  }
+
   const rows = people.map((p) => {
     const contribution = p.teachosUserId ? byInstructor.get(p.teachosUserId) : undefined;
-    const lectureMinutes = contribution?.lectureMinutes ?? 0;
-    const practiceMinutes = contribution?.practiceMinutes ?? 0;
-    const otherMinutes = contribution?.otherMinutes ?? 0;
+    const range = ranged && p.teachosUserId ? rangeByInstructor.get(p.teachosUserId) : undefined;
+    const lectureMinutes = ranged ? (range?.lectureMinutes ?? 0) : (contribution?.lectureMinutes ?? 0);
+    const practiceMinutes = ranged ? (range?.practiceMinutes ?? 0) : (contribution?.practiceMinutes ?? 0);
+    const otherMinutes = ranged ? (range?.otherMinutes ?? 0) : (contribution?.otherMinutes ?? 0);
+    const lectureSessions = ranged ? (range?.lectureSessions ?? 0) : (contribution?.lectureSessions ?? 0);
+    const practiceSessions = ranged ? (range?.practiceSessions ?? 0) : (contribution?.practiceSessions ?? 0);
     return {
       employee_id: p.employeeId,
       full_name: p.fullName,
@@ -1350,7 +1376,10 @@ router.get("/reports/instructor-contribution", requireAuth, requireRole("admin")
       practice_hours: Math.round((practiceMinutes / 60) * 10) / 10,
       other_hours: Math.round((otherMinutes / 60) * 10) / 10,
       total_hours: Math.round(((lectureMinutes + practiceMinutes + otherMinutes) / 60) * 10) / 10,
-      sessions_completed: contribution?.sessionsCompleted ?? 0,
+      sessions_completed: ranged ? lectureSessions + practiceSessions : (contribution?.sessionsCompleted ?? 0),
+      lecture_sessions: lectureSessions,
+      practice_sessions: practiceSessions,
+      session_days: ranged ? (range?.days ?? 0) : (contribution?.sessionDays ?? 0),
       // Batch coverage (2026-09-28, per request) -- see instructorContribution.ts.
       all_batches: contribution?.allBatches ?? [],
       recent_batches: contribution?.recentBatches ?? [],
@@ -1364,6 +1393,7 @@ router.get("/reports/instructor-contribution", requireAuth, requireRole("admin")
     count: rows.length,
     rows,
     synced_at: contributionRows[0]?.syncedAt ?? null,
+    range: ranged ? { from: fromParam, to: toParam } : null,
   });
 });
 
