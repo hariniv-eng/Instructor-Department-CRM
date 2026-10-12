@@ -133,6 +133,24 @@ function StatusBadge({ status }: { status: CourseStatus }) {
   return <span className={`inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-bold ${badge.className}`}>{badge.label}</span>;
 }
 
+// Subject-wise completion % (2026-10-12, per request): Completed = 100%, In Progress = 50%, Not Started = 0%, averaged
+// over every mapped course of the subject (track group). A course with no training data for the instructor counts as
+// 0% (decided with Ankush); a course with no confirmed mapping yet is left out of the average, since nobody can have it.
+// An instructor with no synced training data at all gets no percentage (null), shown as a dash, rather than a 0% that
+// would look like "has done nothing".
+const STATUS_SCORE: Partial<Record<CourseStatus, number>> = { COMPLETED: 100, IN_PROGRESS: 50, NOT_STARTED: 0, NO_DATA: 0 };
+function subjectCompletion(row: TrainingStatsRow, defs: TrainingCourseDef[]): number | null {
+  if (!row.has_training_data) return null;
+  const scores = defs
+    .filter((def) => def.courseTitles.length > 0)
+    .map((def) => STATUS_SCORE[row.courses[def.key] ?? 'NO_DATA'])
+    .filter((score): score is number => score !== undefined);
+  if (scores.length === 0) return null;
+  return scores.reduce((sum, score) => sum + score, 0) / scores.length;
+}
+const formatPercent = (value: number) => `${Math.round(value * 10) / 10}%`;
+const percentTone = (value: number) => (value >= 80 ? 'bg-[#e5f3ed] text-[#256e65]' : value >= 40 ? 'bg-[#fff3d6] text-[#8a6a12]' : 'bg-[#f3f0ec] text-[#8a7a63]');
+
 export default function TrainingStatsPage() {
   const queryClient = useQueryClient();
   const query = useTrainingStats();
@@ -233,6 +251,10 @@ export default function TrainingStatsPage() {
       <strong className="font-semibold text-foreground">{pendingCount} column{pendingCount === 1 ? '' : 's'}</strong> ({activeTaxonomy.filter((d) => d.courseTitles.length === 0).map((d) => d.label).join(', ')}) don't have a confirmed course mapping yet and show as "Mapping pending" for everyone -- see Instructor_Learning_Status_Course_Mapping_Review.xlsx.
     </p>}
 
+    {data && activeTaxonomy.length > 0 && <p data-testid="note-subject-completion" className="mb-6 max-w-3xl text-[12px] leading-relaxed text-muted-foreground">
+      <strong className="font-semibold text-foreground">Subject completion %</strong> averages each course in the subject: Completed = 100%, In Progress = 50%, Not Started or no data = 0%. Courses still showing "Mapping pending" are left out. For example, Frontend with 5 courses completed and React JS in progress is (5 x 100 + 50) / 6 = 91.7%.
+    </p>}
+
     {data && activeTaxonomy.length === 0 && <EmptyState
       title={`No ${activeSubTab.label} courses configured yet`}
       description={`The ${activeSubTab.label} tab is ready, but no courses have been mapped to it yet -- let Claude know which courses to track and this tab will populate the same way the others did.`}
@@ -258,9 +280,11 @@ export default function TrainingStatsPage() {
                 <th rowSpan={2} className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Department</th>
                 <th rowSpan={2} className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Capability Manager</th>
                 {groups.map((group) => <th key={group.trackGroup} colSpan={group.defs.length} className="whitespace-nowrap border-b border-l border-border px-4 py-2 text-center font-mono-ui text-[10px] font-bold uppercase tracking-[0.12em] text-foreground">{group.trackGroup}</th>)}
+                <th colSpan={groups.length} data-testid="header-subject-completion" className="whitespace-nowrap border-b border-l-2 border-border bg-[#eef4ee] px-4 py-2 text-center font-mono-ui text-[10px] font-bold uppercase tracking-[0.12em] text-foreground" title="Completed = 100%, In Progress = 50%, Not Started or no data = 0%, averaged over the subject's mapped courses">Subject completion %</th>
               </tr>
               <tr className="border-b border-border bg-[#f4f7f9]">
                 {groups.flatMap((group) => group.defs.map((def, i) => <th key={def.key} className={`whitespace-nowrap px-3 py-2.5 text-center font-mono-ui text-[10px] uppercase tracking-[0.1em] text-muted-foreground ${i === 0 ? 'border-l border-border' : ''}`}>{def.label}</th>))}
+                {groups.map((group, i) => <th key={`pct-${group.trackGroup}`} className={`whitespace-nowrap bg-[#eef4ee] px-3 py-2.5 text-center font-mono-ui text-[10px] uppercase tracking-[0.1em] text-muted-foreground ${i === 0 ? 'border-l-2 border-border' : ''}`}>{group.trackGroup}</th>)}
               </tr>
             </thead>
             <tbody>
@@ -270,6 +294,10 @@ export default function TrainingStatsPage() {
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-muted-foreground">{row.department || '—'}</td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-muted-foreground">{row.capability_manager || '—'}</td>
                 {activeTaxonomy.map((def, i) => <td key={def.key} className={`px-3 py-2.5 text-center ${i === 0 ? 'border-l border-border' : ''}`}><StatusBadge status={row.courses[def.key] ?? 'NO_DATA'} /></td>)}
+                {groups.map((group, i) => {
+                  const pct = subjectCompletion(row, group.defs);
+                  return <td key={`pct-${group.trackGroup}`} data-testid={`cell-subject-completion-${group.trackGroup}`} className={`bg-[#f6faf6] px-3 py-2.5 text-center ${i === 0 ? 'border-l-2 border-border' : ''}`}>{pct === null ? <span className="text-[11px] text-muted-foreground">—</span> : <span className={`inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-bold tabular-nums ${percentTone(pct)}`}>{formatPercent(pct)}</span>}</td>;
+                })}
               </tr>)}
             </tbody>
           </table>
