@@ -378,13 +378,23 @@ export const recomputeStatuses = async (options: { grantTeachosOnlyScope?: boole
       exitFlagStatus: exit?.status ?? null,
       exitFlagDate: toISODate(exit?.exitDate ?? null),
       exitLastWorkingDate: toISODate(exit?.lastWorkingDate ?? null),
-      // Every payroll-converted instructor carries a manual Exit entry
-      // (2026-10-07, per request): anyone with no entry yet is marked
-      // "payroll_converted" here, and an entry that already exists -- payroll
-      // or anything a Capability Manager set later (Exited, Serving Notice
-      // Period, Absconded) -- is never overwritten. They stay Payroll
-      // Converted until someone changes it in the FCC.
-      ...(classification === "payroll_converted" && !row.exitVerification ? { exitVerification: "payroll_converted" } : {}),
+      // Strict exit flow (2026-10-12, per request): a raised Darwin exit record
+      // must ALWAYS land in Exception 1 (CM actions) first -- it can never be
+      // pre-marked Payroll Converted by this sync. So:
+      //   * the automatic "payroll_converted" default is applied only to
+      //     payroll-converted instructors with NO exit record on file;
+      //   * when an exit record newly appears for someone sitting on an
+      //     automatic/earlier "payroll_converted" mark, that mark is cleared
+      //     (null) so they show up in CM actions for review.
+      // After that only a Capability Manager's review moves them: Payroll
+      // Converted leaves the queue; Exited / Absconded / Serving Notice Period
+      // go to Exception 2 (Admin actions) -- see reports.ts. A review set by a
+      // CM is never overwritten here once the exit record is already known.
+      ...(classification === "payroll_converted" && !exit && !row.exitVerification
+        ? { exitVerification: "payroll_converted" }
+        : (!!exit && !row.exitFlag && row.exitVerification === "payroll_converted")
+          ? { exitVerification: null }
+          : {}),
       exitDepartment: isTeachosOnlyLeftover ? (exit?.department ?? null) : null,
       exitDesignation: isTeachosOnlyLeftover ? (exit?.designation ?? null) : null,
       exitGender: isTeachosOnlyLeftover ? (exit?.gender ?? null) : null,
