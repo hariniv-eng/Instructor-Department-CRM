@@ -196,8 +196,8 @@ export default function DashboardPage() {
 
     {report && <section className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:items-stretch animate-rise" aria-label="Product mix, NIAT contribution and exit data">
       <ProductMixCard people={departmentPeople} instructors={instructorPeople} mentors={mentorPeople} />
-      {/* Instructors only (2026-10-13): the card filters these to Product = NIAT (Deployed); mentors and the Operations team are not part of it. */}
-      <NiatContributionCard people={instructorPeople} />
+      {/* Instructors + mentors (2026-10-13, per request): the card filters these to Product = NIAT (Deployed); the Operations team is not part of it. */}
+      <NiatContributionCard people={[...instructorPeople, ...mentorPeople]} />
     </section>}
     {report && <section className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2 animate-rise" aria-label="Campuses, capability managers and NIAT university map">
       <div className="flex min-w-0 flex-col gap-3">
@@ -424,7 +424,7 @@ function ProductMixCard({ people, instructors, mentors }: { people: InstructorSu
 }
 
 // Contribution of NIAT instructors (2026-10-09, per request: "beside the pie chart ... contribution of niat
-// instructors"): how many NIAT instructors (Product NIAT Deployed only, from 2026-10-13) are teaching each NIAT cohort. The
+// instructors"): how many NIAT instructors and mentors (Product NIAT Deployed only, from 2026-10-13) are teaching each NIAT cohort. The
 // cohort comes from the Contribution column (person.niat_cohorts: the cohort(s) of the batches they taught in the
 // last 30 days, or the last 2 months when they had no session in the last 30 days, see instructorContribution.ts), so one instructor teaching two cohorts counts in both rows.
 const NIAT_COHORT_ORDER = ['NIAT 2024', 'NIAT 2025', 'NIAT 2026'];
@@ -434,8 +434,10 @@ function NiatContributionCard({ people }: { people: InstructorSummary[] }) {
   // instructor is counted once, under exactly the cohort(s) they teach, so the rows add up to the NIAT total.
   const { rows, total } = useMemo(() => {
     // Deployed only (2026-10-13, per request: "this data should only consist of the deployed instructor data") --
-    // NIAT (Training) instructors are not counted here.
-    const niat = people.filter((p) => productLabel(p) === 'NIAT (Deployed)');
+    // NIAT (Training) people are not counted here. Mentors are included with the instructors (same day, per request:
+    // "your list should consist of instructors plus mentors"); each person once, whichever list they came from.
+    const seen = new Set<number>();
+    const niat = people.filter((p) => productLabel(p) === 'NIAT (Deployed)' && (seen.has(p.id) ? false : (seen.add(p.id), true)));
     const rank = (name: string) => { const i = NIAT_COHORT_ORDER.indexOf(name); return i === -1 ? 99 : i; };
     const labelOf = (cohorts: string[]) => cohorts.map((name, i) => (i === 0 ? name : name.replace(/^NIAT\s+/, ''))).join(' + ');
     const groups = new Map<string, { cohorts: string[]; count: number }>();
@@ -463,13 +465,13 @@ function NiatContributionCard({ people }: { people: InstructorSummary[] }) {
     <div className="mb-3 flex items-center gap-3">
       <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-secondary text-muted-foreground"><GraduationCap size={14} /></span>
       <div>
-        <h2 className="text-[12px] font-extrabold tracking-[-0.03em]">Contribution of NIAT instructors</h2>
-        <p className="text-[10px] text-muted-foreground">Instructors teaching each NIAT cohort · last 30 days (last 2 months if none)</p>
+        <h2 className="text-[12px] font-extrabold tracking-[-0.03em]">Contribution of NIAT instructors &amp; mentors</h2>
+        <p className="text-[10px] text-muted-foreground">Instructors and mentors teaching each NIAT cohort · last 30 days (last 2 months if none)</p>
       </div>
     </div>
     <div className="mb-3 flex items-baseline gap-2">
       <span className="text-[18px] font-extrabold leading-none tracking-[-0.03em] tabular-nums" data-testid="text-niat-instructor-total">{total.toLocaleString('en-IN')}</span>
-      <span className="text-[12px] text-muted-foreground">NIAT instructors (Deployed)</span>
+      <span className="text-[12px] text-muted-foreground">NIAT instructors + mentors (Deployed)</span>
     </div>
     <ul className="flex flex-1 flex-col justify-between gap-2">
       {rows.map((row) => <li key={row.label} data-testid={`row-niat-cohort-${slugify(row.label)}`}>
@@ -480,7 +482,7 @@ function NiatContributionCard({ people }: { people: InstructorSummary[] }) {
         {bar(row.count)}
       </li>)}
     </ul>
-    <p className="mt-3 text-[10px] text-muted-foreground">Each instructor is counted once, under the exact cohort(s) they teach. "No cohort yet" = deployed, but no completed session in the last 2 months.</p>
+    <p className="mt-3 text-[10px] text-muted-foreground">Each instructor or mentor is counted once, under the exact cohort(s) they teach. "No cohort yet" = deployed, but no completed session in the last 2 months.</p>
   </div>;
 }
 
