@@ -423,7 +423,7 @@ function ProductMixCard({ people, instructors, mentors }: { people: InstructorSu
 }
 
 // Contribution of NIAT instructors (2026-10-09, per request: "beside the pie chart ... contribution of niat
-// instructors"): how many NIAT instructors (Product NIAT Deployed or Training) are teaching each NIAT cohort. The
+// instructors"): how many NIAT instructors (Product NIAT Deployed only, from 2026-10-13) are teaching each NIAT cohort. The
 // cohort comes from the Contribution column (person.niat_cohorts: the cohort(s) of the batches they taught in the
 // last 30 days, or the last 2 months when they had no session in the last 30 days, see instructorContribution.ts), so one instructor teaching two cohorts counts in both rows.
 const NIAT_COHORT_ORDER = ['NIAT 2024', 'NIAT 2025', 'NIAT 2026'];
@@ -432,14 +432,17 @@ function NiatContributionCard({ people }: { people: InstructorSummary[] }) {
   // 2024, 2024 + 2025, 2025, 2025 + 2026, 2026 -- no separate "only one cohort" / "combination" sections. Each
   // instructor is counted once, under exactly the cohort(s) they teach, so the rows add up to the NIAT total.
   const { rows, total } = useMemo(() => {
-    const niat = people.filter((p) => productLabel(p).startsWith('NIAT'));
+    // Deployed only (2026-10-13, per request: "this data should only consist of the deployed instructor data") --
+    // NIAT (Training) instructors are not counted here.
+    const niat = people.filter((p) => productLabel(p) === 'NIAT (Deployed)');
     const rank = (name: string) => { const i = NIAT_COHORT_ORDER.indexOf(name); return i === -1 ? 99 : i; };
     const labelOf = (cohorts: string[]) => cohorts.map((name, i) => (i === 0 ? name : name.replace(/^NIAT\s+/, ''))).join(' + ');
     const groups = new Map<string, { cohorts: string[]; count: number }>();
     for (const name of NIAT_COHORT_ORDER) groups.set(name, { cohorts: [name], count: 0 });
+    let noCohort = 0;
     for (const person of niat) {
       const cohorts = [...new Set(person.niat_cohorts ?? [])].sort((x, y) => rank(x) - rank(y) || x.localeCompare(y));
-      if (cohorts.length === 0) continue;
+      if (cohorts.length === 0) { noCohort += 1; continue; }
       const key = cohorts.join(' + ');
       const entry = groups.get(key) ?? { cohorts, count: 0 };
       entry.count += 1;
@@ -448,6 +451,9 @@ function NiatContributionCard({ people }: { people: InstructorSummary[] }) {
     const ordered = [...groups.values()]
       .sort((x, y) => rank(x.cohorts[0]) - rank(y.cohorts[0]) || x.cohorts.length - y.cohorts.length || labelOf(x.cohorts).localeCompare(labelOf(y.cohorts)))
       .map((entry) => ({ label: labelOf(entry.cohorts), count: entry.count }));
+    // People with no cohort (2026-10-13): no completed session in the last 2 months, or a batch that maps to no NIAT cohort,
+    // or no TeachOS match. Shown as their own row so the rows always add up to the total above.
+    if (noCohort > 0) ordered.push({ label: 'No cohort yet', count: noCohort });
     return { rows: ordered, total: niat.length };
   }, [people]);
   const max = Math.max(1, ...rows.map((row) => row.count));
@@ -462,7 +468,7 @@ function NiatContributionCard({ people }: { people: InstructorSummary[] }) {
     </div>
     <div className="mb-3 flex items-baseline gap-2">
       <span className="text-[18px] font-extrabold leading-none tracking-[-0.03em] tabular-nums" data-testid="text-niat-instructor-total">{total.toLocaleString('en-IN')}</span>
-      <span className="text-[12px] text-muted-foreground">NIAT instructors (Deployed + Training)</span>
+      <span className="text-[12px] text-muted-foreground">NIAT instructors (Deployed)</span>
     </div>
     <ul className="flex flex-1 flex-col justify-between gap-2">
       {rows.map((row) => <li key={row.label} data-testid={`row-niat-cohort-${slugify(row.label)}`}>
@@ -473,7 +479,7 @@ function NiatContributionCard({ people }: { people: InstructorSummary[] }) {
         {bar(row.count)}
       </li>)}
     </ul>
-    <p className="mt-3 text-[10px] text-muted-foreground">Each instructor is counted once, under the exact cohort(s) they teach.</p>
+    <p className="mt-3 text-[10px] text-muted-foreground">Each instructor is counted once, under the exact cohort(s) they teach. "No cohort yet" = deployed, but no completed session in the last 2 months.</p>
   </div>;
 }
 
