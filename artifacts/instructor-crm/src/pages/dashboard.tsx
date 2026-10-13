@@ -113,15 +113,6 @@ export default function DashboardPage() {
       .filter((person) => (seen.has(person.id) ? false : (seen.add(person.id), true)));
   }, [removePeople, noticePeople, pendingPeople]);
   const removeCount = removePeople.length;
-  // Capability Manager by person id, for Exception 2's Movement actions list (2026-10-13, per request: show the
-  // Capability Manager column there too) -- a movement only carries the instructor's id and name.
-  const capabilityManagerById = useMemo(() => {
-    const map = new Map<number, string>();
-    for (const person of [...departmentPeople, ...instructorPeople, ...mentorPeople, ...removePeople, ...noticePeople, ...givePeople]) {
-      if (person.capability_manager) map.set(person.id, person.capability_manager);
-    }
-    return map;
-  }, [departmentPeople, instructorPeople, mentorPeople, removePeople, noticePeople, givePeople]);
   // Give TeachOS access (rule set 2026-10-10): instructors + mentors who are in Darwin only (no TeachOS record yet),
   // leaving out the Support and IIT X DSA products. Each person once.
   const givePeople = useMemo(() => {
@@ -140,6 +131,15 @@ export default function DashboardPage() {
       .filter((person) => (seen.has(person.id) ? false : (seen.add(person.id), true)))
       .sort((a, b) => a.full_name.localeCompare(b.full_name));
   }, [instructorSplit, mentorSplit]);
+  // Capability Manager by person id, for Exception 2's Movement actions list (2026-10-13, per request: show the
+  // Capability Manager column there too) -- a movement only carries the instructor's id and name.
+  const capabilityManagerById = useMemo(() => {
+    const map = new Map<number, string>();
+    for (const person of [...departmentPeople, ...instructorPeople, ...mentorPeople, ...removePeople, ...noticePeople, ...givePeople]) {
+      if (person.capability_manager) map.set(person.id, person.capability_manager);
+    }
+    return map;
+  }, [departmentPeople, instructorPeople, mentorPeople, removePeople, noticePeople, givePeople]);
   const giveMentorCount = useMemo(() => { const ids = new Set((mentorSplit?.darwin_only?.people ?? []).map((person) => person.id)); return givePeople.filter((person) => ids.has(person.id)).length; }, [givePeople, mentorSplit]);
   const giveCount = givePeople.length;
   const movementCount = openMovementChanges.length;
