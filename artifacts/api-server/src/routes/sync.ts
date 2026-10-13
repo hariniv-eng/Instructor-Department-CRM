@@ -14,6 +14,7 @@ import { fetchNiatInstructorDetailsRows, NiatInstructorDetailsError } from "../l
 import { fetchCapabilityManagerRows } from "../lib/connectors/capabilityManager";
 import { fetchCourseStatusRows, InstructorLearningStatusError } from "../lib/connectors/instructorLearningStatus";
 import { fetchContributionRows, fetchContributionDailyRows, InstructorContributionError } from "../lib/connectors/instructorContribution";
+import { snapshotTeachosDataIntoArchive } from "../lib/archiveInstructors";
 import { resolvedCourseDefs } from "../data/trainingCourseTaxonomy";
 import { storeDarwinboxActive, storeDarwinboxExits, storeDarwinboxFullRoster, storeTeachosDeployment, storeTrainingStatus, storeContribution, storeContributionDaily } from "../lib/storeRaw";
 import { reconcileDarwin, reconcileDarwinFullRosterFallback, reconcileTeachos, reconcileTeachosEmployeeIdReference, reconcileCapabilityManager, recomputeStatuses } from "../lib/reconcile";
@@ -204,6 +205,8 @@ async function runTrainingStatusSync(): Promise<SyncResult> {
   try {
     const rows = await fetchCourseStatusRows(resolvedCourseDefs());
     const stored = await storeTrainingStatus(rows);
+    // Keep the Instructor Archive's copy of the training data current (2026-10-13).
+    await snapshotTeachosDataIntoArchive().catch((e) => console.error("[archive] training snapshot failed:", e));
     await db.insert(uploadsTable).values({ source: "Instructor Training Status", filename: "BigQuery sync (niat_instructor_unit_wise_completion_and_best_attempt_details, aggregated per course)", rowCount: stored });
     return { ok: true, source: "training_status_live", stored, synced_at: new Date().toISOString() };
   } catch (e) {
@@ -244,6 +247,8 @@ async function runContributionSync(): Promise<SyncResult> {
     const stored = await storeContribution(rows);
     // Per-day rows for the Contribution tab's date filter (2026-10-12).
     await storeContributionDaily(await fetchContributionDailyRows());
+    // Keep the Instructor Archive's copy of the contribution data current (2026-10-13).
+    await snapshotTeachosDataIntoArchive().catch((e) => console.error("[archive] contribution snapshot failed:", e));
     await db.insert(uploadsTable).values({ source: "Instructor Contribution", filename: "BigQuery sync (niat_instructor_session_schedule_details, aggregated per instructor)", rowCount: stored });
     return { ok: true, source: "contribution_live", stored, synced_at: new Date().toISOString() };
   } catch (e) {

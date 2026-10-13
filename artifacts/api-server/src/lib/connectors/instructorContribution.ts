@@ -380,10 +380,47 @@ async function fetchDeploymentDates(): Promise<Map<string, string>> {
   }
 }
 
+// Cohort batches including PENDING (upcoming) sessions (2026-10-13, per request: "even if that session is pending, consider
+// that also"). The hours/session columns stay COMPLETED-only; only the NIAT cohort uses this. Looks at COMPLETED and PENDING
+// sessions from 60 days ago to 30 days ahead: `recent` = batches from the last 30 days up to 30 days ahead, `twoMonths` =
+// the wider 60-days-back window used when `recent` is empty. A failure here is logged and ignored so the Contribution
+// sync itself never fails because of it (cohorts then fall back to completed sessions only).
+async function fetchCohortBatchWindows(): Promise<Map<string, { recent: string[]; twoMonths: string[] }>> {
+  const bq = client();
+  const ref = tableRef(SESSION_SCHEDULE_TABLE);
+  const query = `
+    SELECT
+      instructor_user_id,
+      ARRAY_AGG(DISTINCT CASE WHEN session_start_datetime >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 30 DAY) THEN batch_name END IGNORE NULLS) AS recent_batches,
+      ARRAY_AGG(DISTINCT batch_name IGNORE NULLS) AS two_month_batches
+    FROM \`${ref}\`
+    WHERE UPPER(session_status) IN ('COMPLETED', 'PENDING') AND instructor_user_id IS NOT NULL
+      AND session_start_datetime >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 60 DAY)
+      AND session_start_datetime <= DATETIME_ADD(CURRENT_DATETIME(), INTERVAL 30 DAY)
+    GROUP BY instructor_user_id
+  `;
+  const map = new Map<string, { recent: string[]; twoMonths: string[] }>();
+  try {
+    const [rows] = await runWithHardTimeout(() => bq.query({ query }), API_TIMEOUT_MS * 3 + 10000);
+    for (const r of rows as Array<Record<string, unknown>>) {
+      const id = String(r.instructor_user_id ?? "");
+      if (!id) continue;
+      map.set(id, {
+        recent: Array.isArray(r.recent_batches) ? r.recent_batches.map((v) => String(v)) : [],
+        twoMonths: Array.isArray(r.two_month_batches) ? r.two_month_batches.map((v) => String(v)) : [],
+      });
+    }
+  } catch (e) {
+    console.error(`[contribution] cohort window query failed, using completed sessions only: ${(e as Error).message}`);
+  }
+  return map;
+}
+
 export async function fetchContributionRows(): Promise<ContributionRow[]> {
   const bq = client();
   const ref = tableRef(SESSION_SCHEDULE_TABLE);
   const deploymentDates = await fetchDeploymentDates();
+  const cohortWindows = await fetchCohortBatchWindows();
   const query = `
     SELECT
       instructor_user_id,
@@ -405,8 +442,13 @@ export async function fetchContributionRows(): Promise<ContributionRow[]> {
 
   try {
     const [rows] = await runWithHardTimeout(() => bq.query({ query }), API_TIMEOUT_MS * 3 + 10000);
-    return (rows as Array<Record<string, unknown>>)
+    const completedRows = rows as Array<Record<string, unknown>>;
+    // People with PENDING sessions but no completed one yet get a row too (zero hours), so their cohort and deployment date show.
+    const completedIds = new Set(completedRows.map((r) => String(r.instructor_user_id ?? "")));
+    const pendingOnly: Array<Record<string, unknown>> = [...cohortWindows.keys()].filter((id) => !completedIds.has(id)).map((id) => ({ instructor_user_id: id }));
+    return [...completedRows, ...pendingOnly]
       .map((r) => {
+        const cw = cohortWindows.get(String(r.instructor_user_id ?? ""));
         const allBatches = Array.isArray(r.all_batches) ? r.all_batches.map((v) => String(v)) : [];
         const recentBatches = Array.isArray(r.recent_batches) ? r.recent_batches.map((v) => String(v)) : [];
         const lastTwoMonthsBatches = Array.isArray(r.last_two_months_batches) ? r.last_two_months_batches.map((v) => String(v)) : [];
@@ -439,7 +481,15 @@ export async function fetchContributionRows(): Promise<ContributionRow[]> {
           // Someone who did teach in the last 30 days keeps the 30-day
           // cohort(s) only, even if those batches map to no NIAT cohort.
           // recent_batches itself stays the strict 30-day list.
-          niat_cohorts: cohortsForBatches(recentBatches.length > 0 ? recentBatches : lastTwoMonthsBatches),
+          //
+          // 2026-10-13, per request ("even if that session is pending, consider that also"): PENDING (upcoming) sessions count
+          // towards the cohort exactly like completed ones -- the 30-day and 60-day batch lists are merged with the pending-
+          // inclusive windows from fetchCohortBatchWindows() before the cohort is worked out.
+          niat_cohorts: (() => {
+            const recentAll = [...new Set([...recentBatches, ...(cw?.recent ?? [])])];
+            const twoMonthsAll = [...new Set([...lastTwoMonthsBatches, ...(cw?.twoMonths ?? [])])];
+            return cohortsForBatches(recentAll.length > 0 ? recentAll : twoMonthsAll);
+          })(),
         };
       })
       .filter((r) => r.instructor_user_id);

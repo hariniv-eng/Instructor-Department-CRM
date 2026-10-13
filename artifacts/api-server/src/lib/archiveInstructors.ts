@@ -29,7 +29,7 @@
 // No code path here (or anywhere else in the app) ever deletes a row from
 // this table -- its row count can only grow.
 import { eq } from "drizzle-orm";
-import { instructorArchiveTable, instructorsTable } from "@workspace/db";
+import { instructorArchiveTable, instructorsTable, instructorContributionTable, instructorTrainingStatusTable } from "@workspace/db";
 import { sdb as db } from "./syncContext";
 import { normalize } from "./reconcile";
 import { isPinnedConfirmedInstructor } from "../data/classificationOverrides";
@@ -263,5 +263,54 @@ export async function archiveInstructors(options: { grantTeachosOnlyScope?: bool
     updated += 1;
   }
 
+  // TeachOS-side data (contribution, cohorts, training) -- see the function below.
+  await snapshotTeachosDataIntoArchive();
+
   return { created, updated };
+}
+
+// Contribution + training snapshot (2026-10-13, per request: "everything that we have in the instructor tab ... should be
+// saved in the instructor archive"). Copies each person's contribution totals, NIAT cohorts, batches, deployment date and
+// per-course training status from the live tables (keyed by TeachOS user id) onto their archive row. STICKY, same rule as
+// the Darwin fields above: a person with no rows in the live tables right now (left TeachOS, or BigQuery stopped returning
+// them) keeps whatever was archived last time. Runs at the end of every archive pass and after the contribution and
+// training syncs, because those two syncs run on their own, not as part of the Darwin/TeachOS reconcile.
+export async function snapshotTeachosDataIntoArchive(): Promise<{ updated: number }> {
+  const archived = await db.select({ id: instructorArchiveTable.id, teachosUserId: instructorArchiveTable.teachosUserId }).from(instructorArchiveTable);
+  const withTeachos = archived.filter((row) => !!row.teachosUserId);
+  if (withTeachos.length === 0) return { updated: 0 };
+
+  const contributionRows = await db.select().from(instructorContributionTable);
+  const contributionById = new Map(contributionRows.map((c) => [c.instructorUserId, c]));
+  const trainingRows = await db.select().from(instructorTrainingStatusTable);
+  const trainingById = new Map<string, NonNullable<ArchiveRow["trainingSnapshot"]>>();
+  for (const t of trainingRows) {
+    const list = trainingById.get(t.instructorUserId) ?? [];
+    list.push({ course_key: t.courseKey, track_group: t.trackGroup, status: t.status, units_total: t.unitsTotal, units_completed: t.unitsCompleted });
+    trainingById.set(t.instructorUserId, list);
+  }
+
+  let updated = 0;
+  for (const row of withTeachos) {
+    const contribution = contributionById.get(row.teachosUserId!);
+    const training = trainingById.get(row.teachosUserId!);
+    if (!contribution && !training) continue;
+    const set: Partial<typeof instructorArchiveTable.$inferInsert> = {};
+    if (contribution) {
+      set.niatCohorts = contribution.niatCohorts;
+      set.allBatches = contribution.allBatches;
+      set.lectureMinutes = contribution.lectureMinutes;
+      set.practiceMinutes = contribution.practiceMinutes;
+      set.otherMinutes = contribution.otherMinutes;
+      set.sessionsCompleted = contribution.sessionsCompleted;
+      set.lectureSessions = contribution.lectureSessions;
+      set.practiceSessions = contribution.practiceSessions;
+      set.sessionDays = contribution.sessionDays;
+      if (contribution.deploymentDate) set.deploymentDate = contribution.deploymentDate;
+    }
+    if (training) set.trainingSnapshot = training;
+    await db.update(instructorArchiveTable).set(set).where(eq(instructorArchiveTable.id, row.id));
+    updated += 1;
+  }
+  return { updated };
 }
