@@ -1382,6 +1382,8 @@ router.get("/reports/instructor-contribution", requireAuth, requireRole("admin")
       lecture_sessions: lectureSessions,
       practice_sessions: practiceSessions,
       session_days: ranged ? (range?.days ?? 0) : (contribution?.sessionDays ?? 0),
+      // First session ever scheduled (2026-10-13) -- all-time, not affected by the date filter.
+      deployment_date: contribution?.deploymentDate ?? null,
       // Batch coverage (2026-09-28, per request) -- see instructorContribution.ts.
       all_batches: contribution?.allBatches ?? [],
       recent_batches: contribution?.recentBatches ?? [],

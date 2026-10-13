@@ -506,6 +506,9 @@ export const instructorContributionTable = pgTable("instructor_contribution", {
   lectureSessions: integer("lecture_sessions").notNull().default(0),
   practiceSessions: integer("practice_sessions").notNull().default(0),
   sessionDays: integer("session_days").notNull().default(0),
+  // Deployment date (2026-10-13, per request): the date of the FIRST session ever scheduled for the instructor in
+  // niat_instructor_session_schedule_details (any status). Needs `pnpm --filter @workspace/db run push` after deploying.
+  deploymentDate: date("deployment_date"),
   // Batch coverage (2026-09-28, per request) -- every distinct batch_name
   // this instructor has taught a COMPLETED session for, all-time vs. the
   // last 30 days. Same array-column convention as instructorsTable's
