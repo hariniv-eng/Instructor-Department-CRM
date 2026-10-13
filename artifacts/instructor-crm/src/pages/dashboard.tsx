@@ -113,6 +113,15 @@ export default function DashboardPage() {
       .filter((person) => (seen.has(person.id) ? false : (seen.add(person.id), true)));
   }, [removePeople, noticePeople, pendingPeople]);
   const removeCount = removePeople.length;
+  // Capability Manager by person id, for Exception 2's Movement actions list (2026-10-13, per request: show the
+  // Capability Manager column there too) -- a movement only carries the instructor's id and name.
+  const capabilityManagerById = useMemo(() => {
+    const map = new Map<number, string>();
+    for (const person of [...departmentPeople, ...instructorPeople, ...mentorPeople, ...removePeople, ...noticePeople, ...givePeople]) {
+      if (person.capability_manager) map.set(person.id, person.capability_manager);
+    }
+    return map;
+  }, [departmentPeople, instructorPeople, mentorPeople, removePeople, noticePeople, givePeople]);
   // Give TeachOS access (rule set 2026-10-10): instructors + mentors who are in Darwin only (no TeachOS record yet),
   // leaving out the Support and IIT X DSA products. Each person once.
   const givePeople = useMemo(() => {
@@ -173,7 +182,7 @@ export default function DashboardPage() {
         </div>
       </DialogContent>
     </Dialog>
-    {report && activeException === 'remove' && <ExceptionRemovePanel key={removeInitialView} initialView={removeInitialView} exitPeople={removePeople} noticePeople={noticePeople} givePeople={givePeople} movementsByInstructor={movementsByInstructor} onClose={() => setActiveException(null)} />}
+    {report && activeException === 'remove' && <ExceptionRemovePanel key={removeInitialView} initialView={removeInitialView} exitPeople={removePeople} noticePeople={noticePeople} givePeople={givePeople} movementsByInstructor={movementsByInstructor} capabilityManagerById={capabilityManagerById} onClose={() => setActiveException(null)} />}
 
     {reportQuery.isLoading && <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">{[1, 2, 3, 4].map((item) => <SkeletonBlock key={item} className="h-[126px]" />)}</div>}
     {reportQuery.isError && <QueryError message="Dashboard data is unavailable right now." />}
@@ -774,7 +783,7 @@ type ArchiveExitRow = { id: number; full_name: string; employee_id: string | nul
 const isApprovedExit = (row: ArchiveExitRow) => row.status === 'Exited' && (row.exit_status ?? '').trim().toLowerCase() === 'approved';
 const toExitRow = (p: InstructorSummary): ExitRow => ({ id: String(p.id), full_name: p.full_name, employee_id: p.employee_id ?? null, teachos_user_id: p.teachos_user_id ?? null, dept_area: p.dept_area ?? null, capability_manager: p.capability_manager ?? null, is_payroll: !!p.is_payroll, date_of_exit: p.date_of_exit ?? null, exit_flag_status: p.exit_flag_status ?? null, exit_flag_date: p.exit_flag_date ?? null });
 
-function ExceptionRemovePanel({ exitPeople, noticePeople, givePeople, movementsByInstructor, onClose, initialView = 'exit' }: { exitPeople: InstructorSummary[]; noticePeople: InstructorSummary[]; givePeople: InstructorSummary[]; movementsByInstructor: Map<number, Movement[]>; onClose: () => void; initialView?: 'exit' | 'give' | 'notice' | 'movements' }) {
+function ExceptionRemovePanel({ exitPeople, noticePeople, givePeople, movementsByInstructor, capabilityManagerById, onClose, initialView = 'exit' }: { exitPeople: InstructorSummary[]; noticePeople: InstructorSummary[]; givePeople: InstructorSummary[]; movementsByInstructor: Map<number, Movement[]>; capabilityManagerById: Map<number, string>; onClose: () => void; initialView?: 'exit' | 'give' | 'notice' | 'movements' }) {
   // Exception 2 is only the two worklists (2026-10-09, per request): who must be removed from TeachOS, and who is
   // serving notice. The approved-exit records live on the Overview's Exit data card, not here.
   const [view, setView] = useState<'exit' | 'give' | 'notice' | 'movements'>(initialView);
@@ -798,8 +807,8 @@ function ExceptionRemovePanel({ exitPeople, noticePeople, givePeople, movementsB
       window.setTimeout(() => setCopiedAll(false), 1500);
     }
   };
-  const handleGiveDownload = () => downloadCsv('exception-2-give-teachos-access.csv', toCsv(['Name', 'Employee ID', 'Email', 'Subject', 'Product', 'Darwin manager', 'Date of joining'], filteredGive.map((p) => [p.full_name, p.employee_id ?? '', p.org_email ?? '', p.dept_area ?? '', productLabel(p), p.darwin_manager ?? '', p.date_of_joining ?? ''])));
-  const handleMovementDownload = () => downloadCsv('exception-2-movement-actions.csv', toCsv(['Name', 'Employee ID', 'Movement', 'Remark', 'Logged on', 'Action Taken'], filteredMovementRows.flatMap((row) => row.group.map((movement) => [movement.full_name, movement.employee_id ?? '', movementLabel(movement.movement_type), movement.remark, movement.requested_at.slice(0, 10), movement.action_taken === 'yes' ? 'Yes' : movement.action_taken === 'no' ? 'No' : '']))));
+  const handleGiveDownload = () => downloadCsv('exception-2-give-teachos-access.csv', toCsv(['Name', 'Employee ID', 'Email', 'Subject', 'Product', 'Capability Manager', 'Darwin manager', 'Date of joining'], filteredGive.map((p) => [p.full_name, p.employee_id ?? '', p.org_email ?? '', p.dept_area ?? '', productLabel(p), p.capability_manager ?? '', p.darwin_manager ?? '', p.date_of_joining ?? ''])));
+  const handleMovementDownload = () => downloadCsv('exception-2-movement-actions.csv', toCsv(['Name', 'Employee ID', 'Capability Manager', 'Movement', 'Remark', 'Logged on', 'Action Taken'], filteredMovementRows.flatMap((row) => row.group.map((movement) => [movement.full_name, movement.employee_id ?? '', capabilityManagerById.get(row.instructorId) ?? '', movementLabel(movement.movement_type), movement.remark, movement.requested_at.slice(0, 10), movement.action_taken === 'yes' ? 'Yes' : movement.action_taken === 'no' ? 'No' : '']))));
   const handleDownload = () => downloadCsv(view === 'exit' ? 'exception-2-exit-remove-from-teachos.csv' : 'exception-2-serving-notice-period.csv', toCsv(['Name', 'Employee ID', 'TeachOS User ID', 'Subject', 'Capability Manager', 'Payroll / Nxtwave', 'date_of_exit', 'exit_status', 'exit_date'], filtered.map((p) => [p.full_name, p.employee_id ?? '', p.teachos_user_id ?? '', p.dept_area ?? '', p.capability_manager ?? '', payrollLabel(p), p.date_of_exit ?? '', p.exit_flag_status ?? '', p.exit_flag_date ?? ''])));
   const views: { key: 'exit' | 'give' | 'notice' | 'movements'; label: string; count: number }[] = [
     { key: 'exit', label: 'Remove access', count: exitPeople.length },
@@ -841,7 +850,7 @@ function ExceptionRemovePanel({ exitPeople, noticePeople, givePeople, movementsB
     {view === 'give' ? <div className="max-h-[420px] overflow-auto rounded-lg border border-border" data-testid="exception-give-access">
       <table className="w-full text-left text-[12px]">
         <thead className="sticky top-0 bg-secondary font-mono-ui text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
-          <tr><th className="px-3 py-2">Name</th><th className="px-3 py-2">Employee ID</th><th className="px-3 py-2">Email</th><th className="px-3 py-2">Subject</th><th className="px-3 py-2">Product</th><th className="px-3 py-2">Darwin manager</th><th className="px-3 py-2">Date of joining</th></tr>
+          <tr><th className="px-3 py-2">Name</th><th className="px-3 py-2">Employee ID</th><th className="px-3 py-2">Email</th><th className="px-3 py-2">Subject</th><th className="px-3 py-2">Product</th><th className="px-3 py-2">Capability Manager</th><th className="px-3 py-2">Darwin manager</th><th className="px-3 py-2">Date of joining</th></tr>
         </thead>
         <tbody>
           {filteredGive.map((p) => <tr key={p.id} className="border-t border-border/70">
@@ -850,21 +859,23 @@ function ExceptionRemovePanel({ exitPeople, noticePeople, givePeople, movementsB
             <td className="px-3 py-2 text-muted-foreground"><CopyValue value={p.org_email} testId={`button-copy-give-email-${p.id}`} /></td>
             <td className="px-3 py-2 text-muted-foreground">{p.dept_area ?? '—'}</td>
             <td className="px-3 py-2 text-muted-foreground">{productLabel(p)}</td>
+            <td className="px-3 py-2 text-muted-foreground">{p.capability_manager ?? '—'}</td>
             <td className="px-3 py-2 text-muted-foreground">{p.darwin_manager ?? '—'}</td>
             <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{formatExitDate(p.date_of_joining)}</td>
           </tr>)}
-          {filteredGive.length === 0 && <tr><td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">{givePeople.length === 0 ? 'No one is waiting for TeachOS access.' : 'No one matches this search.'}</td></tr>}
+          {filteredGive.length === 0 && <tr><td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">{givePeople.length === 0 ? 'No one is waiting for TeachOS access.' : 'No one matches this search.'}</td></tr>}
         </tbody>
       </table>
     </div> : view === 'movements' ? <div className="max-h-[420px] overflow-auto rounded-lg border border-border" data-testid="exception-movement-actions">
       <table className="w-full text-left text-[12px]">
         <thead className="sticky top-0 bg-secondary font-mono-ui text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
-          <tr><th className="px-3 py-2">Name</th><th className="px-3 py-2">Employee ID</th><th className="px-3 py-2">Changes</th><th className="px-3 py-2">Logged on</th><th className="w-[130px] px-3 py-2">Action Taken</th></tr>
+          <tr><th className="px-3 py-2">Name</th><th className="px-3 py-2">Employee ID</th><th className="px-3 py-2">Capability Manager</th><th className="px-3 py-2">Changes</th><th className="px-3 py-2">Logged on</th><th className="w-[130px] px-3 py-2">Action Taken</th></tr>
         </thead>
         <tbody>
           {filteredMovementRows.map((row) => <tr key={row.instructorId} className="border-t border-border/70 align-top">
             <td className="px-3 py-2 font-semibold">{row.group[0].full_name}</td>
             <td className="px-3 py-2 font-mono-ui text-muted-foreground">{row.group[0].employee_id ?? '—'}</td>
+            <td className="px-3 py-2 text-muted-foreground">{capabilityManagerById.get(row.instructorId) ?? '—'}</td>
             <td className="px-3 py-2">
               <ul className="space-y-1">
                 {row.group.map((movement) => <li key={movement.id}><span className="font-bold">{movementLabel(movement.movement_type)}</span><span className="text-muted-foreground"> — {movement.remark}</span></li>)}
@@ -873,7 +884,7 @@ function ExceptionRemovePanel({ exitPeople, noticePeople, givePeople, movementsB
             <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{formatExitDate(row.group[0].requested_at)}</td>
             <td className="px-3 py-2"><ActionTakenCell movements={movementsByInstructor.get(row.instructorId) ?? []} /></td>
           </tr>)}
-          {filteredMovementRows.length === 0 && <tr><td colSpan={5} className="px-3 py-8 text-center text-muted-foreground">{movementRows.length === 0 ? 'No movement actions are open.' : 'No one matches this search.'}</td></tr>}
+          {filteredMovementRows.length === 0 && <tr><td colSpan={6} className="px-3 py-8 text-center text-muted-foreground">{movementRows.length === 0 ? 'No movement actions are open.' : 'No one matches this search.'}</td></tr>}
         </tbody>
       </table>
     </div> : <div className="max-h-[420px] overflow-auto rounded-lg border border-border">
