@@ -305,6 +305,8 @@ export type ContributionRow = {
   lecture_sessions: number;
   practice_sessions: number;
   session_days: number;
+  // First session ever scheduled for this instructor, YYYY-MM-DD (null when none has a start date).
+  deployment_date: string | null;
   // Batch coverage (2026-09-28, per request: "in one column add all the
   // batches that are associated with all the instructors, and in other
   // column only put batch_names which he have been taking from past 1
@@ -350,9 +352,36 @@ export type ContributionRow = {
  * hours and also other hours"), so a session_type this table has never
  * shown before still lands in "Other" instead of being silently dropped.
  */
+// Deployment date (2026-10-13, per request): the date of the first session ever scheduled for each instructor -- earliest
+// session_start_datetime across ALL their sessions, whatever the status, so someone whose first sessions are still upcoming
+// or were cancelled still gets a date. One small query, merged into each contribution row below.
+async function fetchDeploymentDates(): Promise<Map<string, string>> {
+  const bq = client();
+  const ref = tableRef(SESSION_SCHEDULE_TABLE);
+  const query = `
+    SELECT instructor_user_id, FORMAT_DATE('%Y-%m-%d', MIN(DATE(session_start_datetime))) AS deployment_date
+    FROM \`${ref}\`
+    WHERE instructor_user_id IS NOT NULL AND session_start_datetime IS NOT NULL
+    GROUP BY instructor_user_id
+  `;
+  try {
+    const [rows] = await runWithHardTimeout(() => bq.query({ query }), API_TIMEOUT_MS * 3 + 10000);
+    const map = new Map<string, string>();
+    for (const r of rows as Array<Record<string, unknown>>) {
+      const id = String(r.instructor_user_id ?? "");
+      const date = String(r.deployment_date ?? "");
+      if (id && /^\d{4}-\d{2}-\d{2}$/.test(date)) map.set(id, date);
+    }
+    return map;
+  } catch (e) {
+    throw new InstructorContributionError(`Deployment-date query against ${ref} failed: ${(e as Error).message}`);
+  }
+}
+
 export async function fetchContributionRows(): Promise<ContributionRow[]> {
   const bq = client();
   const ref = tableRef(SESSION_SCHEDULE_TABLE);
+  const deploymentDates = await fetchDeploymentDates();
   const query = `
     SELECT
       instructor_user_id,
@@ -388,6 +417,7 @@ export async function fetchContributionRows(): Promise<ContributionRow[]> {
           lecture_sessions: Number(r.lecture_sessions ?? 0),
           practice_sessions: Number(r.practice_sessions ?? 0),
           session_days: Number(r.session_days ?? 0),
+          deployment_date: deploymentDates.get(String(r.instructor_user_id ?? "")) ?? null,
           all_batches: allBatches,
           recent_batches: recentBatches,
           // Derived from recent_batches (last 30 days), not all_batches

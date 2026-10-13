@@ -124,6 +124,7 @@ export async function storeContribution(rows: ContributionRow[]): Promise<number
         lectureSessions: row.lecture_sessions,
         practiceSessions: row.practice_sessions,
         sessionDays: row.session_days,
+        deploymentDate: row.deployment_date,
         allBatches: row.all_batches,
         recentBatches: row.recent_batches,
         niatCohorts: row.niat_cohorts,
