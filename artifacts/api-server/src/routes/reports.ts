@@ -142,7 +142,12 @@ const toApiPerson = (row: InstructorRow) => ({
 // what powers a click-to-expand details view on top of the headline total
 // instructor count card (department/campus/payroll status per person, not
 // just name+id like toApiPerson above).
-const toApiInstructorSummary = (row: InstructorRow, contributionByTeachosId: Map<string, string[]>) => ({
+// Archived copy of the Darwin/TeachOS fields the Instructors tab shows (2026-10-13, per request: "even when an instructor is
+// removed ... converted to payroll, even the Darwin is removed ... we can still have their data so that from the instructor tab
+// we can reflect the data"). Used ONLY as a fallback for a person with no current Darwin record: a live Darwin value always wins.
+type ArchiveFallback = Pick<ArchiveRow, "employeeId" | "teachosUserId" | "dateOfJoining" | "orgEmail" | "workspace" | "gender" | "exitGender" | "manualGender" | "designation" | "exitDesignation" | "deptArea" | "manualDeptArea" | "directManager" | "niatCohorts">;
+
+const toApiInstructorSummary = (row: InstructorRow, contributionByTeachosId: Map<string, string[]>, archived?: ArchiveFallback) => ({
   id: row.id,
   full_name: row.fullName,
   employee_id: row.employeeId,
@@ -162,7 +167,7 @@ const toApiInstructorSummary = (row: InstructorRow, contributionByTeachosId: Map
   // strictly a gap-filler for the population that has nothing else, same
   // "computed always wins over a lesser source" convention as gender/
   // dept_area below.
-  designation: row.designation || row.exitDesignation || null,
+  designation: row.designation || row.exitDesignation || archived?.designation || archived?.exitDesignation || null,
   department: row.department || row.exitDepartment || null,
   dept_bucket: row.deptBucket,
   // Added (2026-09-22, per request: a "bifurcation" column on the
@@ -186,8 +191,9 @@ const toApiInstructorSummary = (row: InstructorRow, contributionByTeachosId: Map
   // frontend whether to render plain text (computed) or the manual-entry
   // dropdown (manual/none) -- deliberately not offered at all for
   // Operations team rows, whose null dept_area is intentional, not a gap.
-  dept_area: normalizeSubjectArea(row.deptArea || row.manualDeptArea || null),
-  dept_area_source: row.deptArea ? "computed" : row.manualDeptArea ? "manual" : null,
+  // Archived subject is the last fallback (2026-10-13): shown as a locked "computed" value, since it was computed earlier.
+  dept_area: normalizeSubjectArea(row.deptArea || row.manualDeptArea || archived?.deptArea || archived?.manualDeptArea || null),
+  dept_area_source: row.deptArea ? "computed" : row.manualDeptArea ? "manual" : (archived?.deptArea || archived?.manualDeptArea) ? "computed" : null,
   is_payroll: row.classification === "payroll_converted",
   deployment_status: row.deploymentStatus,
   institutes: row.institutes,
@@ -210,7 +216,7 @@ const toApiInstructorSummary = (row: InstructorRow, contributionByTeachosId: Map
   // text (teachos) or the manual-entry dropdown (manual/none).
   capability_manager: row.teachosManager || row.manualCapabilityManager || null,
   capability_manager_source: row.teachosManager ? "teachos" : row.manualCapabilityManager ? "manual" : null,
-  darwin_manager: row.directManager || null,
+  darwin_manager: row.directManager || (!row.inDarwin ? archived?.directManager : null) || null,
   // Darwin's Date of joining -- added to the Instructors-tab table (2026-09,
   // per request), mirroring the same field already on every Darwin
   // Breakdown bucket (see toApiCandidate below). Gated on inDarwin (not just
@@ -220,12 +226,13 @@ const toApiInstructorSummary = (row: InstructorRow, contributionByTeachosId: Map
   // sync and has since dropped out of it would otherwise still show that
   // stale date. Per request (2026-09-09): no Darwin access right now ->
   // blank, regardless of what's sitting in the column from before.
-  date_of_joining: row.inDarwin ? row.dateOfJoining : null,
+  // 2026-10-13: a person with no current Darwin record falls back to the date archived while they were in Darwin.
+  date_of_joining: row.inDarwin ? row.dateOfJoining : (archived?.dateOfJoining ?? null),
   // Darwin's own "Org Email Id" field -- added to the Instructors tab table
   // (2026-09-15, per request). Same gating as date_of_joining above: a
   // TeachOS-only row (no current Darwin access, or a stale value left over
   // from a past Darwin match) shows blank rather than a stale email.
-  org_email: row.inDarwin ? row.orgEmail : null,
+  org_email: row.inDarwin ? row.orgEmail : (archived?.orgEmail ?? null),
   // Darwin's own "Workspace" field -- powers the Instructors tab table's
   // "Location (Darwin)" column. Originally sourced from Darwin's "Work
   // Location" field (2026-09-15); switched to "Workspace" instead
@@ -233,7 +240,7 @@ const toApiInstructorSummary = (row: InstructorRow, contributionByTeachosId: Map
   // frontend column, just a different Darwin source column feeding it.
   // Distinct from the existing Campus column (institutes, TeachOS
   // deployment). Same gating as date_of_joining/org_email above.
-  work_location: row.inDarwin ? row.workspace : null,
+  work_location: row.inDarwin ? row.workspace : (archived?.workspace ?? null),
   // Darwin's own Gender field -- added (2026-09-09, per request) to power a
   // gender filter + male/female count on the Instructors tab. Same gating
   // as date_of_joining above: a TeachOS-only row (no Darwin record at all,
@@ -258,8 +265,9 @@ const toApiInstructorSummary = (row: InstructorRow, contributionByTeachosId: Map
   // Darwin's own field, an exit record is a secondary source, so leaving it
   // correctable by whoever reviews the row is safer than presenting it as
   // locked fact.
-  gender: (row.inDarwin ? row.gender : null) ?? row.exitGender ?? row.manualGender ?? null,
-  gender_source: row.inDarwin && row.gender ? "darwin" : row.exitGender ? "exit" : row.manualGender ? "manual" : null,
+  gender: (row.inDarwin ? row.gender : null) ?? row.exitGender ?? row.manualGender ?? archived?.gender ?? archived?.exitGender ?? archived?.manualGender ?? null,
+  // Archived Darwin gender is locked like a live Darwin value (2026-10-13).
+  gender_source: row.inDarwin && row.gender ? "darwin" : row.exitGender ? "exit" : row.manualGender ? "manual" : archived?.gender ? "darwin" : archived?.exitGender ? "exit" : archived?.manualGender ? "manual" : null,
   // Whether this person has a live Darwinbox exit record on file (2026-09-17,
   // per request) -- not gated on inDarwin like the fields above, since
   // exitFlag is computed straight from darwinboxExitsTable and stays
@@ -299,7 +307,11 @@ const toApiInstructorSummary = (row: InstructorRow, contributionByTeachosId: Map
   // no teachosUserId, or no matching contribution row at all (never synced,
   // or genuinely no COMPLETED sessions in the last 30 days) -- same "empty,
   // not missing" convention as institutes/enrolled_plans above.
-  niat_cohorts: (row.inTeachos && row.teachosUserId && contributionByTeachosId.get(row.teachosUserId)) || [],
+  // Falls back to the archived cohorts (2026-10-13) when the live contribution table has none for the person.
+  niat_cohorts: (() => {
+    const live = (row.inTeachos && row.teachosUserId && contributionByTeachosId.get(row.teachosUserId)) || [];
+    return live.length > 0 ? live : (archived?.niatCohorts ?? []);
+  })(),
 });
 
 // Instructor Department population (Instructors + Mentors + Ops team,
@@ -501,7 +513,16 @@ router.get("/reports/instructors", async (_req, res) => {
   // whenever the contribution table gains a column that the database has not been pushed yet.
   const contributionRows = await db.select({ instructorUserId: instructorContributionTable.instructorUserId, niatCohorts: instructorContributionTable.niatCohorts }).from(instructorContributionTable);
   const contributionByTeachosId = new Map(contributionRows.map((c) => [c.instructorUserId, c.niatCohorts]));
-  const summarize = (row: InstructorRow) => toApiInstructorSummary(row, contributionByTeachosId);
+  // Archived Darwin/TeachOS fields for the fallback above -- only the columns the fallback reads.
+  const archiveRows: ArchiveFallback[] = await db.select({
+    employeeId: instructorArchiveTable.employeeId, teachosUserId: instructorArchiveTable.teachosUserId, dateOfJoining: instructorArchiveTable.dateOfJoining,
+    orgEmail: instructorArchiveTable.orgEmail, workspace: instructorArchiveTable.workspace, gender: instructorArchiveTable.gender, exitGender: instructorArchiveTable.exitGender,
+    manualGender: instructorArchiveTable.manualGender, designation: instructorArchiveTable.designation, exitDesignation: instructorArchiveTable.exitDesignation,
+    deptArea: instructorArchiveTable.deptArea, manualDeptArea: instructorArchiveTable.manualDeptArea, directManager: instructorArchiveTable.directManager, niatCohorts: instructorArchiveTable.niatCohorts,
+  }).from(instructorArchiveTable);
+  const archiveByEmployeeId = new Map(archiveRows.filter((a) => a.employeeId).map((a) => [a.employeeId!, a]));
+  const archiveByTeachosId = new Map(archiveRows.filter((a) => a.teachosUserId).map((a) => [a.teachosUserId!, a]));
+  const summarize = (row: InstructorRow) => toApiInstructorSummary(row, contributionByTeachosId, (row.employeeId ? archiveByEmployeeId.get(row.employeeId) : undefined) ?? (row.teachosUserId ? archiveByTeachosId.get(row.teachosUserId) : undefined));
 
   // The "total instructor count" and every breakdown here are anchored on
   // TeachOS's own instructor roster (inTeachos=true) — that's the

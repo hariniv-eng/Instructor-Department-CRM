@@ -321,6 +321,23 @@ export const instructorArchiveTable = pgTable("instructor_archive", {
   deploymentStatus: text("deployment_status"),
   payrollCandidateMatched: boolean("payroll_candidate_matched").notNull().default(false),
   payrollCandidateNote: text("payroll_candidate_note"),
+  // TeachOS-side snapshot (2026-10-13, per request: "everything that we have in the instructor tab ... should be saved in the
+  // instructor archive" so a person who leaves Darwin / is converted to payroll keeps their data). Copied from the
+  // contribution and training tables by snapshotTeachosDataIntoArchive() (lib/archiveInstructors.ts) and, like the Darwin
+  // fields above, STICKY: only overwritten when the live source actually has data for the person.
+  // Needs `pnpm --filter @workspace/db run push` after deploying.
+  niatCohorts: text("niat_cohorts").array().notNull().default([]),
+  lectureMinutes: integer("lecture_minutes"),
+  practiceMinutes: integer("practice_minutes"),
+  otherMinutes: integer("other_minutes"),
+  sessionsCompleted: integer("sessions_completed"),
+  lectureSessions: integer("lecture_sessions"),
+  practiceSessions: integer("practice_sessions"),
+  sessionDays: integer("session_days"),
+  deploymentDate: date("deployment_date"),
+  allBatches: text("all_batches").array().notNull().default([]),
+  // One entry per course: { course_key, track_group, status, units_total, units_completed }.
+  trainingSnapshot: jsonb("training_snapshot").$type<{ course_key: string; track_group: string; status: string; units_total: number; units_completed: number }[]>(),
   // Which key resolved this row to an existing archive entry the last time
   // it was updated: "employee_id" | "teachos_user_id" | "name" | null (row
   // just created, nothing to match against yet). Purely diagnostic -- lets
