@@ -858,7 +858,10 @@ export function bifurcationLabel(classification: string | null): string {
 // derived read-only, same treatment as Bifurcation above: checked in a
 // fixed priority order (Academy, then IIT X DSA, then Intensive), with
 // NIAT as the default for everyone who matches none of the other three.
-//   - Academy: TeachOS Enrolled Plans field (2026-09-29 finding: this field
+//   - Academy (rule changed 2026-10-13, per request): Campus (institutes) has ANY entry containing
+//     "academy" (case-insensitive), the same way Intensive works below. The Enrolled Plans history
+//     that follows no longer decides this -- kept only as a record of the old rule:
+//     (old rule: TeachOS Enrolled Plans field (2026-09-29 finding: this field
 //     now holds a numbered, newline-separated list of EVERY plan a person is
 //     enrolled in, e.g. "1. CBA_ONBOARDING\n2. NIAT" -- it used to be a
 //     single flat plan code, which is why an exact-match check silently
@@ -867,7 +870,7 @@ export function bifurcationLabel(classification: string | null): string {
 //     Academy Genius Career Plus" plan). Other Academy-adjacent codes exist
 //     in the live data (CCBP_ACADEMY_GENIUS without Career Plus,
 //     CCBP_ACADEMY_SMART) but are deliberately NOT included here, per
-//     explicit confirmation -- only CCBP_ACADEMY_GENIUS_CAREER_PLUS counts.
+//     explicit confirmation -- only CCBP_ACADEMY_GENIUS_CAREER_PLUS counts.)
 //   - IIT X DSA (rule changed 2026-10-08, per request -- the old
 //     "software developer" designation test is gone): Darwin Location
 //     (work_location -- sourced from Darwin's Workspace field, see
@@ -912,7 +915,9 @@ export function productLabel(person: InstructorSummary): string {
   // Every Operations team row is the "Support" product (2026-10-08, per request) -- checked
   // first so none of the instructor rules below (IIT X DSA, Training, ...) ever apply to them.
   if (person.classification === 'excluded_ops_managers' || person.classification === 'instructor_ops') return 'Support';
-  if ((person.enrolled_plans ?? '').includes('CCBP_ACADEMY_GENIUS_CAREER_PLUS')) return 'Academy';
+  // Academy (rule changed 2026-10-13, per request): Campus (institutes) has ANY entry containing "academy"
+  // (case-insensitive) -- replaces the old TeachOS Enrolled Plans (CCBP_ACADEMY_GENIUS_CAREER_PLUS) test.
+  if ((person.institutes ?? []).some((i) => i.toLowerCase().includes('academy'))) return 'Academy';
   // IIT X DSA (rule changed 2026-10-08, per request -- designation no longer matters): Darwin
   // location is KKH AND the TeachOS Capability Manager is missing AND the
   // Darwin manager is Jashwanth Dandu (NW0005864) -- all three, not "or" -- OR (2026-10-09) the
