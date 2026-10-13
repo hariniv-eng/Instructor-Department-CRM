@@ -259,6 +259,8 @@ export const BATCH_NAME_TO_NIAT_COHORT: Record<string, string> = {
   "Lingaya's Vidyapeeth Batch 1": NIAT_COHORT_2026,
   "Malla Reddy Tirupati Batch 1": NIAT_COHORT_2026,
   "Malla Reddy University Batch 1": NIAT_COHORT_2026,
+  // Added 2026-10-13, per request: MVR College of Engineering & Technology is a 2026 cohort.
+  "MVR College Batch 1": NIAT_COHORT_2026,
   "Noida International University Batch -1": NIAT_COHORT_2026,
   "Noida International University Batch 1": NIAT_COHORT_2026,
   "P K Das University": NIAT_COHORT_2026,
@@ -510,4 +512,29 @@ export async function inspectContributionAggregation(): Promise<void> {
   console.log(`Total COMPLETED sessions: ${totalSessions.toLocaleString()}, total minutes: ${totalMinutes.toLocaleString()} (${(totalMinutes / 60).toFixed(1)} hours)`);
   console.log("\nFirst 15 rows (instructor_user_id, lecture/practice/other minutes, sessions_completed):");
   console.log(rows.slice(0, 15));
+}
+
+/**
+ * Read-only diagnostic (2026-10-13): every session on the schedule table for the given instructors from `days` ago to
+ * `daysAhead` days from now, of any status, grouped by instructor, status, type and batch. Used by
+ * _tmp_scheduled_classes_check.ts to answer "do these people have classes scheduled?".
+ */
+export async function inspectScheduleForUsers(userIds: string[], days = 30, daysAhead = 30): Promise<Array<Record<string, unknown>>> {
+  if (userIds.length === 0) return [];
+  const bq = client();
+  const ref = tableRef(SESSION_SCHEDULE_TABLE);
+  const query = `
+    SELECT instructor_user_id, session_status, session_type, batch_name,
+           COUNT(*) AS sessions,
+           FORMAT_DATE('%Y-%m-%d', MIN(DATE(session_start_datetime))) AS first_day,
+           FORMAT_DATE('%Y-%m-%d', MAX(DATE(session_start_datetime))) AS last_day
+    FROM \`${ref}\`
+    WHERE instructor_user_id IN UNNEST(@ids)
+      AND session_start_datetime >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL ${Math.max(1, Math.floor(days))} DAY)
+      AND session_start_datetime <= DATETIME_ADD(CURRENT_DATETIME(), INTERVAL ${Math.max(0, Math.floor(daysAhead))} DAY)
+    GROUP BY instructor_user_id, session_status, session_type, batch_name
+    ORDER BY instructor_user_id, last_day DESC
+  `;
+  const [rows] = await runWithHardTimeout(() => bq.query({ query, params: { ids: userIds } }), API_TIMEOUT_MS * 3 + 10000);
+  return rows as Array<Record<string, unknown>>;
 }
