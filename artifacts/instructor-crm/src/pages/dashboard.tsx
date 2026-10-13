@@ -196,7 +196,8 @@ export default function DashboardPage() {
 
     {report && <section className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:items-stretch animate-rise" aria-label="Product mix, NIAT contribution and exit data">
       <ProductMixCard people={departmentPeople} instructors={instructorPeople} mentors={mentorPeople} />
-      <NiatContributionCard people={departmentPeople} />
+      {/* Instructors only (2026-10-13): the card filters these to Product = NIAT (Deployed); mentors and the Operations team are not part of it. */}
+      <NiatContributionCard people={instructorPeople} />
     </section>}
     {report && <section className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2 animate-rise" aria-label="Campuses, capability managers and NIAT university map">
       <div className="flex min-w-0 flex-col gap-3">
