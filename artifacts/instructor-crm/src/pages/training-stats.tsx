@@ -59,6 +59,8 @@ type TrainingStatsRow = {
   has_training_data: boolean;
   subject_area: string | null;
   courses: Record<string, CourseStatus>;
+  // Share of each course's units completed (0-100), only for courses the instructor has data for.
+  course_progress?: Record<string, number>;
 };
 
 type TrainingStatsResponse = {
@@ -127,10 +129,12 @@ const STATUS_BADGE: Record<CourseStatus, { label: string; className: string }> =
   NO_DATA: { label: 'No data', className: 'bg-transparent text-muted-foreground' },
 };
 
-function StatusBadge({ status }: { status: CourseStatus }) {
+// An In Progress course also shows how much of it is done, e.g. "In Progress (62%)" (2026-10-14, per request).
+function StatusBadge({ status, progress }: { status: CourseStatus; progress?: number }) {
   const badge = STATUS_BADGE[status];
   if (status === 'NO_DATA') return <span className="text-[11px] text-muted-foreground">—</span>;
-  return <span className={`inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-bold ${badge.className}`}>{badge.label}</span>;
+  const label = status === 'IN_PROGRESS' && progress !== undefined ? `${badge.label} (${Math.round(progress)}%)` : badge.label;
+  return <span className={`inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-bold ${badge.className}`}>{label}</span>;
 }
 
 // Subject-wise completion % (2026-10-12, per request): Completed = 100%, In Progress = 50%, Not Started = 0%, averaged
@@ -143,7 +147,12 @@ function subjectCompletion(row: TrainingStatsRow, defs: TrainingCourseDef[]): nu
   if (!row.has_training_data) return null;
   const scores = defs
     .filter((def) => isResolved(def))
-    .map((def) => STATUS_SCORE[row.courses[def.key] ?? 'NO_DATA'])
+    .map((def) => {
+      const status = row.courses[def.key] ?? 'NO_DATA';
+      // An In Progress course counts for how much of it is actually done; 50% only if that figure is missing.
+      if (status === 'IN_PROGRESS' && row.course_progress?.[def.key] !== undefined) return row.course_progress[def.key];
+      return STATUS_SCORE[status];
+    })
     .filter((score): score is number => score !== undefined);
   if (scores.length === 0) return null;
   return scores.reduce((sum, score) => sum + score, 0) / scores.length;
@@ -252,7 +261,7 @@ export default function TrainingStatsPage() {
     </p>}
 
     {data && activeTaxonomy.length > 0 && <p data-testid="note-subject-completion" className="mb-6 max-w-3xl text-[12px] leading-relaxed text-muted-foreground">
-      <strong className="font-semibold text-foreground">Subject completion %</strong> averages each course in the subject. A course counts as Completed once 85% or more of its units are done, In Progress below that, and Not Started at zero progress. Scores: Completed = 100%, In Progress = 50%, Not Started or no data = 0%. Courses still showing "Mapping pending" are left out. For example, Frontend with 5 courses completed and React JS in progress is (5 x 100 + 50) / 6 = 91.7%.
+      <strong className="font-semibold text-foreground">Subject completion %</strong> averages each course in the subject. A course counts as Completed once 85% or more of its units are done, In Progress below that, and Not Started at zero progress. Scores: Completed = 100%, In Progress = the share of that course's units actually done (shown next to the status), Not Started or no data = 0%. Courses still showing "Mapping pending" are left out. For example, Frontend with 5 courses completed and React JS 60% done is (5 x 100 + 60) / 6 = 93.3%.
     </p>}
 
     {data && activeTaxonomy.length === 0 && <EmptyState
@@ -280,7 +289,7 @@ export default function TrainingStatsPage() {
                 <th rowSpan={2} className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Department</th>
                 <th rowSpan={2} className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Capability Manager</th>
                 {groups.map((group) => <th key={group.trackGroup} colSpan={group.defs.length} className="whitespace-nowrap border-b border-l border-border px-4 py-2 text-center font-mono-ui text-[10px] font-bold uppercase tracking-[0.12em] text-foreground">{group.trackGroup}</th>)}
-                <th colSpan={groups.length} data-testid="header-subject-completion" className="whitespace-nowrap border-b border-l-2 border-border bg-[#eef4ee] px-4 py-2 text-center font-mono-ui text-[10px] font-bold uppercase tracking-[0.12em] text-foreground" title="Completed = 100%, In Progress = 50%, Not Started or no data = 0%, averaged over the subject's mapped courses">Subject completion %</th>
+                <th colSpan={groups.length} data-testid="header-subject-completion" className="whitespace-nowrap border-b border-l-2 border-border bg-[#eef4ee] px-4 py-2 text-center font-mono-ui text-[10px] font-bold uppercase tracking-[0.12em] text-foreground" title="Completed = 100%, In Progress = its actual % done, Not Started or no data = 0%, averaged over the subject's mapped courses">Subject completion %</th>
               </tr>
               <tr className="border-b border-border bg-[#f4f7f9]">
                 {groups.flatMap((group) => group.defs.map((def, i) => <th key={def.key} className={`whitespace-nowrap px-3 py-2.5 text-center font-mono-ui text-[10px] uppercase tracking-[0.1em] text-muted-foreground ${i === 0 ? 'border-l border-border' : ''}`}>{def.label}</th>))}
@@ -293,7 +302,7 @@ export default function TrainingStatsPage() {
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] font-semibold text-foreground">{row.full_name}</td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-muted-foreground">{row.department || '—'}</td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-muted-foreground">{row.capability_manager || '—'}</td>
-                {activeTaxonomy.map((def, i) => <td key={def.key} className={`px-3 py-2.5 text-center ${i === 0 ? 'border-l border-border' : ''}`}><StatusBadge status={row.courses[def.key] ?? 'NO_DATA'} /></td>)}
+                {activeTaxonomy.map((def, i) => <td key={def.key} className={`px-3 py-2.5 text-center ${i === 0 ? 'border-l border-border' : ''}`}><StatusBadge status={row.courses[def.key] ?? 'NO_DATA'} progress={row.course_progress?.[def.key]} /></td>)}
                 {groups.map((group, i) => {
                   const pct = subjectCompletion(row, group.defs);
                   return <td key={`pct-${group.trackGroup}`} data-testid={`cell-subject-completion-${group.trackGroup}`} className={`bg-[#f6faf6] px-3 py-2.5 text-center ${i === 0 ? 'border-l-2 border-border' : ''}`}>{pct === null ? <span className="text-[11px] text-muted-foreground">—</span> : <span className={`inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-bold tabular-nums ${percentTone(pct)}`}>{formatPercent(pct)}</span>}</td>;

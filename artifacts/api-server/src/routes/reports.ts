@@ -1267,6 +1267,9 @@ router.get("/reports/training-stats", requireAuth, requireRole("admin"), async (
     const courseStatuses = p.teachosUserId ? byInstructor.get(p.teachosUserId) : undefined;
     const hasTrainingData = !!courseStatuses;
     const courses: Record<string, string> = {};
+    // Share of the course's units completed, 0-100 (2026-10-14, per request: show how far an In Progress course is). Only
+    // for courses the instructor has real rows for; units_completed / units_total from the training sync.
+    const courseProgress: Record<string, number> = {};
     for (const def of TRAINING_COURSE_TAXONOMY) {
       if (!isResolvedCourse(def)) {
         // No confident course_title mapping yet -- see
@@ -1282,7 +1285,9 @@ router.get("/reports/training-stats", requireAuth, requireRole("admin"), async (
         // course rows that are all YET_TO_START.
         courses[def.key] = "NO_DATA";
       } else {
-        courses[def.key] = courseStatuses!.get(def.key)?.status ?? "NOT_STARTED";
+        const rec = courseStatuses!.get(def.key);
+        courses[def.key] = rec?.status ?? "NOT_STARTED";
+        if (rec && rec.unitsTotal > 0) courseProgress[def.key] = Math.round((rec.unitsCompleted / rec.unitsTotal) * 1000) / 10;
       }
     }
     return {
@@ -1304,6 +1309,7 @@ router.get("/reports/training-stats", requireAuth, requireRole("admin"), async (
       subject_area: normalizeSubjectArea(p.deptArea || p.manualDeptArea || null),
       has_training_data: hasTrainingData,
       courses,
+      course_progress: courseProgress,
     };
   });
 
