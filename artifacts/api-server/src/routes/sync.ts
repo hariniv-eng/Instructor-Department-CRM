@@ -14,9 +14,10 @@ import { fetchNiatInstructorDetailsRows, NiatInstructorDetailsError } from "../l
 import { fetchCapabilityManagerRows } from "../lib/connectors/capabilityManager";
 import { fetchCourseStatusRows, InstructorLearningStatusError } from "../lib/connectors/instructorLearningStatus";
 import { fetchContributionRows, fetchContributionDailyRows, InstructorContributionError } from "../lib/connectors/instructorContribution";
+import { fetchEvaluationDailyRows } from "../lib/connectors/instructorEvaluations";
 import { snapshotTeachosDataIntoArchive } from "../lib/archiveInstructors";
 import { resolvedCourseDefs } from "../data/trainingCourseTaxonomy";
-import { storeDarwinboxActive, storeDarwinboxExits, storeDarwinboxFullRoster, storeTeachosDeployment, storeTrainingStatus, storeContribution, storeContributionDaily } from "../lib/storeRaw";
+import { storeDarwinboxActive, storeDarwinboxExits, storeDarwinboxFullRoster, storeTeachosDeployment, storeTrainingStatus, storeContribution, storeContributionDaily, storeEvaluationDaily } from "../lib/storeRaw";
 import { reconcileDarwin, reconcileDarwinFullRosterFallback, reconcileTeachos, reconcileTeachosEmployeeIdReference, reconcileCapabilityManager, recomputeStatuses } from "../lib/reconcile";
 import { sdb, inSyncTransaction, inSavepoint, withSyncLock } from "../lib/syncContext";
 import { LAST_SYNC, LAST_CAPABILITY_MANAGER_SYNC, setLastCapabilityManagerSync, DAILY_AUTO_SYNC_INTERVAL_HOURS, type SyncResult } from "../lib/syncState";
@@ -271,6 +272,14 @@ async function runContributionSync(): Promise<SyncResult> {
     const stored = await storeContribution(rows);
     // Per-day rows for the Contribution tab's date filter (2026-10-12).
     await storeContributionDaily(await fetchContributionDailyRows());
+    // Demo and AI-assessment hours (2026-10-14, per request). Never fails the Contribution sync: if this part breaks (or its table has
+    // not been pushed yet) the sessions data above is still saved and the Demo / AI columns just keep their last values.
+    try {
+      const evaluationRows = await fetchEvaluationDailyRows();
+      await inSavepoint(() => storeEvaluationDaily(evaluationRows));
+    } catch (e) {
+      console.error("[contribution] demo / AI assessment hours not updated:", (e as Error).message);
+    }
     // Keep the Instructor Archive's copy of the contribution data current (2026-10-13).
     await snapshotTeachosDataIntoArchive().catch((e) => console.error("[archive] contribution snapshot failed:", e));
     await db.insert(uploadsTable).values({ source: "Instructor Contribution", filename: "BigQuery sync (niat_instructor_session_schedule_details, aggregated per instructor)", rowCount: stored });
