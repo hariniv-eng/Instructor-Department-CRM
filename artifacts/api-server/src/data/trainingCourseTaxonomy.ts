@@ -21,7 +21,7 @@
 // why each pending one is unresolved. Per request (2026-09-23): "Build now,
 // mark pending" -- ship with what's confirmed, fill in the rest once
 // answered.
-export type TrainingTrackGroup = "Frontend Development" | "Backend Development" | "DSA" | "Gen AI" | "DSML" | "Aptitude" | "Maths";
+export type TrainingTrackGroup = "Frontend Development" | "Backend Development" | "DSA" | "Gen AI" | "DSML" | "Aptitude" | "Maths" | "English";
 
 export type TrainingCourseDef = {
   key: string;
@@ -95,12 +95,13 @@ export const TRAINING_COURSE_TAXONOMY: TrainingCourseDef[] = [
     key: "dsa",
     label: "DSA",
     trackGroup: "DSA",
-    // The whole DSA course, found by its course_id (2026-10-14, per request: "do the same" as the Faculty-ops app, which maps
-    // DSA to this single course id). Rows of this course that belong to DIA / IPS topics are claimed by those two columns first
-    // (see fetchCourseStatusRows: columns with topicTitles are checked before the rest).
+    // Found by course_id (the title below is a backup if the id column is ever missing).
     courseIds: ["bb04e38a723e4bbfbf99ec43992bb31c"],
-    courseTitles: ["Phase 1: Programming Foundations in C++", "Phase 2: Algorithmic Foundations", "Phase 3: Data Structures & Discrete Math"],
-    topicTitles: ["Introduction to Programming with C++", "The C++ Standard Template Library", "Mathematics - I", "Sorting", "Binary Search", "Recursion and Backtracking", "Bit Manipulation"],
+    // 2026-10-14, per request ("do the same" as the Faculty-ops app): DSA is the "DSA Foundation" course -- the course whose id
+    // bb04e38a... Faculty-ops uses, confirmed live (15 topics, 671 instructors, ~199k unit rows). The earlier mapping
+    // (Phase 1-3 courses, filtered to a topic list, ~290 rows company-wide) was the wrong source, so DSA instructors showed
+    // "no data". DIA and IPS below keep their Phase topic lists; Faculty-ops has no course id for them.
+    courseTitles: ["DSA Foundation"],
   },
   {
     key: "dia",
@@ -152,6 +153,14 @@ export const TRAINING_COURSE_TAXONOMY: TrainingCourseDef[] = [
   { key: "math_for_cs", courseIds: ["70850c6b459c4134a16c3e42d46eb794"], label: "Mathematics for Computer Science", trackGroup: "Maths", courseTitles: ["Math For Computer Science", "Mathematics For Computer Science - AU", "Math for CSE", "Mathematics for Computer Science"] },
   { key: "probability_statistics", courseIds: ["39ddb075b7e8448abac2b89baa4fb3f4"], label: "Probability and Statistics", trackGroup: "Maths", courseTitles: ["Probability and Statistics(P&S)", "Probability and Statistics", "Probability & Statistics"] },
   { key: "linear_algebra_calculus", label: "Linear Algebra and Calculus", trackGroup: "Maths", courseTitles: ["Linear Algebra and Calculus"] },
+  // --- English (2026-10-14, per request: track English learning ONLY for English instructors) ---
+  // Same four courses the Faculty-ops app uses for its English tab, found by course id (titles are the BigQuery
+  // spellings confirmed with _tmp_course_id_check.ts). The Training Stats English tab lists only instructors whose
+  // subject area is English, so these columns never show for Tech or Maths instructors.
+  { key: "english_foundation", courseIds: ["968bccdcf5e04348af889db506d49c9a"], label: "Communicative English Foundation", trackGroup: "English", courseTitles: ["Communicative English Foundation- I", "Communicative English Foundation"] },
+  { key: "english_advanced", courseIds: ["bfd0a2efeb934e4bbc1c9acac895d6a4"], label: "Communicative English Advanced", trackGroup: "English", courseTitles: ["Communicative English Advanced"] },
+  { key: "english_applied", courseIds: ["e27acac864114f34abdeec3948e91e96"], label: "Communicative English Applied", trackGroup: "English", courseTitles: ["Applied Communicative English", "Communicative English Applied"] },
+  { key: "language_analytics", courseIds: ["7288e9d8992549758490a8a87b8b3dd9"], label: "Language Analytics", trackGroup: "English", courseTitles: ["Language Analytics"] },
 ];
 
 export function resolvedCourseDefs(): TrainingCourseDef[] {
