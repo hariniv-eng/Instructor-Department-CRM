@@ -161,6 +161,8 @@ export default function ContributionPage() {
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const [search, setSearch] = useState('');
+  // Subject filter (2026-10-14, per request): '' = all subjects, NONE = people with no subject set, otherwise one subject.
+  const [subject, setSubject] = useState('');
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: QUERY_KEY });
 
@@ -183,18 +185,26 @@ export default function ContributionPage() {
     }
   };
 
-  const searchedRows = useMemo(() => {
+  const subjectOptions = useMemo(() => (data ? [...new Set(data.rows.map((row) => row.subject_area).filter((area): area is string => !!area))].sort() : []), [data]);
+  const hasNoSubject = useMemo(() => !!data && data.rows.some((row) => !row.subject_area), [data]);
+  const subjectRows = useMemo(() => {
     if (!data) return [];
+    if (!subject) return data.rows;
+    if (subject === 'NONE') return data.rows.filter((row) => !row.subject_area);
+    return data.rows.filter((row) => row.subject_area === subject);
+  }, [data, subject]);
+  const searchedRows = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return data.rows;
-    return data.rows.filter((row) => row.full_name.toLowerCase().includes(q) || (row.employee_id ?? '').toLowerCase().includes(q));
-  }, [data, search]);
+    if (!q) return subjectRows;
+    return subjectRows.filter((row) => row.full_name.toLowerCase().includes(q) || (row.employee_id ?? '').toLowerCase().includes(q));
+  }, [subjectRows, search]);
   const pager = usePagedRows(searchedRows, 50);
 
   // Sum across every instructor currently loaded (unaffected by search) --
   // a quick "how much did the department teach in total" figure alongside
   // the per-instructor table below.
-  const totalHoursAllInstructors = useMemo(() => (data ? data.rows.reduce((sum, r) => sum + r.total_hours, 0) : 0), [data]);
+  const totalHoursAllInstructors = useMemo(() => subjectRows.reduce((sum, r) => sum + r.total_hours, 0), [subjectRows]);
+  const subjectLabel = subject === 'NONE' ? 'with no subject' : subject;
 
   return <div className="mx-auto max-w-[1500px]">
     <PageIntro
@@ -219,6 +229,13 @@ export default function ContributionPage() {
       <label className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">To
         <input type="date" value={dateTo} min={dateFrom || undefined} max={toIsoDay(new Date())} onChange={(event) => setDateTo(event.target.value)} data-testid="input-contribution-to" className="mt-1 block h-9 rounded-md border border-border bg-background px-2 text-[12px] font-semibold normal-case tracking-normal text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-ring/25" />
       </label>
+      <label className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">Subject
+        <select value={subject} onChange={(event) => setSubject(event.target.value)} data-testid="select-contribution-subject" className="mt-1 block h-9 min-w-[160px] rounded-md border border-border bg-background px-2 text-[12px] font-semibold normal-case tracking-normal text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-ring/25">
+          <option value="">All subjects</option>
+          {subjectOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+          {hasNoSubject && <option value="NONE">No subject set</option>}
+        </select>
+      </label>
       <div className="flex flex-wrap gap-1.5">
         {PRESETS.map((preset) => {
           const active = preset.days === null ? !dateFrom && !dateTo : dateFrom === daysAgo(preset.days) && dateTo === toIsoDay(new Date());
@@ -233,8 +250,8 @@ export default function ContributionPage() {
     {data && <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
       <div className="grid max-w-md grid-cols-1 gap-3 sm:grid-cols-2">
         <TopStat
-          label="Instructors + Mentors tracked"
-          value={formatKpi(data.count)}
+          label={subject ? `Instructors + Mentors tracked (${subjectLabel})` : 'Instructors + Mentors tracked'}
+          value={formatKpi(subjectRows.length)}
           meta={data.synced_at ? `Last synced -- ${new Date(data.synced_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' })}` : 'Not synced yet -- click Sync Now'}
           icon={<Clock size={16} />}
           tone="navy"
@@ -242,7 +259,7 @@ export default function ContributionPage() {
         <TopStat
           label="Total hours delivered"
           value={formatHours(totalHoursAllInstructors)}
-          meta={dateFrom || dateTo ? `Across every instructor and mentor, ${dateFrom ? formatDay(dateFrom) : 'the start'} to ${dateTo ? formatDay(dateTo) : 'today'}` : 'Across every instructor and mentor, all-time'}
+          meta={dateFrom || dateTo ? `Across ${subject ? `every ${subjectLabel} instructor and mentor` : 'every instructor and mentor'}, ${dateFrom ? formatDay(dateFrom) : 'the start'} to ${dateTo ? formatDay(dateTo) : 'today'}` : `Across ${subject ? `every ${subjectLabel} instructor and mentor` : 'every instructor and mentor'}, all-time`}
           icon={<Clock size={16} />}
           tone="teal"
         />

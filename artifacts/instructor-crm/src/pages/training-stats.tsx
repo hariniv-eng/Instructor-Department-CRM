@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { GraduationCap, RefreshCw } from 'lucide-react';
+import { CheckCircle2, Clock, GraduationCap, RefreshCw } from 'lucide-react';
 import { PageIntro, EmptyState, QueryError, SkeletonBlock, TopStat, TablePager, TableSearchInput, usePagedRows, formatKpi } from '@/components/ui-pieces';
 
 // "Training Stats" (2026-09-23, per request): an instructor's OWN
@@ -98,6 +98,20 @@ function useTrainingStats() {
   });
 }
 
+// Subject filter (2026-10-14, per request): an instructor's Subject (the same value as the Subject column) -> the course track group
+// that measures that subject's training. Selecting a subject shows only that subject's instructors and course columns, and the two
+// overview cards (Completed / In Progress) are worked out over exactly those instructors and that track group. A subject with no
+// course track here (for example Artificial Intelligence & Emerging Technologies) just filters the rows.
+const SUBJECT_TRACK: Record<string, string> = {
+  Frontend: 'Frontend Development',
+  Backend: 'Backend Development',
+  DSA: 'DSA',
+  GenAI: 'Gen AI',
+  Aptitude: 'Aptitude',
+  Maths: 'Maths',
+  English: 'English',
+};
+
 // Groups the flat taxonomy list into [{ trackGroup, defs }] in taxonomy
 // order, for the two-row grouped header below.
 function groupByTrack(taxonomy: TrainingCourseDef[]): { trackGroup: string; defs: TrainingCourseDef[] }[] {
@@ -167,6 +181,7 @@ export default function TrainingStatsPage() {
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const [activeTab, setActiveTab] = useState(SUB_TABS[0].key);
+  const [subject, setSubject] = useState('ALL');
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: QUERY_KEY });
 
@@ -206,14 +221,35 @@ export default function TrainingStatsPage() {
   // search on the Tech tab only searches among tech instructors, not the
   // whole roster.
   const [search, setSearch] = useState('');
+  // Subject filter: the subjects present on this tab, and the rows of the chosen one.
+  const subjectOptions = useMemo(() => [...new Set(activeRows.map((row) => row.subject_area).filter((area): area is string => !!area))].sort(), [activeRows]);
+  const subjectActive = subject !== 'ALL' && subjectOptions.includes(subject);
+  const subjectRows = useMemo(() => (subjectActive ? activeRows.filter((row) => row.subject_area === subject) : activeRows), [activeRows, subject, subjectActive]);
+  const selectedTrack = subjectActive ? SUBJECT_TRACK[subject] : undefined;
+  const trackTaxonomy = selectedTrack ? activeTaxonomy.filter((d) => d.trackGroup === selectedTrack) : [];
+  const displayTaxonomy = trackTaxonomy.length > 0 ? trackTaxonomy : activeTaxonomy;
+  // Overview cards for the chosen subject: how many of ITS instructors have finished every course of the subject (100%), and how
+  // many are part-way (above 0% and below 100%). Instructors with no training data or 0% are in neither.
+  const subjectSummary = useMemo(() => {
+    if (!subjectActive || trackTaxonomy.length === 0) return null;
+    let completed = 0;
+    let inProgress = 0;
+    for (const row of subjectRows) {
+      const pct = subjectCompletion(row, trackTaxonomy);
+      if (pct === null) continue;
+      if (pct >= 100) completed += 1;
+      else if (pct > 0) inProgress += 1;
+    }
+    return { completed, inProgress, total: subjectRows.length };
+  }, [subjectActive, subjectRows, trackTaxonomy]);
   const searchedRows = useMemo(() => {
     const query = search.trim().toLowerCase();
-    if (!query) return activeRows;
-    return activeRows.filter((row) => row.full_name.toLowerCase().includes(query) || (row.employee_id ?? '').toLowerCase().includes(query));
-  }, [activeRows, search]);
+    if (!query) return subjectRows;
+    return subjectRows.filter((row) => row.full_name.toLowerCase().includes(query) || (row.employee_id ?? '').toLowerCase().includes(query));
+  }, [subjectRows, search]);
   const pager = usePagedRows(searchedRows, 50);
-  const groups = groupByTrack(activeTaxonomy);
-  const pendingCount = activeTaxonomy.filter((d) => !isResolved(d)).length;
+  const groups = groupByTrack(displayTaxonomy);
+  const pendingCount = displayTaxonomy.filter((d) => !isResolved(d)).length;
 
   return <div className="mx-auto max-w-[1600px]">
     <PageIntro
@@ -233,31 +269,58 @@ export default function TrainingStatsPage() {
         key={tab.key}
         type="button"
         data-testid={`button-tab-${tab.key}`}
-        onClick={() => setActiveTab(tab.key)}
+        onClick={() => { setActiveTab(tab.key); setSubject('ALL'); }}
         className={`rounded-full px-4 py-2 text-[12px] font-bold transition-colors ${tab.key === activeTab ? 'bg-primary text-primary-foreground shadow-sm' : 'bg-secondary text-muted-foreground hover:text-foreground'}`}
       >
         {tab.label}
       </button>)}
     </div>
 
+    {data && subjectOptions.length > 1 && <div data-testid="training-subject-filter" className="-mt-3 mb-6 flex flex-wrap items-center gap-2">
+      <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">Subject</span>
+      {['ALL', ...subjectOptions].map((option) => <button
+        key={option}
+        type="button"
+        data-testid={`button-subject-${option}`}
+        onClick={() => setSubject(option)}
+        className={`rounded-full px-3 py-1.5 text-[11px] font-bold transition-colors ${(option === 'ALL' ? !subjectActive : subject === option) ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground hover:text-foreground'}`}
+      >
+        {option === 'ALL' ? 'All subjects' : option}
+      </button>)}
+    </div>}
+
     {query.isLoading && <SkeletonBlock className="h-[520px]" />}
     {query.isError && <QueryError message="Training Stats is unavailable right now." />}
 
     {data && <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-      <div className="grid max-w-xs grid-cols-1">
+      <div className={`grid grid-cols-1 gap-3 ${subjectSummary ? 'max-w-3xl sm:grid-cols-3' : 'max-w-xs'}`}>
         <TopStat
-          label={`${activeSubTab.label} instructors tracked`}
-          value={formatKpi(activeRows.length)}
+          label={`${subjectActive ? subject : activeSubTab.label} instructors tracked`}
+          value={formatKpi(subjectRows.length)}
           meta={data.synced_at ? `Last synced -- ${new Date(data.synced_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' })}` : 'Not synced yet -- click Sync Now'}
           icon={<GraduationCap size={16} />}
           tone="navy"
         />
+        {subjectSummary && <TopStat
+          label={`${subject} -- completed`}
+          value={formatKpi(subjectSummary.completed)}
+          meta={`of ${formatKpi(subjectSummary.total)} ${subject} instructors at 100%`}
+          icon={<CheckCircle2 size={16} />}
+          tone="green"
+        />}
+        {subjectSummary && <TopStat
+          label={`${subject} -- in progress`}
+          value={formatKpi(subjectSummary.inProgress)}
+          meta={`of ${formatKpi(subjectSummary.total)} ${subject} instructors, part-way`}
+          icon={<Clock size={16} />}
+          tone="amber"
+        />}
       </div>
-      {activeRows.length > 0 && <TableSearchInput value={search} onChange={setSearch} testId="input-search-training-stats" />}
+      {subjectRows.length > 0 && <TableSearchInput value={search} onChange={setSearch} testId="input-search-training-stats" />}
     </div>}
 
     {data && pendingCount > 0 && <p className="mb-6 max-w-3xl text-[12px] leading-relaxed text-muted-foreground">
-      <strong className="font-semibold text-foreground">{pendingCount} column{pendingCount === 1 ? '' : 's'}</strong> ({activeTaxonomy.filter((d) => !isResolved(d)).map((d) => d.label).join(', ')}) don't have a confirmed course mapping yet and show as "Mapping pending" for everyone -- see Instructor_Learning_Status_Course_Mapping_Review.xlsx.
+      <strong className="font-semibold text-foreground">{pendingCount} column{pendingCount === 1 ? '' : 's'}</strong> ({displayTaxonomy.filter((d) => !isResolved(d)).map((d) => d.label).join(', ')}) don't have a confirmed course mapping yet and show as "Mapping pending" for everyone -- see Instructor_Learning_Status_Course_Mapping_Review.xlsx.
     </p>}
 
     {data && activeTaxonomy.length > 0 && <p data-testid="note-subject-completion" className="mb-6 max-w-3xl text-[12px] leading-relaxed text-muted-foreground">
@@ -304,7 +367,7 @@ export default function TrainingStatsPage() {
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-muted-foreground">{row.department || '—'}</td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-foreground" data-testid={`cell-subject-${row.employee_id ?? row.full_name}`}>{row.subject_area || '—'}</td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-muted-foreground">{row.capability_manager || '—'}</td>
-                {activeTaxonomy.map((def, i) => <td key={def.key} className={`px-3 py-2.5 text-center ${i === 0 ? 'border-l border-border' : ''}`}><StatusBadge status={row.courses[def.key] ?? 'NO_DATA'} progress={row.course_progress?.[def.key]} /></td>)}
+                {displayTaxonomy.map((def, i) => <td key={def.key} className={`px-3 py-2.5 text-center ${i === 0 ? 'border-l border-border' : ''}`}><StatusBadge status={row.courses[def.key] ?? 'NO_DATA'} progress={row.course_progress?.[def.key]} /></td>)}
                 {groups.map((group, i) => {
                   const pct = subjectCompletion(row, group.defs);
                   return <td key={`pct-${group.trackGroup}`} data-testid={`cell-subject-completion-${group.trackGroup}`} className={`bg-[#f6faf6] px-3 py-2.5 text-center ${i === 0 ? 'border-l-2 border-border' : ''}`}>{pct === null ? <span className="text-[11px] text-muted-foreground">—</span> : <span className={`inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-bold tabular-nums ${percentTone(pct)}`}>{formatPercent(pct)}</span>}</td>;
