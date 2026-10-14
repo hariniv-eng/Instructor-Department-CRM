@@ -9,7 +9,7 @@ import {
 } from "@workspace/db";
 import { desc } from "drizzle-orm";
 import { fetchDarwinRowsBoth, DarwinboxError } from "../lib/connectors/darwinbox";
-import { fetchExitRows, DarwinboxExitsError } from "../lib/connectors/darwinboxExits";
+import { fetchExitRows, DarwinboxExitsError, getBaseReportGeneratedAt } from "../lib/connectors/darwinboxExits";
 import { fetchNiatInstructorDetailsRows, NiatInstructorDetailsError } from "../lib/connectors/niatInstructorDetails";
 import { fetchCapabilityManagerRows } from "../lib/connectors/capabilityManager";
 import { fetchCourseStatusRows, InstructorLearningStatusError } from "../lib/connectors/instructorLearningStatus";
@@ -100,11 +100,11 @@ async function runDarwinboxExitsSync(): Promise<SyncResult> {
     // employee whose Darwin record was removed -- used to vanish, and the next status recompute then wiped their exit flag and
     // auto-marked them Payroll Converted. Now every stored exit row whose employee id is absent from this pull is carried over
     // unchanged. People who ARE in the pull use Darwin's fresh rows as before.
+    let keptRows = 0;
     {
       const have = new Set(rows.map((r) => String(r["Employee Id"] ?? "").trim().toLowerCase()).filter(Boolean));
       const previous = await db.select().from(darwinboxExitsTable);
       const keptPeople = new Set<string>();
-      let keptRows = 0;
       for (const prev of previous) {
         const raw = { ...((prev.rawData ?? {}) as Record<string, unknown>) };
         const id = String(prev.employeeId ?? raw["Employee Id"] ?? "").trim().toLowerCase();
@@ -119,7 +119,10 @@ async function runDarwinboxExitsSync(): Promise<SyncResult> {
     const stored = await inSyncTransaction(async () => {
       const n = await storeDarwinboxExits(rows);
       await recomputeStatuses(); // re-derives exit flags for existing instructors from the freshly replaced raw exits table — see comment above
-      await sdb.insert(uploadsTable).values({ source: "Exit List", filename: "Darwinbox reports-API sync (raw, flagged only)", rowCount: n });
+      // The details after the name feed GET /sync/health (base report age, how many people came from the fallback / were kept).
+      const fallbackAdded = rows.filter((r) => String(r["Exit Source"] ?? "").startsWith("Offboarding tracking")).length;
+      const detail = ` [base report generated ${getBaseReportGeneratedAt() ?? "unknown"}; fallback +${fallbackAdded}; kept ${keptRows}]`;
+      await sdb.insert(uploadsTable).values({ source: "Exit List", filename: `Darwinbox reports-API sync (raw, flagged only)${detail}`, rowCount: n });
       return n;
     });
     return { ok: true, source: "darwinbox_exits_live", stored, synced_at: new Date().toISOString() };
@@ -316,6 +319,82 @@ router.post("/sync/teachos", async (_req, res) => {
   const result = await runExclusive("teachos_live", runTeachosSync);
   if (!result.busy) LAST_SYNC.teachos_live = result;
   res.json(result);
+});
+
+// Sync health (2026-10-14, per request: "we need to see when a sync silently goes wrong"). Built only from the uploads history and the
+// stored exit rows, so it survives restarts and needs no new table. For every live source: when it last succeeded, whether that
+// covers the most recent 5:00 AM IST run, and whether the last run's row count dropped sharply against the run before it.
+// For the exits: how old Darwin's base report snapshot is, how many people came from the Offboarding fallback, and how many were
+// kept from earlier syncs.
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+function mostRecentDailyRun(now: Date): Date {
+  const istNow = new Date(now.getTime() + IST_OFFSET_MS);
+  let candidate = Date.UTC(istNow.getUTCFullYear(), istNow.getUTCMonth(), istNow.getUTCDate(), 5, 0, 0);
+  if (candidate > istNow.getTime()) candidate -= 24 * 3600 * 1000;
+  return new Date(candidate - IST_OFFSET_MS);
+}
+const HEALTH_SOURCES = [
+  { source: "Darwin", label: "Darwin HRMS" },
+  { source: "Exit List", label: "Darwin Exits" },
+  { source: "TeachOS", label: "TeachOS" },
+  { source: "Instructor Training Status", label: "Training Stats" },
+  { source: "Instructor Contribution", label: "Contribution" },
+] as const;
+
+router.get("/sync/health", async (_req, res) => {
+  const now = new Date();
+  const dueSince = mostRecentDailyRun(now);
+  const history = await db.select().from(uploadsTable).orderBy(desc(uploadsTable.uploadedAt)).limit(400);
+  const sources = HEALTH_SOURCES.map((h) => {
+    const runs = history.filter((u) => u.source === h.source);
+    const last = runs[0];
+    const prev = runs[1];
+    const hoursSince = last ? Math.round(((now.getTime() - last.uploadedAt.getTime()) / 3600000) * 10) / 10 : null;
+    const upToDate = !!last && last.uploadedAt >= dueSince;
+    const rowDrop = last && prev && prev.rowCount > 0 && last.rowCount < prev.rowCount * 0.97 ? { from: prev.rowCount, to: last.rowCount } : null;
+    const warnings: string[] = [];
+    if (!last) warnings.push("Never synced.");
+    else if (!upToDate) warnings.push(`Has not synced since the last 5:00 AM IST run (last success ${hoursSince}h ago).`);
+    if (rowDrop) warnings.push(`Row count dropped from ${rowDrop.from} to ${rowDrop.to} on the last run.`);
+    return { source: h.source, label: h.label, last_success_at: last?.uploadedAt ?? null, hours_since: hoursSince, last_rows: last?.rowCount ?? null, up_to_date: upToDate, row_drop: rowDrop, warnings };
+  });
+
+  const exitRows = await db.select({ employeeId: darwinboxExitsTable.employeeId, rawData: darwinboxExitsTable.rawData, syncedAt: darwinboxExitsTable.syncedAt }).from(darwinboxExitsTable);
+  const people = new Set(exitRows.map((r) => (r.employeeId ?? "").trim().toLowerCase()).filter(Boolean));
+  const sourceOf = (r: (typeof exitRows)[number]) => String((r.rawData as Record<string, unknown> | null)?.["Exit Source"] ?? "");
+  const fallbackRows = exitRows.filter((r) => sourceOf(r).startsWith("Offboarding tracking")).length;
+  const keptRows = exitRows.filter((r) => sourceOf(r).startsWith("Kept from an earlier sync")).length;
+  let newestRequest = "";
+  for (const r of exitRows) {
+    const raw = (r.rawData ?? {}) as Record<string, unknown>;
+    const t = String(raw["Separation Requested On"] ?? raw["Exit Date"] ?? "").trim();
+    const m = t.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+    const iso = m ? `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}` : /^\d{4}-\d{2}-\d{2}/.test(t) ? t.slice(0, 10) : "";
+    if (iso > newestRequest) newestRequest = iso;
+  }
+  const lastExit = history.find((u) => u.source === "Exit List");
+  const generated = lastExit?.filename.match(/base report generated ([^;\]]+)/)?.[1]?.trim() ?? null;
+  const generatedMs = generated && generated !== "unknown" ? Date.parse(generated) : NaN;
+  const baseAgeHours = Number.isNaN(generatedMs) ? null : Math.round(((now.getTime() - generatedMs) / 3600000) * 10) / 10;
+  const exitWarnings: string[] = [];
+  if (baseAgeHours !== null && baseAgeHours > 36) exitWarnings.push(`Darwin's base exit report was last generated ${baseAgeHours} hours ago (${generated}). Resignations raised since then come only from the Offboarding-tracking fallback. Ask the Darwin admin to refresh that report daily.`);
+  if (keptRows > 0) exitWarnings.push(`${keptRows} exit row(s) were kept from earlier syncs because Darwin no longer returns them.`);
+  res.json({
+    generated_at: now.toISOString(),
+    last_due_run: dueSince.toISOString(),
+    sources,
+    exits: {
+      stored_rows: exitRows.length,
+      people: people.size,
+      newest_stored_request_date: newestRequest || null,
+      from_offboarding_fallback: fallbackRows,
+      kept_from_earlier_syncs: keptRows,
+      base_report_generated_at: generated && generated !== "unknown" ? generated : null,
+      base_report_age_hours: baseAgeHours,
+      last_synced_at: exitRows.reduce<Date | null>((m, r) => (!m || r.syncedAt > m ? r.syncedAt : m), null),
+      warnings: exitWarnings,
+    },
+  });
 });
 
 router.get("/sync/status", (_req, res) => {

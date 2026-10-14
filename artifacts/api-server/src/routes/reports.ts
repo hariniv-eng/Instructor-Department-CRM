@@ -465,7 +465,10 @@ export function computeDepartmentAndExceptionRows(rawRows: InstructorRow[]) {
   // person whose raised exit is still "Pending With Approver" in Darwin must stay on this list until Darwin shows the
   // decision. Serving-notice people stay too (they were never dropped). Only people filed under another team and
   // people no longer in Darwin or TeachOS are left out.
-  const pendingApprovalRows = allRows.filter((r) => r.exitFlag && (r.inDarwin || r.inTeachos) && exitStatusLower(r).startsWith("pending") && !NOT_DEPARTMENT_CLASSIFICATIONS.has(r.classification ?? ""));
+  // 2026-10-14, per request ("what about the 6 names ... still pending"): people who are in NEITHER Darwin nor TeachOS any more
+  // but whose raised exit is still "Pending With Approver" stay on this list too. They have left, the approver simply has not
+  // acted, and without them here nobody would chase the approval (they were invisible in every queue).
+  const pendingApprovalRows = allRows.filter((r) => r.exitFlag && exitStatusLower(r).startsWith("pending") && !NOT_DEPARTMENT_CLASSIFICATIONS.has(r.classification ?? ""));
   // Payroll-converted instructors (2026-10-07): they carry a manual Exit entry
   // (default Payroll Converted) and usually have no Darwin exit record at all,
   // so when a Capability Manager later marks one Exited/Absconded/Serving
