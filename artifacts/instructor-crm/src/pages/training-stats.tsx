@@ -143,11 +143,12 @@ const STATUS_BADGE: Record<CourseStatus, { label: string; className: string }> =
   NO_DATA: { label: 'No data', className: 'bg-transparent text-muted-foreground' },
 };
 
-// An In Progress course also shows how much of it is done, e.g. "In Progress (62%)" (2026-10-14, per request).
+// An In Progress or Completed course also shows how much of it is done, e.g. "In Progress (62%)" or "Completed (92%)" (2026-10-14, per
+// request: a course counts as Completed from 85% of its units, so the actual share is shown to tell 85, 90 and 100 apart).
 function StatusBadge({ status, progress }: { status: CourseStatus; progress?: number }) {
   const badge = STATUS_BADGE[status];
   if (status === 'NO_DATA') return <span className="text-[11px] text-muted-foreground">—</span>;
-  const label = status === 'IN_PROGRESS' && progress !== undefined ? `${badge.label} (${Math.round(progress)}%)` : badge.label;
+  const label = (status === 'IN_PROGRESS' || status === 'COMPLETED') && progress !== undefined ? `${badge.label} (${Math.round(progress)}%)` : badge.label;
   return <span className={`inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-bold ${badge.className}`}>{label}</span>;
 }
 
@@ -324,7 +325,7 @@ export default function TrainingStatsPage() {
     </p>}
 
     {data && activeTaxonomy.length > 0 && <p data-testid="note-subject-completion" className="mb-6 max-w-3xl text-[12px] leading-relaxed text-muted-foreground">
-      <strong className="font-semibold text-foreground">Subject completion %</strong> averages each course in the subject. A course counts as Completed once 85% or more of its units are done, In Progress below that, and Not Started at zero progress. Scores: Completed = 100%, In Progress = the share of that course's units actually done (shown next to the status), Not Started or no data = 0%. Courses still showing "Mapping pending" are left out. For example, Frontend with 5 courses completed and React JS 60% done is (5 x 100 + 60) / 6 = 93.3%.
+      <strong className="font-semibold text-foreground">Subject completion %</strong> averages each course in the subject. A course counts as Completed once 85% or more of its units are done, In Progress below that, and Not Started at zero progress. Both Completed and In Progress show the actual share of units done next to the status (for example Completed (92%)). Scores: Completed = 100%, In Progress = the share of that course's units actually done (shown next to the status), Not Started or no data = 0%. Courses still showing "Mapping pending" are left out. For example, Frontend with 5 courses completed and React JS 60% done is (5 x 100 + 60) / 6 = 93.3%.
     </p>}
 
     {data && activeTaxonomy.length === 0 && <EmptyState
