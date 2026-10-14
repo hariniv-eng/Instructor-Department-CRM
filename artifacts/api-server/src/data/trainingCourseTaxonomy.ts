@@ -105,12 +105,13 @@ export const TRAINING_COURSE_TAXONOMY: TrainingCourseDef[] = [
   },
   {
     key: "dia",
-    label: "DIA",
+    label: "DAA",
     trackGroup: "DSA",
-    // 2026-10-14, per request: DIA is its own course, found by course id 9e370332-c9dd-4778-9e65-e5d7f75c24f3 (the earlier Phase 2/3
+    // 2026-10-14, per request: DAA (Design and Analysis of Algorithms; internal key stays "dia") is its own course, found by course id 9e370332-c9dd-4778-9e65-e5d7f75c24f3 (the earlier Phase 2/3
     // topic-list mapping was only a stand-in and is removed).
     courseIds: ["9e370332-c9dd-4778-9e65-e5d7f75c24f3"],
-    courseTitles: [],
+    // Confirmed live: "Design and Analysis of Algorithms", 5 topics, 292 instructors, ~91.7k unit rows.
+    courseTitles: ["Design and Analysis of Algorithms"],
   },
   {
     key: "ips",
@@ -119,7 +120,8 @@ export const TRAINING_COURSE_TAXONOMY: TrainingCourseDef[] = [
     // 2026-10-14, per request: IPS is its own course, found by course id c51b2ebf-d646-4680-b868-e731110ef183 (the earlier Phase 4
     // topic-list mapping was only a stand-in and is removed).
     courseIds: ["c51b2ebf-d646-4680-b868-e731110ef183"],
-    courseTitles: [],
+    // Confirmed live: "NIAT - DSA Sem 4 Course", 5 topics, 99 instructors, ~22.9k unit rows.
+    courseTitles: ["NIAT - DSA Sem 4 Course"],
   },
   // --- Gen AI ---
   { key: "gen_ai", courseIds: ["b9811b34585b47e0a0be65f1081a74f2"], label: "Gen AI", trackGroup: "Gen AI", courseTitles: ["Generative AI", "Intro to Generative AI"] },
