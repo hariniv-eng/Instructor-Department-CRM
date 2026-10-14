@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AlertTriangle, CheckCircle2, Clock3, FileSpreadsheet, Info, Loader2, RefreshCw, UploadCloud, X, Zap } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { getGetDashboardQueryKey, getGetSyncStatusQueryKey, getListInstructorsQueryKey, getListUploadsQueryKey, useGetSyncStatus, useListUploads, useSyncDarwinbox, useSyncDarwinboxExits, useSyncTeachos, useUploadSource, type Upload } from '@workspace/api-client-react';
@@ -76,6 +76,8 @@ export default function UploadsPage() {
     <PageIntro eyebrow="Source control / Replace and reconcile" title="Source uploads" description="Replace source snapshots when a new export lands. Every upload is recorded here so the team can trace what the register was built from." action={<button type="button" data-testid="button-refresh-uploads" onClick={() => queryClient.invalidateQueries({ queryKey: getListUploadsQueryKey() })} className="inline-flex items-center gap-2 self-start rounded-lg border border-border bg-card px-3.5 py-2.5 text-[12px] font-bold text-foreground transition-colors hover:bg-secondary lg:self-auto"><RefreshCw size={14} /> Refresh history</button>} />
 
     <LiveSyncPanel uploads={uploadsQuery.data} />
+
+    <SyncHealthPanel refreshKey={uploadsQuery.dataUpdatedAt} />
 
     <div className="grid gap-5 lg:grid-cols-[.88fr_1.12fr]">
       <section className="rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6">
@@ -185,6 +187,61 @@ function LiveSyncPanel({ uploads }: { uploads: Upload[] | undefined }) {
         </div>;
       })}
     </div>
+  </section>;
+}
+
+// Sync health (2026-10-14, per request): a silent failure should be visible the day it happens. Reads GET /api/sync/health, which is
+// built from the uploads history and the stored exit rows.
+type SyncHealth = {
+  generated_at: string;
+  sources: Array<{ source: string; label: string; last_success_at: string | null; hours_since: number | null; last_rows: number | null; up_to_date: boolean; row_drop: { from: number; to: number } | null; warnings: string[] }>;
+  exits: { stored_rows: number; people: number; newest_stored_request_date: string | null; from_offboarding_fallback: number; kept_from_earlier_syncs: number; base_report_generated_at: string | null; base_report_age_hours: number | null; warnings: string[] };
+};
+
+function SyncHealthPanel({ refreshKey }: { refreshKey: number }) {
+  const [health, setHealth] = useState<SyncHealth | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/sync/health')
+      .then((response) => (response.ok ? response.json() : Promise.reject(new Error(`HTTP ${response.status}`))))
+      .then((data: SyncHealth) => { if (!cancelled) { setHealth(data); setFailed(false); } })
+      .catch(() => { if (!cancelled) setFailed(true); });
+    return () => { cancelled = true; };
+  }, [refreshKey]);
+
+  const problems = health ? health.sources.reduce((n, s) => n + s.warnings.length, 0) + health.exits.warnings.filter((w) => !w.includes('were kept')).length : 0;
+  return <section data-testid="panel-sync-health" className="mb-5 rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6">
+    <div className="mb-4 flex items-start justify-between">
+      <div><p className="font-mono-ui text-[10px] uppercase tracking-[0.17em] text-muted-foreground">Data freshness</p><h2 className="mt-1 text-[18px] font-extrabold tracking-[-0.03em]">Sync health</h2></div>
+      {health && <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ${problems === 0 ? 'bg-[#e5f3ed] text-[#256e65]' : 'bg-[#fff0ec] text-[#9b4434]'}`}>{problems === 0 ? <CheckCircle2 size={13} /> : <AlertTriangle size={13} />}{problems === 0 ? 'All sources current' : `${problems} thing${problems === 1 ? '' : 's'} need attention`}</span>}
+    </div>
+    {failed && <p className="rounded-lg bg-[#fff0ec] px-3 py-2 text-[12px] font-semibold text-[#9b4434]">Sync health is unavailable right now.</p>}
+    {!health && !failed && <SkeletonBlock className="h-[96px]" />}
+    {health && <>
+      <div className="overflow-x-auto rounded-lg border border-border">
+        <table className="w-full text-left text-[12px]">
+          <thead className="bg-[#f4f7f9] font-mono-ui text-[10px] uppercase tracking-[0.1em] text-muted-foreground"><tr><th className="px-3 py-2">Source</th><th className="px-3 py-2">Last success</th><th className="px-3 py-2">Rows</th><th className="px-3 py-2">State</th></tr></thead>
+          <tbody>
+            {health.sources.map((item) => <tr key={item.source} data-testid={`row-health-${item.source.toLowerCase().replaceAll(' ', '-')}`} className="border-t border-border/70 align-top">
+              <td className="px-3 py-2 font-semibold">{item.label}</td>
+              <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{item.last_success_at ? `${formatDateTime(item.last_success_at)} (${item.hours_since}h ago)` : 'Never'}</td>
+              <td className="px-3 py-2 font-mono-ui text-muted-foreground">{item.last_rows === null ? '—' : item.last_rows.toLocaleString('en-IN')}</td>
+              <td className="px-3 py-2">{item.warnings.length === 0 ? <span className="font-semibold text-[#256e65]">Current</span> : <span className="font-semibold text-[#9b4434]">{item.warnings.join(' ')}</span>}</td>
+            </tr>)}
+          </tbody>
+        </table>
+      </div>
+      <div className="mt-4 rounded-lg border border-border p-4">
+        <p className="text-[13px] font-bold">Darwin exit data</p>
+        <p className="mt-1 text-[11px] text-muted-foreground">
+          {health.exits.people.toLocaleString('en-IN')} people, {health.exits.stored_rows.toLocaleString('en-IN')} records stored. Newest request on file: {health.exits.newest_stored_request_date ?? '—'}.
+          {' '}Darwin's base report generated {health.exits.base_report_generated_at ? `${formatDateTime(health.exits.base_report_generated_at)} (${health.exits.base_report_age_hours}h ago)` : 'at an unknown time'}.
+          {' '}{health.exits.from_offboarding_fallback} added from the Offboarding report, {health.exits.kept_from_earlier_syncs} kept from earlier syncs.
+        </p>
+        {health.exits.warnings.map((warning) => <p key={warning} className="mt-2 flex items-start gap-1.5 rounded-lg bg-[#fff7db] px-3 py-2 text-[11px] font-semibold text-[#79601a]"><AlertTriangle size={13} className="mt-0.5 shrink-0" /><span>{warning}</span></p>)}
+      </div>
+    </>}
   </section>;
 }
 
