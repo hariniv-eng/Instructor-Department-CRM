@@ -29,8 +29,13 @@ type ContributionRow = {
   full_name: string;
   department: string | null;
   capability_manager: string | null;
-  // Darwin's Date of joining (2026-10-14, per request); null when Darwin has none on file.
+  // Subject (2026-10-14, per request) -- same value as the Training Stats and Instructors tabs.
+  subject_area: string | null;
+  // Date of joining: Darwin, then the archived Darwin record, then typed in by hand (payroll-converted people have none in Darwin).
   date_of_joining: string | null;
+  date_of_joining_source: 'darwin' | 'archive' | 'manual' | null;
+  // Training Duration: whole days from the date of joining to the deployment date (first session ever scheduled).
+  training_days: number | null;
   classification: string | null;
   // Instructor/Mentor bifurcation (2026-09-24, per request) -- mirrors the
   // Instructors tab's own bifurcation column/badge styling.
@@ -116,6 +121,35 @@ function RoleBadge({ role }: { role: ContributionRow['role'] }) {
 function sessionRole(row: ContributionRow): ContributionRow['role'] | null {
   if (!row.has_contribution_data || row.total_hours <= 0) return null;
   return row.lecture_hours > 0 ? 'Instructor' : 'Mentor';
+}
+
+const todayIso = () => toIsoDay(new Date());
+
+// Date of joining cell (2026-10-14, per request): Darwin's date is plain text. For people Darwin has no date for (payroll-converted
+// instructors) it is a date box -- pick or type the date and it saves straight away; clearing the box removes it.
+function JoiningDateCell({ row, onSaved }: { row: ContributionRow; onSaved: () => void }) {
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const editable = (row.date_of_joining_source === null || row.date_of_joining_source === 'manual') && !!row.employee_id;
+  if (!editable) return row.date_of_joining ? <span title={row.date_of_joining_source === 'archive' ? 'From the archived Darwin record' : 'From Darwinbox'}>{formatDay(row.date_of_joining)}</span> : <span className="text-muted-foreground">—</span>;
+  const save = async (value: string) => {
+    setSaving(true);
+    setError(null);
+    try {
+      const response = await fetch('/api/reports/instructor-contribution/joining-date', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ employee_id: row.employee_id, date_of_joining: value || null }) });
+      if (!response.ok) throw new Error(((await response.json().catch(() => null)) as { error?: string } | null)?.error ?? `HTTP ${response.status}`);
+      onSaved();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  };
+  return <div className="flex flex-col gap-1">
+    <input type="date" value={row.date_of_joining ?? ''} max={todayIso()} disabled={saving} onChange={(event) => void save(event.target.value)} data-testid={`input-joining-${row.employee_id}`} title="No joining date in Darwin -- type it here" className={`h-8 w-[140px] rounded-md border bg-background px-2 text-[12px] font-semibold text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-ring/25 ${row.date_of_joining ? 'border-border' : 'border-dashed border-[#d9a441]'}`} />
+    {row.date_of_joining_source === 'manual' && <span className="text-[10px] font-bold uppercase tracking-[0.06em] text-[#8a6a12]">Manual</span>}
+    {error && <span className="max-w-[140px] whitespace-normal text-[10px] font-semibold text-[#9b4434]">{error}</span>}
+  </div>;
 }
 
 export default function ContributionPage() {
@@ -231,9 +265,11 @@ export default function ContributionPage() {
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Role</th>
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Instructor if they took any Lecture session; Mentor if they took sessions but no Lecture; blank if no session data">Role (by sessions)</th>
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Department</th>
+                <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Subject</th>
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Capability Manager</th>
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Date of joining from Darwinbox">Date of Joining</th>
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Date of the first session ever scheduled for this instructor">Deployment Date</th>
+                <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Whole days from the date of joining to the deployment date (first session taken)">Training Duration</th>
                 <th className="whitespace-nowrap border-l border-border px-4 py-3 text-right font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Hours, with the number of Lecture sessions in brackets">Lecture Hrs (sessions)</th>
                 <th className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Hours, with the number of Practice sessions in brackets">Practice Hrs (sessions)</th>
                 <th className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Other Hrs</th>
@@ -251,9 +287,11 @@ export default function ContributionPage() {
                 <td className="whitespace-nowrap border-r border-border px-4 py-3"><RoleBadge role={row.role} /></td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3" data-testid={`cell-session-role-${row.employee_id ?? row.full_name}`}>{(() => { const derived = sessionRole(row); return derived ? <RoleBadge role={derived} /> : null; })()}</td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-muted-foreground">{row.department || '—'}</td>
+                <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-foreground" data-testid={`cell-subject-${row.employee_id ?? row.full_name}`}>{row.subject_area || '—'}</td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-muted-foreground">{row.capability_manager || '—'}</td>
-                <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-foreground" data-testid={`cell-date-of-joining-${row.employee_id ?? row.full_name}`}>{row.date_of_joining ? formatDay(row.date_of_joining) : <span className="text-muted-foreground">—</span>}</td>
+                <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-foreground" data-testid={`cell-date-of-joining-${row.employee_id ?? row.full_name}`}><JoiningDateCell row={row} onSaved={refresh} /></td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-foreground" data-testid={`cell-deployment-date-${row.employee_id ?? row.full_name}`}>{row.deployment_date ? formatDay(row.deployment_date) : <span className="text-muted-foreground">—</span>}</td>
+                <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] font-semibold tabular-nums text-foreground" data-testid={`cell-training-duration-${row.employee_id ?? row.full_name}`} title={row.training_days !== null ? `About ${Math.round((row.training_days / 7) * 10) / 10} weeks` : 'Needs both a date of joining and a deployment date'}>{row.training_days !== null ? `${row.training_days} ${row.training_days === 1 ? 'day' : 'days'}` : <span className="font-normal text-muted-foreground">—</span>}</td>
                 {row.has_contribution_data
                   ? <>
                     <td className="whitespace-nowrap border-l border-border px-4 py-3 text-right font-mono-ui text-[12px] tabular-nums text-foreground">{formatHours(row.lecture_hours)} <span className="text-muted-foreground" title="Lecture sessions">({formatKpi(row.lecture_sessions ?? 0)})</span></td>
