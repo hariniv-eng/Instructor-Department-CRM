@@ -107,15 +107,19 @@ export const TRAINING_COURSE_TAXONOMY: TrainingCourseDef[] = [
     key: "dia",
     label: "DIA",
     trackGroup: "DSA",
-    courseTitles: ["Phase 2: Algorithmic Foundations", "Phase 3: Data Structures & Discrete Math"],
-    topicTitles: ["Prefix Sums & Two Pointers", "Stack & Queue", "Advanced Counting & Ordering"],
+    // 2026-10-14, per request: DIA is its own course, found by course id 9e370332-c9dd-4778-9e65-e5d7f75c24f3 (the earlier Phase 2/3
+    // topic-list mapping was only a stand-in and is removed).
+    courseIds: ["9e370332-c9dd-4778-9e65-e5d7f75c24f3"],
+    courseTitles: [],
   },
   {
     key: "ips",
     label: "IPS",
     trackGroup: "DSA",
-    courseTitles: ["Phase 4: Dynamic Programming & Graph Theory"],
-    topicTitles: ["Dynamic Programming", "Graphs"],
+    // 2026-10-14, per request: IPS is its own course, found by course id c51b2ebf-d646-4680-b868-e731110ef183 (the earlier Phase 4
+    // topic-list mapping was only a stand-in and is removed).
+    courseIds: ["c51b2ebf-d646-4680-b868-e731110ef183"],
+    courseTitles: [],
   },
   // --- Gen AI ---
   { key: "gen_ai", courseIds: ["b9811b34585b47e0a0be65f1081a74f2"], label: "Gen AI", trackGroup: "Gen AI", courseTitles: ["Generative AI", "Intro to Generative AI"] },

@@ -519,3 +519,28 @@ export async function inspectCourseIds(courseIds: string[]): Promise<{ idColumn:
   const [rows] = await runWithHardTimeout(() => bq.query({ query, params: { ids: courseIds.map((c) => c.replace(/-/g, "").toLowerCase()) } }), API_TIMEOUT_MS * 3 + 10000);
   return { idColumn, columns, rows: rows as Array<Record<string, unknown>> };
 }
+
+// One-off, READ-ONLY diagnostic (2026-10-14): finds the real course ids behind DIA and IPS. Lists every course whose title
+// looks DSA-related (Phase, algorithm, data structure, DP, graph ...) with its id, plus the topics inside each course.
+export async function inspectDsaRelatedCourses(): Promise<{ idColumn: string | null; courses: Array<Record<string, unknown>>; topics: Array<Record<string, unknown>> }> {
+  const bq = client();
+  const ref = tableRef(UNIT_COMPLETION_TABLE);
+  const schema = await getSchema(UNIT_COMPLETION_TABLE);
+  const columns = schema.map(([name]) => name);
+  const idColumn = columns.find((c) => /^course_id$/i.test(c)) ?? columns.find((c) => /course.*id/i.test(c)) ?? null;
+  if (!idColumn) return { idColumn: null, courses: [], topics: [] };
+  const titleMatch = `REGEXP_CONTAINS(LOWER(course_title), r'phase|dsa|algorithm|data structure|dynamic|graph|recursion|problem solving|discrete|dia\\b|ips\\b|competitive|coding')`;
+  const coursesQuery = `
+    SELECT REPLACE(LOWER(CAST(${idColumn} AS STRING)), '-', '') AS course_id, course_title,
+           COUNT(DISTINCT topic_title) AS topics, COUNT(DISTINCT instructor_user_id) AS instructors, COUNT(*) AS unit_rows
+    FROM \`${ref}\` WHERE ${titleMatch}
+    GROUP BY course_id, course_title ORDER BY instructors DESC`;
+  const topicsQuery = `
+    SELECT REPLACE(LOWER(CAST(${idColumn} AS STRING)), '-', '') AS course_id, course_title, topic_title,
+           COUNT(DISTINCT instructor_user_id) AS instructors, COUNT(*) AS unit_rows
+    FROM \`${ref}\` WHERE ${titleMatch}
+    GROUP BY course_id, course_title, topic_title ORDER BY course_title, topic_title`;
+  const [courses] = await runWithHardTimeout(() => bq.query({ query: coursesQuery }), API_TIMEOUT_MS * 3 + 10000);
+  const [topics] = await runWithHardTimeout(() => bq.query({ query: topicsQuery }), API_TIMEOUT_MS * 3 + 10000);
+  return { idColumn, courses: courses as Array<Record<string, unknown>>, topics: topics as Array<Record<string, unknown>> };
+}
