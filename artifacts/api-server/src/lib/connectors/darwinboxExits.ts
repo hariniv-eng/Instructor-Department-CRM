@@ -144,6 +144,11 @@ function findRecordsArray(value: unknown, depth = 0): Record<string, unknown>[] 
   return null;
 }
 
+// Diagnostic only (2026-10-14): the raw JSON envelope of a report, so the response's own fields (code, status, message, totals) can be inspected.
+export async function fetchRawReportResponse(reportId: string): Promise<unknown> {
+  return fetchRaw(reportId);
+}
+
 export async function fetchExitRecords(): Promise<Record<string, unknown>[]> {
   const raw = await fetchRaw(config.DBX_CHECK_REPORT_ID!);
   const found = findRecordsArray(raw);
@@ -394,14 +399,24 @@ function finishFallbackRows(rows: SheetRow[], fallbackRows: SheetRow[]) {
   if (!fallbackRows.length) return;
   const clean = (v: unknown) => (v === null || v === undefined ? "" : String(v).trim());
   let kept = 0;
+  let keptByExitDate = 0;
   for (const row of fallbackRows) {
-    const requestDate = clean(row["Date Of Resignation"]) || clean(row["Separation Request Raised On"]);
+    let requestDate = clean(row["Date Of Resignation"]) || clean(row["Separation Request Raised On"]);
     const employment = clean(row["Employment Status"]).toLowerCase();
     const exitDate = clean(row["Date Of Exit"]);
     let status: string | null = null;
     if (requestDate) {
       if (employment === "inactive") status = exitDate ? "Approved" : null;
       else status = "Pending With Approver";
+    } else if (exitDate) {
+      // 2026-10-14, per request ("what about recent exits"): people with no request date anywhere (not in the TA Employee Master,
+      // which is cut off at 10,000 rows) but with a Date Of Exit in Offboarding tracking are still added, so a real exit is not
+      // dropped. That date is only the expected last day -- Darwin confirms the last working day when the resignation is APPROVED,
+      // so these rows are NOT marked Approved: they stay "Pending With Approver" until Darwin's own report says otherwise.
+      requestDate = exitDate;
+      status = "Pending With Approver";
+      row["Request Date Note"] = "Request date not available in any Darwin report; the Offboarding tracking Date Of Exit (not yet confirmed by an approval) is used";
+      keptByExitDate += 1;
     }
     if (!requestDate || !status) {
       const at = rows.indexOf(row);
@@ -412,7 +427,7 @@ function finishFallbackRows(rows: SheetRow[], fallbackRows: SheetRow[]) {
     row["Status"] = status;
     kept += 1;
   }
-  console.log(`[darwinboxExits] Offboarding-tracking fallback: ${kept} resignation(s) missing from the base exit report added, ${fallbackRows.length - kept} skipped (no request date).`);
+  console.log(`[darwinboxExits] Offboarding-tracking fallback: ${kept} resignation(s) missing from the base exit report added (${keptByExitDate} of them dated by Date Of Exit), ${fallbackRows.length - kept} skipped (no request date).`);
 }
 
 // Targeted check (2026-09-22, per request: "not just 5 fields i also need
