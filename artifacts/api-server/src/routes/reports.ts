@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { db, instructorsTable, instructorArchiveTable, darwinboxActiveTable, darwinboxFullRosterTable, darwinboxExitsTable, instructorTrainingStatusTable, instructorContributionTable, instructorContributionDailyTable } from "@workspace/db";
-import { and, gte, lte } from "drizzle-orm";
+import { db, instructorsTable, instructorArchiveTable, darwinboxActiveTable, darwinboxFullRosterTable, darwinboxExitsTable, instructorTrainingStatusTable, instructorContributionTable, instructorContributionDailyTable, instructorManualJoiningTable } from "@workspace/db";
+import { and, eq, gte, lte } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/auth";
 import { cell, parseLooseDate, toISODate } from "../lib/reconcile";
 import { archiveInstructors } from "../lib/archiveInstructors";
@@ -1248,11 +1248,49 @@ const TRAINING_STATS_EXCLUDED_CLASSIFICATIONS = new Set([
   "other_department_manual",
 ]);
 
+// Date of joining for the Training Stats and Contribution tabs (2026-10-14, per request). Darwin's value comes first, with the
+// same gating as the Instructors tab (the live dateOfJoining is only trusted while the person is matched in Darwin --
+// reconcileDarwin() resets inDarwin but leaves the old date behind); then the date archived while they were in Darwin; then a date
+// typed in by hand (instructor_manual_joining, for payroll-converted people Darwin has no date for). Only two long-standing archive
+// columns are selected, and the manual table is read defensively, so a database that has not been pushed yet cannot break these pages.
+type JoiningSource = "darwin" | "archive" | "manual";
+async function loadJoiningLookups() {
+  const archived = await db.select({ employeeId: instructorArchiveTable.employeeId, dateOfJoining: instructorArchiveTable.dateOfJoining }).from(instructorArchiveTable);
+  const archiveByEmployeeId = new Map<string, string>(archived.filter((a) => a.employeeId && a.dateOfJoining).map((a) => [a.employeeId!, a.dateOfJoining!]));
+  let manualByEmployeeId = new Map<string, string>();
+  try {
+    const manual = await db.select().from(instructorManualJoiningTable);
+    manualByEmployeeId = new Map(manual.map((m) => [m.employeeId, m.dateOfJoining]));
+  } catch (err) {
+    console.warn("[joining] instructor_manual_joining is not readable yet (run the database push):", (err as Error).message);
+  }
+  return { archiveByEmployeeId, manualByEmployeeId };
+}
+function resolveJoining(p: typeof instructorsTable.$inferSelect, lookups: Awaited<ReturnType<typeof loadJoiningLookups>>): { date: string | null; source: JoiningSource | null } {
+  if (p.inDarwin && p.dateOfJoining) return { date: p.dateOfJoining, source: "darwin" };
+  const archived = p.employeeId ? lookups.archiveByEmployeeId.get(p.employeeId) : undefined;
+  if (archived) return { date: archived, source: "archive" };
+  const manual = p.employeeId ? lookups.manualByEmployeeId.get(p.employeeId) : undefined;
+  if (manual) return { date: manual, source: "manual" };
+  return { date: null, source: null };
+}
+
 router.get("/reports/training-stats", requireAuth, requireRole("admin"), async (_req, res) => {
   const allRows = await db.select().from(instructorsTable);
   const people = allRows
     .filter((r) => r.inTeachos && !TRAINING_STATS_EXCLUDED_CLASSIFICATIONS.has(r.classification ?? ""))
     .sort((a, b) => a.fullName.localeCompare(b.fullName));
+
+  // Date of joining, deployment date (first session ever scheduled, from the Contribution data) and the Training Duration between
+  // them (2026-10-14, per request). Read defensively so these extra columns can never take the whole page down.
+  const joiningLookups = await loadJoiningLookups();
+  const deploymentByTeachosId = new Map<string, string>();
+  try {
+    const dep = await db.select({ instructorUserId: instructorContributionTable.instructorUserId, deploymentDate: instructorContributionTable.deploymentDate }).from(instructorContributionTable);
+    for (const d of dep) if (d.deploymentDate) deploymentByTeachosId.set(d.instructorUserId, d.deploymentDate);
+  } catch (err) {
+    console.warn("[training-stats] deployment dates are not readable:", (err as Error).message);
+  }
 
   const statusRows = await db.select().from(instructorTrainingStatusTable);
   // instructor_user_id (BigQuery's own hex ID) -> courseKey -> that row.
@@ -1293,12 +1331,20 @@ router.get("/reports/training-stats", requireAuth, requireRole("admin"), async (
         if (rec && rec.unitsTotal > 0) courseProgress[def.key] = Math.round((rec.unitsCompleted / rec.unitsTotal) * 1000) / 10;
       }
     }
+    const joining = resolveJoining(p, joiningLookups);
+    const deploymentDate = p.teachosUserId ? deploymentByTeachosId.get(p.teachosUserId) ?? null : null;
+    // Whole days from joining to the first session; null if either date is missing or the first session is before the joining date.
+    const days = joining.date && deploymentDate ? Math.round((Date.parse(`${deploymentDate}T00:00:00Z`) - Date.parse(`${joining.date}T00:00:00Z`)) / 86400000) : null;
     return {
       employee_id: p.employeeId,
       full_name: p.fullName,
       department: p.department,
       capability_manager: p.teachosManager || p.manualCapabilityManager || null,
       classification: p.classification,
+      date_of_joining: joining.date,
+      date_of_joining_source: joining.source,
+      deployment_date: deploymentDate,
+      training_days: days !== null && days >= 0 ? days : null,
       // Added 2026-09-24, per request ("if I'm trying to open only tech, to
       // only see the tech-related instructors") -- same computed-then-manual
       // fallback pattern as dept_area on /reports/instructors (toApiInstructorSummary),
@@ -1328,6 +1374,27 @@ router.get("/reports/training-stats", requireAuth, requireRole("admin"), async (
   });
 });
 
+// Manual Date of joining (2026-10-14, per request): sets or clears the typed-in joining date for someone Darwin has no date for
+// (payroll-converted instructors). Admin-only like the rest of Training Stats. Body: { employee_id, date_of_joining: "YYYY-MM-DD" | null }.
+router.put("/reports/training-stats/joining-date", requireAuth, requireRole("admin"), async (req, res) => {
+  const body = req.body as { employee_id?: unknown; date_of_joining?: unknown };
+  const employeeId = typeof body.employee_id === "string" ? body.employee_id.trim() : "";
+  if (!employeeId) { res.status(400).json({ error: "employee_id is required" }); return; }
+  const [person] = await db.select({ id: instructorsTable.id }).from(instructorsTable).where(eq(instructorsTable.employeeId, employeeId)).limit(1);
+  if (!person) { res.status(404).json({ error: "No instructor with that employee id" }); return; }
+  if (body.date_of_joining === null) {
+    await db.delete(instructorManualJoiningTable).where(eq(instructorManualJoiningTable.employeeId, employeeId));
+    res.json({ employee_id: employeeId, date_of_joining: null });
+    return;
+  }
+  const day = typeof body.date_of_joining === "string" ? body.date_of_joining : "";
+  const parsed = /^\d{4}-\d{2}-\d{2}$/.test(day) ? Date.parse(`${day}T00:00:00Z`) : NaN;
+  if (Number.isNaN(parsed) || new Date(parsed).toISOString().slice(0, 10) !== day) { res.status(400).json({ error: "date_of_joining must be a real date as YYYY-MM-DD, or null to clear it" }); return; }
+  if (parsed > Date.now() + 86400000) { res.status(400).json({ error: "date_of_joining cannot be in the future" }); return; }
+  await db.insert(instructorManualJoiningTable).values({ employeeId, dateOfJoining: day }).onConflictDoUpdate({ target: instructorManualJoiningTable.employeeId, set: { dateOfJoining: day, updatedAt: new Date() } });
+  res.json({ employee_id: employeeId, date_of_joining: day });
+});
+
 // Instructor Contribution ("Contribution" tab, 2026-09-24, per request):
 // actual session-teaching hours delivered, sourced from BigQuery's
 // niat_instructor_session_schedule_details (aggregated per instructor by
@@ -1355,6 +1422,7 @@ router.get("/reports/instructor-contribution", requireAuth, requireRole("admin")
     .sort((a, b) => a.fullName.localeCompare(b.fullName));
 
   const contributionRows = await db.select().from(instructorContributionTable);
+  const joiningLookups = await loadJoiningLookups();
   // instructor_user_id (BigQuery's own hex ID) -> that row. Joined here, at
   // read time, against instructorsTable.teachosUserId -- same key
   // reconcileCapabilityManager() and the Training Stats join above already
@@ -1390,6 +1458,8 @@ router.get("/reports/instructor-contribution", requireAuth, requireRole("admin")
       full_name: p.fullName,
       department: p.department,
       capability_manager: p.teachosManager || p.manualCapabilityManager || null,
+      // Date of joining (2026-10-14, per request), read-only here; Training Duration and the manual entry live on Training Stats.
+      date_of_joining: resolveJoining(p, joiningLookups).date,
       classification: p.classification,
       // Instructor/Mentor bifurcation (2026-09-24, per request) -- same
       // rule as bifurcationLabel() on the Instructors tab: classification
