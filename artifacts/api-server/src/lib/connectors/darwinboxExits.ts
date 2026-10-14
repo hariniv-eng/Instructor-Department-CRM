@@ -64,7 +64,27 @@ function basicAuthHeader(username: string, password: string): string {
 // Same Report Builder endpoint/credentials as the base exit report, just a
 // different report id — reused for both the base report and each
 // enrichment report below (fetchEnrichmentRecords).
-async function fetchRaw(reportId: string, timeoutMs = 30000): Promise<unknown> {
+// Timeouts and network drops are retried (2026-10-14: the offboarding-tracking and L&D reports were intermittently "aborted" at
+// 30s -- the same report succeeded moments later -- and one aborted fetch silently dropped people from the stored exits). An
+// HTTP error response from Darwin is NOT retried.
+const FETCH_ATTEMPTS = 3;
+async function fetchRaw(reportId: string, timeoutMs = 45000): Promise<unknown> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= FETCH_ATTEMPTS; attempt++) {
+    try {
+      return await fetchRawOnce(reportId, timeoutMs);
+    } catch (e) {
+      lastError = e;
+      const retryable = !(e instanceof DarwinboxExitsError) || !/returned HTTP|credentials are not fully configured/.test(e.message);
+      if (!retryable || attempt === FETCH_ATTEMPTS) break;
+      console.warn(`[darwinboxExits] Report ${reportId} attempt ${attempt}/${FETCH_ATTEMPTS} failed (${(e as Error).message}); retrying.`);
+      await new Promise((r) => setTimeout(r, 1500 * attempt));
+    }
+  }
+  throw lastError;
+}
+
+async function fetchRawOnce(reportId: string, timeoutMs: number): Promise<unknown> {
   const missingKeys = missing(REQUIRED);
   if (missingKeys.length) {
     throw new DarwinboxExitsError(`Darwinbox exits-report credentials are not fully configured — missing: ${missingKeys.join(", ")} (check .env).`);
@@ -321,9 +341,15 @@ export async function fetchExitRows(): Promise<SheetRow[]> {
 // --- Offboarding-tracking fallback (2026-10-08) ------------------------------
 
 const OFFBOARDING_TRACKING_REPORT_ID = "9feb118d44726a";
-const FALLBACK_SOURCE_LABEL = "Offboarding tracking (missing from the base exit report)";
+export const FALLBACK_SOURCE_LABEL = "Offboarding tracking (missing from the base exit report)";
+
+// True when the last fetchExitRows() could not read the offboarding-tracking report (after retries). The caller then keeps the
+// fallback rows already stored instead of deleting those people (2026-10-14).
+let offboardingFallbackFailed = false;
+export const didOffboardingFallbackFail = () => offboardingFallbackFailed;
 
 async function addOffboardingFallbackRows(rows: SheetRow[]): Promise<SheetRow[]> {
+  offboardingFallbackFailed = false;
   if (!parseEnrichReportIds().includes(OFFBOARDING_TRACKING_REPORT_ID)) return [];
   try {
     const records = await fetchEnrichmentRecords(OFFBOARDING_TRACKING_REPORT_ID);
@@ -350,6 +376,7 @@ async function addOffboardingFallbackRows(rows: SheetRow[]): Promise<SheetRow[]>
     }
     return added;
   } catch (e) {
+    offboardingFallbackFailed = true;
     console.warn(`[darwinboxExits] Offboarding-tracking fallback skipped: ${(e as Error).message}`);
     return [];
   }

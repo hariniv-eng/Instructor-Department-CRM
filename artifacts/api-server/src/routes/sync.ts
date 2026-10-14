@@ -95,6 +95,27 @@ async function runDarwinboxSync(): Promise<SyncResult> {
 async function runDarwinboxExitsSync(): Promise<SyncResult> {
   try {
     const rows = await fetchExitRows();
+    // Never lose an exit record (2026-10-14, per request: payroll-converted instructors' exit records were disappearing). The exits
+    // table is replaced on every sync, so anyone Darwin's reports stop returning -- a timed-out fallback report, a converted
+    // employee whose Darwin record was removed -- used to vanish, and the next status recompute then wiped their exit flag and
+    // auto-marked them Payroll Converted. Now every stored exit row whose employee id is absent from this pull is carried over
+    // unchanged. People who ARE in the pull use Darwin's fresh rows as before.
+    {
+      const have = new Set(rows.map((r) => String(r["Employee Id"] ?? "").trim().toLowerCase()).filter(Boolean));
+      const previous = await db.select().from(darwinboxExitsTable);
+      const keptPeople = new Set<string>();
+      let keptRows = 0;
+      for (const prev of previous) {
+        const raw = { ...((prev.rawData ?? {}) as Record<string, unknown>) };
+        const id = String(prev.employeeId ?? raw["Employee Id"] ?? "").trim().toLowerCase();
+        if (!id || have.has(id)) continue;
+        if (!raw["Exit Source"]) raw["Exit Source"] = "Kept from an earlier sync (no longer returned by the Darwin reports)";
+        rows.push(raw as (typeof rows)[number]);
+        keptPeople.add(id);
+        keptRows += 1;
+      }
+      if (keptRows) console.warn(`[sync] Kept ${keptRows} stored exit row(s) for ${keptPeople.size} employee(s) the Darwin reports did not return this run.`);
+    }
     const stored = await inSyncTransaction(async () => {
       const n = await storeDarwinboxExits(rows);
       await recomputeStatuses(); // re-derives exit flags for existing instructors from the freshly replaced raw exits table — see comment above
