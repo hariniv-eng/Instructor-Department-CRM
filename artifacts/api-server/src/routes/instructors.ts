@@ -175,6 +175,11 @@ router.patch("/instructors/:id/gender", async (req, res): Promise<void> => {
     res.status(404).json({ error: "Instructor not found" });
     return;
   }
+  // Mirror onto the Instructor Archive row right away (2026-10-13), not only at the next sync.
+  const archiveKey = row.employeeId
+    ? eq(instructorArchiveTable.employeeId, row.employeeId)
+    : row.teachosUserId ? eq(instructorArchiveTable.teachosUserId, row.teachosUserId) : null;
+  if (archiveKey) await db.update(instructorArchiveTable).set({ manualGender: raw }).where(archiveKey);
   res.json(toApiInstructor(row));
 });
 
@@ -223,6 +228,11 @@ router.patch("/instructors/:id/subject", async (req, res): Promise<void> => {
     res.status(404).json({ error: "Instructor not found" });
     return;
   }
+  // Mirror onto the Instructor Archive row right away (2026-10-13), not only at the next sync.
+  const archiveKey = row.employeeId
+    ? eq(instructorArchiveTable.employeeId, row.employeeId)
+    : row.teachosUserId ? eq(instructorArchiveTable.teachosUserId, row.teachosUserId) : null;
+  if (archiveKey) await db.update(instructorArchiveTable).set({ manualDeptArea: raw }).where(archiveKey);
   res.json(toApiInstructor(row));
 });
 

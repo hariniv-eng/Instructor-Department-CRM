@@ -4,7 +4,7 @@ import { and, gte, lte } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/auth";
 import { cell, parseLooseDate, toISODate } from "../lib/reconcile";
 import { archiveInstructors } from "../lib/archiveInstructors";
-import { TRAINING_COURSE_TAXONOMY } from "../data/trainingCourseTaxonomy";
+import { TRAINING_COURSE_TAXONOMY, isResolvedCourse } from "../data/trainingCourseTaxonomy";
 import { TECH_AREAS, normalizeSubjectArea } from "../lib/departmentTaxonomy";
 import { isPinnedConfirmedInstructor } from "../data/classificationOverrides";
 
@@ -1268,7 +1268,7 @@ router.get("/reports/training-stats", requireAuth, requireRole("admin"), async (
     const hasTrainingData = !!courseStatuses;
     const courses: Record<string, string> = {};
     for (const def of TRAINING_COURSE_TAXONOMY) {
-      if (def.courseTitles.length === 0) {
+      if (!isResolvedCourse(def)) {
         // No confident course_title mapping yet -- see
         // trainingCourseTaxonomy.ts and Instructor_Learning_Status_Course_
         // Mapping_Review.xlsx. Uniform across every instructor, not

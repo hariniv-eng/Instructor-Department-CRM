@@ -45,7 +45,11 @@ type TrainingCourseDef = {
   label: string;
   trackGroup: string;
   courseTitles: string[];
+  courseIds?: string[];
 };
+
+// A column is mapped when it has course titles or course ids (2026-10-14, course ids added to match the Faculty-ops app).
+const isResolved = (def: TrainingCourseDef): boolean => def.courseTitles.length > 0 || (def.courseIds?.length ?? 0) > 0;
 
 type TrainingStatsRow = {
   employee_id: string | null;
@@ -142,7 +146,7 @@ const STATUS_SCORE: Partial<Record<CourseStatus, number>> = { COMPLETED: 100, IN
 function subjectCompletion(row: TrainingStatsRow, defs: TrainingCourseDef[]): number | null {
   if (!row.has_training_data) return null;
   const scores = defs
-    .filter((def) => def.courseTitles.length > 0)
+    .filter((def) => isResolved(def))
     .map((def) => STATUS_SCORE[row.courses[def.key] ?? 'NO_DATA'])
     .filter((score): score is number => score !== undefined);
   if (scores.length === 0) return null;
@@ -204,7 +208,7 @@ export default function TrainingStatsPage() {
   }, [activeRows, search]);
   const pager = usePagedRows(searchedRows, 50);
   const groups = groupByTrack(activeTaxonomy);
-  const pendingCount = activeTaxonomy.filter((d) => d.courseTitles.length === 0).length;
+  const pendingCount = activeTaxonomy.filter((d) => !isResolved(d)).length;
 
   return <div className="mx-auto max-w-[1600px]">
     <PageIntro
@@ -248,7 +252,7 @@ export default function TrainingStatsPage() {
     </div>}
 
     {data && pendingCount > 0 && <p className="mb-6 max-w-3xl text-[12px] leading-relaxed text-muted-foreground">
-      <strong className="font-semibold text-foreground">{pendingCount} column{pendingCount === 1 ? '' : 's'}</strong> ({activeTaxonomy.filter((d) => d.courseTitles.length === 0).map((d) => d.label).join(', ')}) don't have a confirmed course mapping yet and show as "Mapping pending" for everyone -- see Instructor_Learning_Status_Course_Mapping_Review.xlsx.
+      <strong className="font-semibold text-foreground">{pendingCount} column{pendingCount === 1 ? '' : 's'}</strong> ({activeTaxonomy.filter((d) => !isResolved(d)).map((d) => d.label).join(', ')}) don't have a confirmed course mapping yet and show as "Mapping pending" for everyone -- see Instructor_Learning_Status_Course_Mapping_Review.xlsx.
     </p>}
 
     {data && activeTaxonomy.length > 0 && <p data-testid="note-subject-completion" className="mb-6 max-w-3xl text-[12px] leading-relaxed text-muted-foreground">

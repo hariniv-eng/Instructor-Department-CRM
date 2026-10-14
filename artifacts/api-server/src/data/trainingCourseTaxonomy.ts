@@ -36,22 +36,29 @@ export type TrainingCourseDef = {
   // topics (Sorting, Binary Search, Mathematics - I) and DIA topics (Prefix
   // Sums & Two Pointers), so courseTitles alone can't separate them.
   topicTitles?: string[];
+  // Course ids (2026-10-14, per request: match the Faculty-ops app, which finds every course by its course_id). When set, a unit
+  // row also counts toward this column if its course id column holds one of these ids (hyphens/case ignored). Used together with
+  // courseTitles: either way of matching is enough. Ignored (titles only) when the table has no course id column.
+  courseIds?: string[];
 };
+
+// A column is "resolved" (queried, shows real data) when it has course titles OR course ids.
+export const isResolvedCourse = (c: TrainingCourseDef): boolean => c.courseTitles.length > 0 || (c.courseIds?.length ?? 0) > 0;
 
 export const TRAINING_COURSE_TAXONOMY: TrainingCourseDef[] = [
   // --- Frontend Development ---
-  { key: "static_web", label: "Static Web", trackGroup: "Frontend Development", courseTitles: ["Build Your Own Static Website"] },
-  { key: "responsive_design", label: "Responsive Design", trackGroup: "Frontend Development", courseTitles: ["Build Your Own Responsive Website"] },
-  { key: "modern_responsive_ui", label: "Modern Responsive UI", trackGroup: "Frontend Development", courseTitles: ["Modern Responsive Web Design"] },
+  { key: "static_web", courseIds: ["6d41f35076d543379be03fe0b26b1b26"], label: "Static Web", trackGroup: "Frontend Development", courseTitles: ["Build Your Own Static Website"] },
+  { key: "responsive_design", courseIds: ["62e43c70ee744afe8d1c26ca9c22947a"], label: "Responsive Design", trackGroup: "Frontend Development", courseTitles: ["Build Your Own Responsive Website"] },
+  { key: "modern_responsive_ui", courseIds: ["1d571a66be1e49cda17f5b3b22d6d751"], label: "Modern Responsive UI", trackGroup: "Frontend Development", courseTitles: ["Modern Responsive Web Design"] },
   { key: "javascript_sprint", label: "JavaScript Sprint", trackGroup: "Frontend Development", courseTitles: ["JavaScript Quick Revision"] },
-  { key: "javascript_essentials", label: "JavaScript Essentials", trackGroup: "Frontend Development", courseTitles: ["JS Essentials", "JavaScript Essentials"] },
-  { key: "react_js", label: "React JS", trackGroup: "Frontend Development", courseTitles: ["React JS", "Introduction to React JS"] },
+  { key: "javascript_essentials", courseIds: ["7e0446da981d4faab02df4dc605dba66"], label: "JavaScript Essentials", trackGroup: "Frontend Development", courseTitles: ["JS Essentials", "JavaScript Essentials"] },
+  { key: "react_js", courseIds: ["f7b58b9d1a424a6681020bad28f37483"], label: "React JS", trackGroup: "Frontend Development", courseTitles: ["React JS", "Introduction to React JS"] },
   // --- Backend Development ---
-  { key: "python", label: "Python", trackGroup: "Backend Development", courseTitles: ["Python Programming"] },
-  { key: "sql", label: "SQL", trackGroup: "Backend Development", courseTitles: ["SQL"] },
-  { key: "node_js", label: "Node JS", trackGroup: "Backend Development", courseTitles: ["Node JS"] },
-  { key: "mongodb", label: "MongoDB", trackGroup: "Backend Development", courseTitles: ["MongoDB", "Mongo DB"] },
-  { key: "developer_foundation", label: "Developer Foundation", trackGroup: "Backend Development", courseTitles: ["Developer Foundations"] },
+  { key: "python", courseIds: ["b76ff0b83180494fa9a80e89c56421b1"], label: "Python", trackGroup: "Backend Development", courseTitles: ["Python Programming"] },
+  { key: "sql", courseIds: ["d3cb79d46f31424cb0f8cddbdf68659f"], label: "SQL", trackGroup: "Backend Development", courseTitles: ["SQL"] },
+  { key: "node_js", courseIds: ["d82d6905669442c48c0cbd2c887c1b53"], label: "Node JS", trackGroup: "Backend Development", courseTitles: ["Node JS"] },
+  { key: "mongodb", courseIds: ["a5777f9b1a9c42a5aab70182e80efca2"], label: "MongoDB", trackGroup: "Backend Development", courseTitles: ["MongoDB", "Mongo DB"] },
+  { key: "developer_foundation", courseIds: ["33a457452b2a4d60bc1683ca731081f3"], label: "Developer Foundation", trackGroup: "Backend Development", courseTitles: ["Developer Foundations"] },
   // --- DSA ---
   // DSA / DIA / IPS (2026-09-24, reverted back to these 3 names per request
   // after briefly trying 4 columns matching the raw phase structure). The
@@ -88,6 +95,10 @@ export const TRAINING_COURSE_TAXONOMY: TrainingCourseDef[] = [
     key: "dsa",
     label: "DSA",
     trackGroup: "DSA",
+    // The whole DSA course, found by its course_id (2026-10-14, per request: "do the same" as the Faculty-ops app, which maps
+    // DSA to this single course id). Rows of this course that belong to DIA / IPS topics are claimed by those two columns first
+    // (see fetchCourseStatusRows: columns with topicTitles are checked before the rest).
+    courseIds: ["bb04e38a723e4bbfbf99ec43992bb31c"],
     courseTitles: ["Phase 1: Programming Foundations in C++", "Phase 2: Algorithmic Foundations", "Phase 3: Data Structures & Discrete Math"],
     topicTitles: ["Introduction to Programming with C++", "The C++ Standard Template Library", "Mathematics - I", "Sorting", "Binary Search", "Recursion and Backtracking", "Bit Manipulation"],
   },
@@ -106,16 +117,16 @@ export const TRAINING_COURSE_TAXONOMY: TrainingCourseDef[] = [
     topicTitles: ["Dynamic Programming", "Graphs"],
   },
   // --- Gen AI ---
-  { key: "gen_ai", label: "Gen AI", trackGroup: "Gen AI", courseTitles: ["Generative AI", "Intro to Generative AI"] },
-  { key: "llm", label: "LLM", trackGroup: "Gen AI", courseTitles: ["Building LLM Applications", "Building LLM Applications Part - 2", "Building  LLM  Applications"] },
-  { key: "ai_for_finance", label: "AI for Finance", trackGroup: "Gen AI", courseTitles: ["AI for Finance"] },
+  { key: "gen_ai", courseIds: ["b9811b34585b47e0a0be65f1081a74f2"], label: "Gen AI", trackGroup: "Gen AI", courseTitles: ["Generative AI", "Intro to Generative AI"] },
+  { key: "llm", courseIds: ["8874b64282db42748d71b9940316db8d"], label: "LLM", trackGroup: "Gen AI", courseTitles: ["Building LLM Applications", "Building LLM Applications Part - 2", "Building  LLM  Applications"] },
+  { key: "ai_for_finance", courseIds: ["85dac56985f54205b71ae86327f39b92"], label: "AI for Finance", trackGroup: "Gen AI", courseTitles: ["AI for Finance"] },
   // --- DSML ---
-  { key: "ml", label: "ML", trackGroup: "DSML", courseTitles: [] },
+  { key: "ml", courseIds: ["919bb576966a48dfa1e0b8b071fc7f69"], label: "ML", trackGroup: "DSML", courseTitles: [] },
   { key: "supervised_learning", label: "Supervised Learning", trackGroup: "DSML", courseTitles: ["Supervised Learning: Regression", "Supervised Learning: Classification"] },
-  { key: "deep_learning", label: "Deep Learning", trackGroup: "DSML", courseTitles: ["Introduction to Deep Learning and ANN", "Introduction to Deep Learning"] },
-  { key: "ml_projects", label: "ML Projects", trackGroup: "DSML", courseTitles: ["Machine Learning & AI Projects"] },
-  { key: "nlp", label: "NLP", trackGroup: "DSML", courseTitles: ["Introduction to Natural Language Processing"] },
-  { key: "data_foundation", label: "Data Foundation", trackGroup: "DSML", courseTitles: [] },
+  { key: "deep_learning", courseIds: ["8347d32f770a49579696335a4eec5828"], label: "Deep Learning", trackGroup: "DSML", courseTitles: ["Introduction to Deep Learning and ANN", "Introduction to Deep Learning"] },
+  { key: "ml_projects", courseIds: ["611beb92cdf746fd8f4a8b794dbc7b71"], label: "ML Projects", trackGroup: "DSML", courseTitles: ["Machine Learning & AI Projects"] },
+  { key: "nlp", courseIds: ["74536befa3df4e8aa2958b727fa2f2b6"], label: "NLP", trackGroup: "DSML", courseTitles: ["Introduction to Natural Language Processing"] },
+  { key: "data_foundation", courseIds: ["58aeb728b2524b0897c478cb22e8acdc"], label: "Data Foundation", trackGroup: "DSML", courseTitles: [] },
   // --- Aptitude ---
   // Added 2026-09-24 per request ("we only have tech instructors related
   // data, now we need to also get the aptitude, math and also english") --
@@ -126,10 +137,10 @@ export const TRAINING_COURSE_TAXONOMY: TrainingCourseDef[] = [
   // table. Advanced Aptitude combines two spelling variants found in the
   // data ("Advanced Aptitude" / "Advance Aptitude") -- same near-duplicate
   // pattern as MongoDB/Mongo DB or JS Essentials/JavaScript Essentials.
-  { key: "quantitative_aptitude", label: "Quantitative Aptitude", trackGroup: "Aptitude", courseTitles: ["Quantitative Aptitude"] },
-  { key: "numerical_ability", label: "Numerical Ability", trackGroup: "Aptitude", courseTitles: ["Numerical Ability"] },
-  { key: "logical_reasoning", label: "Logical Reasoning", trackGroup: "Aptitude", courseTitles: ["Logical Reasoning"] },
-  { key: "advanced_aptitude", label: "Advanced Aptitude", trackGroup: "Aptitude", courseTitles: ["Advanced Aptitude", "Advance Aptitude"] },
+  { key: "quantitative_aptitude", courseIds: ["97671af2f44f4eed978cd65d5c0c55c9"], label: "Quantitative Aptitude", trackGroup: "Aptitude", courseTitles: ["Quantitative Aptitude"] },
+  { key: "numerical_ability", courseIds: ["0bbea1fb25bc402db0d472112198d5da"], label: "Numerical Ability", trackGroup: "Aptitude", courseTitles: ["Numerical Ability"] },
+  { key: "logical_reasoning", courseIds: ["ef795b8b487e44b38acc3b8a28353043"], label: "Logical Reasoning", trackGroup: "Aptitude", courseTitles: ["Logical Reasoning"] },
+  { key: "advanced_aptitude", courseIds: ["8024ea95e38e40f89664aaada968168f"], label: "Advanced Aptitude", trackGroup: "Aptitude", courseTitles: ["Advanced Aptitude", "Advance Aptitude"] },
   // --- Math ---
   // Added 2026-09-24, same request/population as Aptitude above. "Math for
   // Computer Science" combines 4 near-duplicate course_title variants found
@@ -138,15 +149,15 @@ export const TRAINING_COURSE_TAXONOMY: TrainingCourseDef[] = [
   // to Ankush, included for now, easy to split out if it turns out wrong.
   // "Probability and Statistics" similarly combines 3 spelling/punctuation
   // variants ("(P&S)" suffix, "&" vs "and").
-  { key: "math_for_cs", label: "Mathematics for Computer Science", trackGroup: "Maths", courseTitles: ["Math For Computer Science", "Mathematics For Computer Science - AU", "Math for CSE", "Mathematics for Computer Science"] },
-  { key: "probability_statistics", label: "Probability and Statistics", trackGroup: "Maths", courseTitles: ["Probability and Statistics(P&S)", "Probability and Statistics", "Probability & Statistics"] },
+  { key: "math_for_cs", courseIds: ["70850c6b459c4134a16c3e42d46eb794"], label: "Mathematics for Computer Science", trackGroup: "Maths", courseTitles: ["Math For Computer Science", "Mathematics For Computer Science - AU", "Math for CSE", "Mathematics for Computer Science"] },
+  { key: "probability_statistics", courseIds: ["39ddb075b7e8448abac2b89baa4fb3f4"], label: "Probability and Statistics", trackGroup: "Maths", courseTitles: ["Probability and Statistics(P&S)", "Probability and Statistics", "Probability & Statistics"] },
   { key: "linear_algebra_calculus", label: "Linear Algebra and Calculus", trackGroup: "Maths", courseTitles: ["Linear Algebra and Calculus"] },
 ];
 
 export function resolvedCourseDefs(): TrainingCourseDef[] {
-  return TRAINING_COURSE_TAXONOMY.filter((c) => c.courseTitles.length > 0);
+  return TRAINING_COURSE_TAXONOMY.filter(isResolvedCourse);
 }
 
 export function pendingCourseKeys(): string[] {
-  return TRAINING_COURSE_TAXONOMY.filter((c) => c.courseTitles.length === 0).map((c) => c.key);
+  return TRAINING_COURSE_TAXONOMY.filter((c) => !isResolvedCourse(c)).map((c) => c.key);
 }

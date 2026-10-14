@@ -54,6 +54,17 @@ function keep<T>(liveValue: T, archivedValue: T): T {
   return isAbsent(liveValue) ? archivedValue : liveValue;
 }
 
+// Gender and Subject protection (2026-10-13, per request: "we also need gender and the subject of an instructor that he is
+// teaching ... save it up in the instructor archive and then use it later when they're converted to payroll"). While the person
+// is in Darwin, Darwin is the source of truth, so the archive is refreshed from it. Once they are NOT in Darwin (payroll
+// conversion), the live row's gender/subject get re-derived from weaker sources (exit record, TeachOS category), and a plain
+// keep() would let those overwrite the Darwin value. So for a person outside Darwin the value already archived wins, and the
+// live value is only used to fill a gap.
+function keepFromDarwin<T>(inDarwin: boolean, liveValue: T, archivedValue: T): T {
+  if (inDarwin) return keep(liveValue, archivedValue);
+  return isAbsent(archivedValue) ? liveValue : archivedValue;
+}
+
 // Archive scope (2026-10-06, per request: today's department is the
 // baseline, new joiners get added, leavers stay, and anyone who left before
 // the baseline is never brought in). A person is "in scope" the first time
@@ -208,7 +219,7 @@ export async function archiveInstructors(options: { grantTeachosOnlyScope?: bool
       directManager: keep(row.directManager, match.directManager),
       workLocation: keep(row.workLocation, match.workLocation),
       workspace: keep(row.workspace, match.workspace),
-      gender: keep(row.gender, match.gender),
+      gender: keepFromDarwin(row.inDarwin, row.gender, match.gender),
       manualGender: keep(row.manualGender, match.manualGender),
       currentState: keep(row.currentState, match.currentState),
       currentCity: keep(row.currentCity, match.currentCity),
@@ -233,7 +244,7 @@ export async function archiveInstructors(options: { grantTeachosOnlyScope?: bool
       // current Employee Status entry instead of a stale one.
       exitVerification: row.exitVerification,
       deptBucket: keep(row.deptBucket, match.deptBucket),
-      deptArea: keep(row.deptArea, match.deptArea),
+      deptArea: keepFromDarwin(row.inDarwin, row.deptArea, match.deptArea),
       manualDeptArea: keep(row.manualDeptArea, match.manualDeptArea),
       exitDepartment: keep(row.exitDepartment, match.exitDepartment),
       exitDesignation: keep(row.exitDesignation, match.exitDesignation),
