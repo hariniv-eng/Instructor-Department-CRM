@@ -16,10 +16,9 @@ import { PageIntro, EmptyState, QueryError, SkeletonBlock, TopStat, TablePager, 
 // DSML) matching Ankush's reference sheet; Math and Aptitude share ONE
 // tab/button ("I don't want two separate sheets or two separate tabs for
 // math and aptitude. I want it in one only") even though they're still two
-// separate track groups in the taxonomy underneath; English has no taxonomy
-// columns yet (still waiting on Ankush's course list) -- its tab renders
-// with an explanatory empty state rather than being hidden, since all 3
-// buttons should always be visible.
+// separate track groups in the taxonomy underneath; English (2026-10-14) has 4
+// columns (Foundation, Advanced, Applied, Language Analytics) shown only for
+// instructors whose subject is English.
 //
 // EACH TAB SHOWS ONLY ITS OWN SUBJECT'S INSTRUCTORS (2026-09-24, per
 // request -- "we know the bifurcation using the teacher's data... if I'm
@@ -78,11 +77,8 @@ const QUERY_KEY = ['reports', 'training-stats'];
 // areas come from the server's `tech_areas` list (the same RULES-derived set
 // classifyDepartment() uses) rather than being hardcoded here, so this file
 // can't drift out of sync with departmentTaxonomy.ts -- see 'TECH' handling
-// below. "english" intentionally maps to a track group name that doesn't
-// exist in TRAINING_COURSE_TAXONOMY yet (see backend
-// trainingCourseTaxonomy.ts) -- that's expected until Ankush's English
-// course list is confirmed, and is handled below as an empty tab rather
-// than an error.
+// below. "english" maps to the English track group (4 courses) in the backend
+// trainingCourseTaxonomy.ts.
 const SUB_TABS: { key: string; label: string; trackGroups: string[]; subjectAreas: string[] | 'TECH' }[] = [
   { key: 'tech', label: 'Tech', trackGroups: ['Frontend Development', 'Backend Development', 'DSA', 'Gen AI', 'DSML'], subjectAreas: 'TECH' },
   { key: 'math_aptitude', label: 'Maths and Aptitude', trackGroups: ['Aptitude', 'Maths'], subjectAreas: ['Aptitude', 'Maths'] },
