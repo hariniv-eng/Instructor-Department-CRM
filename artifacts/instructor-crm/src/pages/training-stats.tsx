@@ -56,6 +56,12 @@ type TrainingStatsRow = {
   department: string | null;
   capability_manager: string | null;
   classification: string | null;
+  // Date of joining (Darwin, then archive, then typed in by hand), the first session ever scheduled, and the whole days between
+  // them -- the Training Duration (2026-10-14, per request). source tells whether the date can be edited (only manual / none).
+  date_of_joining: string | null;
+  date_of_joining_source: 'darwin' | 'archive' | 'manual' | null;
+  deployment_date: string | null;
+  training_days: number | null;
   has_training_data: boolean;
   subject_area: string | null;
   courses: Record<string, CourseStatus>;
@@ -159,6 +165,36 @@ function subjectCompletion(row: TrainingStatsRow, defs: TrainingCourseDef[]): nu
 }
 const formatPercent = (value: number) => `${Math.round(value * 10) / 10}%`;
 const percentTone = (value: number) => (value >= 80 ? 'bg-[#e5f3ed] text-[#256e65]' : value >= 40 ? 'bg-[#fff3d6] text-[#8a6a12]' : 'bg-[#f3f0ec] text-[#8a7a63]');
+
+const formatDay = (iso: string) => new Date(`${iso}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+const todayIso = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+
+// Date of joining cell (2026-10-14, per request): shows Darwin's date as plain text. For people Darwin has no date for (payroll-converted
+// instructors) it is a date box -- pick or type the date and it saves straight away; clearing the box removes it.
+function JoiningDateCell({ row, onSaved }: { row: TrainingStatsRow; onSaved: () => void }) {
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const editable = (row.date_of_joining_source === null || row.date_of_joining_source === 'manual') && !!row.employee_id;
+  if (!editable) return row.date_of_joining ? <span title={row.date_of_joining_source === 'archive' ? 'From the archived Darwin record' : 'From Darwinbox'}>{formatDay(row.date_of_joining)}</span> : <span className="text-muted-foreground">—</span>;
+  const save = async (value: string) => {
+    setSaving(true);
+    setError(null);
+    try {
+      const response = await fetch('/api/reports/training-stats/joining-date', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ employee_id: row.employee_id, date_of_joining: value || null }) });
+      if (!response.ok) throw new Error(((await response.json().catch(() => null)) as { error?: string } | null)?.error ?? `HTTP ${response.status}`);
+      onSaved();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  };
+  return <div className="flex flex-col gap-1">
+    <input type="date" value={row.date_of_joining ?? ''} max={todayIso()} disabled={saving} onChange={(event) => void save(event.target.value)} data-testid={`input-joining-${row.employee_id}`} title="No joining date in Darwin -- type it here" className={`h-8 w-[140px] rounded-md border bg-background px-2 text-[12px] font-semibold text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-ring/25 ${row.date_of_joining ? 'border-border' : 'border-dashed border-[#d9a441]'}`} />
+    {row.date_of_joining_source === 'manual' && <span className="text-[10px] font-bold uppercase tracking-[0.06em] text-[#8a6a12]">Manual</span>}
+    {error && <span className="max-w-[140px] whitespace-normal text-[10px] font-semibold text-[#9b4434]">{error}</span>}
+  </div>;
+}
 
 export default function TrainingStatsPage() {
   const queryClient = useQueryClient();
@@ -287,7 +323,11 @@ export default function TrainingStatsPage() {
                 <th rowSpan={2} className="sticky left-0 z-10 whitespace-nowrap border-r border-border bg-[#f4f7f9] px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Employee ID</th>
                 <th rowSpan={2} className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Name</th>
                 <th rowSpan={2} className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Department</th>
+                <th rowSpan={2} className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Subject</th>
                 <th rowSpan={2} className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Capability Manager</th>
+                <th rowSpan={2} className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Date of joining from Darwinbox. Payroll-converted instructors have none in Darwin, so type it in.">Date of Joining</th>
+                <th rowSpan={2} className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Date of the first session ever scheduled for this instructor (from the Contribution data)">Deployment Date</th>
+                <th rowSpan={2} className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Whole days from the date of joining to the first session taken">Training Duration</th>
                 {groups.map((group) => <th key={group.trackGroup} colSpan={group.defs.length} className="whitespace-nowrap border-b border-l border-border px-4 py-2 text-center font-mono-ui text-[10px] font-bold uppercase tracking-[0.12em] text-foreground">{group.trackGroup}</th>)}
                 <th colSpan={groups.length} data-testid="header-subject-completion" className="whitespace-nowrap border-b border-l-2 border-border bg-[#eef4ee] px-4 py-2 text-center font-mono-ui text-[10px] font-bold uppercase tracking-[0.12em] text-foreground" title="Completed = 100%, In Progress = its actual % done, Not Started or no data = 0%, averaged over the subject's mapped courses">Subject completion %</th>
               </tr>
@@ -301,7 +341,11 @@ export default function TrainingStatsPage() {
                 <td className="sticky left-0 z-10 whitespace-nowrap border-r border-border bg-card px-4 py-3 font-mono-ui text-[11px] text-foreground">{row.employee_id || '—'}</td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] font-semibold text-foreground">{row.full_name}</td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-muted-foreground">{row.department || '—'}</td>
+                <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-foreground" data-testid={`cell-subject-${row.employee_id ?? row.full_name}`}>{row.subject_area || '—'}</td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-muted-foreground">{row.capability_manager || '—'}</td>
+                <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-foreground" data-testid={`cell-date-of-joining-${row.employee_id ?? row.full_name}`}><JoiningDateCell row={row} onSaved={refresh} /></td>
+                <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-foreground" data-testid={`cell-deployment-date-${row.employee_id ?? row.full_name}`}>{row.deployment_date ? formatDay(row.deployment_date) : <span className="text-muted-foreground">—</span>}</td>
+                <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] font-semibold tabular-nums text-foreground" data-testid={`cell-training-duration-${row.employee_id ?? row.full_name}`} title={row.training_days !== null ? `About ${Math.round((row.training_days / 7) * 10) / 10} weeks` : 'Needs both a date of joining and a first session'}>{row.training_days !== null ? `${row.training_days} ${row.training_days === 1 ? 'day' : 'days'}` : <span className="font-normal text-muted-foreground">—</span>}</td>
                 {activeTaxonomy.map((def, i) => <td key={def.key} className={`px-3 py-2.5 text-center ${i === 0 ? 'border-l border-border' : ''}`}><StatusBadge status={row.courses[def.key] ?? 'NO_DATA'} progress={row.course_progress?.[def.key]} /></td>)}
                 {groups.map((group, i) => {
                   const pct = subjectCompletion(row, group.defs);

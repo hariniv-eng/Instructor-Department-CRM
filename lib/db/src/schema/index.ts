@@ -643,6 +643,17 @@ export const appSessionsTable = pgTable("app_sessions", {
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
 });
 
+// Manual Date of joining (2026-10-14, per request): payroll-converted instructors (and anyone else Darwin has no joining date for)
+// have no date in Darwin, so one is typed in on the Contribution tab and kept here, keyed by employee id. A separate small table on
+// purpose: syncs and reconciles rebuild instructors/archive rows, and this must never be overwritten by them. Darwin's own date,
+// when there is one, always wins; this only fills the gap. Used to work out the Training Duration column.
+export const instructorManualJoiningTable = pgTable("instructor_manual_joining", {
+  id: serial("id").primaryKey(),
+  employeeId: text("employee_id").notNull().unique(),
+  dateOfJoining: date("date_of_joining").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const insertAppUserSchema = createInsertSchema(appUsersTable).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertAppSessionSchema = createInsertSchema(appSessionsTable).omit({ id: true, createdAt: true });
 export type AppUser = typeof appUsersTable.$inferSelect;
