@@ -1248,7 +1248,7 @@ const TRAINING_STATS_EXCLUDED_CLASSIFICATIONS = new Set([
   "other_department_manual",
 ]);
 
-// Date of joining for the Training Stats and Contribution tabs (2026-10-14, per request). Darwin's value comes first, with the
+// Date of joining for the Contribution tab (2026-10-14, per request). Darwin's value comes first, with the
 // same gating as the Instructors tab (the live dateOfJoining is only trusted while the person is matched in Darwin --
 // reconcileDarwin() resets inDarwin but leaves the old date behind); then the date archived while they were in Darwin; then a date
 // typed in by hand (instructor_manual_joining, for payroll-converted people Darwin has no date for). Only two long-standing archive
@@ -1280,17 +1280,6 @@ router.get("/reports/training-stats", requireAuth, requireRole("admin"), async (
   const people = allRows
     .filter((r) => r.inTeachos && !TRAINING_STATS_EXCLUDED_CLASSIFICATIONS.has(r.classification ?? ""))
     .sort((a, b) => a.fullName.localeCompare(b.fullName));
-
-  // Date of joining, deployment date (first session ever scheduled, from the Contribution data) and the Training Duration between
-  // them (2026-10-14, per request). Read defensively so these extra columns can never take the whole page down.
-  const joiningLookups = await loadJoiningLookups();
-  const deploymentByTeachosId = new Map<string, string>();
-  try {
-    const dep = await db.select({ instructorUserId: instructorContributionTable.instructorUserId, deploymentDate: instructorContributionTable.deploymentDate }).from(instructorContributionTable);
-    for (const d of dep) if (d.deploymentDate) deploymentByTeachosId.set(d.instructorUserId, d.deploymentDate);
-  } catch (err) {
-    console.warn("[training-stats] deployment dates are not readable:", (err as Error).message);
-  }
 
   const statusRows = await db.select().from(instructorTrainingStatusTable);
   // instructor_user_id (BigQuery's own hex ID) -> courseKey -> that row.
@@ -1331,20 +1320,12 @@ router.get("/reports/training-stats", requireAuth, requireRole("admin"), async (
         if (rec && rec.unitsTotal > 0) courseProgress[def.key] = Math.round((rec.unitsCompleted / rec.unitsTotal) * 1000) / 10;
       }
     }
-    const joining = resolveJoining(p, joiningLookups);
-    const deploymentDate = p.teachosUserId ? deploymentByTeachosId.get(p.teachosUserId) ?? null : null;
-    // Whole days from joining to the first session; null if either date is missing or the first session is before the joining date.
-    const days = joining.date && deploymentDate ? Math.round((Date.parse(`${deploymentDate}T00:00:00Z`) - Date.parse(`${joining.date}T00:00:00Z`)) / 86400000) : null;
     return {
       employee_id: p.employeeId,
       full_name: p.fullName,
       department: p.department,
       capability_manager: p.teachosManager || p.manualCapabilityManager || null,
       classification: p.classification,
-      date_of_joining: joining.date,
-      date_of_joining_source: joining.source,
-      deployment_date: deploymentDate,
-      training_days: days !== null && days >= 0 ? days : null,
       // Added 2026-09-24, per request ("if I'm trying to open only tech, to
       // only see the tech-related instructors") -- same computed-then-manual
       // fallback pattern as dept_area on /reports/instructors (toApiInstructorSummary),
@@ -1375,8 +1356,8 @@ router.get("/reports/training-stats", requireAuth, requireRole("admin"), async (
 });
 
 // Manual Date of joining (2026-10-14, per request): sets or clears the typed-in joining date for someone Darwin has no date for
-// (payroll-converted instructors). Admin-only like the rest of Training Stats. Body: { employee_id, date_of_joining: "YYYY-MM-DD" | null }.
-router.put("/reports/training-stats/joining-date", requireAuth, requireRole("admin"), async (req, res) => {
+// (payroll-converted instructors). Admin-only like the rest of the Contribution tab. Body: { employee_id, date_of_joining: "YYYY-MM-DD" | null }.
+router.put("/reports/instructor-contribution/joining-date", requireAuth, requireRole("admin"), async (req, res) => {
   const body = req.body as { employee_id?: unknown; date_of_joining?: unknown };
   const employeeId = typeof body.employee_id === "string" ? body.employee_id.trim() : "";
   if (!employeeId) { res.status(400).json({ error: "employee_id is required" }); return; }
@@ -1453,13 +1434,22 @@ router.get("/reports/instructor-contribution", requireAuth, requireRole("admin")
     const otherMinutes = ranged ? (range?.otherMinutes ?? 0) : (contribution?.otherMinutes ?? 0);
     const lectureSessions = ranged ? (range?.lectureSessions ?? 0) : (contribution?.lectureSessions ?? 0);
     const practiceSessions = ranged ? (range?.practiceSessions ?? 0) : (contribution?.practiceSessions ?? 0);
+    const joining = resolveJoining(p, joiningLookups);
+    const deploymentDay = contribution?.deploymentDate ?? null;
+    const trainingDays = joining.date && deploymentDay ? Math.round((Date.parse(`${deploymentDay}T00:00:00Z`) - Date.parse(`${joining.date}T00:00:00Z`)) / 86400000) : null;
     return {
       employee_id: p.employeeId,
       full_name: p.fullName,
       department: p.department,
       capability_manager: p.teachosManager || p.manualCapabilityManager || null,
-      // Date of joining (2026-10-14, per request), read-only here; Training Duration and the manual entry live on Training Stats.
-      date_of_joining: resolveJoining(p, joiningLookups).date,
+      // Subject (2026-10-14, per request) -- same value the Training Stats and Instructors tabs show.
+      subject_area: normalizeSubjectArea(p.deptArea || p.manualDeptArea || null),
+      // Date of joining (Darwin, then archive, then typed in by hand for payroll-converted people) and Training Duration: whole days
+      // from joining to the first session ever scheduled (deployment date). Null when either date is missing or the first session
+      // is before the joining date. All-time, not affected by the date filter.
+      date_of_joining: joining.date,
+      date_of_joining_source: joining.source,
+      training_days: trainingDays !== null && trainingDays >= 0 ? trainingDays : null,
       classification: p.classification,
       // Instructor/Mentor bifurcation (2026-09-24, per request) -- same
       // rule as bifurcationLabel() on the Instructors tab: classification
