@@ -18,11 +18,13 @@ import {
   instructorTrainingStatusTable,
   instructorContributionTable,
   instructorContributionDailyTable,
+  instructorEvaluationDailyTable,
 } from "@workspace/db";
 import { sdb as db } from "./syncContext";
 import { cell, type SheetRow } from "./reconcile";
 import type { CourseStatusRow } from "./connectors/instructorLearningStatus";
 import type { ContributionRow, ContributionDailyRow } from "./connectors/instructorContribution";
+import type { EvaluationDailyRow } from "./connectors/instructorEvaluations";
 
 const CHUNK = 500;
 
@@ -150,6 +152,24 @@ export async function storeContributionDaily(rows: ContributionDailyRow[]): Prom
         practiceSessions: row.practice_sessions,
       }));
       if (batch.length) await tx.insert(instructorContributionDailyTable).values(batch);
+    }
+  });
+  return rows.length;
+}
+
+// Demo / AI-assessment hours per instructor per day (2026-10-14): full replace, same as the Contribution daily table.
+export async function storeEvaluationDaily(rows: EvaluationDailyRow[]): Promise<number> {
+  await db.transaction(async (tx) => {
+    await tx.delete(instructorEvaluationDailyTable);
+    for (let i = 0; i < rows.length; i += CHUNK) {
+      const batch = rows.slice(i, i + CHUNK).map((row) => ({
+        instructorUserId: row.instructor_user_id,
+        sessionDate: row.session_date,
+        evaluationType: row.evaluation_type,
+        seconds: row.seconds,
+        evaluations: row.evaluations,
+      }));
+      if (batch.length) await tx.insert(instructorEvaluationDailyTable).values(batch);
     }
   });
   return rows.length;

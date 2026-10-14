@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, instructorsTable, instructorArchiveTable, darwinboxActiveTable, darwinboxFullRosterTable, darwinboxExitsTable, instructorTrainingStatusTable, instructorContributionTable, instructorContributionDailyTable, instructorManualJoiningTable } from "@workspace/db";
+import { db, instructorsTable, instructorArchiveTable, darwinboxActiveTable, darwinboxFullRosterTable, darwinboxExitsTable, instructorTrainingStatusTable, instructorContributionTable, instructorContributionDailyTable, instructorManualJoiningTable, instructorEvaluationDailyTable } from "@workspace/db";
 import { and, eq, gte, lte } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/auth";
 import { cell, parseLooseDate, toISODate } from "../lib/reconcile";
@@ -1404,6 +1404,21 @@ router.get("/reports/instructor-contribution", requireAuth, requireRole("admin")
 
   const contributionRows = await db.select().from(instructorContributionTable);
   const joiningLookups = await loadJoiningLookups();
+  // Demo and AI-assessment recording time per instructor (2026-10-14, per request), totalled over the chosen date range or all-time.
+  // Read defensively: if the table is not pushed / synced yet the two columns are simply empty and nothing else is affected.
+  type EvalTotals = { demoSeconds: number; demoCount: number; aiSeconds: number; aiCount: number };
+  const evaluationByInstructor = new Map<string, EvalTotals>();
+  try {
+    const evalConditions = [fromParam ? gte(instructorEvaluationDailyTable.sessionDate, fromParam) : undefined, toParam ? lte(instructorEvaluationDailyTable.sessionDate, toParam) : undefined].filter((c) => c !== undefined);
+    const evalRows = await db.select().from(instructorEvaluationDailyTable).where(evalConditions.length ? and(...evalConditions) : undefined);
+    for (const e of evalRows) {
+      const t = evaluationByInstructor.get(e.instructorUserId) ?? { demoSeconds: 0, demoCount: 0, aiSeconds: 0, aiCount: 0 };
+      if (e.evaluationType === "DEMO") { t.demoSeconds += e.seconds; t.demoCount += e.evaluations; } else { t.aiSeconds += e.seconds; t.aiCount += e.evaluations; }
+      evaluationByInstructor.set(e.instructorUserId, t);
+    }
+  } catch (err) {
+    console.warn("[contribution] demo / AI assessment hours are not readable yet (run the database push, then Sync Now):", (err as Error).message);
+  }
   // instructor_user_id (BigQuery's own hex ID) -> that row. Joined here, at
   // read time, against instructorsTable.teachosUserId -- same key
   // reconcileCapabilityManager() and the Training Stats join above already
@@ -1434,6 +1449,7 @@ router.get("/reports/instructor-contribution", requireAuth, requireRole("admin")
     const otherMinutes = ranged ? (range?.otherMinutes ?? 0) : (contribution?.otherMinutes ?? 0);
     const lectureSessions = ranged ? (range?.lectureSessions ?? 0) : (contribution?.lectureSessions ?? 0);
     const practiceSessions = ranged ? (range?.practiceSessions ?? 0) : (contribution?.practiceSessions ?? 0);
+    const evaluation = p.teachosUserId ? evaluationByInstructor.get(p.teachosUserId) : undefined;
     const joining = resolveJoining(p, joiningLookups);
     const deploymentDay = contribution?.deploymentDate ?? null;
     const trainingDays = joining.date && deploymentDay ? Math.round((Date.parse(`${deploymentDay}T00:00:00Z`) - Date.parse(`${joining.date}T00:00:00Z`)) / 86400000) : null;
@@ -1442,6 +1458,12 @@ router.get("/reports/instructor-contribution", requireAuth, requireRole("admin")
       full_name: p.fullName,
       department: p.department,
       capability_manager: p.teachosManager || p.manualCapabilityManager || null,
+      // Demo and AI-assessment hours: total recorded audio time of the person's Completed demo / AI assessment evaluations (hours,
+      // one decimal) and how many evaluations that is. Follow the date filter.
+      demo_hours: Math.round(((evaluation?.demoSeconds ?? 0) / 3600) * 10) / 10,
+      demo_evaluations: evaluation?.demoCount ?? 0,
+      ai_assessment_hours: Math.round(((evaluation?.aiSeconds ?? 0) / 3600) * 10) / 10,
+      ai_assessment_evaluations: evaluation?.aiCount ?? 0,
       // Subject (2026-10-14, per request) -- same value the Training Stats and Instructors tabs show.
       subject_area: normalizeSubjectArea(p.deptArea || p.manualDeptArea || null),
       // Date of joining (Darwin, then archive, then typed in by hand for payroll-converted people) and Training Duration: whole days
