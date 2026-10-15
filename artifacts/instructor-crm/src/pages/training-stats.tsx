@@ -179,6 +179,64 @@ function subjectCompletion(row: TrainingStatsRow, defs: TrainingCourseDef[]): nu
 const formatPercent = (value: number) => `${Math.round(value * 10) / 10}%`;
 const percentTone = (value: number) => (value >= 80 ? 'bg-[#e5f3ed] text-[#256e65]' : value >= 40 ? 'bg-[#fff3d6] text-[#8a6a12]' : 'bg-[#f3f0ec] text-[#8a7a63]');
 
+// Completion tally (2026-10-15, per request): how many instructors finished the subject they teach. Each instructor is measured on THEIR OWN
+// subject's course track (SUBJECT_TRACK) -- a Frontend instructor on Frontend Development, an English instructor on English -- so a mixed group
+// (a whole tab, a product) can be counted together. Completed = 100% on that track, In progress = above 0% and below 100%, Not started = 0%,
+// No data = no synced training data (or nothing mapped yet). Instructors whose subject has no course track (for example Artificial Intelligence
+// & Emerging Technologies) cannot be measured and are counted separately, not in the total or the rate.
+// nearComplete: instructors at 80% or more but not yet 100% -- shown wherever nobody has reached 100% yet (2026-10-15, per request).
+type CompletionTally = { total: number; completed: number; nearComplete: number; inProgress: number; notStarted: number; noData: number; untracked: number };
+const NEAR_COMPLETE_PCT = 80;
+function tallyCompletion(rows: TrainingStatsRow[], taxonomy: TrainingCourseDef[]): CompletionTally {
+  const tally: CompletionTally = { total: 0, completed: 0, nearComplete: 0, inProgress: 0, notStarted: 0, noData: 0, untracked: 0 };
+  for (const row of rows) {
+    const track = row.subject_area ? SUBJECT_TRACK[row.subject_area] : undefined;
+    const defs = track ? taxonomy.filter((def) => def.trackGroup === track) : [];
+    if (defs.length === 0) { tally.untracked += 1; continue; }
+    tally.total += 1;
+    const pct = subjectCompletion(row, defs);
+    if (pct === null) tally.noData += 1;
+    else if (pct >= 100) tally.completed += 1;
+    else if (pct > 0) { tally.inProgress += 1; if (pct >= NEAR_COMPLETE_PCT) tally.nearComplete += 1; }
+    else tally.notStarted += 1;
+  }
+  return tally;
+}
+const completionRate = (tally: CompletionTally) => (tally.total > 0 ? Math.round((tally.completed / tally.total) * 1000) / 10 : null);
+
+function CompletionBreakdown({ title, firstColumn, rows, testId }: { title: string; firstColumn: string; rows: { name: string; tally: CompletionTally }[]; testId: string }) {
+  return <div data-testid={testId} className="min-w-[320px] flex-1 overflow-x-auto rounded-md border border-border bg-card">
+    <p className="border-b border-border px-4 py-2.5 text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">{title}</p>
+    <table className="w-full border-collapse text-[12px]">
+      <thead>
+        <tr className="border-b border-border text-left font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+          <th className="whitespace-nowrap px-4 py-2 font-normal">{firstColumn}</th>
+          <th className="whitespace-nowrap px-3 py-2 text-right font-normal" title="Instructors measured on their own subject's course track">Instructors</th>
+          <th className="whitespace-nowrap px-3 py-2 text-right font-normal" title="Every course of their subject at 100%">Completed</th>
+          <th className="whitespace-nowrap px-3 py-2 text-right font-normal" title="Part-way: above 0% and below 100%">In progress</th>
+          <th className="whitespace-nowrap px-3 py-2 text-right font-normal" title="0% on their subject">Not started</th>
+          <th className="whitespace-nowrap px-3 py-2 text-right font-normal" title="No synced training data">No data</th>
+          <th className="whitespace-nowrap px-4 py-2 text-right font-normal" title="Completed divided by Instructors">Completion rate</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map(({ name, tally }) => {
+          const rate = completionRate(tally);
+          return <tr key={name} className="border-b border-border last:border-b-0">
+            <td className="whitespace-nowrap px-4 py-2 font-semibold text-foreground">{name}</td>
+            <td className="px-3 py-2 text-right font-mono-ui tabular-nums text-foreground">{formatKpi(tally.total)}</td>
+            <td className="px-3 py-2 text-right font-mono-ui tabular-nums text-foreground">{formatKpi(tally.completed)}{tally.completed === 0 && tally.total > 0 && <span className="ml-1 text-[11px] text-muted-foreground" title="Nobody is at 100% yet -- instructors at 80% or more">({formatKpi(tally.nearComplete)} at 80%+)</span>}</td>
+            <td className="px-3 py-2 text-right font-mono-ui tabular-nums text-foreground">{formatKpi(tally.inProgress)}</td>
+            <td className="px-3 py-2 text-right font-mono-ui tabular-nums text-muted-foreground">{formatKpi(tally.notStarted)}</td>
+            <td className="px-3 py-2 text-right font-mono-ui tabular-nums text-muted-foreground">{formatKpi(tally.noData)}</td>
+            <td className="px-4 py-2 text-right font-mono-ui font-bold tabular-nums text-foreground">{rate === null ? '—' : `${rate}%`}</td>
+          </tr>;
+        })}
+      </tbody>
+    </table>
+  </div>;
+}
+
 export default function TrainingStatsPage() {
   const queryClient = useQueryClient();
   const query = useTrainingStats();
@@ -240,20 +298,22 @@ export default function TrainingStatsPage() {
   const selectedTrack = subjectActive ? SUBJECT_TRACK[subject] : undefined;
   const trackTaxonomy = selectedTrack ? activeTaxonomy.filter((d) => d.trackGroup === selectedTrack) : [];
   const displayTaxonomy = trackTaxonomy.length > 0 ? trackTaxonomy : activeTaxonomy;
-  // Overview cards for the chosen subject: how many of ITS instructors have finished every course of the subject (100%), and how
-  // many are part-way (above 0% and below 100%). Instructors with no training data or 0% are in neither.
+  // Overview cards (2026-10-15, per request): completion over everyone the filters leave -- the whole tab when no subject is picked, one
+  // subject when it is, narrowed by the Product filter as well. See tallyCompletion above for how each instructor is counted.
   const subjectSummary = useMemo(() => {
-    if (!subjectActive || trackTaxonomy.length === 0) return null;
-    let completed = 0;
-    let inProgress = 0;
-    for (const row of subjectRows) {
-      const pct = subjectCompletion(row, trackTaxonomy);
-      if (pct === null) continue;
-      if (pct >= 100) completed += 1;
-      else if (pct > 0) inProgress += 1;
-    }
-    return { completed, inProgress, total: subjectRows.length };
-  }, [subjectActive, subjectRows, trackTaxonomy]);
+    const tally = tallyCompletion(subjectRows, activeTaxonomy);
+    return tally.total > 0 ? tally : null;
+  }, [subjectRows, activeTaxonomy]);
+  // Breakdowns: every subject on this tab (narrowed by the chosen product) and every product on this tab (narrowed by the chosen subject).
+  const subjectBreakdown = useMemo(() => {
+    const byProduct = productActive ? activeRows.filter((row) => row.product === product) : activeRows;
+    return subjectOptions.map((name) => ({ name, tally: tallyCompletion(byProduct.filter((row) => row.subject_area === name), activeTaxonomy) })).filter((entry) => entry.tally.total + entry.tally.untracked > 0);
+  }, [activeRows, subjectOptions, product, productActive, activeTaxonomy]);
+  const productBreakdown = useMemo(() => {
+    const bySubject = subjectActive ? activeRows.filter((row) => row.subject_area === subject) : activeRows;
+    return productOptions.map((name) => ({ name, tally: tallyCompletion(bySubject.filter((row) => row.product === name), activeTaxonomy) })).filter((entry) => entry.tally.total + entry.tally.untracked > 0);
+  }, [activeRows, productOptions, subject, subjectActive, activeTaxonomy]);
+  const scopeLabel = `${subjectActive ? subject : activeSubTab.label}${productActive ? ` (${product})` : ''}`;
   const productSuffix = productActive ? ` (${product})` : '';
   const searchedRows = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -344,16 +404,16 @@ export default function TrainingStatsPage() {
           tone="navy"
         />
         {subjectSummary && <TopStat
-          label={`${subject} -- completed`}
+          label={`${scopeLabel} -- completed`}
           value={formatKpi(subjectSummary.completed)}
-          meta={`of ${formatKpi(subjectSummary.total)} ${subject} instructors at 100%`}
+          meta={`of ${formatKpi(subjectSummary.total)} instructors at 100% (${completionRate(subjectSummary) ?? 0}%)${subjectSummary.completed === 0 ? ` -- ${formatKpi(subjectSummary.nearComplete)} at 80% or more` : ''}${subjectSummary.untracked > 0 ? ` -- ${formatKpi(subjectSummary.untracked)} with no course track not counted` : ''}`}
           icon={<CheckCircle2 size={16} />}
           tone="green"
         />}
         {subjectSummary && <TopStat
-          label={`${subject} -- in progress`}
+          label={`${scopeLabel} -- in progress`}
           value={formatKpi(subjectSummary.inProgress)}
-          meta={`of ${formatKpi(subjectSummary.total)} ${subject} instructors, part-way`}
+          meta={`of ${formatKpi(subjectSummary.total)} instructors, part-way`}
           icon={<Clock size={16} />}
           tone="amber"
         />}
@@ -362,6 +422,11 @@ export default function TrainingStatsPage() {
         <DownloadCsvButton onClick={downloadTable} disabled={searchedRows.length === 0} label={`Download CSV (${formatKpi(searchedRows.length)})`} testId="button-download-training-stats-csv" />
         <TableSearchInput value={search} onChange={setSearch} testId="input-search-training-stats" />
       </div>}
+    </div>}
+
+    {data && (subjectBreakdown.length > 1 || productBreakdown.length > 1) && <div data-testid="completion-breakdown" className="mb-6 flex flex-wrap gap-4">
+      {subjectBreakdown.length > 1 && <CompletionBreakdown title={`Completion by subject${productActive ? ` -- ${product}` : ''}`} firstColumn="Subject" rows={subjectBreakdown} testId="completion-by-subject" />}
+      {productBreakdown.length > 1 && <CompletionBreakdown title={`Completion by product${subjectActive ? ` -- ${subject}` : ` -- ${activeSubTab.label}`}`} firstColumn="Product" rows={productBreakdown} testId="completion-by-product" />}
     </div>}
 
     {data && pendingCount > 0 && <p className="mb-6 max-w-3xl text-[12px] leading-relaxed text-muted-foreground">
