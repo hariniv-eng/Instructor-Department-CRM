@@ -170,6 +170,8 @@ export async function storeEvaluationDaily(rows: EvaluationDailyRow[]): Promise<
         evaluationType: row.evaluation_type,
         seconds: row.seconds,
         evaluations: row.evaluations,
+        scoreSum: row.score_sum,
+        scored: row.scored,
       }));
       if (batch.length) await tx.insert(instructorEvaluationDailyTable).values(batch);
     }

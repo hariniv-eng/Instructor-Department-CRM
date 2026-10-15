@@ -1435,14 +1435,14 @@ router.get("/reports/instructor-contribution", requireAuth, requireRole("admin")
   const joiningLookups = await loadJoiningLookups();
   // Demo and AI-assessment recording time per instructor (2026-10-14, per request), totalled over the chosen date range or all-time.
   // Read defensively: if the table is not pushed / synced yet the two columns are simply empty and nothing else is affected.
-  type EvalTotals = { demoSeconds: number; demoCount: number; aiSeconds: number; aiCount: number };
+  type EvalTotals = { demoSeconds: number; demoCount: number; aiSeconds: number; aiCount: number; demoScoreSum: number; demoScored: number; aiScoreSum: number; aiScored: number };
   const evaluationByInstructor = new Map<string, EvalTotals>();
   try {
     const evalConditions = [fromParam ? gte(instructorEvaluationDailyTable.sessionDate, fromParam) : undefined, toParam ? lte(instructorEvaluationDailyTable.sessionDate, toParam) : undefined].filter((c) => c !== undefined);
     const evalRows = await db.select().from(instructorEvaluationDailyTable).where(evalConditions.length ? and(...evalConditions) : undefined);
     for (const e of evalRows) {
-      const t = evaluationByInstructor.get(e.instructorUserId) ?? { demoSeconds: 0, demoCount: 0, aiSeconds: 0, aiCount: 0 };
-      if (e.evaluationType === "DEMO") { t.demoSeconds += e.seconds; t.demoCount += e.evaluations; } else { t.aiSeconds += e.seconds; t.aiCount += e.evaluations; }
+      const t = evaluationByInstructor.get(e.instructorUserId) ?? { demoSeconds: 0, demoCount: 0, aiSeconds: 0, aiCount: 0, demoScoreSum: 0, demoScored: 0, aiScoreSum: 0, aiScored: 0 };
+      if (e.evaluationType === "DEMO") { t.demoSeconds += e.seconds; t.demoCount += e.evaluations; t.demoScoreSum += e.scoreSum; t.demoScored += e.scored; } else { t.aiSeconds += e.seconds; t.aiCount += e.evaluations; t.aiScoreSum += e.scoreSum; t.aiScored += e.scored; }
       evaluationByInstructor.set(e.instructorUserId, t);
     }
   } catch (err) {
@@ -1508,6 +1508,9 @@ router.get("/reports/instructor-contribution", requireAuth, requireRole("admin")
       demo_evaluations: evaluation?.demoCount ?? 0,
       ai_assessment_hours: Math.round(((evaluation?.aiSeconds ?? 0) / 3600) * 10) / 10,
       ai_assessment_evaluations: evaluation?.aiCount ?? 0,
+      // Average final score (0-10, one decimal) of the Completed evaluations that have a score; null when none do.
+      demo_avg_score: evaluation && evaluation.demoScored > 0 ? Math.round((evaluation.demoScoreSum / evaluation.demoScored) * 10) / 10 : null,
+      ai_avg_score: evaluation && evaluation.aiScored > 0 ? Math.round((evaluation.aiScoreSum / evaluation.aiScored) * 10) / 10 : null,
       // Learning hours: total time the person spent on course units (BigQuery z_niat_instructor_day_wise_unit_wise_time_spent_details,
       // seconds converted to hours, one decimal) and the number of days with activity. Follows the date filter.
       learning_hours: Math.round(((timeSpent?.seconds ?? 0) / 3600) * 10) / 10,

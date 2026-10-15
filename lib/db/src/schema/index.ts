@@ -18,7 +18,7 @@
 //   export type Post = typeof postsTable.$inferSelect;
 
 import { createInsertSchema } from "drizzle-zod";
-import { boolean, date, integer, jsonb, pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, date, doublePrecision, integer, jsonb, pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
 import { z } from "zod/v4";
 
 export const instructorsTable = pgTable("instructors", {
@@ -570,6 +570,10 @@ export const instructorEvaluationDailyTable = pgTable("instructor_evaluation_dai
   evaluationType: text("evaluation_type").notNull(),
   seconds: integer("seconds").notNull().default(0),
   evaluations: integer("evaluations").notNull().default(0),
+  // Scores (2026-10-15, per request: average Demo / AI score): scoreSum is the sum of final_score (0-10) over the evaluations that day
+  // that have a score, scored is how many of them have one -- average = total scoreSum / total scored over the chosen date range.
+  scoreSum: doublePrecision("score_sum").notNull().default(0),
+  scored: integer("scored").notNull().default(0),
   syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
