@@ -812,14 +812,14 @@ function gridColsClass(category: CategoryKey): string {
   // mixed into Department/Exception just reads "Nxtwave" in this column,
   // same as any non-payroll instructor. Never wrong, just not usually the
   // interesting value there.
-  if (category === 'instructors' || category === 'mentors' || category === 'instructors_mentors' || category === 'department' || category === 'exception') return 'grid-cols-[260px_190px_130px_280px_220px_150px_160px_170px_220px_160px_110px_140px_190px_190px_160px_130px_130px_150px_170px_140px_170px_190px_150px_260px_150px]';
+  if (category === 'instructors' || category === 'mentors' || category === 'instructors_mentors' || category === 'department' || category === 'exception') return 'grid-cols-[260px_190px_130px_280px_220px_150px_160px_170px_220px_160px_110px_140px_120px_190px_190px_160px_130px_130px_150px_170px_140px_170px_190px_150px_260px_150px]';
   // Operations team keeps its own shape (2026-09-21: not part of the above
   // request) -- no Campus column (ops rows aren't deployed to a teaching
   // campus the way instructors and mentors are), a single Department
   // column instead of Subject+Department, and no Payroll either (same
   // reason it's never meaningful for Mentors: payroll_converted can't be
   // assigned to an ops row).
-  return 'grid-cols-[260px_190px_130px_280px_220px_150px_280px_140px_190px_190px_160px_130px_150px_170px_140px_170px_190px_150px_260px_150px]';
+  return 'grid-cols-[260px_190px_130px_280px_220px_150px_280px_140px_120px_190px_190px_160px_130px_150px_170px_140px_170px_190px_150px_260px_150px]';
 }
 
 // Manager (Darwin) (2026-09-22, per request: "in the overview table we have
@@ -937,6 +937,36 @@ export function productLabel(person: InstructorSummary): string {
 
 // Name column header/label is per-category -- "Instructor Department" mixes
 // all three roles, so it gets a neutral "Person" rather than "Instructor".
+// Experience (2026-10-15, per request): how long the person has worked in the organization, in years, from their date of joining to
+// today -- or to their date of exit once they have one (an exited person stops accruing). Blank when there is no joining date (for example
+// payroll-converted people, whose Darwin date is not shown on this tab) or the dates do not make sense. Worked out here from the two dates
+// already on the row, so it is always current and needs no sync.
+function parseDay(value: string | null | undefined): Date | null {
+  const text = (value ?? '').trim();
+  if (!text) return null;
+  const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(text);
+  if (iso) return new Date(Date.UTC(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3])));
+  const dmy = /^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$/.exec(text);
+  if (dmy) return new Date(Date.UTC(Number(dmy[3]), Number(dmy[2]) - 1, Number(dmy[1])));
+  const named = Date.parse(`${text.replace(/-/g, ' ')} UTC`);
+  return Number.isNaN(named) ? null : new Date(named);
+}
+export function experienceOf(person: { date_of_joining?: string | null; date_of_exit?: string | null }): { years: number; label: string; detail: string } | null {
+  const joined = parseDay(person.date_of_joining);
+  if (!joined) return null;
+  const exited = parseDay(person.date_of_exit);
+  const now = new Date();
+  const end = exited ?? new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+  const days = (end.getTime() - joined.getTime()) / 86400000;
+  if (days < 0) return null;
+  const years = days / 365.25;
+  let wholeYears = end.getUTCFullYear() - joined.getUTCFullYear();
+  let months = end.getUTCMonth() - joined.getUTCMonth();
+  if (end.getUTCDate() < joined.getUTCDate()) months -= 1;
+  if (months < 0) { wholeYears -= 1; months += 12; }
+  return { years, label: `${(Math.round(years * 10) / 10).toFixed(1)} yrs`, detail: `${wholeYears} years ${months} months${exited ? ' (until date of exit)' : ' (until today)'}` };
+}
+
 function nameColumnLabel(category: CategoryKey): string {
   if (category === 'ops_team') return 'Team member';
   if (category === 'mentors') return 'Mentor';
@@ -951,6 +981,7 @@ export function downloadInstructorsCsv(category: CategoryKey, people: PersonWith
   if (category === 'ops_team') headers.push('Department'); else headers.push('Subject', 'Department');
   if (category !== 'ops_team') headers.push('Campus', 'campus_city', 'campus_state');
   headers.push('Date of joining');
+  headers.push('Experience (years)');
   headers.push('Capability Manager');
   headers.push('Manager (Darwin)');
   headers.push('Bifurcation');
@@ -971,6 +1002,7 @@ export function downloadInstructorsCsv(category: CategoryKey, people: PersonWith
     if (category === 'ops_team') row.push(person.department ?? ''); else row.push(person.dept_area ?? '', person.department ?? '');
     if (category !== 'ops_team') { const place = campusCityAndState(person.institutes); row.push(person.institutes?.join(', ') ?? '', place.city, place.state); }
     row.push(person.date_of_joining ?? '');
+    row.push(experienceOf(person) ? String(Math.round(experienceOf(person)!.years * 10) / 10) : '');
     row.push(person.capability_manager ?? '');
     row.push(person.darwin_manager ?? '');
     row.push(bifurcationLabel(person.classification));
@@ -1020,6 +1052,7 @@ export function CategoryTable({ category, people, backQuery, linkMode = 'row', b
           {category === 'ops_team' ? <span>Department</span> : <><span>Subject</span><span>Department</span></>}
           {category !== 'ops_team' && <><span>Campus</span><span>campus_city</span><span>campus_state</span></>}
           <span>Date of joining</span>
+          <span>Experience</span>
           <span>Capability Manager</span>
           <span>Manager (Darwin)</span>
           <span>Bifurcation</span>
@@ -1099,6 +1132,7 @@ function PersonRow({ category, person, columns, backQuery, linkMode = 'row', bac
         column is specifically Darwin's date of joining, not a general
         "unknown" placeholder. See date_of_joining's gating in reports.ts. */}
     <div className="truncate font-mono-ui text-[11px] text-muted-foreground">{person.date_of_joining || ''}</div>
+    <div data-testid={`cell-experience-${person.id}`} title={experienceOf(person)?.detail} className="truncate text-[12px] font-semibold tabular-nums text-foreground">{experienceOf(person)?.label ?? ''}</div>
     <CapabilityManagerCell person={person} />
     <div className="truncate text-[12px] text-muted-foreground">{person.darwin_manager || '—'}</div>
     <BifurcationCell person={person} />
