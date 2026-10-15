@@ -11,7 +11,7 @@ import { once } from "node:events";
 import { config } from "./config";
 
 const TABLE = "z_niat_instructor_day_wise_unit_wise_time_spent_details";
-const ROWS_PER_FILE = 500_000;
+const ROWS_PER_FILE = 100_000;
 
 const cellText = (v: unknown): string => {
   if (v === null || v === undefined) return "";
