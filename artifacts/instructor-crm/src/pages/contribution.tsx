@@ -40,6 +40,10 @@ type ContributionRow = {
   date_of_joining_source: 'darwin' | 'exit' | 'archive' | 'manual' | null;
   // Training Duration: whole days from the date of joining to the deployment date (first session ever scheduled).
   training_days: number | null;
+  // Experience (2026-10-15, per request): years in the organization from the date of joining to today (or to the date of exit once the
+  // person has one, experience_until_exit), one decimal. Null when there is no joining date.
+  experience_years: number | null;
+  experience_until_exit: boolean;
   classification: string | null;
   // Instructor/Mentor bifurcation (2026-09-24, per request) -- mirrors the
   // Instructors tab's own bifurcation column/badge styling.
@@ -123,7 +127,8 @@ function formatHours(hours: number): string {
 }
 
 // Average sessions per day (2026-10-15, per request): total sessions completed divided by the number of days sessions were taken on --
-// the two figures the Sessions (days) column already shows. Null when there are no session days.
+// the two figures the Sessions (days) column already shows. Shown as a whole number (rounded to the nearest, 2026-10-15 per request:
+// sessions are counted in whole numbers). Null when there are no session days.
 function avgSessionsPerDay(row: ContributionRow): number | null {
   if (!row.has_contribution_data || !row.session_days || row.session_days <= 0) return null;
   return row.sessions_completed / row.session_days;
@@ -243,13 +248,13 @@ export default function ContributionPage() {
   // Download CSV (2026-10-15, per request): everything the current date range, subject filter and search match -- every page, not just the
   // one on screen -- with the same columns as the table. Hours and counts are plain numbers so they sum and sort in a spreadsheet.
   const downloadTable = () => {
-    const headers = ['Employee ID', 'Name', 'Role', 'Role (by sessions)', 'Department', 'Subject', 'Product', 'Capability Manager', 'Date of Joining', 'Date of Joining Source', 'Deployment Date', 'Training Duration (days)', 'Lecture Hrs', 'Lecture Sessions', 'Practice Hrs', 'Practice Sessions', 'Other Hrs', 'Total Hrs', 'Sessions', 'Session Days', 'Avg Sessions / Day', 'Avg Hrs / Day', 'Demo Hrs', 'Demo Evaluations', 'AI Assessment Hrs', 'AI Assessment Evaluations', 'Avg Demo / AI Score', 'Learning Hrs', 'Learning Days', 'Learning Hrs / Day', 'Contribution', 'All Batches', 'Batches (Last 30 Days)'];
+    const headers = ['Employee ID', 'Name', 'Role', 'Role (by sessions)', 'Department', 'Subject', 'Product', 'Capability Manager', 'Date of Joining', 'Date of Joining Source', 'Deployment Date', 'Training Duration (days)', 'Experience (years)', 'Lecture Hrs', 'Lecture Sessions', 'Practice Hrs', 'Practice Sessions', 'Other Hrs', 'Total Hrs', 'Sessions', 'Session Days', 'Avg Sessions / Day', 'Avg Hrs / Day', 'Demo Hrs', 'Demo Evaluations', 'AI Assessment Hrs', 'AI Assessment Evaluations', 'Avg Demo / AI Score', 'Learning Hrs', 'Learning Days', 'Learning Hrs / Day', 'Contribution', 'All Batches', 'Batches (Last 30 Days)'];
     const rows = searchedRows.map((row) => {
       const has = row.has_contribution_data;
       return [
         row.employee_id, row.full_name, row.role, sessionRole(row), row.department, row.subject_area, row.product, row.capability_manager,
-        row.date_of_joining, row.date_of_joining_source, row.deployment_date, row.training_days,
-        has ? row.lecture_hours : '', has ? row.lecture_sessions : '', has ? row.practice_hours : '', has ? row.practice_sessions : '', has ? row.other_hours : '', has ? row.total_hours : '', has ? row.sessions_completed : '', has ? row.session_days : '', avgSessionsPerDay(row) !== null ? Math.round(avgSessionsPerDay(row)! * 10) / 10 : '', avgHoursPerDay(row) !== null ? Math.round(avgHoursPerDay(row)! * 10) / 10 : '',
+        row.date_of_joining, row.date_of_joining_source, row.deployment_date, row.training_days, row.experience_years,
+        has ? row.lecture_hours : '', has ? row.lecture_sessions : '', has ? row.practice_hours : '', has ? row.practice_sessions : '', has ? row.other_hours : '', has ? row.total_hours : '', has ? row.sessions_completed : '', has ? row.session_days : '', avgSessionsPerDay(row) !== null ? Math.round(avgSessionsPerDay(row)!) : '', avgHoursPerDay(row) !== null ? Math.round(avgHoursPerDay(row)! * 10) / 10 : '',
         row.demo_evaluations > 0 ? row.demo_hours : '', row.demo_evaluations > 0 ? row.demo_evaluations : '',
         row.ai_assessment_evaluations > 0 ? row.ai_assessment_hours : '', row.ai_assessment_evaluations > 0 ? row.ai_assessment_evaluations : '', row.eval_avg_score ?? '',
         row.learning_days > 0 ? row.learning_hours : '', row.learning_days > 0 ? row.learning_days : '', row.learning_days > 0 ? Math.round((row.learning_hours / row.learning_days) * 10) / 10 : '',
@@ -352,6 +357,7 @@ export default function ContributionPage() {
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Date of joining from Darwinbox">Date of Joining</th>
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Date of the first session ever scheduled for this instructor">Deployment Date</th>
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Whole days from the date of joining to the deployment date (first session taken)">Training Duration</th>
+                <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Years in the organization: from the date of joining to today, or to the date of exit once the person has one">Experience</th>
                 <th className="whitespace-nowrap border-l border-border px-4 py-3 text-right font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Hours, with the number of Lecture sessions in brackets">Lecture Hrs (sessions)</th>
                 <th className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Hours, with the number of Practice sessions in brackets">Practice Hrs (sessions)</th>
                 <th className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Other Hrs</th>
@@ -382,6 +388,7 @@ export default function ContributionPage() {
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-foreground" data-testid={`cell-date-of-joining-${row.employee_id ?? row.full_name}`}><JoiningDateCell row={row} onSaved={refresh} /></td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-foreground" data-testid={`cell-deployment-date-${row.employee_id ?? row.full_name}`}>{row.deployment_date ? formatDay(row.deployment_date) : <span className="text-muted-foreground">—</span>}</td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] font-semibold tabular-nums text-foreground" data-testid={`cell-training-duration-${row.employee_id ?? row.full_name}`} title={row.training_days !== null ? `About ${Math.round((row.training_days / 7) * 10) / 10} weeks` : 'Needs both a date of joining and a deployment date'}>{row.training_days !== null ? `${row.training_days} ${row.training_days === 1 ? 'day' : 'days'}` : <span className="font-normal text-muted-foreground">—</span>}</td>
+                <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] font-semibold tabular-nums text-foreground" data-testid={`cell-experience-${row.employee_id ?? row.full_name}`} title={row.experience_years !== null ? (row.experience_until_exit ? 'Joining date to date of exit' : 'Joining date to today') : 'Needs a date of joining'}>{row.experience_years !== null ? `${row.experience_years.toFixed(1)} yrs` : <span className="font-normal text-muted-foreground">—</span>}</td>
                 {row.has_contribution_data
                   ? <>
                     <td className="whitespace-nowrap border-l border-border px-4 py-3 text-right font-mono-ui text-[12px] tabular-nums text-foreground">{formatHours(row.lecture_hours)} <span className="text-muted-foreground" title="Lecture sessions">({formatKpi(row.lecture_sessions ?? 0)})</span></td>
@@ -389,7 +396,7 @@ export default function ContributionPage() {
                     <td className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[12px] tabular-nums text-foreground">{formatHours(row.other_hours)}</td>
                     <td className="whitespace-nowrap border-l border-border px-4 py-3 text-right font-mono-ui text-[12px] font-bold tabular-nums text-foreground">{formatHours(row.total_hours)}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[12px] tabular-nums text-muted-foreground">{formatKpi(row.sessions_completed)} <span className="text-[11px]" title="Distinct days on which these Lecture and Practice sessions were taken">(in {formatKpi(row.session_days ?? 0)} {row.session_days === 1 ? 'day' : 'days'})</span></td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[12px] tabular-nums text-foreground" data-testid={`cell-avg-sessions-${row.employee_id ?? row.full_name}`} title={`${row.sessions_completed} sessions over ${row.session_days ?? 0} days`}>{avgSessionsPerDay(row) !== null ? formatAvg(avgSessionsPerDay(row)!) : <span className="text-muted-foreground">—</span>}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[12px] tabular-nums text-foreground" data-testid={`cell-avg-sessions-${row.employee_id ?? row.full_name}`} title={`${row.sessions_completed} sessions over ${row.session_days ?? 0} days (rounded to the nearest whole number)`}>{avgSessionsPerDay(row) !== null ? Math.round(avgSessionsPerDay(row)!).toLocaleString('en-IN') : <span className="text-muted-foreground">—</span>}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[12px] tabular-nums text-foreground" data-testid={`cell-avg-hours-${row.employee_id ?? row.full_name}`} title={`${formatHours(row.total_hours)} hrs over ${row.session_days ?? 0} days`}>{avgHoursPerDay(row) !== null ? formatAvg(avgHoursPerDay(row)!) : <span className="text-muted-foreground">—</span>}</td>
                   </>
                   : <td colSpan={7} className="whitespace-nowrap border-l border-border px-4 py-3 text-center text-[11px] italic text-muted-foreground">No data</td>}
