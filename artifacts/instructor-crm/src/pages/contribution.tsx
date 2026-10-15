@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Clock, RefreshCw } from 'lucide-react';
-import { PageIntro, EmptyState, QueryError, SkeletonBlock, TopStat, TablePager, TableSearchInput, usePagedRows, formatKpi } from '@/components/ui-pieces';
+import { PageIntro, EmptyState, QueryError, SkeletonBlock, TopStat, TablePager, TableSearchInput, DownloadCsvButton, usePagedRows, formatKpi } from '@/components/ui-pieces';
+import { downloadCsv, toCsv } from '@/lib/csv';
+import { ALL_PRODUCTS } from './instructors';
 
 // "Contribution" (2026-09-24, per request): each instructor's actual
 // session-teaching hours delivered -- distinct from Training Stats, which
@@ -31,6 +33,8 @@ type ContributionRow = {
   capability_manager: string | null;
   // Subject (2026-10-14, per request) -- same value as the Training Stats and Instructors tabs.
   subject_area: string | null;
+  // Product (2026-10-15, per request) -- same label as the Instructors tab's Product column (NIAT (Deployed), NIAT (Training), Academy, Intensive, IIT X DSA, Support).
+  product: string;
   // Date of joining: Darwin, then the archived Darwin record, then typed in by hand (payroll-converted people have none in Darwin).
   date_of_joining: string | null;
   date_of_joining_source: 'darwin' | 'exit' | 'archive' | 'manual' | null;
@@ -174,6 +178,8 @@ export default function ContributionPage() {
   const [search, setSearch] = useState('');
   // Subject filter (2026-10-14, per request): '' = all subjects, NONE = people with no subject set, otherwise one subject.
   const [subject, setSubject] = useState('');
+  // Product filter (2026-10-15, per request): '' = all products, otherwise one product.
+  const [product, setProduct] = useState('');
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: QUERY_KEY });
 
@@ -198,12 +204,14 @@ export default function ContributionPage() {
 
   const subjectOptions = useMemo(() => (data ? [...new Set(data.rows.map((row) => row.subject_area).filter((area): area is string => !!area))].sort() : []), [data]);
   const hasNoSubject = useMemo(() => !!data && data.rows.some((row) => !row.subject_area), [data]);
+  const productOptions = useMemo(() => (data ? ALL_PRODUCTS.filter((name) => data.rows.some((row) => row.product === name)) : []), [data]);
   const subjectRows = useMemo(() => {
     if (!data) return [];
-    if (!subject) return data.rows;
-    if (subject === 'NONE') return data.rows.filter((row) => !row.subject_area);
-    return data.rows.filter((row) => row.subject_area === subject);
-  }, [data, subject]);
+    const byProduct = product ? data.rows.filter((row) => row.product === product) : data.rows;
+    if (!subject) return byProduct;
+    if (subject === 'NONE') return byProduct.filter((row) => !row.subject_area);
+    return byProduct.filter((row) => row.subject_area === subject);
+  }, [data, subject, product]);
   const searchedRows = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return subjectRows;
@@ -215,7 +223,28 @@ export default function ContributionPage() {
   // a quick "how much did the department teach in total" figure alongside
   // the per-instructor table below.
   const totalHoursAllInstructors = useMemo(() => subjectRows.reduce((sum, r) => sum + r.total_hours, 0), [subjectRows]);
-  const subjectLabel = subject === 'NONE' ? 'with no subject' : subject;
+  const subjectLabel = [product, subject === 'NONE' ? 'with no subject' : subject].filter(Boolean).join(' · ');
+
+  // Download CSV (2026-10-15, per request): everything the current date range, subject filter and search match -- every page, not just the
+  // one on screen -- with the same columns as the table. Hours and counts are plain numbers so they sum and sort in a spreadsheet.
+  const downloadTable = () => {
+    const headers = ['Employee ID', 'Name', 'Role', 'Role (by sessions)', 'Department', 'Subject', 'Product', 'Capability Manager', 'Date of Joining', 'Date of Joining Source', 'Deployment Date', 'Training Duration (days)', 'Lecture Hrs', 'Lecture Sessions', 'Practice Hrs', 'Practice Sessions', 'Other Hrs', 'Total Hrs', 'Sessions', 'Session Days', 'Demo Hrs', 'Demo Evaluations', 'AI Assessment Hrs', 'AI Assessment Evaluations', 'Learning Hrs', 'Learning Days', 'Contribution', 'All Batches', 'Batches (Last 30 Days)'];
+    const rows = searchedRows.map((row) => {
+      const has = row.has_contribution_data;
+      return [
+        row.employee_id, row.full_name, row.role, sessionRole(row), row.department, row.subject_area, row.product, row.capability_manager,
+        row.date_of_joining, row.date_of_joining_source, row.deployment_date, row.training_days,
+        has ? row.lecture_hours : '', has ? row.lecture_sessions : '', has ? row.practice_hours : '', has ? row.practice_sessions : '', has ? row.other_hours : '', has ? row.total_hours : '', has ? row.sessions_completed : '', has ? row.session_days : '',
+        row.demo_evaluations > 0 ? row.demo_hours : '', row.demo_evaluations > 0 ? row.demo_evaluations : '',
+        row.ai_assessment_evaluations > 0 ? row.ai_assessment_hours : '', row.ai_assessment_evaluations > 0 ? row.ai_assessment_evaluations : '',
+        row.learning_days > 0 ? row.learning_hours : '', row.learning_days > 0 ? row.learning_days : '',
+        row.niat_cohorts.join(', '), row.all_batches.join(', '), row.recent_batches.join(', '),
+      ];
+    });
+    const range = dateFrom || dateTo ? `-${dateFrom || 'start'}-to-${dateTo || toIsoDay(new Date())}` : '';
+    const subjectPart = [product, subject && subject !== 'NONE' ? subject : ''].filter(Boolean).map((part) => `-${part.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')}`).join('');
+    downloadCsv(`contribution${subjectPart}${range}.csv`, toCsv(headers, rows));
+  };
 
   return <div className="mx-auto max-w-[1500px]">
     <PageIntro
@@ -247,6 +276,12 @@ export default function ContributionPage() {
           {hasNoSubject && <option value="NONE">No subject set</option>}
         </select>
       </label>
+      <label className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">Product
+        <select value={product} onChange={(event) => setProduct(event.target.value)} data-testid="select-contribution-product" className="mt-1 block h-9 min-w-[160px] rounded-md border border-border bg-background px-2 text-[12px] font-semibold normal-case tracking-normal text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-ring/25">
+          <option value="">All products</option>
+          {productOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+        </select>
+      </label>
       <div className="flex flex-wrap gap-1.5">
         {PRESETS.map((preset) => {
           const active = preset.days === null ? !dateFrom && !dateTo : dateFrom === daysAgo(preset.days) && dateTo === toIsoDay(new Date());
@@ -275,7 +310,10 @@ export default function ContributionPage() {
           tone="teal"
         />
       </div>
-      {data.count > 0 && <TableSearchInput value={search} onChange={setSearch} testId="input-search-contribution" />}
+      {data.count > 0 && <div className="flex flex-wrap items-center gap-2">
+        <DownloadCsvButton onClick={downloadTable} disabled={searchedRows.length === 0} label={`Download CSV (${formatKpi(searchedRows.length)})`} testId="button-download-contribution-csv" />
+        <TableSearchInput value={search} onChange={setSearch} testId="input-search-contribution" />
+      </div>}
     </div>}
 
     {data && data.count === 0 && <EmptyState title="No contribution data yet" description="Click Sync Now to pull the latest from BigQuery." />}
@@ -294,6 +332,7 @@ export default function ContributionPage() {
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Instructor if they took any Lecture session; Mentor if they took sessions but no Lecture; blank if no session data">Role (by sessions)</th>
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Department</th>
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Subject</th>
+                <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Same Product as the Instructors tab">Product</th>
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Capability Manager</th>
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Date of joining from Darwinbox">Date of Joining</th>
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Date of the first session ever scheduled for this instructor">Deployment Date</th>
@@ -319,6 +358,7 @@ export default function ContributionPage() {
                 <td className="whitespace-nowrap border-r border-border px-4 py-3" data-testid={`cell-session-role-${row.employee_id ?? row.full_name}`}>{(() => { const derived = sessionRole(row); return derived ? <RoleBadge role={derived} /> : null; })()}</td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-muted-foreground">{row.department || '—'}</td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-foreground" data-testid={`cell-subject-${row.employee_id ?? row.full_name}`}>{row.subject_area || '—'}</td>
+                <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-foreground" data-testid={`cell-product-${row.employee_id ?? row.full_name}`}>{row.product || '—'}</td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-muted-foreground">{row.capability_manager || '—'}</td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-foreground" data-testid={`cell-date-of-joining-${row.employee_id ?? row.full_name}`}><JoiningDateCell row={row} onSaved={refresh} /></td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-foreground" data-testid={`cell-deployment-date-${row.employee_id ?? row.full_name}`}>{row.deployment_date ? formatDay(row.deployment_date) : <span className="text-muted-foreground">—</span>}</td>

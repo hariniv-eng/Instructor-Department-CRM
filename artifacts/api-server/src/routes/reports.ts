@@ -7,6 +7,7 @@ import { archiveInstructors } from "../lib/archiveInstructors";
 import { TRAINING_COURSE_TAXONOMY, isResolvedCourse } from "../data/trainingCourseTaxonomy";
 import { TECH_AREAS, normalizeSubjectArea } from "../lib/departmentTaxonomy";
 import { isPinnedConfirmedInstructor } from "../data/classificationOverrides";
+import { productOf } from "../lib/product";
 
 // Pinned edge-case instructors (NW0005068): see isPinnedConfirmedInstructor() in
 // data/classificationOverrides.ts. Kept counted on every sync until their Darwin
@@ -1364,6 +1365,7 @@ router.get("/reports/training-stats", requireAuth, requireRole("admin"), async (
       // Manual Subject for them (same PATCH /instructors/:id/subject path
       // the Instructors tab already uses).
       subject_area: normalizeSubjectArea(p.deptArea || p.manualDeptArea || null),
+      product: productOf(p),
       has_training_data: hasTrainingData,
       courses,
       course_progress: courseProgress,
@@ -1512,6 +1514,7 @@ router.get("/reports/instructor-contribution", requireAuth, requireRole("admin")
       learning_days: timeSpent?.days ?? 0,
       // Subject (2026-10-14, per request) -- same value the Training Stats and Instructors tabs show.
       subject_area: normalizeSubjectArea(p.deptArea || p.manualDeptArea || null),
+      product: productOf(p),
       // Date of joining (Darwin, then archive, then typed in by hand for payroll-converted people) and Training Duration: whole days
       // from joining to the first session ever scheduled (deployment date). Null when either date is missing or the first session
       // is before the joining date. All-time, not affected by the date filter.
