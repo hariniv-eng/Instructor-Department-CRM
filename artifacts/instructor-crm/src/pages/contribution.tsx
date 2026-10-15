@@ -33,7 +33,7 @@ type ContributionRow = {
   subject_area: string | null;
   // Date of joining: Darwin, then the archived Darwin record, then typed in by hand (payroll-converted people have none in Darwin).
   date_of_joining: string | null;
-  date_of_joining_source: 'darwin' | 'archive' | 'manual' | null;
+  date_of_joining_source: 'darwin' | 'exit' | 'archive' | 'manual' | null;
   // Training Duration: whole days from the date of joining to the deployment date (first session ever scheduled).
   training_days: number | null;
   classification: string | null;
@@ -142,7 +142,7 @@ function JoiningDateCell({ row, onSaved }: { row: ContributionRow; onSaved: () =
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const editable = (row.date_of_joining_source === null || row.date_of_joining_source === 'manual') && !!row.employee_id;
-  if (!editable) return row.date_of_joining ? <span title={row.date_of_joining_source === 'archive' ? 'From the archived Darwin record' : 'From Darwinbox'}>{formatDay(row.date_of_joining)}</span> : <span className="text-muted-foreground">—</span>;
+  if (!editable) return row.date_of_joining ? <span title={row.date_of_joining_source === 'archive' ? 'From the archived Darwin record' : row.date_of_joining_source === 'exit' ? 'From the Darwin exit data' : 'From Darwinbox'}>{formatDay(row.date_of_joining)}</span> : <span className="text-muted-foreground">—</span>;
   const save = async (value: string) => {
     setSaving(true);
     setError(null);

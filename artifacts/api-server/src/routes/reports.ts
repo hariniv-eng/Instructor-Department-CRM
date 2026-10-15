@@ -1253,21 +1253,48 @@ const TRAINING_STATS_EXCLUDED_CLASSIFICATIONS = new Set([
 // reconcileDarwin() resets inDarwin but leaves the old date behind); then the date archived while they were in Darwin; then a date
 // typed in by hand (instructor_manual_joining, for payroll-converted people Darwin has no date for). Only two long-standing archive
 // columns are selected, and the manual table is read defensively, so a database that has not been pushed yet cannot break these pages.
-type JoiningSource = "darwin" | "archive" | "manual";
+type JoiningSource = "darwin" | "exit" | "archive" | "manual";
+// Date of Joining off a Darwin exit record (2026-10-15, per request: payroll-converted instructors have left the Darwin roster but their
+// exit record still carries it). The header is matched loosely -- "Date Of Joining", "Date of Joining", "DOJ", "Joining Date" -- and the
+// value read in whatever format Darwin sent; the newest record (highest id) with a usable date wins. Future / pre-1990 values are ignored.
+const JOINING_HEADERS = new Set(["dateofjoining", "doj", "joiningdate", "dateofjoin", "dateofjoiningdoj"]);
+function joiningDateOfExitRecord(rawData: Record<string, unknown>): string | null {
+  for (const [key, value] of Object.entries(rawData)) {
+    if (value === null || value === undefined) continue;
+    if (!JOINING_HEADERS.has(key.toLowerCase().replace(/[^a-z]/g, ""))) continue;
+    const iso = toISODate(String(value).trim());
+    if (iso && iso >= "1990-01-01" && iso <= new Date().toISOString().slice(0, 10)) return iso;
+  }
+  return null;
+}
 async function loadJoiningLookups() {
   const archived = await db.select({ employeeId: instructorArchiveTable.employeeId, dateOfJoining: instructorArchiveTable.dateOfJoining }).from(instructorArchiveTable);
   const archiveByEmployeeId = new Map<string, string>(archived.filter((a) => a.employeeId && a.dateOfJoining).map((a) => [a.employeeId!, a.dateOfJoining!]));
   let manualByEmployeeId = new Map<string, string>();
+  const exitByEmployeeId = new Map<string, string>();
+  try {
+    const exits = await db.select({ id: darwinboxExitsTable.id, employeeId: darwinboxExitsTable.employeeId, rawData: darwinboxExitsTable.rawData }).from(darwinboxExitsTable);
+    const newest = new Map<string, number>();
+    for (const x of exits) {
+      if (!x.employeeId) continue;
+      const iso = joiningDateOfExitRecord(x.rawData);
+      if (iso && x.id > (newest.get(x.employeeId) ?? -1)) { newest.set(x.employeeId, x.id); exitByEmployeeId.set(x.employeeId, iso); }
+    }
+  } catch (err) {
+    console.warn("[joining] could not read the exit data for joining dates:", (err as Error).message);
+  }
   try {
     const manual = await db.select().from(instructorManualJoiningTable);
     manualByEmployeeId = new Map(manual.map((m) => [m.employeeId, m.dateOfJoining]));
   } catch (err) {
     console.warn("[joining] instructor_manual_joining is not readable yet (run the database push):", (err as Error).message);
   }
-  return { archiveByEmployeeId, manualByEmployeeId };
+  return { archiveByEmployeeId, manualByEmployeeId, exitByEmployeeId };
 }
 function resolveJoining(p: typeof instructorsTable.$inferSelect, lookups: Awaited<ReturnType<typeof loadJoiningLookups>>): { date: string | null; source: JoiningSource | null } {
   if (p.inDarwin && p.dateOfJoining) return { date: p.dateOfJoining, source: "darwin" };
+  const fromExit = p.employeeId ? lookups.exitByEmployeeId.get(p.employeeId) : undefined;
+  if (fromExit) return { date: fromExit, source: "exit" };
   const archived = p.employeeId ? lookups.archiveByEmployeeId.get(p.employeeId) : undefined;
   if (archived) return { date: archived, source: "archive" };
   const manual = p.employeeId ? lookups.manualByEmployeeId.get(p.employeeId) : undefined;
