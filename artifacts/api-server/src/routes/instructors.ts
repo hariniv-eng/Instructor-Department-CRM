@@ -293,9 +293,11 @@ router.patch("/instructors/:id/exit-verification", async (req, res): Promise<voi
 // Admin or Manager like the exit-verification route above. null clears it.
 router.patch("/instructors/:id/exit-date", async (req, res): Promise<void> => {
   const raw = (req.body as { exit_date?: string | null }).exit_date;
-  const valid = raw === null || (typeof raw === "string" && /^\d{4}-\d{2}-\d{2}$/.test(raw) && !Number.isNaN(Date.parse(raw)));
+  // A real calendar date with a believable year (2026-10-15: half-typed values such as 0002-10-15 used to be accepted and saved).
+  const isRealDate = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v)) && new Date(Date.parse(v)).toISOString().slice(0, 10) === v && Number(v.slice(0, 4)) >= 2000 && Number(v.slice(0, 4)) <= 2100;
+  const valid = raw === null || (typeof raw === "string" && isRealDate(raw));
   if (!valid) {
-    res.status(400).json({ error: "exit_date must be a YYYY-MM-DD date, or null" });
+    res.status(400).json({ error: "exit_date must be a real YYYY-MM-DD date (year 2000 or later), or null" });
     return;
   }
   const [row] = await db.update(instructorsTable).set({ manualExitDate: raw }).where(eq(instructorsTable.id, Number(req.params.id))).returning();
