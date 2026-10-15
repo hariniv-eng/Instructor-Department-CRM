@@ -573,6 +573,19 @@ export const instructorEvaluationDailyTable = pgTable("instructor_evaluation_dai
   syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// Learning time per instructor per day (2026-10-15, per request), synced from the BigQuery view
+// z_niat_instructor_day_wise_unit_wise_time_spent_details together with the Contribution sync. That view has one row per instructor
+// per unit per day; seconds here is the SUM of datewise_total_time_spent_in_sec over all of that instructor's units on that date,
+// units is how many distinct units they spent time on. Full delete-then-insert on every sync; read defensively like the evaluation
+// table above. Needs `pnpm --filter @workspace/db run push`.
+export const instructorTimeSpentDailyTable = pgTable("instructor_time_spent_daily", {
+  id: serial("id").primaryKey(),
+  instructorUserId: text("instructor_user_id").notNull(),
+  activityDate: date("activity_date").notNull(),
+  seconds: integer("seconds").notNull().default(0),
+  units: integer("units").notNull().default(0),
+  syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
+});
 
 export const insertInstructorContributionSchema = createInsertSchema(instructorContributionTable);
 export type InstructorContribution = typeof instructorContributionTable.$inferSelect;
