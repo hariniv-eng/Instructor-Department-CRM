@@ -523,6 +523,10 @@ export const instructorContributionTable = pgTable("instructor_contribution", {
   lectureSessions: integer("lecture_sessions").notNull().default(0),
   practiceSessions: integer("practice_sessions").notNull().default(0),
   sessionDays: integer("session_days").notNull().default(0),
+  // Other sessions (2026-10-15, per request): completed sessions that are neither Lecture nor Practice (exams and any other type). From
+  // now sessionsCompleted is the COMPLETE total (Lecture + Practice + Other) and sessionDays counts every day with any completed session.
+  // Needs `pnpm --filter @workspace/db run push` after deploying.
+  otherSessions: integer("other_sessions").notNull().default(0),
   // Deployment date (2026-10-13, per request): the date of the FIRST session ever scheduled for the instructor in
   // niat_instructor_session_schedule_details (any status). Needs `pnpm --filter @workspace/db run push` after deploying.
   deploymentDate: date("deployment_date"),
@@ -553,6 +557,8 @@ export const instructorContributionDailyTable = pgTable("instructor_contribution
   otherMinutes: integer("other_minutes").notNull().default(0),
   lectureSessions: integer("lecture_sessions").notNull().default(0),
   practiceSessions: integer("practice_sessions").notNull().default(0),
+  // Other (non Lecture / Practice) completed sessions that day (2026-10-15, per request). Needs the database push.
+  otherSessions: integer("other_sessions").notNull().default(0),
   syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

@@ -306,6 +306,9 @@ export type ContributionRow = {
   // Per request 2026-10-12: Lecture / Practice session counts, and distinct days on which those sessions happened.
   lecture_sessions: number;
   practice_sessions: number;
+  // Completed sessions that are neither Lecture nor Practice (exams and other types), 2026-10-15 per request. sessions_completed is the
+  // complete total (Lecture + Practice + Other) and session_days counts every day with any completed session.
+  other_sessions: number;
   session_days: number;
   // First session ever scheduled for this instructor, YYYY-MM-DD (null when none has a start date).
   deployment_date: string | null;
@@ -427,11 +430,12 @@ export async function fetchContributionRows(): Promise<ContributionRow[]> {
       SUM(CASE WHEN session_type = 'LECTURE' THEN session_duration_in_mins_from_schedule_time ELSE 0 END) AS lecture_minutes,
       SUM(CASE WHEN session_type = 'PRACTICE' THEN session_duration_in_mins_from_schedule_time ELSE 0 END) AS practice_minutes,
       SUM(CASE WHEN session_type NOT IN ('LECTURE', 'PRACTICE') THEN session_duration_in_mins_from_schedule_time ELSE 0 END) AS other_minutes,
-      -- Lecture + Practice sessions only (2026-10-12, per request); Exam / other types still count in the hours columns.
-      COUNTIF(session_type IN ('LECTURE', 'PRACTICE')) AS sessions_completed,
+      -- Complete total of completed sessions: Lecture + Practice + Other (2026-10-15, per request; it was Lecture + Practice only since 2026-10-12).
+      COUNT(*) AS sessions_completed,
       COUNTIF(session_type = 'LECTURE') AS lecture_sessions,
       COUNTIF(session_type = 'PRACTICE') AS practice_sessions,
-      COUNT(DISTINCT IF(session_type IN ('LECTURE', 'PRACTICE'), DATE(session_start_datetime), NULL)) AS session_days,
+      COUNTIF(session_type NOT IN ('LECTURE', 'PRACTICE')) AS other_sessions,
+      COUNT(DISTINCT DATE(session_start_datetime)) AS session_days,
       ARRAY_AGG(DISTINCT batch_name IGNORE NULLS) AS all_batches,
       ARRAY_AGG(DISTINCT CASE WHEN session_start_datetime >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 30 DAY) THEN batch_name END IGNORE NULLS) AS recent_batches,
       ARRAY_AGG(DISTINCT CASE WHEN session_start_datetime >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 60 DAY) THEN batch_name END IGNORE NULLS) AS last_two_months_batches
@@ -460,6 +464,7 @@ export async function fetchContributionRows(): Promise<ContributionRow[]> {
           sessions_completed: Number(r.sessions_completed ?? 0),
           lecture_sessions: Number(r.lecture_sessions ?? 0),
           practice_sessions: Number(r.practice_sessions ?? 0),
+          other_sessions: Number(r.other_sessions ?? 0),
           session_days: Number(r.session_days ?? 0),
           deployment_date: deploymentDates.get(String(r.instructor_user_id ?? "")) ?? null,
           all_batches: allBatches,
@@ -507,6 +512,7 @@ export type ContributionDailyRow = {
   other_minutes: number;
   lecture_sessions: number;
   practice_sessions: number;
+  other_sessions: number;
 };
 
 /**
@@ -524,7 +530,8 @@ export async function fetchContributionDailyRows(): Promise<ContributionDailyRow
       SUM(CASE WHEN session_type = 'PRACTICE' THEN session_duration_in_mins_from_schedule_time ELSE 0 END) AS practice_minutes,
       SUM(CASE WHEN session_type NOT IN ('LECTURE', 'PRACTICE') THEN session_duration_in_mins_from_schedule_time ELSE 0 END) AS other_minutes,
       COUNTIF(session_type = 'LECTURE') AS lecture_sessions,
-      COUNTIF(session_type = 'PRACTICE') AS practice_sessions
+      COUNTIF(session_type = 'PRACTICE') AS practice_sessions,
+      COUNTIF(session_type NOT IN ('LECTURE', 'PRACTICE')) AS other_sessions
     FROM \`${ref}\`
     WHERE session_status = 'COMPLETED' AND instructor_user_id IS NOT NULL AND session_start_datetime IS NOT NULL
     GROUP BY instructor_user_id, session_date
@@ -540,6 +547,7 @@ export async function fetchContributionDailyRows(): Promise<ContributionDailyRow
         other_minutes: Number(r.other_minutes ?? 0),
         lecture_sessions: Number(r.lecture_sessions ?? 0),
         practice_sessions: Number(r.practice_sessions ?? 0),
+        other_sessions: Number(r.other_sessions ?? 0),
       }))
       .filter((r) => r.instructor_user_id && /^\d{4}-\d{2}-\d{2}$/.test(r.session_date));
   } catch (e) {

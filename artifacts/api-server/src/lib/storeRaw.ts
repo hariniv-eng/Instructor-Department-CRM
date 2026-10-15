@@ -127,6 +127,7 @@ export async function storeContribution(rows: ContributionRow[]): Promise<number
         sessionsCompleted: row.sessions_completed,
         lectureSessions: row.lecture_sessions,
         practiceSessions: row.practice_sessions,
+        otherSessions: row.other_sessions,
         sessionDays: row.session_days,
         deploymentDate: row.deployment_date,
         allBatches: row.all_batches,
@@ -152,6 +153,7 @@ export async function storeContributionDaily(rows: ContributionDailyRow[]): Prom
         otherMinutes: row.other_minutes,
         lectureSessions: row.lecture_sessions,
         practiceSessions: row.practice_sessions,
+        otherSessions: row.other_sessions,
       }));
       if (batch.length) await tx.insert(instructorContributionDailyTable).values(batch);
     }
