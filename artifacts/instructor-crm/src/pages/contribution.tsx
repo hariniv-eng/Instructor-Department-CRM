@@ -61,9 +61,8 @@ type ContributionRow = {
   demo_evaluations: number;
   ai_assessment_hours: number;
   ai_assessment_evaluations: number;
-  // Average final score (0-10) of the Completed Demo / AI assessment evaluations that have a score; null when none do.
-  demo_avg_score: number | null;
-  ai_avg_score: number | null;
+  // One combined average final score (0-10) over all Completed Demo and AI assessment evaluations that have a score; null when none do.
+  eval_avg_score: number | null;
   // Learning hours (2026-10-15, per request): total time spent on course units (seconds converted to hours) and the number of days
   // with activity. Follows the date filter.
   learning_hours: number;
@@ -244,15 +243,15 @@ export default function ContributionPage() {
   // Download CSV (2026-10-15, per request): everything the current date range, subject filter and search match -- every page, not just the
   // one on screen -- with the same columns as the table. Hours and counts are plain numbers so they sum and sort in a spreadsheet.
   const downloadTable = () => {
-    const headers = ['Employee ID', 'Name', 'Role', 'Role (by sessions)', 'Department', 'Subject', 'Product', 'Capability Manager', 'Date of Joining', 'Date of Joining Source', 'Deployment Date', 'Training Duration (days)', 'Lecture Hrs', 'Lecture Sessions', 'Practice Hrs', 'Practice Sessions', 'Other Hrs', 'Total Hrs', 'Sessions', 'Session Days', 'Avg Sessions / Day', 'Avg Hrs / Day', 'Demo Hrs', 'Demo Evaluations', 'Avg Demo Score', 'AI Assessment Hrs', 'AI Assessment Evaluations', 'Avg AI Score', 'Learning Hrs', 'Learning Days', 'Learning Hrs / Day', 'Contribution', 'All Batches', 'Batches (Last 30 Days)'];
+    const headers = ['Employee ID', 'Name', 'Role', 'Role (by sessions)', 'Department', 'Subject', 'Product', 'Capability Manager', 'Date of Joining', 'Date of Joining Source', 'Deployment Date', 'Training Duration (days)', 'Lecture Hrs', 'Lecture Sessions', 'Practice Hrs', 'Practice Sessions', 'Other Hrs', 'Total Hrs', 'Sessions', 'Session Days', 'Avg Sessions / Day', 'Avg Hrs / Day', 'Demo Hrs', 'Demo Evaluations', 'AI Assessment Hrs', 'AI Assessment Evaluations', 'Avg Demo / AI Score', 'Learning Hrs', 'Learning Days', 'Learning Hrs / Day', 'Contribution', 'All Batches', 'Batches (Last 30 Days)'];
     const rows = searchedRows.map((row) => {
       const has = row.has_contribution_data;
       return [
         row.employee_id, row.full_name, row.role, sessionRole(row), row.department, row.subject_area, row.product, row.capability_manager,
         row.date_of_joining, row.date_of_joining_source, row.deployment_date, row.training_days,
         has ? row.lecture_hours : '', has ? row.lecture_sessions : '', has ? row.practice_hours : '', has ? row.practice_sessions : '', has ? row.other_hours : '', has ? row.total_hours : '', has ? row.sessions_completed : '', has ? row.session_days : '', avgSessionsPerDay(row) !== null ? Math.round(avgSessionsPerDay(row)! * 10) / 10 : '', avgHoursPerDay(row) !== null ? Math.round(avgHoursPerDay(row)! * 10) / 10 : '',
-        row.demo_evaluations > 0 ? row.demo_hours : '', row.demo_evaluations > 0 ? row.demo_evaluations : '', row.demo_avg_score ?? '',
-        row.ai_assessment_evaluations > 0 ? row.ai_assessment_hours : '', row.ai_assessment_evaluations > 0 ? row.ai_assessment_evaluations : '', row.ai_avg_score ?? '',
+        row.demo_evaluations > 0 ? row.demo_hours : '', row.demo_evaluations > 0 ? row.demo_evaluations : '',
+        row.ai_assessment_evaluations > 0 ? row.ai_assessment_hours : '', row.ai_assessment_evaluations > 0 ? row.ai_assessment_evaluations : '', row.eval_avg_score ?? '',
         row.learning_days > 0 ? row.learning_hours : '', row.learning_days > 0 ? row.learning_days : '', row.learning_days > 0 ? Math.round((row.learning_hours / row.learning_days) * 10) / 10 : '',
         row.niat_cohorts.join(', '), row.all_batches.join(', '), row.recent_batches.join(', '),
       ];
@@ -361,9 +360,8 @@ export default function ContributionPage() {
                 <th className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Total sessions divided by the number of days the instructor took sessions on (both follow the date filter)">Avg Sessions / Day</th>
                 <th className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Total session hours (Lecture + Practice + Other) divided by the number of days the instructor took sessions on (both follow the date filter)">Avg Hrs / Day</th>
                 <th className="border-l border-border whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Total recorded time of the instructor's Completed DEMO evaluations, in hours, with the number of evaluations in brackets">Demo Hrs (evaluations)</th>
-                <th className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Average final score (0-10) of the instructor's Completed demo evaluations that have a score">Avg Demo Score</th>
                 <th className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Total recorded time of the instructor's Completed AI assessment evaluations, in hours, with the number of evaluations in brackets">AI Assessment Hrs (evaluations)</th>
-                <th className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Average final score (0-10) of the instructor's Completed AI assessment evaluations that have a score">Avg AI Score</th>
+                <th className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Average final score (0-10) across all of the instructor's Completed demo and AI assessment evaluations that have a score">Avg Demo / AI Score</th>
                 <th className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Total time the instructor spent on course units on the learning platform, in hours, with the number of active days in brackets">Learning Hrs (days)</th>
                 <th className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Learning hours divided by the number of days the instructor was active on the learning platform (both follow the date filter)">Learning Hrs / Day</th>
                 <th className="whitespace-nowrap border-l border-border px-4 py-3 text-left font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Contribution</th>
@@ -396,9 +394,8 @@ export default function ContributionPage() {
                   </>
                   : <td colSpan={7} className="whitespace-nowrap border-l border-border px-4 py-3 text-center text-[11px] italic text-muted-foreground">No data</td>}
                 <td className="whitespace-nowrap border-l border-border px-4 py-3 text-right font-mono-ui text-[12px] tabular-nums text-foreground" data-testid={`cell-demo-hours-${row.employee_id ?? row.full_name}`}>{row.demo_evaluations > 0 ? <>{formatHours(row.demo_hours)} <span className="text-muted-foreground" title="Demo evaluations">({formatKpi(row.demo_evaluations)})</span></> : <span className="text-muted-foreground">—</span>}</td>
-                <td className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[12px] tabular-nums text-foreground" data-testid={`cell-demo-score-${row.employee_id ?? row.full_name}`}>{row.demo_avg_score !== null ? formatAvg(row.demo_avg_score) : <span className="text-muted-foreground">—</span>}</td>
                 <td className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[12px] tabular-nums text-foreground" data-testid={`cell-ai-hours-${row.employee_id ?? row.full_name}`}>{row.ai_assessment_evaluations > 0 ? <>{formatHours(row.ai_assessment_hours)} <span className="text-muted-foreground" title="AI assessment evaluations">({formatKpi(row.ai_assessment_evaluations)})</span></> : <span className="text-muted-foreground">—</span>}</td>
-                <td className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[12px] tabular-nums text-foreground" data-testid={`cell-ai-score-${row.employee_id ?? row.full_name}`}>{row.ai_avg_score !== null ? formatAvg(row.ai_avg_score) : <span className="text-muted-foreground">—</span>}</td>
+                <td className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[12px] tabular-nums text-foreground" data-testid={`cell-eval-score-${row.employee_id ?? row.full_name}`} title="Average of all scored demo and AI assessment evaluations">{row.eval_avg_score !== null ? formatAvg(row.eval_avg_score) : <span className="text-muted-foreground">—</span>}</td>
                 <td className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[12px] tabular-nums text-foreground" data-testid={`cell-learning-hours-${row.employee_id ?? row.full_name}`}>{row.learning_days > 0 ? <>{formatHours(row.learning_hours)} <span className="text-muted-foreground" title="Days with activity">({formatKpi(row.learning_days)})</span></> : <span className="text-muted-foreground">—</span>}</td>
                 <td className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[12px] tabular-nums text-foreground" data-testid={`cell-learning-per-day-${row.employee_id ?? row.full_name}`}>{row.learning_days > 0 ? formatAvg(row.learning_hours / row.learning_days) : <span className="text-muted-foreground">—</span>}</td>
                 {row.has_contribution_data
