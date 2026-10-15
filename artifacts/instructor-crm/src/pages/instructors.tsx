@@ -1254,7 +1254,12 @@ function ExitCell({ person }: { person: InstructorSummary }) {
 function DateOfExitCell({ person }: { person: InstructorSummary }) {
   const queryClient = useQueryClient();
   const [value, setValue] = useState(person.date_of_exit ?? '');
-  useEffect(() => { setValue(person.date_of_exit ?? ''); }, [person.date_of_exit]);
+  const editingRef = useRef(false);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Follow the saved value only while the box is NOT being edited. Before (2026-10-15) every refetch after a save overwrote the box
+  // mid-typing, which scrambled or cleared a date that was still being keyed in.
+  useEffect(() => { if (!editingRef.current) setValue(person.date_of_exit ?? ''); }, [person.date_of_exit]);
+  useEffect(() => () => { if (saveTimer.current) clearTimeout(saveTimer.current); }, []);
   const updateExitDate = useUpdateInstructorExitDate({
     mutation: {
       onSuccess: () => {
@@ -1270,18 +1275,31 @@ function DateOfExitCell({ person }: { person: InstructorSummary }) {
   if (!person.is_payroll) {
     return <div className="truncate font-mono-ui text-[11px] text-muted-foreground">{person.date_of_exit || ''}</div>;
   }
+  // A complete, believable date only: typing a year digit by digit passes through values like 0002-10-15 and 0020-10-15, which must
+  // never be saved. Clearing the box is saved when the box loses focus, not while it is half-edited.
+  const isCompleteDate = (next: string) => /^\d{4}-\d{2}-\d{2}$/.test(next) && Number(next.slice(0, 4)) >= 2000 && Number(next.slice(0, 4)) <= new Date().getFullYear() + 1;
+  const save = (next: string) => {
+    if (saveTimer.current) { clearTimeout(saveTimer.current); saveTimer.current = null; }
+    if (next === (person.date_of_exit ?? '')) return;
+    if (next !== '' && !isCompleteDate(next)) return;
+    updateExitDate.mutate({ id: person.id, data: { exit_date: next === '' ? null : next } });
+  };
   return <div onClick={(event) => { event.preventDefault(); event.stopPropagation(); }} className="text-[12px]">
     <input
       type="date"
       value={value}
+      min="2000-01-01"
+      onFocus={() => { editingRef.current = true; }}
       onChange={(event) => {
         const next = event.target.value;
         setValue(next);
-        updateExitDate.mutate({ id: person.id, data: { exit_date: next === '' ? null : next } });
+        if (saveTimer.current) clearTimeout(saveTimer.current);
+        if (next !== '' && isCompleteDate(next)) saveTimer.current = setTimeout(() => save(next), 700);
       }}
-      disabled={updateExitDate.isPending}
+      onBlur={(event) => { editingRef.current = false; save(event.target.value); }}
+      onKeyDown={(event) => { if (event.key === 'Enter') save((event.target as HTMLInputElement).value); }}
       data-testid={`input-exit-date-${person.id}`}
-      title="Payroll instructor -- the Capability Manager enters the date of exit here when they actually exit"
+      title="Payroll instructor -- the Capability Manager enters the date of exit here when they actually exit. Saved when the date is complete (or when you click away)."
       className="h-8 w-full rounded-md border border-border bg-background px-1.5 text-[11px] font-semibold text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-ring/25 disabled:opacity-60"
     />
   </div>;

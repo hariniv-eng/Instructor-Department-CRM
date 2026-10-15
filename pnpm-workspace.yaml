@@ -169,5 +169,22 @@ overrides:
   "source-map-js@<1.2.2": "^1.2.2"
   "brace-expansion@>=4.0.0 <5.0.12": "^5.0.12"
 
+  # Second round from the same scan (2026-10-14), again pinned to the first fixed release inside the same major version:
+  #   nanoid      3.3.16 -> 3.3.18+  high,     custom generators can loop forever when size is zero (via postcss)
+  #   markdown-it 14.3.0 -> 14.3.1+  moderate, quadratic linkify paths block the event loop (via typedoc, dev only)
+  #   qs          6.15.3 -> 6.16.0   moderate, array-limit bypass and isBuffer denial of service (via express / body-parser)
+  #   fast-copy   4.0.4  -> 4.1.0+   moderate, stack exhaustion on deeply nested values (via pino-pretty)
+  # Deliberately NOT overridden (no safe fix inside the same major version):
+  #   braces 3.0.3 (high): no patched release exists yet (3.0.3 is the latest) -- watch for one.
+  #   uuid 8.3.2 / 9.0.1 (high, moderate): fixed only from 11.1.1; the bug is in v3/v5/v6 with a caller-supplied buffer, which
+  #     nothing here uses (node-cron and the Google Cloud client only call v4).
+  #   postcss-selector-parser 6.0.10 (moderate): fixed only in 7.x, a major jump for @tailwindcss/typography (build-time only).
+  #   esbuild 0.27.3 (low): fixed in 0.28.1, but vite / tsx / drizzle-kit are pinned to this line; it only affects the esbuild dev
+  #     server on Windows.
+  "nanoid@<3.3.18": "^3.3.18"
+  "markdown-it@>=14.0.0 <14.3.1": "^14.3.1"
+  "qs@<6.16.0": "^6.16.0"
+  "fast-copy@>=4.0.0 <4.1.0": "^4.1.0"
+
 allowBuilds:
   esbuild: true

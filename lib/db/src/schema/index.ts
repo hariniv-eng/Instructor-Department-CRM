@@ -558,6 +558,22 @@ export const instructorContributionDailyTable = pgTable("instructor_contribution
 
 export type InstructorContributionDaily = typeof instructorContributionDailyTable.$inferSelect;
 
+// Demo and AI-assessment hours per instructor per day (2026-10-14, per request), synced from the BigQuery view
+// z_niat_instructors_demo_qa_rating_details together with the Contribution sync. One row per instructor per session date per
+// evaluation type ("DEMO" or "AI_ASSESSMENT"); seconds is the total recorded audio length of the Completed evaluations that day
+// (one per session), evaluations is how many. Full delete-then-insert on every sync. Kept as its own table so a database that has
+// not been pushed yet cannot break the Contribution tab -- it is read defensively. Needs `pnpm --filter @workspace/db run push`.
+export const instructorEvaluationDailyTable = pgTable("instructor_evaluation_daily", {
+  id: serial("id").primaryKey(),
+  instructorUserId: text("instructor_user_id").notNull(),
+  sessionDate: date("session_date").notNull(),
+  evaluationType: text("evaluation_type").notNull(),
+  seconds: integer("seconds").notNull().default(0),
+  evaluations: integer("evaluations").notNull().default(0),
+  syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+
 export const insertInstructorContributionSchema = createInsertSchema(instructorContributionTable);
 export type InstructorContribution = typeof instructorContributionTable.$inferSelect;
 export type InsertInstructorContribution = z.infer<typeof insertInstructorContributionSchema>;
