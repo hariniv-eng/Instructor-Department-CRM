@@ -20,6 +20,8 @@ export type EvaluationDailyRow = {
   evaluation_type: "DEMO" | "AI_ASSESSMENT";
   seconds: number;
   evaluations: number;
+  score_sum: number; // sum of final_score (0-10) over the evaluations that have a score
+  scored: number; // how many evaluations have a score
 };
 
 export async function fetchEvaluationDailyRows(): Promise<EvaluationDailyRow[]> {
@@ -40,9 +42,11 @@ export async function fetchEvaluationDailyRows(): Promise<EvaluationDailyRow[]> 
       FORMAT_DATE('%Y-%m-%d', session_date) AS session_date,
       evaluation_type,
       SUM(secs) AS seconds,
-      COUNT(*) AS evaluations
+      COUNT(*) AS evaluations,
+      SUM(score) AS score_sum,
+      COUNTIF(score IS NOT NULL) AS scored
     FROM (
-      SELECT instructor_user_id, session_date, evaluation_type, session_id, MAX(SAFE_CAST(audio_duration AS FLOAT64)) AS secs
+      SELECT instructor_user_id, session_date, evaluation_type, session_id, MAX(SAFE_CAST(audio_duration AS FLOAT64)) AS secs, MAX(SAFE_CAST(final_score AS FLOAT64)) AS score
       FROM \`${ref}\`
       WHERE UPPER(status) = 'COMPLETED'
         AND instructor_user_id IS NOT NULL
@@ -62,6 +66,8 @@ export async function fetchEvaluationDailyRows(): Promise<EvaluationDailyRow[]> 
         evaluation_type: (r.evaluation_type === "DEMO" ? "DEMO" : "AI_ASSESSMENT") as "DEMO" | "AI_ASSESSMENT",
         seconds: Math.round(Number(r.seconds ?? 0)),
         evaluations: Number(r.evaluations ?? 0),
+        score_sum: Number(r.score_sum ?? 0),
+        scored: Number(r.scored ?? 0),
       }))
       .filter((r) => r.instructor_user_id && /^\d{4}-\d{2}-\d{2}$/.test(r.session_date));
   } catch (e) {
