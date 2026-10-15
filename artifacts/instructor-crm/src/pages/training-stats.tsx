@@ -184,9 +184,11 @@ const percentTone = (value: number) => (value >= 80 ? 'bg-[#e5f3ed] text-[#256e6
 // (a whole tab, a product) can be counted together. Completed = 100% on that track, In progress = above 0% and below 100%, Not started = 0%,
 // No data = no synced training data (or nothing mapped yet). Instructors whose subject has no course track (for example Artificial Intelligence
 // & Emerging Technologies) cannot be measured and are counted separately, not in the total or the rate.
-type CompletionTally = { total: number; completed: number; inProgress: number; notStarted: number; noData: number; untracked: number };
+// nearComplete: instructors at 80% or more but not yet 100% -- shown wherever nobody has reached 100% yet (2026-10-15, per request).
+type CompletionTally = { total: number; completed: number; nearComplete: number; inProgress: number; notStarted: number; noData: number; untracked: number };
+const NEAR_COMPLETE_PCT = 80;
 function tallyCompletion(rows: TrainingStatsRow[], taxonomy: TrainingCourseDef[]): CompletionTally {
-  const tally: CompletionTally = { total: 0, completed: 0, inProgress: 0, notStarted: 0, noData: 0, untracked: 0 };
+  const tally: CompletionTally = { total: 0, completed: 0, nearComplete: 0, inProgress: 0, notStarted: 0, noData: 0, untracked: 0 };
   for (const row of rows) {
     const track = row.subject_area ? SUBJECT_TRACK[row.subject_area] : undefined;
     const defs = track ? taxonomy.filter((def) => def.trackGroup === track) : [];
@@ -195,7 +197,7 @@ function tallyCompletion(rows: TrainingStatsRow[], taxonomy: TrainingCourseDef[]
     const pct = subjectCompletion(row, defs);
     if (pct === null) tally.noData += 1;
     else if (pct >= 100) tally.completed += 1;
-    else if (pct > 0) tally.inProgress += 1;
+    else if (pct > 0) { tally.inProgress += 1; if (pct >= NEAR_COMPLETE_PCT) tally.nearComplete += 1; }
     else tally.notStarted += 1;
   }
   return tally;
@@ -223,7 +225,7 @@ function CompletionBreakdown({ title, firstColumn, rows, testId }: { title: stri
           return <tr key={name} className="border-b border-border last:border-b-0">
             <td className="whitespace-nowrap px-4 py-2 font-semibold text-foreground">{name}</td>
             <td className="px-3 py-2 text-right font-mono-ui tabular-nums text-foreground">{formatKpi(tally.total)}</td>
-            <td className="px-3 py-2 text-right font-mono-ui tabular-nums text-foreground">{formatKpi(tally.completed)}</td>
+            <td className="px-3 py-2 text-right font-mono-ui tabular-nums text-foreground">{formatKpi(tally.completed)}{tally.completed === 0 && tally.total > 0 && <span className="ml-1 text-[11px] text-muted-foreground" title="Nobody is at 100% yet -- instructors at 80% or more">({formatKpi(tally.nearComplete)} at 80%+)</span>}</td>
             <td className="px-3 py-2 text-right font-mono-ui tabular-nums text-foreground">{formatKpi(tally.inProgress)}</td>
             <td className="px-3 py-2 text-right font-mono-ui tabular-nums text-muted-foreground">{formatKpi(tally.notStarted)}</td>
             <td className="px-3 py-2 text-right font-mono-ui tabular-nums text-muted-foreground">{formatKpi(tally.noData)}</td>
@@ -404,7 +406,7 @@ export default function TrainingStatsPage() {
         {subjectSummary && <TopStat
           label={`${scopeLabel} -- completed`}
           value={formatKpi(subjectSummary.completed)}
-          meta={`of ${formatKpi(subjectSummary.total)} instructors at 100% (${completionRate(subjectSummary) ?? 0}%)${subjectSummary.untracked > 0 ? ` -- ${formatKpi(subjectSummary.untracked)} with no course track not counted` : ''}`}
+          meta={`of ${formatKpi(subjectSummary.total)} instructors at 100% (${completionRate(subjectSummary) ?? 0}%)${subjectSummary.completed === 0 ? ` -- ${formatKpi(subjectSummary.nearComplete)} at 80% or more` : ''}${subjectSummary.untracked > 0 ? ` -- ${formatKpi(subjectSummary.untracked)} with no course track not counted` : ''}`}
           icon={<CheckCircle2 size={16} />}
           tone="green"
         />}
