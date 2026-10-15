@@ -1517,6 +1517,11 @@ router.get("/reports/instructor-contribution", requireAuth, requireRole("admin")
       ai_assessment_evaluations: evaluation?.aiCount ?? 0,
       // One combined average final score (0-10, one decimal) over ALL the person's Completed Demo and AI assessment evaluations that
       // have a score (every evaluation counts once, so it is not an average of two averages); null when none do.
+      // Average evaluation length (2026-10-15, per request): demo hours / demo evaluations + AI assessment hours / AI evaluations, worked out
+      // from the exact seconds (not the rounded hours shown). A type with no evaluations counts as 0; null when there are none of either.
+      eval_avg_hours: evaluation && evaluation.demoCount + evaluation.aiCount > 0
+        ? Math.round(((evaluation.demoCount > 0 ? evaluation.demoSeconds / 3600 / evaluation.demoCount : 0) + (evaluation.aiCount > 0 ? evaluation.aiSeconds / 3600 / evaluation.aiCount : 0)) * 100) / 100
+        : null,
       eval_avg_score: evaluation && evaluation.demoScored + evaluation.aiScored > 0 ? Math.round(((evaluation.demoScored > 0 ? evaluation.demoScoreSum / evaluation.demoScored : 0) + (evaluation.aiScored > 0 ? evaluation.aiScoreSum / evaluation.aiScored : 0)) * 10) / 10 : null,
       // Learning hours: total time the person spent on course units (BigQuery z_niat_instructor_day_wise_unit_wise_time_spent_details,
       // seconds converted to hours, one decimal) and the number of days with activity. Follows the date filter.
