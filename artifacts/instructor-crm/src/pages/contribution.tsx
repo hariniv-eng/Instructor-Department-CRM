@@ -56,6 +56,9 @@ type ContributionRow = {
   sessions_completed: number;
   lecture_sessions: number;
   practice_sessions: number;
+  // Completed sessions that are neither Lecture nor Practice (exams and other types). sessions_completed is the complete total
+  // (Lecture + Practice + Other) and session_days counts every day with any completed session (2026-10-15, per request).
+  other_sessions: number;
   session_days: number;
   deployment_date: string | null;
   // Demo and AI-assessment hours (2026-10-14, per request): total recorded audio time of the person's Completed demo / AI assessment
@@ -248,13 +251,13 @@ export default function ContributionPage() {
   // Download CSV (2026-10-15, per request): everything the current date range, subject filter and search match -- every page, not just the
   // one on screen -- with the same columns as the table. Hours and counts are plain numbers so they sum and sort in a spreadsheet.
   const downloadTable = () => {
-    const headers = ['Employee ID', 'Name', 'Role', 'Role (by sessions)', 'Department', 'Subject', 'Product', 'Capability Manager', 'Date of Joining', 'Date of Joining Source', 'Deployment Date', 'Training Duration (days)', 'Experience (years)', 'Lecture Hrs', 'Lecture Sessions', 'Practice Hrs', 'Practice Sessions', 'Other Hrs', 'Total Hrs', 'Sessions', 'Session Days', 'Avg Sessions / Day', 'Avg Hrs / Day', 'Demo Hrs', 'Demo Evaluations', 'AI Assessment Hrs', 'AI Assessment Evaluations', 'Avg Demo / AI Score', 'Learning Hrs', 'Learning Days', 'Learning Hrs / Day', 'Contribution', 'All Batches', 'Batches (Last 30 Days)'];
+    const headers = ['Employee ID', 'Name', 'Role', 'Role (by sessions)', 'Department', 'Subject', 'Product', 'Capability Manager', 'Date of Joining', 'Date of Joining Source', 'Deployment Date', 'Training Duration (days)', 'Experience (years)', 'Lecture Hrs', 'Lecture Sessions', 'Practice Hrs', 'Practice Sessions', 'Other Hrs', 'Other Sessions', 'Total Hrs', 'Sessions', 'Session Days', 'Avg Sessions / Day', 'Avg Hrs / Day', 'Demo Hrs', 'Demo Evaluations', 'AI Assessment Hrs', 'AI Assessment Evaluations', 'Avg Demo / AI Score', 'Learning Hrs', 'Learning Days', 'Learning Hrs / Day', 'Contribution', 'All Batches', 'Batches (Last 30 Days)'];
     const rows = searchedRows.map((row) => {
       const has = row.has_contribution_data;
       return [
         row.employee_id, row.full_name, row.role, sessionRole(row), row.department, row.subject_area, row.product, row.capability_manager,
         row.date_of_joining, row.date_of_joining_source, row.deployment_date, row.training_days, row.experience_years,
-        has ? row.lecture_hours : '', has ? row.lecture_sessions : '', has ? row.practice_hours : '', has ? row.practice_sessions : '', has ? row.other_hours : '', has ? row.total_hours : '', has ? row.sessions_completed : '', has ? row.session_days : '', avgSessionsPerDay(row) !== null ? Math.round(avgSessionsPerDay(row)!) : '', avgHoursPerDay(row) !== null ? Math.round(avgHoursPerDay(row)! * 10) / 10 : '',
+        has ? row.lecture_hours : '', has ? row.lecture_sessions : '', has ? row.practice_hours : '', has ? row.practice_sessions : '', has ? row.other_hours : '', has ? row.other_sessions : '', has ? row.total_hours : '', has ? row.sessions_completed : '', has ? row.session_days : '', avgSessionsPerDay(row) !== null ? Math.round(avgSessionsPerDay(row)!) : '', avgHoursPerDay(row) !== null ? Math.round(avgHoursPerDay(row)! * 10) / 10 : '',
         row.demo_evaluations > 0 ? row.demo_hours : '', row.demo_evaluations > 0 ? row.demo_evaluations : '',
         row.ai_assessment_evaluations > 0 ? row.ai_assessment_hours : '', row.ai_assessment_evaluations > 0 ? row.ai_assessment_evaluations : '', row.eval_avg_score ?? '',
         row.learning_days > 0 ? row.learning_hours : '', row.learning_days > 0 ? row.learning_days : '', row.learning_days > 0 ? Math.round((row.learning_hours / row.learning_days) * 10) / 10 : '',
@@ -360,9 +363,9 @@ export default function ContributionPage() {
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Years in the organization: from the date of joining to today, or to the date of exit once the person has one">Experience</th>
                 <th className="whitespace-nowrap border-l border-border px-4 py-3 text-right font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Hours, with the number of Lecture sessions in brackets">Lecture Hrs (sessions)</th>
                 <th className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Hours, with the number of Practice sessions in brackets">Practice Hrs (sessions)</th>
-                <th className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Other Hrs</th>
+                <th className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Hours of exams and any other session type that is not Lecture or Practice, with the number of those sessions in brackets">Other Hrs (sessions)</th>
                 <th className="whitespace-nowrap border-l border-border px-4 py-3 text-right font-mono-ui text-[10px] font-bold uppercase tracking-[0.12em] text-foreground">Total Hrs</th>
-                <th className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Completed Lecture and Practice sessions only. Exams and other session types are not counted here (they still count in Other hours).">Sessions (days)</th>
+                <th className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Total completed sessions: Lecture + Practice + Other (exams and other types), with the number of days the instructor took sessions on in brackets">Sessions (days)</th>
                 <th className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Total sessions divided by the number of days the instructor took sessions on (both follow the date filter)">Avg Sessions / Day</th>
                 <th className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Total session hours (Lecture + Practice + Other) divided by the number of days the instructor took sessions on (both follow the date filter)">Avg Hrs / Day</th>
                 <th className="border-l border-border whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Total recorded time of the instructor's Completed DEMO evaluations, in hours, with the number of evaluations in brackets">Demo Hrs (evaluations)</th>
@@ -393,7 +396,7 @@ export default function ContributionPage() {
                   ? <>
                     <td className="whitespace-nowrap border-l border-border px-4 py-3 text-right font-mono-ui text-[12px] tabular-nums text-foreground">{formatHours(row.lecture_hours)} <span className="text-muted-foreground" title="Lecture sessions">({formatKpi(row.lecture_sessions ?? 0)})</span></td>
                     <td className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[12px] tabular-nums text-foreground">{formatHours(row.practice_hours)} <span className="text-muted-foreground" title="Practice sessions">({formatKpi(row.practice_sessions ?? 0)})</span></td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[12px] tabular-nums text-foreground">{formatHours(row.other_hours)}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[12px] tabular-nums text-foreground">{formatHours(row.other_hours)} <span className="text-muted-foreground" title="Other sessions (exams and other types)">({formatKpi(row.other_sessions ?? 0)})</span></td>
                     <td className="whitespace-nowrap border-l border-border px-4 py-3 text-right font-mono-ui text-[12px] font-bold tabular-nums text-foreground">{formatHours(row.total_hours)}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[12px] tabular-nums text-muted-foreground">{formatKpi(row.sessions_completed)} <span className="text-[11px]" title="Distinct days on which these Lecture and Practice sessions were taken">(in {formatKpi(row.session_days ?? 0)} {row.session_days === 1 ? 'day' : 'days'})</span></td>
                     <td className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[12px] tabular-nums text-foreground" data-testid={`cell-avg-sessions-${row.employee_id ?? row.full_name}`} title={`${row.sessions_completed} sessions over ${row.session_days ?? 0} days (rounded to the nearest whole number)`}>{avgSessionsPerDay(row) !== null ? Math.round(avgSessionsPerDay(row)!).toLocaleString('en-IN') : <span className="text-muted-foreground">—</span>}</td>

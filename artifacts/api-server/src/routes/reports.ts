@@ -1470,16 +1470,16 @@ router.get("/reports/instructor-contribution", requireAuth, requireRole("admin")
   for (const row of contributionRows) byInstructor.set(row.instructorUserId, row);
 
   // Per-instructor totals for the chosen range, summed from the per-day rows.
-  type RangeTotals = { lectureMinutes: number; practiceMinutes: number; otherMinutes: number; lectureSessions: number; practiceSessions: number; days: number };
+  type RangeTotals = { lectureMinutes: number; practiceMinutes: number; otherMinutes: number; lectureSessions: number; practiceSessions: number; otherSessions: number; days: number };
   const rangeByInstructor = new Map<string, RangeTotals>();
   if (ranged) {
     const conditions = [fromParam ? gte(instructorContributionDailyTable.sessionDate, fromParam) : undefined, toParam ? lte(instructorContributionDailyTable.sessionDate, toParam) : undefined].filter((c) => c !== undefined);
     const dailyRows = await db.select().from(instructorContributionDailyTable).where(and(...conditions));
     for (const d of dailyRows) {
-      const t = rangeByInstructor.get(d.instructorUserId) ?? { lectureMinutes: 0, practiceMinutes: 0, otherMinutes: 0, lectureSessions: 0, practiceSessions: 0, days: 0 };
+      const t = rangeByInstructor.get(d.instructorUserId) ?? { lectureMinutes: 0, practiceMinutes: 0, otherMinutes: 0, lectureSessions: 0, practiceSessions: 0, otherSessions: 0, days: 0 };
       t.lectureMinutes += d.lectureMinutes; t.practiceMinutes += d.practiceMinutes; t.otherMinutes += d.otherMinutes;
-      t.lectureSessions += d.lectureSessions; t.practiceSessions += d.practiceSessions;
-      if (d.lectureSessions + d.practiceSessions > 0) t.days += 1; // one row per instructor per day
+      t.lectureSessions += d.lectureSessions; t.practiceSessions += d.practiceSessions; t.otherSessions += d.otherSessions;
+      if (d.lectureSessions + d.practiceSessions + d.otherSessions > 0) t.days += 1; // one row per instructor per day; any completed session counts
       rangeByInstructor.set(d.instructorUserId, t);
     }
   }
@@ -1492,6 +1492,7 @@ router.get("/reports/instructor-contribution", requireAuth, requireRole("admin")
     const otherMinutes = ranged ? (range?.otherMinutes ?? 0) : (contribution?.otherMinutes ?? 0);
     const lectureSessions = ranged ? (range?.lectureSessions ?? 0) : (contribution?.lectureSessions ?? 0);
     const practiceSessions = ranged ? (range?.practiceSessions ?? 0) : (contribution?.practiceSessions ?? 0);
+    const otherSessions = ranged ? (range?.otherSessions ?? 0) : (contribution?.otherSessions ?? 0);
     const evaluation = p.teachosUserId ? evaluationByInstructor.get(p.teachosUserId) : undefined;
     const timeSpent = p.teachosUserId ? timeSpentByInstructor.get(p.teachosUserId) : undefined;
     const joining = resolveJoining(p, joiningLookups);
@@ -1550,9 +1551,11 @@ router.get("/reports/instructor-contribution", requireAuth, requireRole("admin")
       practice_hours: Math.round((practiceMinutes / 60) * 10) / 10,
       other_hours: Math.round((otherMinutes / 60) * 10) / 10,
       total_hours: Math.round(((lectureMinutes + practiceMinutes + otherMinutes) / 60) * 10) / 10,
-      sessions_completed: ranged ? lectureSessions + practiceSessions : (contribution?.sessionsCompleted ?? 0),
+      // Complete total of completed sessions: Lecture + Practice + Other (2026-10-15, per request).
+      sessions_completed: ranged ? lectureSessions + practiceSessions + otherSessions : (contribution?.sessionsCompleted ?? 0),
       lecture_sessions: lectureSessions,
       practice_sessions: practiceSessions,
+      other_sessions: otherSessions,
       session_days: ranged ? (range?.days ?? 0) : (contribution?.sessionDays ?? 0),
       // First session ever scheduled (2026-10-13) -- all-time, not affected by the date filter.
       deployment_date: contribution?.deploymentDate ?? null,
