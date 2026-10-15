@@ -57,6 +57,10 @@ type ContributionRow = {
   demo_evaluations: number;
   ai_assessment_hours: number;
   ai_assessment_evaluations: number;
+  // Learning hours (2026-10-15, per request): total time spent on course units (seconds converted to hours) and the number of days
+  // with activity. Follows the date filter.
+  learning_hours: number;
+  learning_days: number;
   // Batch coverage (2026-09-28, per request: "add all the batches that are
   // associated with all the instructors, and in other column only put
   // batch_names which he have been taking from past 1 month") -- both
@@ -301,6 +305,7 @@ export default function ContributionPage() {
                 <th className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Completed Lecture and Practice sessions only. Exams and other session types are not counted here (they still count in Other hours).">Sessions (days)</th>
                 <th className="border-l border-border whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Total recorded time of the instructor's Completed DEMO evaluations, in hours, with the number of evaluations in brackets">Demo Hrs (evaluations)</th>
                 <th className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Total recorded time of the instructor's Completed AI assessment evaluations, in hours, with the number of evaluations in brackets">AI Assessment Hrs (evaluations)</th>
+                <th className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Total time the instructor spent on course units on the learning platform, in hours, with the number of active days in brackets">Learning Hrs (days)</th>
                 <th className="whitespace-nowrap border-l border-border px-4 py-3 text-left font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Contribution</th>
                 <th className="whitespace-nowrap border-l border-border px-4 py-3 text-left font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">All Batches</th>
                 <th className="whitespace-nowrap px-4 py-3 text-left font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Batches (Last 30 Days)</th>
@@ -329,6 +334,7 @@ export default function ContributionPage() {
                   : <td colSpan={5} className="whitespace-nowrap border-l border-border px-4 py-3 text-center text-[11px] italic text-muted-foreground">No data</td>}
                 <td className="whitespace-nowrap border-l border-border px-4 py-3 text-right font-mono-ui text-[12px] tabular-nums text-foreground" data-testid={`cell-demo-hours-${row.employee_id ?? row.full_name}`}>{row.demo_evaluations > 0 ? <>{formatHours(row.demo_hours)} <span className="text-muted-foreground" title="Demo evaluations">({formatKpi(row.demo_evaluations)})</span></> : <span className="text-muted-foreground">—</span>}</td>
                 <td className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[12px] tabular-nums text-foreground" data-testid={`cell-ai-hours-${row.employee_id ?? row.full_name}`}>{row.ai_assessment_evaluations > 0 ? <>{formatHours(row.ai_assessment_hours)} <span className="text-muted-foreground" title="AI assessment evaluations">({formatKpi(row.ai_assessment_evaluations)})</span></> : <span className="text-muted-foreground">—</span>}</td>
+                <td className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[12px] tabular-nums text-foreground" data-testid={`cell-learning-hours-${row.employee_id ?? row.full_name}`}>{row.learning_days > 0 ? <>{formatHours(row.learning_hours)} <span className="text-muted-foreground" title="Days with activity">({formatKpi(row.learning_days)})</span></> : <span className="text-muted-foreground">—</span>}</td>
                 {row.has_contribution_data
                   ? <>
                     <td className="whitespace-nowrap border-l border-border px-4 py-3 text-[12px] text-foreground">{row.niat_cohorts.length > 0 ? row.niat_cohorts.join(', ') : '—'}</td>

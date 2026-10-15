@@ -15,9 +15,10 @@ import { fetchCapabilityManagerRows } from "../lib/connectors/capabilityManager"
 import { fetchCourseStatusRows, InstructorLearningStatusError } from "../lib/connectors/instructorLearningStatus";
 import { fetchContributionRows, fetchContributionDailyRows, InstructorContributionError } from "../lib/connectors/instructorContribution";
 import { fetchEvaluationDailyRows } from "../lib/connectors/instructorEvaluations";
+import { fetchTimeSpentDailyRows } from "../lib/connectors/instructorTimeSpent";
 import { snapshotTeachosDataIntoArchive } from "../lib/archiveInstructors";
 import { resolvedCourseDefs } from "../data/trainingCourseTaxonomy";
-import { storeDarwinboxActive, storeDarwinboxExits, storeDarwinboxFullRoster, storeTeachosDeployment, storeTrainingStatus, storeContribution, storeContributionDaily, storeEvaluationDaily } from "../lib/storeRaw";
+import { storeDarwinboxActive, storeDarwinboxExits, storeDarwinboxFullRoster, storeTeachosDeployment, storeTrainingStatus, storeContribution, storeContributionDaily, storeEvaluationDaily, storeTimeSpentDaily } from "../lib/storeRaw";
 import { reconcileDarwin, reconcileDarwinFullRosterFallback, reconcileTeachos, reconcileTeachosEmployeeIdReference, reconcileCapabilityManager, recomputeStatuses } from "../lib/reconcile";
 import { sdb, inSyncTransaction, inSavepoint, withSyncLock } from "../lib/syncContext";
 import { LAST_SYNC, LAST_CAPABILITY_MANAGER_SYNC, setLastCapabilityManagerSync, DAILY_AUTO_SYNC_INTERVAL_HOURS, type SyncResult } from "../lib/syncState";
@@ -279,6 +280,13 @@ async function runContributionSync(): Promise<SyncResult> {
       await inSavepoint(() => storeEvaluationDaily(evaluationRows));
     } catch (e) {
       console.error("[contribution] demo / AI assessment hours not updated:", (e as Error).message);
+    }
+    // Learning time (2026-10-15, per request) -- same rule: non-fatal.
+    try {
+      const timeSpentRows = await fetchTimeSpentDailyRows();
+      await inSavepoint(() => storeTimeSpentDaily(timeSpentRows));
+    } catch (e) {
+      console.error("[contribution] learning hours not updated:", (e as Error).message);
     }
     // Keep the Instructor Archive's copy of the contribution data current (2026-10-13).
     await snapshotTeachosDataIntoArchive().catch((e) => console.error("[archive] contribution snapshot failed:", e));

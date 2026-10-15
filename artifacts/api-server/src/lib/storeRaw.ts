@@ -19,12 +19,14 @@ import {
   instructorContributionTable,
   instructorContributionDailyTable,
   instructorEvaluationDailyTable,
+  instructorTimeSpentDailyTable,
 } from "@workspace/db";
 import { sdb as db } from "./syncContext";
 import { cell, type SheetRow } from "./reconcile";
 import type { CourseStatusRow } from "./connectors/instructorLearningStatus";
 import type { ContributionRow, ContributionDailyRow } from "./connectors/instructorContribution";
 import type { EvaluationDailyRow } from "./connectors/instructorEvaluations";
+import type { TimeSpentDailyRow } from "./connectors/instructorTimeSpent";
 
 const CHUNK = 500;
 
@@ -170,6 +172,23 @@ export async function storeEvaluationDaily(rows: EvaluationDailyRow[]): Promise<
         evaluations: row.evaluations,
       }));
       if (batch.length) await tx.insert(instructorEvaluationDailyTable).values(batch);
+    }
+  });
+  return rows.length;
+}
+
+// Learning time per instructor per day (2026-10-15): full delete-then-insert, same shape as storeEvaluationDaily().
+export async function storeTimeSpentDaily(rows: TimeSpentDailyRow[]): Promise<number> {
+  await db.transaction(async (tx) => {
+    await tx.delete(instructorTimeSpentDailyTable);
+    for (let i = 0; i < rows.length; i += CHUNK) {
+      const batch = rows.slice(i, i + CHUNK).map((row) => ({
+        instructorUserId: row.instructor_user_id,
+        activityDate: row.activity_date,
+        seconds: row.seconds,
+        units: row.units,
+      }));
+      if (batch.length) await tx.insert(instructorTimeSpentDailyTable).values(batch);
     }
   });
   return rows.length;
