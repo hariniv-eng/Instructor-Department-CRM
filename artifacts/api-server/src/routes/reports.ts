@@ -1496,6 +1496,12 @@ router.get("/reports/instructor-contribution", requireAuth, requireRole("admin")
     const timeSpent = p.teachosUserId ? timeSpentByInstructor.get(p.teachosUserId) : undefined;
     const joining = resolveJoining(p, joiningLookups);
     const deploymentDay = contribution?.deploymentDate ?? null;
+    // Experience (2026-10-15, per request): years in the organization from the date of joining above to today, or to the date of exit
+    // once there is one -- the same exit date the Instructors tab shows (payroll-converted people: the manual one; everyone else:
+    // Darwin's last working day). Null when there is no joining date or the dates do not make sense.
+    const exitDay = p.classification === "payroll_converted" ? p.manualExitDate : p.exitLastWorkingDate;
+    const experienceEnd = exitDay ?? new Date().toISOString().slice(0, 10);
+    const experienceDays = joining.date ? (Date.parse(`${experienceEnd}T00:00:00Z`) - Date.parse(`${joining.date}T00:00:00Z`)) / 86400000 : null;
     const trainingDays = joining.date && deploymentDay ? Math.round((Date.parse(`${deploymentDay}T00:00:00Z`) - Date.parse(`${joining.date}T00:00:00Z`)) / 86400000) : null;
     return {
       employee_id: p.employeeId,
@@ -1524,6 +1530,8 @@ router.get("/reports/instructor-contribution", requireAuth, requireRole("admin")
       date_of_joining: joining.date,
       date_of_joining_source: joining.source,
       training_days: trainingDays !== null && trainingDays >= 0 ? trainingDays : null,
+      experience_years: experienceDays !== null && experienceDays >= 0 ? Math.round((experienceDays / 365.25) * 10) / 10 : null,
+      experience_until_exit: !!exitDay,
       classification: p.classification,
       // Instructor/Mentor bifurcation (2026-09-24, per request) -- same
       // rule as bifurcationLabel() on the Instructors tab: classification
