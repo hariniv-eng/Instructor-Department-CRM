@@ -89,7 +89,8 @@ function formatCount(value: number | undefined) {
 // report already placed in exactly one bucket (see reports.ts's
 // buildAccessSplit), so it is tagged here rather than re-derived.
 type AccessKind = 'both' | 'darwin_only' | 'teachos_only';
-export type PersonWithAccess = InstructorSummary & { access: AccessKind };
+// workload (2026-10-16): all-time Workload from GET /reports/instructors -- the same figure as the Contribution tab with no date filter.
+export type PersonWithAccess = InstructorSummary & { access: AccessKind; workload?: number | null };
 export const ACCESS_LABELS: Record<AccessKind, string> = { both: 'Both', darwin_only: 'Only Darwin', teachos_only: 'Only TeachOS' };
 
 export function mergedPeople(split: AccessSplit | undefined): PersonWithAccess[] {
@@ -812,14 +813,14 @@ function gridColsClass(category: CategoryKey): string {
   // mixed into Department/Exception just reads "Nxtwave" in this column,
   // same as any non-payroll instructor. Never wrong, just not usually the
   // interesting value there.
-  if (category === 'instructors' || category === 'mentors' || category === 'instructors_mentors' || category === 'department' || category === 'exception') return 'grid-cols-[260px_190px_130px_280px_220px_150px_160px_170px_220px_160px_110px_140px_120px_190px_190px_160px_130px_130px_150px_170px_140px_170px_190px_150px_260px_150px]';
+  if (category === 'instructors' || category === 'mentors' || category === 'instructors_mentors' || category === 'department' || category === 'exception') return 'grid-cols-[260px_190px_130px_280px_220px_150px_160px_170px_220px_160px_110px_140px_120px_110px_190px_190px_160px_130px_130px_150px_170px_140px_170px_190px_150px_260px_150px]';
   // Operations team keeps its own shape (2026-09-21: not part of the above
   // request) -- no Campus column (ops rows aren't deployed to a teaching
   // campus the way instructors and mentors are), a single Department
   // column instead of Subject+Department, and no Payroll either (same
   // reason it's never meaningful for Mentors: payroll_converted can't be
   // assigned to an ops row).
-  return 'grid-cols-[260px_190px_130px_280px_220px_150px_280px_140px_120px_190px_190px_160px_130px_150px_170px_140px_170px_190px_150px_260px_150px]';
+  return 'grid-cols-[260px_190px_130px_280px_220px_150px_280px_140px_120px_110px_190px_190px_160px_130px_150px_170px_140px_170px_190px_150px_260px_150px]';
 }
 
 // Manager (Darwin) (2026-09-22, per request: "in the overview table we have
@@ -982,6 +983,7 @@ export function downloadInstructorsCsv(category: CategoryKey, people: PersonWith
   if (category !== 'ops_team') headers.push('Campus', 'campus_city', 'campus_state');
   headers.push('Date of joining');
   headers.push('Experience (years)');
+  headers.push('Workload');
   headers.push('Capability Manager');
   headers.push('Manager (Darwin)');
   headers.push('Bifurcation');
@@ -1003,6 +1005,7 @@ export function downloadInstructorsCsv(category: CategoryKey, people: PersonWith
     if (category !== 'ops_team') { const place = campusCityAndState(person.institutes); row.push(person.institutes?.join(', ') ?? '', place.city, place.state); }
     row.push(person.date_of_joining ?? '');
     row.push(experienceOf(person) ? String(Math.round(experienceOf(person)!.years * 10) / 10) : '');
+    row.push(person.workload != null ? person.workload.toFixed(2) : '');
     row.push(person.capability_manager ?? '');
     row.push(person.darwin_manager ?? '');
     row.push(bifurcationLabel(person.classification));
@@ -1053,6 +1056,7 @@ export function CategoryTable({ category, people, backQuery, linkMode = 'row', b
           {category !== 'ops_team' && <><span>Campus</span><span>campus_city</span><span>campus_state</span></>}
           <span>Date of joining</span>
           <span>Experience</span>
+          <span title="Same as the Contribution tab's Workload (all-time): Avg Hrs / Day + Learning Hrs / Day + Avg Demo / AI Hrs">Workload</span>
           <span>Capability Manager</span>
           <span>Manager (Darwin)</span>
           <span>Bifurcation</span>
@@ -1133,6 +1137,7 @@ function PersonRow({ category, person, columns, backQuery, linkMode = 'row', bac
         "unknown" placeholder. See date_of_joining's gating in reports.ts. */}
     <div className="truncate font-mono-ui text-[11px] text-muted-foreground">{person.date_of_joining || ''}</div>
     <div data-testid={`cell-experience-${person.id}`} title={experienceOf(person)?.detail} className="truncate text-[12px] font-semibold tabular-nums text-foreground">{experienceOf(person)?.label ?? ''}</div>
+    <div data-testid={`cell-workload-${person.id}`} title="All-time: Avg Hrs / Day + Learning Hrs / Day + Avg Demo / AI Hrs (same as the Contribution tab)" className="truncate text-right text-[12px] font-semibold tabular-nums text-foreground">{person.workload != null ? person.workload.toFixed(2) : ''}</div>
     <CapabilityManagerCell person={person} />
     <div className="truncate text-[12px] text-muted-foreground">{person.darwin_manager || '—'}</div>
     <BifurcationCell person={person} />

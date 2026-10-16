@@ -188,10 +188,12 @@ const percentTone = (value: number) => (value >= 80 ? 'bg-[#e5f3ed] text-[#256e6
 // (e.g. a subject not listed in SUBJECT_TRACK) cannot be measured and are counted separately, not in the total or the rate.
 // atLeast80 (2026-10-16, per request, replacing the earlier nearComplete): instructors at 80% or more on their track, INCLUDING those at 100%,
 // so "80%+ rate" is always at least the completion rate.
-type CompletionTally = { total: number; completed: number; atLeast80: number; inProgress: number; notStarted: number; noData: number; untracked: number };
+// atLeast50 (2026-10-16, per request): the same at 50% or more (including 80%+ and 100%).
+type CompletionTally = { total: number; completed: number; atLeast80: number; atLeast50: number; inProgress: number; notStarted: number; noData: number; untracked: number };
 const NEAR_COMPLETE_PCT = 80;
+const HALF_COMPLETE_PCT = 50;
 function tallyCompletion(rows: TrainingStatsRow[], taxonomy: TrainingCourseDef[]): CompletionTally {
-  const tally: CompletionTally = { total: 0, completed: 0, atLeast80: 0, inProgress: 0, notStarted: 0, noData: 0, untracked: 0 };
+  const tally: CompletionTally = { total: 0, completed: 0, atLeast80: 0, atLeast50: 0, inProgress: 0, notStarted: 0, noData: 0, untracked: 0 };
   for (const row of rows) {
     const track = row.subject_area ? SUBJECT_TRACK[row.subject_area] : undefined;
     const defs = track ? taxonomy.filter((def) => def.trackGroup === track) : [];
@@ -199,8 +201,8 @@ function tallyCompletion(rows: TrainingStatsRow[], taxonomy: TrainingCourseDef[]
     tally.total += 1;
     const pct = subjectCompletion(row, defs);
     if (pct === null) tally.noData += 1;
-    else if (pct >= 100) { tally.completed += 1; tally.atLeast80 += 1; }
-    else if (pct > 0) { tally.inProgress += 1; if (pct >= NEAR_COMPLETE_PCT) tally.atLeast80 += 1; }
+    else if (pct >= 100) { tally.completed += 1; tally.atLeast80 += 1; tally.atLeast50 += 1; }
+    else if (pct > 0) { tally.inProgress += 1; if (pct >= NEAR_COMPLETE_PCT) tally.atLeast80 += 1; if (pct >= HALF_COMPLETE_PCT) tally.atLeast50 += 1; }
     else tally.notStarted += 1;
   }
   return tally;
@@ -208,6 +210,7 @@ function tallyCompletion(rows: TrainingStatsRow[], taxonomy: TrainingCourseDef[]
 const completionRate = (tally: CompletionTally) => (tally.total > 0 ? Math.round((tally.completed / tally.total) * 1000) / 10 : null);
 
 const atLeast80Rate = (tally: CompletionTally) => (tally.total > 0 ? Math.round((tally.atLeast80 / tally.total) * 1000) / 10 : null);
+const atLeast50Rate = (tally: CompletionTally) => (tally.total > 0 ? Math.round((tally.atLeast50 / tally.total) * 1000) / 10 : null);
 
 // Completion tables (2026-10-16, per request: the overview cards were removed and the "Completion by subject" / "Completion by product" tables
 // brought back, with an 80%+ count and 80%+ rate). Rows arrive sorted by instructor count, largest first.
@@ -215,11 +218,12 @@ function CompletionBreakdown({ title, firstColumn, rows, testId, note }: { title
   // Total row (2026-10-16, per request): every row of the table added together, shown ABOVE the column names. The rates are worked out
   // from the summed counts (total completed / total instructors), not averaged across rows.
   const total = rows.reduce<CompletionTally>((sum, { tally }) => ({
-    total: sum.total + tally.total, completed: sum.completed + tally.completed, atLeast80: sum.atLeast80 + tally.atLeast80, inProgress: sum.inProgress + tally.inProgress,
+    total: sum.total + tally.total, completed: sum.completed + tally.completed, atLeast80: sum.atLeast80 + tally.atLeast80, atLeast50: sum.atLeast50 + tally.atLeast50, inProgress: sum.inProgress + tally.inProgress,
     notStarted: sum.notStarted + tally.notStarted, noData: sum.noData + tally.noData, untracked: sum.untracked + tally.untracked,
-  }), { total: 0, completed: 0, atLeast80: 0, inProgress: 0, notStarted: 0, noData: 0, untracked: 0 });
+  }), { total: 0, completed: 0, atLeast80: 0, atLeast50: 0, inProgress: 0, notStarted: 0, noData: 0, untracked: 0 });
   const totalRate = completionRate(total);
   const totalRate80 = atLeast80Rate(total);
+  const totalRate50 = atLeast50Rate(total);
   return <div data-testid={testId} className="min-w-[320px] flex-1 overflow-x-auto rounded-md border border-border bg-card">
     <p className="border-b border-border px-4 py-2.5 text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">{title}</p>
     <table className="w-full border-collapse text-[12px]">
@@ -229,38 +233,45 @@ function CompletionBreakdown({ title, firstColumn, rows, testId, note }: { title
           <td className="px-3 py-2 text-right font-mono-ui font-bold tabular-nums">{formatKpi(total.total)}</td>
           <td className="px-3 py-2 text-right font-mono-ui font-bold tabular-nums">{formatKpi(total.completed)}</td>
           <td className="px-3 py-2 text-right font-mono-ui font-bold tabular-nums">{formatKpi(total.atLeast80)}</td>
+          <td className="px-3 py-2 text-right font-mono-ui font-bold tabular-nums">{formatKpi(total.atLeast50)}</td>
           <td className="px-3 py-2 text-right font-mono-ui font-bold tabular-nums">{formatKpi(total.inProgress)}</td>
           <td className="px-3 py-2 text-right font-mono-ui font-bold tabular-nums">{formatKpi(total.notStarted)}</td>
           <td className="px-3 py-2 text-right font-mono-ui font-bold tabular-nums">{formatKpi(total.noData)}</td>
           <td className="px-3 py-2 text-right font-mono-ui font-bold tabular-nums">{totalRate === null ? '—' : `${totalRate}%`}</td>
-          <td className="px-4 py-2 text-right font-mono-ui font-bold tabular-nums">{totalRate80 === null ? '—' : `${totalRate80}%`}</td>
+          <td className="px-3 py-2 text-right font-mono-ui font-bold tabular-nums">{totalRate80 === null ? '—' : `${totalRate80}%`}</td>
+          <td className="px-4 py-2 text-right font-mono-ui font-bold tabular-nums">{totalRate50 === null ? '—' : `${totalRate50}%`}</td>
         </tr>
         <tr className="border-b border-border text-left font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
           <th className="whitespace-nowrap px-4 py-2 font-normal">{firstColumn}</th>
           <th className="whitespace-nowrap px-3 py-2 text-right font-normal" title="Instructors measured on their own subject's course track">Instructors</th>
           <th className="whitespace-nowrap px-3 py-2 text-right font-normal" title="Every course of their subject at 100%">Completed</th>
           <th className="whitespace-nowrap px-3 py-2 text-right font-normal" title="At 80% or more on their subject, including those at 100%">80%+</th>
+          <th className="whitespace-nowrap px-3 py-2 text-right font-normal" title="At 50% or more on their subject, including those at 80%+ and 100%">50%+</th>
           <th className="whitespace-nowrap px-3 py-2 text-right font-normal" title="Part-way: above 0% and below 100%">In progress</th>
           <th className="whitespace-nowrap px-3 py-2 text-right font-normal" title="0% on their subject">Not started</th>
           <th className="whitespace-nowrap px-3 py-2 text-right font-normal" title="No synced training data">No data</th>
           <th className="whitespace-nowrap px-3 py-2 text-right font-normal" title="Completed divided by Instructors">Completion rate</th>
-          <th className="whitespace-nowrap px-4 py-2 text-right font-normal" title="80%+ divided by Instructors">80%+ rate</th>
+          <th className="whitespace-nowrap px-3 py-2 text-right font-normal" title="80%+ divided by Instructors">80%+ rate</th>
+          <th className="whitespace-nowrap px-4 py-2 text-right font-normal" title="50%+ divided by Instructors">50%+ rate</th>
         </tr>
       </thead>
       <tbody>
         {rows.map(({ name, tally }) => {
           const rate = completionRate(tally);
           const rate80 = atLeast80Rate(tally);
+          const rate50 = atLeast50Rate(tally);
           return <tr key={name} className="border-b border-border last:border-b-0">
             <td className="whitespace-nowrap px-4 py-2 font-semibold text-foreground">{name}</td>
             <td className="px-3 py-2 text-right font-mono-ui tabular-nums text-foreground">{formatKpi(tally.total)}</td>
             <td className="px-3 py-2 text-right font-mono-ui tabular-nums text-foreground">{formatKpi(tally.completed)}</td>
             <td className="px-3 py-2 text-right font-mono-ui tabular-nums text-foreground">{formatKpi(tally.atLeast80)}</td>
+            <td className="px-3 py-2 text-right font-mono-ui tabular-nums text-foreground">{formatKpi(tally.atLeast50)}</td>
             <td className="px-3 py-2 text-right font-mono-ui tabular-nums text-foreground">{formatKpi(tally.inProgress)}</td>
             <td className="px-3 py-2 text-right font-mono-ui tabular-nums text-muted-foreground">{formatKpi(tally.notStarted)}</td>
             <td className="px-3 py-2 text-right font-mono-ui tabular-nums text-muted-foreground">{formatKpi(tally.noData)}</td>
             <td className="px-3 py-2 text-right font-mono-ui font-bold tabular-nums text-foreground">{rate === null ? '—' : `${rate}%`}</td>
-            <td className="px-4 py-2 text-right font-mono-ui font-bold tabular-nums text-foreground">{rate80 === null ? '—' : `${rate80}%`}</td>
+            <td className="px-3 py-2 text-right font-mono-ui font-bold tabular-nums text-foreground">{rate80 === null ? '—' : `${rate80}%`}</td>
+            <td className="px-4 py-2 text-right font-mono-ui font-bold tabular-nums text-foreground">{rate50 === null ? '—' : `${rate50}%`}</td>
           </tr>;
         })}
       </tbody>
