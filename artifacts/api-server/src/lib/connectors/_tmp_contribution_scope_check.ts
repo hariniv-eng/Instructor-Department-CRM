@@ -27,6 +27,24 @@ async function main() {
   const odd = after.filter((r) => !/instructor/i.test(`${r.department ?? ""} ${r.subDepartment ?? ""}`));
   console.log(`\n=== Still listed, department text does not mention "Instructor" (${odd.length}) -- check these ===`);
   for (const r of odd) console.log(fmt(r));
+  // 2026-10-16: "around 652 instructors + mentors have TeachOS, only 606 show in the Contribution table -- why?" Every Instructors-tab
+  // instructor or mentor, split by the reason they are or are not on the Contribution tab (new rule).
+  const dept = all.filter((r) => ids.has(r.id));
+  const reasonOf = (r: (typeof all)[number]): string => {
+    if (afterIds.has(r.id)) return r.teachosUserId ? "LISTED" : "LISTED but no TeachOS user id (no data can join)";
+    if (!r.inTeachos) return r.teachosUserId ? "NOT LISTED: has a TeachOS id but inTeachos=false (not in the latest TeachOS sync)" : "NOT LISTED: not in TeachOS";
+    return `NOT LISTED: classification '${r.classification}' is excluded`;
+  };
+  const byReason = new Map<string, (typeof all)[number][]>();
+  for (const r of dept) { const k = reasonOf(r); byReason.set(k, [...(byReason.get(k) ?? []), r]); }
+  console.log(`\n=== Instructors-tab Instructors + Mentors: ${dept.length} (${countedInstructorRows.length} instructors, ${mentors.length} mentors); with a TeachOS id: ${dept.filter((r) => r.teachosUserId).length}; inTeachos: ${dept.filter((r) => r.inTeachos).length} ===`);
+  for (const [k, rows] of [...byReason.entries()].sort((a, b) => b[1].length - a[1].length)) {
+    console.log(`\n-- ${k}: ${rows.length}`);
+    if (!k.startsWith("LISTED") || k.includes("no TeachOS")) for (const r of rows.slice(0, 80)) console.log(`   ${fmt(r)} | teachosId ${r.teachosUserId ?? "-"} | status ${r.computedStatus ?? "-"}/${r.manualStatus ?? "-"}`);
+  }
+  const oldOnly = before.filter((r) => !ids.has(r.id));
+  console.log(`\nOn the Contribution tab under the OLD rule but not an Instructors-tab instructor/mentor: ${oldOnly.length}`);
+
   console.log("\n=== Saumya Sunil Patil ===");
   for (const r of all.filter((x) => x.employeeId?.toUpperCase() === "NW0005068")) console.log(`${fmt(r)} | listed after: ${afterIds.has(r.id)}`);
   process.exit(0);
