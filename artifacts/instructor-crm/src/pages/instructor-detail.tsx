@@ -55,7 +55,7 @@ function useInstructorProfile(id: number) {
   });
 }
 
-const CARD = 'rounded-2xl bg-card p-5 shadow-[0_8px_24px_rgba(14,26,43,0.06)] sm:p-6';
+const CARD = 'rounded-xl bg-card p-4 shadow-[0_4px_16px_rgba(14,26,43,0.06)]';
 const EYEBROW = 'font-mono-ui text-[10px] font-semibold uppercase tracking-[0.14em] text-[#5A6B80]';
 
 export default function InstructorDetailPage() {
@@ -98,7 +98,7 @@ export default function InstructorDetailPage() {
 
   const training = useMemo(() => trainingView(profile), [profile]);
 
-  if (instructorQuery.isLoading) return <div className="mx-auto max-w-[1280px]"><SkeletonBlock className="mb-6 h-56" /><div className="grid gap-5 lg:grid-cols-[1.6fr_1fr]"><SkeletonBlock className="h-[450px]" /><SkeletonBlock className="h-[450px]" /></div></div>;
+  if (instructorQuery.isLoading) return <div className="mx-auto max-w-[1400px]"><SkeletonBlock className="mb-4 h-24" /><div className="grid gap-4 lg:grid-cols-[1.8fr_1fr]"><SkeletonBlock className="h-[450px]" /><SkeletonBlock className="h-[450px]" /></div></div>;
   if (instructorQuery.isError || !instructor) return <div className="mx-auto max-w-[1280px]"><QueryError message="This instructor record could not be loaded." /><Link href={backHref} data-testid="link-back-instructors-error" className="mt-4 inline-flex items-center gap-2 text-[12px] font-bold text-primary hover:underline"><ArrowLeft size={14} /> Back to register</Link></div>;
 
   const status = instructor.manual_status || instructor.computed_status || 'Pending';
@@ -107,117 +107,116 @@ export default function InstructorDetailPage() {
   const teaching = profile?.teaching;
   const wl = profile?.workload;
 
-  return <div className="mx-auto max-w-[1280px] pb-10">
+  // Compact layout (2026-10-16, per request: "decrease the font size and the element size ... the name, the workload, the teaching
+  // should be at one page, and the profile in the sidebar"): a slim header, small headline cards, and a right sidebar (Profile, Systems,
+  // Admin review) that starts at the top of the page beside everything else.
+  return <div className="mx-auto max-w-[1400px] pb-8">
+    <Link href={backHref} data-testid="link-back-instructors" className="mb-2 inline-flex min-h-[36px] items-center gap-1.5 text-[12px] font-semibold text-muted-foreground transition-colors hover:text-foreground"><ArrowLeft size={14} /> {backLabel}</Link>
+    <div className="flex flex-wrap items-start gap-4">
+    <div className="flex min-w-0 flex-[999_1_640px] flex-col gap-4">
     {/* Header band */}
-    <header className="rounded-[22px] bg-[#0E1A2B] px-5 pb-24 pt-5 text-white sm:px-8 sm:pt-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <Link href={backHref} data-testid="link-back-instructors" className="inline-flex min-h-[44px] items-center gap-2 text-[13px] font-semibold text-[#A9B8CC] transition-colors hover:text-white"><ArrowLeft size={16} /> {backLabel}</Link>
-        {user && <a href="#admin-review" data-testid="link-edit-record" className="inline-flex min-h-[44px] items-center rounded-[10px] bg-[#7EE2C4] px-4 text-[13px] font-bold text-[#0E1A2B] transition-opacity hover:opacity-90">Edit record</a>}
-      </div>
-      <div className="mt-5 flex flex-wrap items-center gap-5 sm:gap-6">
-        <div aria-hidden="true" className="grid h-[76px] w-[76px] shrink-0 place-items-center rounded-[22px] bg-[#1E3350] text-[28px] font-bold text-[#7EE2C4] sm:h-[88px] sm:w-[88px] sm:text-[32px]">{initials(instructor.full_name)}</div>
-        <div className="flex min-w-0 flex-[1_1_320px] flex-col gap-2">
-          <p className="font-mono-ui text-[11px] tracking-[0.12em] text-[#8FA3BD]">{[instructor.employee_id || `ID-${instructor.id}`, instructor.teachos_user_id ? `TEACHOS ${instructor.teachos_user_id.slice(0, 4)}…${instructor.teachos_user_id.slice(-4)}` : null].filter(Boolean).join(' · ')}</p>
-          <h1 className="text-[32px] font-extrabold leading-[1.05] tracking-[-0.02em] sm:text-[42px]">{instructor.full_name}</h1>
-          <p className="text-[14px] text-[#B8C6D8] sm:text-[15px]">{[instructor.designation || 'Instructor', subject].filter(Boolean).join(' · ')}</p>
+    <header className="rounded-xl bg-[#0E1A2B] px-4 py-3.5 text-white">
+      <div className="flex flex-wrap items-center gap-3.5">
+        <div aria-hidden="true" className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-[#1E3350] text-[17px] font-bold text-[#7EE2C4]">{initials(instructor.full_name)}</div>
+        <div className="flex min-w-0 flex-[1_1_260px] flex-col gap-0.5">
+          <h1 className="truncate text-[20px] font-extrabold leading-tight tracking-[-0.01em]">{instructor.full_name}</h1>
+          <p className="truncate text-[12px] text-[#B8C6D8]">{[instructor.designation || 'Instructor', subject].filter(Boolean).join(' · ')}</p>
+          <p className="font-mono-ui text-[10px] tracking-[0.1em] text-[#8FA3BD]">{[instructor.employee_id || `ID-${instructor.id}`, instructor.teachos_user_id ? `TEACHOS ${instructor.teachos_user_id.slice(0, 4)}…${instructor.teachos_user_id.slice(-4)}` : null].filter(Boolean).join(' · ')}</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <span data-testid="status-detail-record" className={`rounded-full px-3.5 py-2 text-[12px] font-bold capitalize ${darkStatusTone(status)}`}>{status}</span>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span data-testid="status-detail-record" className={`rounded-full px-2.5 py-1 text-[11px] font-bold capitalize ${darkStatusTone(status)}`}>{status}</span>
           {profile && <Chip>{profile.product}</Chip>}
           {profile && <Chip>{profile.role}</Chip>}
           {profile && <Chip>{profile.is_payroll ? 'Payroll' : 'Nxtwave'}</Chip>}
+          {user && <a href="#admin-review" data-testid="link-edit-record" className="ml-1 inline-flex min-h-[32px] items-center rounded-lg bg-[#7EE2C4] px-3 text-[12px] font-bold text-[#0E1A2B] transition-opacity hover:opacity-90">Edit record</a>}
         </div>
       </div>
     </header>
 
     {/* Headline cards */}
-    <section aria-label="Key numbers" className="relative -mt-16 grid gap-4 px-3 sm:grid-cols-2 sm:px-5 xl:grid-cols-4">
+    <section aria-label="Key numbers" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       <Kpi label="Workload" value={wl?.total != null ? wl.total.toFixed(2) : '—'} testId="kpi-workload">
         {wl?.total ? <>
-          <div className="flex h-2 overflow-hidden rounded bg-[#EEF1F5]" aria-hidden="true">
+          <div className="flex h-1.5 overflow-hidden rounded bg-[#EEF1F5]" aria-hidden="true">
             <div style={{ width: `${((wl.hours_per_day ?? 0) / wl.total) * 100}%` }} className="bg-[#2B59C3]" />
             <div style={{ width: `${((wl.learning_per_day ?? 0) / wl.total) * 100}%` }} className="bg-[#E59A2F]" />
             <div style={{ width: `${((wl.eval_avg_hours ?? 0) / wl.total) * 100}%` }} className="bg-[#7E57C2]" />
           </div>
-          <p className="text-[12px] text-[#5A6B80]">{num1(wl.hours_per_day ?? 0)} teaching + {num1(wl.learning_per_day ?? 0)} learning + {(wl.eval_avg_hours ?? 0).toFixed(2)} eval hrs / day</p>
-        </> : <p className="text-[12px] text-[#5A6B80]">No session, learning or evaluation data yet</p>}
+          <p className="text-[11px] text-[#5A6B80]">{num1(wl.hours_per_day ?? 0)} teaching + {num1(wl.learning_per_day ?? 0)} learning + {(wl.eval_avg_hours ?? 0).toFixed(2)} eval hrs / day</p>
+        </> : <p className="text-[11px] text-[#5A6B80]">No session, learning or evaluation data yet</p>}
       </Kpi>
       <Kpi label="Hours taught" value={teaching ? num1(teaching.total_hours) : '—'} testId="kpi-hours">
-        <p className="text-[12px] text-[#5A6B80]">{teaching?.has_data ? `${count(teaching.sessions_completed)} sessions over ${count(teaching.session_days)} days` : 'No completed sessions yet'}</p>
+        <p className="text-[11px] text-[#5A6B80]">{teaching?.has_data ? `${count(teaching.sessions_completed)} sessions over ${count(teaching.session_days)} days` : 'No completed sessions yet'}</p>
       </Kpi>
       <Kpi label={`Training${training.track ? ` · ${training.track}` : ''}`} value={training.overall !== null ? `${num1(training.overall)}%` : '—'} testId="kpi-training">
-        {training.overall !== null && <div className="h-2 rounded bg-[#EEF1F5]" aria-hidden="true"><div className="h-2 rounded bg-[#1F8A70]" style={{ width: `${Math.min(100, training.overall)}%` }} /></div>}
-        <p className="text-[12px] text-[#5A6B80]">{training.message ?? `${training.completed} of ${training.resolved} courses completed`}</p>
+        {training.overall !== null && <div className="h-1.5 rounded bg-[#EEF1F5]" aria-hidden="true"><div className="h-1.5 rounded bg-[#1F8A70]" style={{ width: `${Math.min(100, training.overall)}%` }} /></div>}
+        <p className="text-[11px] text-[#5A6B80]">{training.message ?? `${training.completed} of ${training.resolved} courses completed`}</p>
       </Kpi>
       <Kpi label="Experience" value={profile?.experience_years != null ? `${num1(profile.experience_years)} yrs` : '—'} testId="kpi-experience">
-        <p className="text-[12px] text-[#5A6B80]">{[profile?.date_of_joining ? `Joined ${formatDate(profile.date_of_joining)}` : 'No joining date', profile?.training_days != null ? `deployed after ${profile.training_days} days` : null].filter(Boolean).join(' · ')}</p>
+        <p className="text-[11px] text-[#5A6B80]">{[profile?.date_of_joining ? `Joined ${formatDate(profile.date_of_joining)}` : 'No joining date', profile?.training_days != null ? `deployed after ${profile.training_days} days` : null].filter(Boolean).join(' · ')}</p>
       </Kpi>
     </section>
 
-    {profileQuery.isError && <p className="mx-3 mt-4 rounded-lg bg-[#fff0ec] px-3 py-2 text-[12px] font-semibold text-[#9b4434] sm:mx-5">The teaching, training and evaluation figures could not be loaded right now.</p>}
+    {profileQuery.isError && <p className="rounded-lg bg-[#fff0ec] px-3 py-2 text-[12px] font-semibold text-[#9b4434] sm:mx-5">The teaching, training and evaluation figures could not be loaded right now.</p>}
 
-    <div className="mt-6 flex flex-col gap-3 px-0">
-      {instructor.classification && <div data-testid="banner-classification" className="flex items-start gap-2.5 rounded-xl border border-[#d8dce4] bg-[#f4f5fa] px-4 py-3 text-[12px] leading-5 text-[#4a4fb0]"><ShieldOff size={16} className="mt-0.5 shrink-0" /><span><strong className="font-extrabold">{classificationLabel(instructor.classification)}.</strong>{instructor.classification_reason ? ` ${instructor.classification_reason}` : ''}</span></div>}
-      {instructor.exit_flag && <div data-testid="banner-exit-flag" className="flex items-start gap-2.5 rounded-xl border border-[#f0dca0] bg-[#fff7db] px-4 py-3 text-[12px] leading-5 text-[#79601a]"><AlertTriangle size={16} className="mt-0.5 shrink-0" /><span><strong className="font-extrabold">Darwinbox exit record on file{instructor.exit_flag_status ? ` — ${instructor.exit_flag_status}` : ''}.</strong> Flagged for review, not automatically removed from the instructor count.</span></div>}
-    </div>
-
-    <div className="mt-6 flex flex-wrap items-start gap-6">
-      <div className="flex min-w-0 flex-[999_1_620px] flex-col gap-6">
+    {(instructor.classification || instructor.exit_flag) && <div className="flex flex-col gap-2">
+      {instructor.classification && <div data-testid="banner-classification" className="flex items-start gap-2.5 rounded-xl border border-[#d8dce4] bg-[#f4f5fa] px-3 py-2 text-[12px] leading-5 text-[#4a4fb0]"><ShieldOff size={16} className="mt-0.5 shrink-0" /><span><strong className="font-extrabold">{classificationLabel(instructor.classification)}.</strong>{instructor.classification_reason ? ` ${instructor.classification_reason}` : ''}</span></div>}
+      {instructor.exit_flag && <div data-testid="banner-exit-flag" className="flex items-start gap-2.5 rounded-xl border border-[#f0dca0] bg-[#fff7db] px-3 py-2 text-[12px] leading-5 text-[#79601a]"><AlertTriangle size={16} className="mt-0.5 shrink-0" /><span><strong className="font-extrabold">Darwinbox exit record on file{instructor.exit_flag_status ? ` — ${instructor.exit_flag_status}` : ''}.</strong> Flagged for review, not automatically removed from the instructor count.</span></div>}
+    </div>}
 
         {/* Teaching */}
         <section className={CARD}>
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 className="text-[19px] font-extrabold tracking-[-0.01em]">Teaching</h2>
-            <span className="text-[12px] text-[#5A6B80]">All-time{profile?.deployment_date ? ` · first session ${formatDate(profile.deployment_date)}` : ''}</span>
+            <h2 className="text-[15px] font-extrabold">Teaching</h2>
+            <span className="text-[11px] text-[#5A6B80]">All-time{profile?.deployment_date ? ` · first session ${formatDate(profile.deployment_date)}` : ''}</span>
           </div>
           {teaching?.has_data ? <>
-            <div className="mt-5 flex flex-col gap-3.5">
+            <div className="mt-3 flex flex-col gap-2">
               <HourBar label="Lecture" hours={teaching.lecture_hours} sessions={teaching.lecture_sessions} total={teaching.total_hours} color="bg-[#2B59C3]" />
               <HourBar label="Practice" hours={teaching.practice_hours} sessions={teaching.practice_sessions} total={teaching.total_hours} color="bg-[#5B85E0]" />
               <HourBar label="Other" hours={teaching.other_hours} sessions={teaching.other_sessions} total={teaching.total_hours} color="bg-[#A9BDEB]" />
             </div>
-            <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4">
+            <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-3">
               <MiniTile label="Avg sessions / day" value={teaching.session_days > 0 ? String(Math.round(teaching.sessions_completed / teaching.session_days)) : '—'} />
               <MiniTile label="Avg hrs / day" value={wl?.hours_per_day != null ? num1(wl.hours_per_day) : '—'} />
               <MiniTile label="Cohort" value={teaching.niat_cohorts.length ? teaching.niat_cohorts.join(', ') : '—'} />
-              <MiniTile label="Batches (last 30 days)" value={`${teaching.recent_batches.length} of ${teaching.all_batches.length}`} />
             </div>
-            {teaching.all_batches.length > 0 && <div className="mt-4 flex flex-wrap gap-1.5">{teaching.all_batches.map((batch) => <span key={batch} className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${teaching.recent_batches.includes(batch) ? 'bg-[#E6ECFA] text-[#2B4C9B]' : 'bg-[#F1F3F6] text-[#5A6B80]'}`}>{batch}</span>)}</div>}
-          </> : <p className="mt-4 text-[13px] text-[#5A6B80]">{profile ? 'No completed sessions on file yet — this instructor may still be in training.' : 'Loading…'}</p>}
+            {teaching.all_batches.length > 0 && <div className="mt-2.5 flex flex-wrap gap-1">{teaching.all_batches.map((batch) => <span key={batch} className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${teaching.recent_batches.includes(batch) ? 'bg-[#E6ECFA] text-[#2B4C9B]' : 'bg-[#F1F3F6] text-[#5A6B80]'}`}>{batch}</span>)}</div>}
+          </> : <p className="mt-3 text-[12px] text-[#5A6B80]">{profile ? 'No completed sessions on file yet — this instructor may still be in training.' : 'Loading…'}</p>}
         </section>
 
         {/* Training by semester */}
         <section className={CARD}>
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 className="text-[19px] font-extrabold tracking-[-0.01em]">Training by semester</h2>
-            {training.track && <span className="text-[12px] text-[#5A6B80]">{training.track} track · {training.resolved} courses</span>}
+            <h2 className="text-[15px] font-extrabold">Training by semester</h2>
+            {training.track && <span className="text-[11px] text-[#5A6B80]">{training.track} track · {training.resolved} courses</span>}
           </div>
           {training.message
-            ? <p className="mt-4 text-[13px] text-[#5A6B80]">{training.message}</p>
-            : <div className="mt-5 grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(230px,1fr))]">
-                {training.groups.map((group) => <div key={group.label} className="flex flex-col gap-3 rounded-[14px] border border-[#E2E7EE] p-4">
-                  <div className="flex items-center justify-between"><strong className="text-[14px]">{group.label}</strong>{group.pct !== null && <span className={`font-mono-ui text-[13px] font-semibold ${pctTone(group.pct)}`}>{num1(group.pct)}%</span>}</div>
-                  {group.courses.map((course) => <div key={course.key} className="flex items-center justify-between gap-3 text-[13px]"><span className="min-w-0 truncate">{course.label}</span><span className={`shrink-0 font-bold ${course.tone}`}>{course.text}</span></div>)}
+            ? <p className="mt-3 text-[12px] text-[#5A6B80]">{training.message}</p>
+            : <div className="mt-3 grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(200px,1fr))]">
+                {training.groups.map((group) => <div key={group.label} className="flex flex-col gap-1.5 rounded-lg border border-[#E2E7EE] p-3">
+                  <div className="flex items-center justify-between"><strong className="text-[13px]">{group.label}</strong>{group.pct !== null && <span className={`font-mono-ui text-[12px] font-semibold ${pctTone(group.pct)}`}>{num1(group.pct)}%</span>}</div>
+                  {group.courses.map((course) => <div key={course.key} className="flex items-center justify-between gap-3 text-[12px]"><span className="min-w-0 truncate">{course.label}</span><span className={`shrink-0 font-bold ${course.tone}`}>{course.text}</span></div>)}
                 </div>)}
               </div>}
-          {profile && <p className="mt-4 text-[12px] text-[#5A6B80]">Learning time: {profile.learning.days > 0 ? `${num1(profile.learning.hours)} h over ${count(profile.learning.days)} days · ${num1(wl?.learning_per_day ?? 0)} h / day` : 'none on file'}</p>}
+          {profile && <p className="mt-2.5 text-[11px] text-[#5A6B80]">Learning time: {profile.learning.days > 0 ? `${num1(profile.learning.hours)} h over ${count(profile.learning.days)} days · ${num1(wl?.learning_per_day ?? 0)} h / day` : 'none on file'}</p>}
         </section>
 
         {/* Evaluations */}
         <section className={CARD}>
-          <h2 className="text-[19px] font-extrabold tracking-[-0.01em]">Evaluations</h2>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <h2 className="text-[15px] font-extrabold">Evaluations</h2>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <EvalCard title="Demo" count={profile?.evaluations.demo_count ?? 0} hours={profile?.evaluations.demo_hours ?? 0} avgHours={profile?.evaluations.demo_avg_hours ?? null} score={profile?.evaluations.demo_avg_score ?? null} />
             <EvalCard title="AI assessment" count={profile?.evaluations.ai_count ?? 0} hours={profile?.evaluations.ai_hours ?? 0} avgHours={profile?.evaluations.ai_avg_hours ?? null} score={profile?.evaluations.ai_avg_score ?? null} />
           </div>
         </section>
-      </div>
+    </div>
 
-      <aside className="flex min-w-0 flex-[1_1_330px] flex-col gap-6">
+      <aside className="flex min-w-0 flex-[1_1_300px] flex-col gap-4 lg:sticky lg:top-4 lg:max-w-[340px]">
         {/* Profile */}
         <section className={CARD}>
-          <h2 className="text-[17px] font-extrabold">Profile</h2>
-          <dl className="mt-3">
+          <h2 className="text-[14px] font-extrabold">Profile</h2>
+          <dl className="mt-1.5">
             <Row label="Email" value={instructor.org_email} testId="text-detail-email" />
             <Row label="Mobile" value={instructor.mobile} testId="text-detail-mobile" />
             <Row label="Location" value={location} testId="text-detail-location" />
@@ -233,12 +232,12 @@ export default function InstructorDetailPage() {
 
         {/* Systems */}
         <section className={CARD}>
-          <h2 className="text-[17px] font-extrabold">Systems</h2>
-          <div className="mt-3 grid grid-cols-2 gap-2.5">
+          <h2 className="text-[14px] font-extrabold">Systems</h2>
+          <div className="mt-2 grid grid-cols-2 gap-2">
             <Signal label="Darwin" positive={instructor.in_darwin} />
             <Signal label="TeachOS" positive={instructor.in_teachos} />
           </div>
-          <dl className="mt-3">
+          <dl className="mt-1.5">
             <Row label="TeachOS role" value={instructor.teachos_role} testId="text-detail-teachos-role" />
             <Row label="Category" value={instructor.teachos_category} testId="text-detail-teachos-category" />
             <Row label="Darwin status" value={instructor.darwin_employee_status} testId="text-detail-darwin-status" />
@@ -249,23 +248,23 @@ export default function InstructorDetailPage() {
         {/* Admin review */}
         {user
           ? <form id="admin-review" onSubmit={submit} className={`${CARD} scroll-mt-6`}>
-              <h2 className="text-[17px] font-extrabold">Admin review</h2>
-              <p className="mt-1 text-[12px] text-[#5A6B80]">Manual fields are kept alongside the source-derived status.</p>
-              <div className="mt-4 flex flex-col gap-4">
-                <label className="block"><span className="mb-1.5 block text-[12px] font-bold">Manual status</span><select value={form.manual_status || ''} onChange={(event) => setForm((current) => ({ ...current, manual_status: event.target.value }))} data-testid="select-manual-status" className="h-11 w-full rounded-[10px] border border-input bg-background px-3 text-[13px] font-semibold outline-none focus:border-primary focus:ring-2 focus:ring-ring/25"><option value="">Use computed status</option><option value="Active">Active</option><option value="Exception">Exception</option><option value="Exited">Exited</option><option value="Pending">Pending</option></select></label>
-                <label className="block"><span className="mb-1.5 block text-[12px] font-bold">Exit date</span><input type="date" value={form.exit_date || ''} onChange={(event) => setForm((current) => ({ ...current, exit_date: event.target.value }))} data-testid="input-exit-date" className="h-11 w-full rounded-[10px] border border-input bg-background px-3 text-[13px] outline-none focus:border-primary focus:ring-2 focus:ring-ring/25" /></label>
-                <label className="block"><span className="mb-1.5 block text-[12px] font-bold">Converted university</span><input value={form.converted_university_name || ''} onChange={(event) => setForm((current) => ({ ...current, converted_university_name: event.target.value }))} data-testid="input-converted-university" placeholder="Add if this instructor has converted" className="h-11 w-full rounded-[10px] border border-input bg-background px-3 text-[13px] outline-none placeholder:text-muted-foreground/65 focus:border-primary focus:ring-2 focus:ring-ring/25" /></label>
-                <label className="block"><span className="mb-1.5 block text-[12px] font-bold">Operator notes</span><textarea value={form.notes || ''} onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} data-testid="textarea-instructor-notes" rows={4} placeholder="Leave context for the next reviewer..." className="w-full resize-y rounded-[10px] border border-input bg-background px-3 py-2.5 text-[13px] leading-5 outline-none placeholder:text-muted-foreground/65 focus:border-primary focus:ring-2 focus:ring-ring/25" /></label>
+              <h2 className="text-[14px] font-extrabold">Admin review</h2>
+              <p className="mt-0.5 text-[11px] text-[#5A6B80]">Manual fields are kept alongside the source-derived status.</p>
+              <div className="mt-3 flex flex-col gap-3">
+                <label className="block"><span className="mb-1 block text-[11px] font-bold">Manual status</span><select value={form.manual_status || ''} onChange={(event) => setForm((current) => ({ ...current, manual_status: event.target.value }))} data-testid="select-manual-status" className="h-9 w-full rounded-lg border border-input bg-background px-3 text-[13px] font-semibold outline-none focus:border-primary focus:ring-2 focus:ring-ring/25"><option value="">Use computed status</option><option value="Active">Active</option><option value="Exception">Exception</option><option value="Exited">Exited</option><option value="Pending">Pending</option></select></label>
+                <label className="block"><span className="mb-1 block text-[11px] font-bold">Exit date</span><input type="date" value={form.exit_date || ''} onChange={(event) => setForm((current) => ({ ...current, exit_date: event.target.value }))} data-testid="input-exit-date" className="h-9 w-full rounded-lg border border-input bg-background px-3 text-[13px] outline-none focus:border-primary focus:ring-2 focus:ring-ring/25" /></label>
+                <label className="block"><span className="mb-1 block text-[11px] font-bold">Converted university</span><input value={form.converted_university_name || ''} onChange={(event) => setForm((current) => ({ ...current, converted_university_name: event.target.value }))} data-testid="input-converted-university" placeholder="Add if this instructor has converted" className="h-9 w-full rounded-lg border border-input bg-background px-3 text-[13px] outline-none placeholder:text-muted-foreground/65 focus:border-primary focus:ring-2 focus:ring-ring/25" /></label>
+                <label className="block"><span className="mb-1 block text-[11px] font-bold">Operator notes</span><textarea value={form.notes || ''} onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} data-testid="textarea-instructor-notes" rows={3} placeholder="Leave context for the next reviewer..." className="w-full resize-y rounded-lg border border-input bg-background px-3 py-2.5 text-[13px] leading-5 outline-none placeholder:text-muted-foreground/65 focus:border-primary focus:ring-2 focus:ring-ring/25" /></label>
               </div>
               {updateInstructor.isError && <p data-testid="status-update-error" className="mt-4 rounded-lg bg-[#fff0ec] px-3 py-2 text-[12px] font-semibold text-[#9b4434]">Save failed. The source record was not changed.</p>}
               {saved && <p data-testid="status-update-success" className="mt-4 flex items-center gap-2 rounded-lg bg-[#e5f3ed] px-3 py-2 text-[12px] font-semibold text-[#256e65]"><CheckCircle2 size={15} /> Changes saved.</p>}
-              <div className="mt-5 flex justify-end"><SaveButton pending={updateInstructor.isPending} /></div>
+              <div className="mt-3 flex justify-end"><SaveButton pending={updateInstructor.isPending} /></div>
             </form>
           // Manager view is read-only (no login) -- same four fields as plain text, since PATCH /instructors/:id is Admin-only.
           : <section className={CARD}>
-              <h2 className="text-[17px] font-extrabold">Admin review</h2>
-              <p className="mt-1 text-[12px] text-[#5A6B80]">Read-only in Manager view — sign in as Admin to edit.</p>
-              <dl className="mt-3">
+              <h2 className="text-[14px] font-extrabold">Admin review</h2>
+              <p className="mt-0.5 text-[11px] text-[#5A6B80]">Read-only in Manager view — sign in as Admin to edit.</p>
+              <dl className="mt-1.5">
                 <Row label="Manual status" value={form.manual_status} testId="text-detail-manual-status" />
                 <Row label="Exit date" value={form.exit_date ? formatDate(form.exit_date) : null} testId="text-detail-form-exit-date" />
                 <Row label="Converted university" value={form.converted_university_name} testId="text-detail-converted-university" />
@@ -316,48 +315,48 @@ function trainingView(profile: InstructorProfile | undefined) {
 }
 
 function Chip({ children }: { children: React.ReactNode }) {
-  return <span className="rounded-full bg-[#1E3350] px-3.5 py-2 text-[12px] font-bold text-[#CFDAE8]">{children}</span>;
+  return <span className="rounded-full bg-[#1E3350] px-2.5 py-1 text-[11px] font-bold text-[#CFDAE8]">{children}</span>;
 }
 
 function Kpi({ label, value, testId, children }: { label: string; value: string; testId: string; children?: React.ReactNode }) {
-  return <div data-testid={testId} className="flex flex-col gap-2.5 rounded-[18px] bg-card p-5 shadow-[0_8px_24px_rgba(14,26,43,0.08)]">
+  return <div data-testid={testId} className="flex flex-col gap-1.5 rounded-xl bg-card p-3.5 shadow-[0_4px_16px_rgba(14,26,43,0.06)]">
     <p className={EYEBROW}>{label}</p>
-    <p className="text-[32px] font-extrabold leading-none tracking-[-0.02em] tabular-nums">{value}</p>
+    <p className="text-[22px] font-extrabold leading-none tabular-nums">{value}</p>
     {children}
   </div>;
 }
 
 function HourBar({ label, hours, sessions, total, color }: { label: string; hours: number; sessions: number; total: number; color: string }) {
-  return <div className="grid grid-cols-[76px_minmax(0,1fr)_116px] items-center gap-3">
-    <span className="text-[13px] font-bold">{label}</span>
-    <div className="h-3 rounded-md bg-[#EEF1F5]" aria-hidden="true"><div className={`h-3 rounded-md ${color}`} style={{ width: `${total > 0 ? (hours / total) * 100 : 0}%` }} /></div>
-    <span className="text-right font-mono-ui text-[12px] tabular-nums">{num1(hours)} h · {count(sessions)}</span>
+  return <div className="grid grid-cols-[64px_minmax(0,1fr)_104px] items-center gap-2.5">
+    <span className="text-[12px] font-bold">{label}</span>
+    <div className="h-2 rounded bg-[#EEF1F5]" aria-hidden="true"><div className={`h-2 rounded ${color}`} style={{ width: `${total > 0 ? (hours / total) * 100 : 0}%` }} /></div>
+    <span className="text-right font-mono-ui text-[11px] tabular-nums">{num1(hours)} h · {count(sessions)}</span>
   </div>;
 }
 
 function MiniTile({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-xl bg-[#F5F7FA] p-3.5"><p className="text-[12px] text-[#5A6B80]">{label}</p><p className="mt-0.5 truncate text-[20px] font-extrabold tabular-nums">{value}</p></div>;
+  return <div className="rounded-lg bg-[#F5F7FA] px-3 py-2"><p className="text-[11px] text-[#5A6B80]">{label}</p><p className="truncate text-[15px] font-extrabold tabular-nums">{value}</p></div>;
 }
 
 function EvalCard({ title, count: n, hours, avgHours, score }: { title: string; count: number; hours: number; avgHours: number | null; score: number | null }) {
-  return <div className="flex flex-col gap-1.5 rounded-[14px] bg-[#F3EFFB] p-4">
+  return <div className="flex flex-col gap-1 rounded-lg bg-[#F3EFFB] px-3 py-2.5">
     <p className="font-mono-ui text-[10px] font-semibold uppercase tracking-[0.14em] text-[#5E3FA0]">{title}</p>
-    <p className="text-[22px] font-extrabold">{n > 0 ? `${count(n)} evaluation${n === 1 ? '' : 's'}` : 'None yet'}</p>
-    {n > 0 && <p className="text-[13px] text-[#3F4B5C]">{num1(hours)} h recorded · avg {avgHours !== null ? avgHours.toFixed(2) : '—'} h each{score !== null ? ` · score ${num1(score)} / 10` : ''}</p>}
+    <p className="text-[15px] font-extrabold">{n > 0 ? `${count(n)} evaluation${n === 1 ? '' : 's'}` : 'None yet'}</p>
+    {n > 0 && <p className="text-[12px] text-[#3F4B5C]">{num1(hours)} h recorded · avg {avgHours !== null ? avgHours.toFixed(2) : '—'} h each{score !== null ? ` · score ${num1(score)} / 10` : ''}</p>}
   </div>;
 }
 
 function Row({ label, value, testId }: { label: string; value?: string | null; testId: string }) {
-  return <div className="flex items-start justify-between gap-3 border-b border-[#EEF1F5] py-2.5 text-[13px] last:border-0">
+  return <div className="flex items-start justify-between gap-3 border-b border-[#EEF1F5] py-1.5 text-[12px] last:border-0">
     <dt className="shrink-0 text-[#5A6B80]">{label}</dt>
     <dd data-testid={testId} className="min-w-0 break-words text-right font-semibold">{value || <span className="font-normal text-[#8A96A6]">Not recorded</span>}</dd>
   </div>;
 }
 
 function Signal({ label, positive }: { label: string; positive: boolean }) {
-  return <div className={`rounded-xl p-3 ${positive ? 'bg-[#E6F5EF]' : 'bg-[#FDECE7]'}`}>
+  return <div className={`rounded-lg px-3 py-2 ${positive ? 'bg-[#E6F5EF]' : 'bg-[#FDECE7]'}`}>
     <p className={`font-mono-ui text-[10px] font-semibold uppercase tracking-[0.12em] ${positive ? 'text-[#1F6B57]' : 'text-[#9b4434]'}`}>{label}</p>
-    <p className={`mt-0.5 text-[14px] font-extrabold ${positive ? 'text-[#14503F]' : 'text-[#9b4434]'}`}>{positive ? 'Present' : 'Missing'}</p>
+    <p className={`text-[13px] font-extrabold ${positive ? 'text-[#14503F]' : 'text-[#9b4434]'}`}>{positive ? 'Present' : 'Missing'}</p>
   </div>;
 }
 
