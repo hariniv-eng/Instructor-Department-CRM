@@ -127,6 +127,15 @@ export async function runDailySyncIfDue(graceMs = 0): Promise<DailySyncOutcome> 
   return runSources(overdue);
 }
 
+// Second, exits-only run at 9:00 AM IST (2026-10-16, per request: exit data "not reflecting correctly"). Darwin regenerates the
+// base exit report at about 8:07 AM IST (02:37 UTC -- the stamp on both the 9 Oct and 16 Oct copies), i.e. AFTER the 5am run, so
+// on days it refreshes, the 5am run stored the previous copy and the app showed stale exits until the next morning. Called by
+// .github/workflows/exits-refresh.yml via POST /api/sync/exits-refresh (routes/cron.ts). Always runs (no "up to date" check):
+// one exits sync takes a few seconds and changes nothing when Darwin has not refreshed the report.
+export function runExitsRefresh(): Promise<DailySyncOutcome> {
+  return runSources(new Set(["Exit List"]));
+}
+
 async function runCatchUpIfOverdue() {
   try {
     await runDailySyncIfDue();

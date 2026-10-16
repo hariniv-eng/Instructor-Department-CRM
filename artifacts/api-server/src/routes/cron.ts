@@ -16,9 +16,9 @@
 //
 // Mounted in routes/index.ts BEFORE the admin-only routers.
 
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request, type Response } from "express";
 import { timingSafeEqual } from "node:crypto";
-import { runDailySyncIfDue } from "../lib/scheduler";
+import { runDailySyncIfDue, runExitsRefresh, type DailySyncOutcome } from "../lib/scheduler";
 import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
@@ -33,7 +33,8 @@ function secretMatches(provided: string, expected: string): boolean {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
-router.post("/sync/daily", async (req, res) => {
+// Shared by both token-protected triggers: checks the secret, then holds the request open until `run` finishes.
+async function handleTokenTrigger(req: Request, res: Response, run: () => Promise<DailySyncOutcome>, label: string) {
   const expected = process.env.SYNC_CRON_SECRET;
   if (!expected) {
     res.status(503).json({ error: "SYNC_CRON_SECRET is not configured on the server" });
@@ -50,14 +51,21 @@ router.post("/sync/daily", async (req, res) => {
   res.flushHeaders();
   const keepAlive = setInterval(() => res.write(" "), 15 * 1000);
   try {
-    const outcome = await runDailySyncIfDue(DUE_GRACE_MS);
+    const outcome = await run();
     res.end(JSON.stringify(outcome));
   } catch (err) {
-    logger.error({ err }, "Daily sync request failed");
+    logger.error({ err }, `${label} request failed`);
     res.end(JSON.stringify({ ran: false, reason: "error", error: err instanceof Error ? err.message : String(err) }));
   } finally {
     clearInterval(keepAlive);
   }
-});
+}
+
+router.post("/sync/daily", (req, res) => handleTokenTrigger(req, res, () => runDailySyncIfDue(DUE_GRACE_MS), "Daily sync"));
+
+// POST /api/sync/exits-refresh (2026-10-16, per request) -- the 9:00 AM IST exits-only re-sync, after Darwin regenerates its
+// base exit report (~8:07 AM IST). Same secret as /sync/daily. See runExitsRefresh() in lib/scheduler.ts and
+// .github/workflows/exits-refresh.yml.
+router.post("/sync/exits-refresh", (req, res) => handleTokenTrigger(req, res, runExitsRefresh, "Exits refresh"));
 
 export default router;
