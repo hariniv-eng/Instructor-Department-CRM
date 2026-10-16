@@ -192,8 +192,8 @@ const percentTone = (value: number) => (value >= 80 ? 'bg-[#e5f3ed] text-[#256e6
 type CompletionTally = { total: number; completed: number; atLeast80: number; atLeast50: number; inProgress: number; notStarted: number; noData: number; untracked: number };
 const NEAR_COMPLETE_PCT = 80;
 const HALF_COMPLETE_PCT = 50;
-// Semester of each course (2026-10-16, per request). Courses not listed here (Developer Foundation, every DSML course, Maths, Aptitude,
-// English) belong to no semester yet and only count in the subject / product tables. DSML to follow.
+// Semester of each course (2026-10-16, per request). Courses not listed here (Developer Foundation, every DSML course) belong to no
+// semester yet and only count in the subject / product tables. DSML to follow.
 const COURSE_SEMESTER: Record<string, number> = {
   // Frontend
   static_web: 1, responsive_design: 1, modern_responsive_ui: 1,
@@ -205,6 +205,12 @@ const COURSE_SEMESTER: Record<string, number> = {
   dsa: 2, dia: 3, ips: 4,
   // Gen AI
   gen_ai: 1, llm: 2, ai_for_finance: 3,
+  // Aptitude
+  quantitative_aptitude: 1, numerical_ability: 2, logical_reasoning: 3, advanced_aptitude: 4,
+  // Maths (no Maths course in semester 2, as given)
+  math_for_cs: 1, probability_statistics: 3, linear_algebra_calculus: 4,
+  // English
+  english_foundation: 1, english_advanced: 2, english_applied: 3, language_analytics: 4,
 };
 const SEMESTERS = [...new Set(Object.values(COURSE_SEMESTER))].sort((a, b) => a - b);
 
@@ -309,6 +315,10 @@ export default function TrainingStatsPage() {
   const [subject, setSubject] = useState('ALL');
   // Product filter (2026-10-15, per request): 'ALL' or one product. Kept when switching tabs; a product with nobody on the tab is ignored.
   const [product, setProduct] = useState('ALL');
+  // Semester filter (2026-10-16, per request, instead of per-semester columns): 0 = all semesters, otherwise only that semester's courses
+  // (COURSE_SEMESTER) are shown and every completion figure on the page -- the per-instructor % column and the completion tables -- is
+  // worked out over just those courses.
+  const [semester, setSemester] = useState(0);
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: QUERY_KEY });
 
@@ -333,6 +343,11 @@ export default function TrainingStatsPage() {
 
   const activeSubTab = SUB_TABS.find((t) => t.key === activeTab) ?? SUB_TABS[0];
   const activeTaxonomy = data ? data.taxonomy.filter((d) => activeSubTab.trackGroups.includes(d.trackGroup)) : [];
+  const semesterOptions = SEMESTERS.filter((sem) => activeTaxonomy.some((d) => COURSE_SEMESTER[d.key] === sem));
+  const semesterActive = semester !== 0 && semesterOptions.includes(semester);
+  const semTaxonomy = semesterActive ? activeTaxonomy.filter((d) => COURSE_SEMESTER[d.key] === semester) : activeTaxonomy;
+  // With a semester chosen, only instructors whose subject HAS courses in that semester are listed (a DSA instructor has nothing in Sem 1).
+  const hasSemCourses = (row: TrainingStatsRow) => !semesterActive || (!!row.subject_area && semTaxonomy.some((d) => d.trackGroup === SUBJECT_TRACK[row.subject_area!]));
   // Each tab shows only ITS OWN subject's instructors (2026-09-24, per
   // request -- see the big comment above SUB_TABS). "TECH" resolves against
   // the server-supplied tech_areas list; the other tabs use their own static
@@ -355,11 +370,11 @@ export default function TrainingStatsPage() {
   const productActive = product !== 'ALL' && productOptions.includes(product);
   const subjectRows = useMemo(() => {
     const byProduct = productActive ? activeRows.filter((row) => row.product === product) : activeRows;
-    return subjectActive ? byProduct.filter((row) => row.subject_area === subject) : byProduct;
-  }, [activeRows, subject, subjectActive, product, productActive]);
+    return (subjectActive ? byProduct.filter((row) => row.subject_area === subject) : byProduct).filter(hasSemCourses);
+  }, [activeRows, subject, subjectActive, product, productActive, semesterActive, semTaxonomy]);
   const selectedTrack = subjectActive ? SUBJECT_TRACK[subject] : undefined;
-  const trackTaxonomy = selectedTrack ? activeTaxonomy.filter((d) => d.trackGroup === selectedTrack) : [];
-  const displayTaxonomy = trackTaxonomy.length > 0 ? trackTaxonomy : activeTaxonomy;
+  const trackTaxonomy = selectedTrack ? semTaxonomy.filter((d) => d.trackGroup === selectedTrack) : [];
+  const displayTaxonomy = trackTaxonomy.length > 0 ? trackTaxonomy : semTaxonomy;
   // Completion tables (2026-10-16, per request). Subject table: every subject on this tab, narrowed by the chosen product. Product table:
   // every product on this tab, narrowed by the chosen subject. Only instructors whose subject has a course track are counted; subjects
   // without one (for example Interdisciplinary & Applied) are listed in a note under the table instead of as a row of zeros.
@@ -367,12 +382,12 @@ export default function TrainingStatsPage() {
   const bySize = (a: { name: string; tally: CompletionTally }, b: { name: string; tally: CompletionTally }) => b.tally.total - a.tally.total || a.name.localeCompare(b.name);
   const subjectBreakdown = useMemo(() => {
     const byProduct = productActive ? activeRows.filter((row) => row.product === product) : activeRows;
-    const all = subjectOptions.map((name) => ({ name, tally: tallyCompletion(byProduct.filter((row) => row.subject_area === name), activeTaxonomy) }));
+    const all = subjectOptions.map((name) => ({ name, tally: tallyCompletion(byProduct.filter((row) => row.subject_area === name), semTaxonomy) }));
     return {
       rows: all.filter((entry) => entry.tally.total > 0).sort(bySize),
       untracked: all.filter((entry) => entry.tally.total === 0 && entry.tally.untracked > 0).map((entry) => `${entry.name} (${formatKpi(entry.tally.untracked)})`),
     };
-  }, [activeRows, subjectOptions, product, productActive, activeTaxonomy]);
+  }, [activeRows, subjectOptions, product, productActive, semTaxonomy]);
   // Completion by semester (2026-10-16, per request): one row per semester, over the same instructors as the subject table (tab, product
   // and subject filters). Each instructor is measured on THEIR OWN track's courses for that semester (see COURSE_SEMESTER), so a Frontend
   // instructor's Semester 1 is Static Web + Responsive Design + Modern Responsive UI, a Backend instructor's is Python.
@@ -383,8 +398,8 @@ export default function TrainingStatsPage() {
   }, [activeRows, product, productActive, subject, subjectActive, activeTaxonomy]);
   const productBreakdown = useMemo(() => {
     const bySubject = subjectActive ? activeRows.filter((row) => row.subject_area === subject) : activeRows;
-    return productOptions.map((name) => ({ name, tally: tallyCompletion(bySubject.filter((row) => row.product === name), activeTaxonomy) })).filter((entry) => entry.tally.total > 0).sort(bySize);
-  }, [activeRows, productOptions, subject, subjectActive, activeTaxonomy]);
+    return productOptions.map((name) => ({ name, tally: tallyCompletion(bySubject.filter((row) => row.product === name), semTaxonomy) })).filter((entry) => entry.tally.total > 0).sort(bySize);
+  }, [activeRows, productOptions, subject, subjectActive, semTaxonomy]);
   const searchedRows = useMemo(() => {
     const query = search.trim().toLowerCase();
     if (!query) return subjectRows;
@@ -400,7 +415,7 @@ export default function TrainingStatsPage() {
       const label = status === 'COMPLETED' ? 'Completed' : status === 'IN_PROGRESS' ? 'In Progress' : status === 'NOT_STARTED' ? 'Not Started' : 'Mapping pending';
       return (status === 'IN_PROGRESS' || status === 'COMPLETED') && progress !== undefined ? `${label} (${Math.round(progress)}%)` : label;
     };
-    const headers = ['Employee ID', 'Name', 'Department', 'Subject', 'Product', 'Capability Manager', ...displayTaxonomy.map((def) => `${def.trackGroup} - ${def.label}`), ...groups.map((group) => `Subject completion % - ${group.trackGroup}`)];
+    const headers = ['Employee ID', 'Name', 'Department', 'Subject', 'Product', 'Capability Manager', ...displayTaxonomy.map((def) => `${def.trackGroup} - ${def.label}`), ...groups.map((group) => `${semesterActive ? `Semester ${semester}` : 'Subject'} completion % - ${group.trackGroup}`)];
     const rows = searchedRows.map((row) => [
       row.employee_id, row.full_name, row.department, row.subject_area, row.product, row.capability_manager,
       ...displayTaxonomy.map((def) => statusText(row.courses[def.key] ?? 'NO_DATA', row.course_progress?.[def.key])),
@@ -461,6 +476,19 @@ export default function TrainingStatsPage() {
       </button>)}
     </div>}
 
+    {data && semesterOptions.length > 0 && <div data-testid="training-semester-filter" className="-mt-3 mb-6 flex flex-wrap items-center gap-2">
+      <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">Semester</span>
+      {[0, ...semesterOptions].map((option) => <button
+        key={option}
+        type="button"
+        data-testid={`button-semester-${option || 'all'}`}
+        onClick={() => setSemester(option)}
+        className={`rounded-full px-3 py-1.5 text-[11px] font-bold transition-colors ${(option === 0 ? !semesterActive : semester === option) ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground hover:text-foreground'}`}
+      >
+        {option === 0 ? 'All semesters' : `Sem ${option}`}
+      </button>)}
+    </div>}
+
     {query.isLoading && <SkeletonBlock className="h-[520px]" />}
     {query.isError && <QueryError message="Training Stats is unavailable right now." />}
 
@@ -472,23 +500,23 @@ export default function TrainingStatsPage() {
       </div>}
     </div>}
 
-    {data && (subjectBreakdown.rows.length > 0 || productBreakdown.length > 0 || semesterBreakdown.length > 0) && <div data-testid="completion-breakdown" className="mb-6 flex flex-wrap gap-4">
+    {data && (subjectBreakdown.rows.length > 0 || productBreakdown.length > 0 || (!semesterActive && semesterBreakdown.length > 0)) && <div data-testid="completion-breakdown" className="mb-6 flex flex-wrap gap-4">
       {subjectBreakdown.rows.length > 0 && <CompletionBreakdown
-        title={`Completion by subject${productActive ? ` -- ${product}` : ''}`}
+        title={`Completion by subject${semesterActive ? ` -- Semester ${semester}` : ''}${productActive ? ` -- ${product}` : ''}`}
         firstColumn="Subject"
         rows={subjectBreakdown.rows}
         testId="completion-by-subject"
-        note={subjectBreakdown.untracked.length ? `Not measured (no training courses for the subject): ${subjectBreakdown.untracked.join(', ')}` : undefined}
+        note={subjectBreakdown.untracked.length ? `Not measured (no ${semesterActive ? `Semester ${semester} ` : 'training '}courses for the subject): ${subjectBreakdown.untracked.join(', ')}` : undefined}
       />}
-      {semesterBreakdown.length > 0 && <CompletionBreakdown
+      {!semesterActive && semesterBreakdown.length > 0 && <CompletionBreakdown
         title={`Completion by semester${[subjectActive ? subject : '', productActive ? product : ''].filter(Boolean).map((part) => ` -- ${part}`).join('')}`}
         firstColumn="Semester"
         rows={semesterBreakdown}
         testId="completion-by-semester"
         showTotal={false}
-        note="Each instructor is counted on their own subject's courses for that semester. Semesters so far: Frontend, Backend, DSA and Gen AI (DSML to follow; Developer Foundation is in no semester)."
+        note="Each instructor is counted on their own subject's courses for that semester. DSML has no semesters yet, and Developer Foundation is in none."
       />}
-      {productBreakdown.length > 0 && <CompletionBreakdown title={`Completion by product${subjectActive ? ` -- ${subject}` : ` -- ${activeSubTab.label}`}`} firstColumn="Product" rows={productBreakdown} testId="completion-by-product" />}
+      {productBreakdown.length > 0 && <CompletionBreakdown title={`Completion by product${subjectActive ? ` -- ${subject}` : ` -- ${activeSubTab.label}`}${semesterActive ? ` -- Semester ${semester}` : ''}`} firstColumn="Product" rows={productBreakdown} testId="completion-by-product" />}
     </div>}
 
     {data && pendingCount > 0 && <p className="mb-6 max-w-3xl text-[12px] leading-relaxed text-muted-foreground">
@@ -519,14 +547,15 @@ export default function TrainingStatsPage() {
           <table className="w-max min-w-full border-collapse text-left">
             <thead>
               <tr className="border-b border-border bg-[#f4f7f9]">
-                <th rowSpan={2} className="sticky left-0 z-10 whitespace-nowrap border-r border-border bg-[#f4f7f9] px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Employee ID</th>
-                <th rowSpan={2} className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Name</th>
+                {/* Name first and frozen (2026-10-16, per request), Employee ID second and scrolling. */}
+                <th rowSpan={2} className="sticky left-0 z-10 whitespace-nowrap border-r border-border bg-[#f4f7f9] px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Name</th>
+                <th rowSpan={2} className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Employee ID</th>
                 <th rowSpan={2} className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Department</th>
                 <th rowSpan={2} className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Subject</th>
                 <th rowSpan={2} className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Same Product as the Instructors tab">Product</th>
                 <th rowSpan={2} className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Capability Manager</th>
                 {groups.map((group) => <th key={group.trackGroup} colSpan={group.defs.length} className="whitespace-nowrap border-b border-l border-border px-4 py-2 text-center font-mono-ui text-[10px] font-bold uppercase tracking-[0.12em] text-foreground">{group.trackGroup}</th>)}
-                <th colSpan={groups.length} data-testid="header-subject-completion" className="whitespace-nowrap border-b border-l-2 border-border bg-[#eef4ee] px-4 py-2 text-center font-mono-ui text-[10px] font-bold uppercase tracking-[0.12em] text-foreground" title="Completed = 100%, In Progress = its actual % done, Not Started or no data = 0%, averaged over the subject's mapped courses">Subject completion %</th>
+                <th colSpan={groups.length} data-testid="header-subject-completion" className="whitespace-nowrap border-b border-l-2 border-border bg-[#eef4ee] px-4 py-2 text-center font-mono-ui text-[10px] font-bold uppercase tracking-[0.12em] text-foreground" title="Completed = 100%, In Progress = its actual % done, Not Started or no data = 0%, averaged over the subject's mapped courses">{semesterActive ? `Semester ${semester} completion %` : 'Subject completion %'}</th>
               </tr>
               <tr className="border-b border-border bg-[#f4f7f9]">
                 {groups.flatMap((group) => group.defs.map((def, i) => <th key={def.key} className={`whitespace-nowrap px-3 py-2.5 text-center font-mono-ui text-[10px] uppercase tracking-[0.1em] text-muted-foreground ${i === 0 ? 'border-l border-border' : ''}`}>{def.label}</th>))}
@@ -535,8 +564,8 @@ export default function TrainingStatsPage() {
             </thead>
             <tbody>
               {pager.pageRows.map((row) => <tr key={row.employee_id ?? row.full_name} className="border-b border-border/70 last:border-0 hover:bg-[#f8fafb]">
-                <td className="sticky left-0 z-10 whitespace-nowrap border-r border-border bg-card px-4 py-3 font-mono-ui text-[11px] text-foreground">{row.employee_id || '—'}</td>
-                <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] font-semibold text-foreground">{row.full_name}</td>
+                <td className="sticky left-0 z-10 whitespace-nowrap border-r border-border bg-card px-4 py-3 text-[12px] font-semibold text-foreground">{row.full_name}</td>
+                <td className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[11px] text-foreground">{row.employee_id || '—'}</td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-muted-foreground">{row.department || '—'}</td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-foreground" data-testid={`cell-subject-${row.employee_id ?? row.full_name}`}>{row.subject_area || '—'}</td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-foreground" data-testid={`cell-product-${row.employee_id ?? row.full_name}`}>{row.product || '—'}</td>
