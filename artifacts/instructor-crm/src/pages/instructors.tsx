@@ -691,7 +691,8 @@ export default function InstructorsPage() {
 // keys and subject/capability-manager/campus's dynamic string keys can all
 // share one component -- callers narrow the type back with `as` where
 // needed (see the two typed filters' onChange props in the JSX below).
-function MultiSelectFilter({ label, options, selected, onChange, testId, widthClass = 'max-w-[220px]' }: {
+// Exported 2026-10-16 so the Training Stats tab uses the same filter dropdowns.
+export function MultiSelectFilter({ label, options, selected, onChange, testId, widthClass = 'max-w-[220px]' }: {
   label: string;
   options: { key: string; label: string; count: number }[];
   selected: string[];
