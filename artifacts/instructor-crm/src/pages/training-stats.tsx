@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, X } from 'lucide-react';
 import { PageIntro, EmptyState, QueryError, SkeletonBlock, TablePager, TableSearchInput, DownloadCsvButton, usePagedRows, formatKpi } from '@/components/ui-pieces';
 import { downloadCsv, slugify, toCsv } from '@/lib/csv';
-import { ALL_PRODUCTS } from './instructors';
+import { ALL_PRODUCTS, MultiSelectFilter } from './instructors';
 
 // "Training Stats" (2026-09-23, per request): an instructor's OWN
 // training/upskilling progress, distinct from every other tab here, which
@@ -309,13 +309,14 @@ export default function TrainingStatsPage() {
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const [activeTab, setActiveTab] = useState(SUB_TABS[0].key);
-  const [subject, setSubject] = useState('ALL');
+  // Filters (2026-10-16, per request: the same multi-select dropdowns as the Instructors tab). Empty = no filter; several values are OR'd.
+  const [subjects, setSubjects] = useState<string[]>([]);
   // Product filter (2026-10-15, per request): 'ALL' or one product. Kept when switching tabs; a product with nobody on the tab is ignored.
-  const [product, setProduct] = useState('ALL');
+  const [products, setProducts] = useState<string[]>([]);
   // Semester filter (2026-10-16, per request, instead of per-semester columns): 0 = all semesters, otherwise only that semester's courses
   // (COURSE_SEMESTER) are shown and every completion figure on the page -- the per-instructor % column and the completion tables -- is
   // worked out over just those courses.
-  const [semester, setSemester] = useState(0);
+  const [semesters, setSemesters] = useState<number[]>([]);
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: QUERY_KEY });
 
@@ -341,8 +342,10 @@ export default function TrainingStatsPage() {
   const activeSubTab = SUB_TABS.find((t) => t.key === activeTab) ?? SUB_TABS[0];
   const activeTaxonomy = data ? data.taxonomy.filter((d) => activeSubTab.trackGroups.includes(d.trackGroup)) : [];
   const semesterOptions = SEMESTERS.filter((sem) => activeTaxonomy.some((d) => COURSE_SEMESTER[d.key] === sem));
-  const semesterActive = semester !== 0 && semesterOptions.includes(semester);
-  const semTaxonomy = semesterActive ? activeTaxonomy.filter((d) => COURSE_SEMESTER[d.key] === semester) : activeTaxonomy;
+  const semSel = semesters.filter((sem) => semesterOptions.includes(sem));
+  const semesterActive = semSel.length > 0;
+  const semText = semSel.length === 1 ? `Semester ${semSel[0]}` : `Semesters ${semSel.join(', ')}`;
+  const semTaxonomy = semesterActive ? activeTaxonomy.filter((d) => semSel.includes(COURSE_SEMESTER[d.key])) : activeTaxonomy;
   // With a semester chosen, only instructors whose subject HAS courses in that semester are listed (a DSA instructor has nothing in Sem 1).
   const hasSemCourses = (row: TrainingStatsRow) => !semesterActive || (!!row.subject_area && semTaxonomy.some((d) => d.trackGroup === SUBJECT_TRACK[row.subject_area!]));
   // Each tab shows only ITS OWN subject's instructors (2026-09-24, per
@@ -362,15 +365,19 @@ export default function TrainingStatsPage() {
   const [search, setSearch] = useState('');
   // Subject filter: the subjects present on this tab, and the rows of the chosen one.
   const subjectOptions = useMemo(() => [...new Set(activeRows.map((row) => row.subject_area).filter((area): area is string => !!area))].sort(), [activeRows]);
-  const subjectActive = subject !== 'ALL' && subjectOptions.includes(subject);
+  const subjectSel = subjects.filter((name) => subjectOptions.includes(name));
+  const subjectActive = subjectSel.length > 0;
+  const subjectText = subjectSel.join(', ');
   const productOptions = useMemo(() => ALL_PRODUCTS.filter((name) => activeRows.some((row) => row.product === name)), [activeRows]);
-  const productActive = product !== 'ALL' && productOptions.includes(product);
+  const productSel = products.filter((name) => productOptions.includes(name));
+  const productActive = productSel.length > 0;
+  const productText = productSel.join(', ');
   const subjectRows = useMemo(() => {
-    const byProduct = productActive ? activeRows.filter((row) => row.product === product) : activeRows;
-    return (subjectActive ? byProduct.filter((row) => row.subject_area === subject) : byProduct).filter(hasSemCourses);
-  }, [activeRows, subject, subjectActive, product, productActive, semesterActive, semTaxonomy]);
-  const selectedTrack = subjectActive ? SUBJECT_TRACK[subject] : undefined;
-  const trackTaxonomy = selectedTrack ? semTaxonomy.filter((d) => d.trackGroup === selectedTrack) : [];
+    const byProduct = productActive ? activeRows.filter((row) => productSel.includes(row.product)) : activeRows;
+    return (subjectActive ? byProduct.filter((row) => subjectSel.includes(row.subject_area ?? '')) : byProduct).filter(hasSemCourses);
+  }, [activeRows, subjects, products, subjectOptions, productOptions, semesterActive, semTaxonomy]);
+  const selectedTracks = subjectSel.map((name) => SUBJECT_TRACK[name]).filter(Boolean);
+  const trackTaxonomy = selectedTracks.length ? semTaxonomy.filter((d) => selectedTracks.includes(d.trackGroup)) : [];
   const displayTaxonomy = trackTaxonomy.length > 0 ? trackTaxonomy : semTaxonomy;
   // Completion tables (2026-10-16, per request). Subject table: every subject on this tab, narrowed by the chosen product. Product table:
   // every product on this tab, narrowed by the chosen subject. Only instructors whose subject has a course track are counted; subjects
@@ -378,17 +385,17 @@ export default function TrainingStatsPage() {
   // Both sorted by number of instructors, largest first (ties alphabetical).
   const bySize = (a: { name: string; tally: CompletionTally }, b: { name: string; tally: CompletionTally }) => b.tally.total - a.tally.total || a.name.localeCompare(b.name);
   const subjectBreakdown = useMemo(() => {
-    const byProduct = productActive ? activeRows.filter((row) => row.product === product) : activeRows;
+    const byProduct = productActive ? activeRows.filter((row) => productSel.includes(row.product)) : activeRows;
     const all = subjectOptions.map((name) => ({ name, tally: tallyCompletion(byProduct.filter((row) => row.subject_area === name), semTaxonomy) }));
     return {
       rows: all.filter((entry) => entry.tally.total > 0).sort(bySize),
       untracked: all.filter((entry) => entry.tally.total === 0 && entry.tally.untracked > 0).map((entry) => `${entry.name} (${formatKpi(entry.tally.untracked)})`),
     };
-  }, [activeRows, subjectOptions, product, productActive, semTaxonomy]);
+  }, [activeRows, subjectOptions, products, productOptions, semTaxonomy]);
   const productBreakdown = useMemo(() => {
-    const bySubject = subjectActive ? activeRows.filter((row) => row.subject_area === subject) : activeRows;
+    const bySubject = subjectActive ? activeRows.filter((row) => subjectSel.includes(row.subject_area ?? '')) : activeRows;
     return productOptions.map((name) => ({ name, tally: tallyCompletion(bySubject.filter((row) => row.product === name), semTaxonomy) })).filter((entry) => entry.tally.total > 0).sort(bySize);
-  }, [activeRows, productOptions, subject, subjectActive, semTaxonomy]);
+  }, [activeRows, productOptions, subjects, subjectOptions, semTaxonomy]);
   const searchedRows = useMemo(() => {
     const query = search.trim().toLowerCase();
     if (!query) return subjectRows;
@@ -404,13 +411,13 @@ export default function TrainingStatsPage() {
       const label = status === 'COMPLETED' ? 'Completed' : status === 'IN_PROGRESS' ? 'In Progress' : status === 'NOT_STARTED' ? 'Not Started' : 'Mapping pending';
       return (status === 'IN_PROGRESS' || status === 'COMPLETED') && progress !== undefined ? `${label} (${Math.round(progress)}%)` : label;
     };
-    const headers = ['Employee ID', 'Name', 'Department', 'Subject', 'Product', 'Capability Manager', ...displayTaxonomy.map((def) => `${def.trackGroup} - ${def.label}`), ...groups.map((group) => `${semesterActive ? `Semester ${semester}` : 'Subject'} completion % - ${group.trackGroup}`)];
+    const headers = ['Employee ID', 'Name', 'Department', 'Subject', 'Product', 'Capability Manager', ...displayTaxonomy.map((def) => `${def.trackGroup} - ${def.label}`), ...groups.map((group) => `${semesterActive ? semText : 'Subject'} completion % - ${group.trackGroup}`)];
     const rows = searchedRows.map((row) => [
       row.employee_id, row.full_name, row.department, row.subject_area, row.product, row.capability_manager,
       ...displayTaxonomy.map((def) => statusText(row.courses[def.key] ?? 'NO_DATA', row.course_progress?.[def.key])),
       ...groups.map((group) => { const pct = subjectCompletion(row, group.defs); return pct === null ? '' : Math.round(pct * 10) / 10; }),
     ]);
-    downloadCsv(`training-stats-${slugify(subjectActive ? subject : activeSubTab.label)}${productActive ? `-${slugify(product)}` : ''}.csv`, toCsv(headers, rows));
+    downloadCsv(`training-stats-${slugify(subjectActive ? subjectText : activeSubTab.label)}${productActive ? `-${slugify(productText)}` : ''}${semesterActive ? `-${slugify(semText)}` : ''}.csv`, toCsv(headers, rows));
   };
   const pendingCount = displayTaxonomy.filter((d) => !isResolved(d)).length;
 
@@ -432,57 +439,49 @@ export default function TrainingStatsPage() {
         key={tab.key}
         type="button"
         data-testid={`button-tab-${tab.key}`}
-        onClick={() => { setActiveTab(tab.key); setSubject('ALL'); }}
+        onClick={() => { setActiveTab(tab.key); setSubjects([]); }}
         className={`rounded-full px-4 py-2 text-[12px] font-bold transition-colors ${tab.key === activeTab ? 'bg-primary text-primary-foreground shadow-sm' : 'bg-secondary text-muted-foreground hover:text-foreground'}`}
       >
         {tab.label}
       </button>)}
     </div>
 
-    {data && subjectOptions.length > 1 && <div data-testid="training-subject-filter" className="-mt-3 mb-6 flex flex-wrap items-center gap-2">
-      <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">Subject</span>
-      {['ALL', ...subjectOptions].map((option) => <button
-        key={option}
-        type="button"
-        data-testid={`button-subject-${option}`}
-        onClick={() => setSubject(option)}
-        className={`rounded-full px-3 py-1.5 text-[11px] font-bold transition-colors ${(option === 'ALL' ? !subjectActive : subject === option) ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground hover:text-foreground'}`}
-      >
-        {option === 'ALL' ? 'All subjects' : option}
-      </button>)}
-    </div>}
-
-    {data && productOptions.length > 1 && <div data-testid="training-product-filter" className={`mb-6 flex flex-wrap items-center gap-2 ${subjectOptions.length > 1 ? '-mt-3' : ''}`}>
-      <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">Product</span>
-      {['ALL', ...productOptions].map((option) => <button
-        key={option}
-        type="button"
-        data-testid={`button-product-${option}`}
-        onClick={() => setProduct(option)}
-        className={`rounded-full px-3 py-1.5 text-[11px] font-bold transition-colors ${(option === 'ALL' ? !productActive : product === option) ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground hover:text-foreground'}`}
-      >
-        {option === 'ALL' ? 'All products' : option}
-      </button>)}
-    </div>}
-
-    {data && semesterOptions.length > 0 && <div data-testid="training-semester-filter" className="-mt-3 mb-6 flex flex-wrap items-center gap-2">
-      <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">Semester</span>
-      {[0, ...semesterOptions].map((option) => <button
-        key={option}
-        type="button"
-        data-testid={`button-semester-${option || 'all'}`}
-        onClick={() => setSemester(option)}
-        className={`rounded-full px-3 py-1.5 text-[11px] font-bold transition-colors ${(option === 0 ? !semesterActive : semester === option) ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground hover:text-foreground'}`}
-      >
-        {option === 0 ? 'All semesters' : `Sem ${option}`}
-      </button>)}
+    {data && <div data-testid="training-filters" className="-mt-3 mb-6 flex flex-wrap items-center gap-4">
+      {subjectOptions.length > 1 && <MultiSelectFilter
+        label="Subject"
+        options={subjectOptions.map((name) => ({ key: name, label: name, count: activeRows.filter((row) => row.subject_area === name).length }))}
+        selected={subjectSel}
+        onChange={setSubjects}
+        testId="select-training-subject"
+      />}
+      {productOptions.length > 1 && <MultiSelectFilter
+        label="Product"
+        options={productOptions.map((name) => ({ key: name, label: name, count: activeRows.filter((row) => row.product === name).length }))}
+        selected={productSel}
+        onChange={setProducts}
+        testId="select-training-product"
+      />}
+      {semesterOptions.length > 0 && <MultiSelectFilter
+        label="Semester"
+        options={semesterOptions.map((sem) => {
+          const tracks = new Set(activeTaxonomy.filter((d) => COURSE_SEMESTER[d.key] === sem).map((d) => d.trackGroup));
+          return { key: String(sem), label: `Sem ${sem}`, count: activeRows.filter((row) => !!row.subject_area && tracks.has(SUBJECT_TRACK[row.subject_area])).length };
+        })}
+        selected={semSel.map(String)}
+        onChange={(next) => setSemesters(next.map(Number))}
+        testId="select-training-semester"
+        widthClass="w-[150px]"
+      />}
+      {(subjectActive || productActive || semesterActive) && <button type="button" data-testid="button-clear-training-filters" onClick={() => { setSubjects([]); setProducts([]); setSemesters([]); }} className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-[11px] font-bold text-foreground transition-colors hover:bg-secondary">
+        <X size={13} /> Clear filters
+      </button>}
     </div>}
 
     {query.isLoading && <SkeletonBlock className="h-[520px]" />}
     {query.isError && <QueryError message="Training Stats is unavailable right now." />}
 
     {data && <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-      <p className="text-[11px] text-muted-foreground">{formatKpi(subjectRows.length)} {subjectActive ? subject : activeSubTab.label}{productActive ? ` (${product})` : ''} instructors · {data.synced_at ? `last synced ${new Date(data.synced_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' })}` : 'not synced yet -- click Sync Now'}</p>
+      <p className="text-[11px] text-muted-foreground">{formatKpi(subjectRows.length)} {subjectActive ? subjectText : activeSubTab.label}{productActive ? ` (${productText})` : ''}{semesterActive ? ` -- ${semText}` : ''} instructors · {data.synced_at ? `last synced ${new Date(data.synced_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' })}` : 'not synced yet -- click Sync Now'}</p>
       {subjectRows.length > 0 && <div className="flex flex-wrap items-center gap-2">
         <DownloadCsvButton onClick={downloadTable} disabled={searchedRows.length === 0} label={`Download CSV (${formatKpi(searchedRows.length)})`} testId="button-download-training-stats-csv" />
         <TableSearchInput value={search} onChange={setSearch} testId="input-search-training-stats" />
@@ -491,13 +490,13 @@ export default function TrainingStatsPage() {
 
     {data && (subjectBreakdown.rows.length > 0 || productBreakdown.length > 0) && <div data-testid="completion-breakdown" className="mb-6 flex flex-wrap gap-4">
       {subjectBreakdown.rows.length > 0 && <CompletionBreakdown
-        title={`Completion by subject${semesterActive ? ` -- Semester ${semester}` : ''}${productActive ? ` -- ${product}` : ''}`}
+        title={`Completion by subject${semesterActive ? ` -- ${semText}` : ''}${productActive ? ` -- ${productText}` : ''}`}
         firstColumn="Subject"
         rows={subjectBreakdown.rows}
         testId="completion-by-subject"
-        note={subjectBreakdown.untracked.length ? `Not measured (no ${semesterActive ? `Semester ${semester} ` : 'training '}courses for the subject): ${subjectBreakdown.untracked.join(', ')}` : undefined}
+        note={subjectBreakdown.untracked.length ? `Not measured (no ${semesterActive ? `${semText} ` : 'training '}courses for the subject): ${subjectBreakdown.untracked.join(', ')}` : undefined}
       />}
-      {productBreakdown.length > 0 && <CompletionBreakdown title={`Completion by product${subjectActive ? ` -- ${subject}` : ` -- ${activeSubTab.label}`}${semesterActive ? ` -- Semester ${semester}` : ''}`} firstColumn="Product" rows={productBreakdown} testId="completion-by-product" />}
+      {productBreakdown.length > 0 && <CompletionBreakdown title={`Completion by product${subjectActive ? ` -- ${subjectText}` : ` -- ${activeSubTab.label}`}${semesterActive ? ` -- ${semText}` : ''}`} firstColumn="Product" rows={productBreakdown} testId="completion-by-product" />}
     </div>}
 
     {data && pendingCount > 0 && <p className="mb-6 max-w-3xl text-[12px] leading-relaxed text-muted-foreground">
@@ -536,7 +535,7 @@ export default function TrainingStatsPage() {
                 <th rowSpan={2} className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Same Product as the Instructors tab">Product</th>
                 <th rowSpan={2} className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Capability Manager</th>
                 {groups.map((group) => <th key={group.trackGroup} colSpan={group.defs.length} className="whitespace-nowrap border-b border-l border-border px-4 py-2 text-center font-mono-ui text-[10px] font-bold uppercase tracking-[0.12em] text-foreground">{group.trackGroup}</th>)}
-                <th colSpan={groups.length} data-testid="header-subject-completion" className="whitespace-nowrap border-b border-l-2 border-border bg-[#eef4ee] px-4 py-2 text-center font-mono-ui text-[10px] font-bold uppercase tracking-[0.12em] text-foreground" title="Completed = 100%, In Progress = its actual % done, Not Started or no data = 0%, averaged over the subject's mapped courses">{semesterActive ? `Semester ${semester} completion %` : 'Subject completion %'}</th>
+                <th colSpan={groups.length} data-testid="header-subject-completion" className="whitespace-nowrap border-b border-l-2 border-border bg-[#eef4ee] px-4 py-2 text-center font-mono-ui text-[10px] font-bold uppercase tracking-[0.12em] text-foreground" title="Completed = 100%, In Progress = its actual % done, Not Started or no data = 0%, averaged over the subject's mapped courses">{semesterActive ? `${semText} completion %` : 'Subject completion %'}</th>
               </tr>
               <tr className="border-b border-border bg-[#f4f7f9]">
                 {groups.flatMap((group) => group.defs.map((def, i) => <th key={def.key} className={`whitespace-nowrap px-3 py-2.5 text-center font-mono-ui text-[10px] uppercase tracking-[0.1em] text-muted-foreground ${i === 0 ? 'border-l border-border' : ''}`}>{def.label}</th>))}
