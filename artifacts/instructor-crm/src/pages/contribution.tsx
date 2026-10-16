@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Clock, RefreshCw } from 'lucide-react';
+import { Clock, Gauge, RefreshCw } from 'lucide-react';
 import { PageIntro, EmptyState, QueryError, SkeletonBlock, TopStat, TablePager, TableSearchInput, DownloadCsvButton, usePagedRows, formatKpi } from '@/components/ui-pieces';
 import { downloadCsv, toCsv } from '@/lib/csv';
 import { ALL_PRODUCTS } from './instructors';
@@ -143,10 +143,10 @@ function avgHoursPerDay(row: ContributionRow): number | null {
   return row.total_hours / row.session_days;
 }
 // Workload (2026-10-15, per request): Avg Hrs / Day + Learning Hrs / Day + Avg Demo / AI Hrs, added up from the figures as the row shows them
-// (hours to one decimal, the demo/AI figure to two). Not calculated (null) for an instructor who is not deployed yet -- no deployment date, i.e.
-// no session scheduled so far. A missing part counts as 0; null when all three are missing.
+// (hours to one decimal, the demo/AI figure to two). A missing part counts as 0; null when all three are missing.
+// 2026-10-16, per request: now also calculated for instructors still in training (no deployment date), from whatever data they have
+// (typically learning hours and demo / AI evaluations). Someone with none of the three still gets no workload.
 function workloadOf(row: ContributionRow): number | null {
-  if (!row.deployment_date) return null;
   const hours = avgHoursPerDay(row);
   const learning = row.learning_days > 0 ? row.learning_hours / row.learning_days : null;
   const evalHrs = row.eval_avg_hours;
@@ -259,6 +259,13 @@ export default function ContributionPage() {
   // a quick "how much did the department teach in total" figure alongside
   // the per-instructor table below.
   const totalHoursAllInstructors = useMemo(() => subjectRows.reduce((sum, r) => sum + r.total_hours, 0), [subjectRows]);
+  // Average workload (2026-10-16, per request): the mean of the Workload column over the same rows as the cards above (date range,
+  // subject and product filters; not search). People with no workload (no session, learning or evaluation data) are left out, not
+  // counted as 0. Averages the workloads exactly as the column shows them (two decimals).
+  const workloadStats = useMemo(() => {
+    const values = subjectRows.map(workloadOf).filter((v): v is number => v !== null);
+    return { count: values.length, average: values.length ? values.reduce((sum, v) => sum + v, 0) / values.length : null };
+  }, [subjectRows]);
   const subjectLabel = [product, subject === 'NONE' ? 'with no subject' : subject].filter(Boolean).join(' · ');
 
   // Download CSV (2026-10-15, per request): everything the current date range, subject filter and search match -- every page, not just the
@@ -330,7 +337,7 @@ export default function ContributionPage() {
     {data && (dateFrom || dateTo) && data.count > 0 && totalHoursAllInstructors === 0 && <p data-testid="note-contribution-empty-range" className="mb-4 max-w-3xl rounded-lg bg-[#fff3d6] px-3 py-2 text-[12px] font-semibold text-[#8a6a12]">No completed sessions in this range. If the date filter was only just added, click Sync Now once to load the day-by-day data.</p>}
 
     {data && <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-      <div className="grid max-w-md grid-cols-1 gap-3 sm:grid-cols-2">
+      <div className="grid max-w-3xl grid-cols-1 gap-3 sm:grid-cols-3">
         <TopStat
           label={subject ? `Instructors + Mentors tracked (${subjectLabel})` : 'Instructors + Mentors tracked'}
           value={formatKpi(subjectRows.length)}
@@ -344,6 +351,13 @@ export default function ContributionPage() {
           meta={dateFrom || dateTo ? `Across ${subject ? `every ${subjectLabel} instructor and mentor` : 'every instructor and mentor'}, ${dateFrom ? formatDay(dateFrom) : 'the start'} to ${dateTo ? formatDay(dateTo) : 'today'}` : `Across ${subject ? `every ${subjectLabel} instructor and mentor` : 'every instructor and mentor'}, all-time`}
           icon={<Clock size={16} />}
           tone="teal"
+        />
+        <TopStat
+          label="Average workload"
+          value={workloadStats.average !== null ? workloadStats.average.toFixed(2) : '—'}
+          meta={`Over ${formatKpi(workloadStats.count)} of ${formatKpi(subjectRows.length)} ${subject || product ? `${subjectLabel} ` : ''}instructors and mentors with a workload; the ${formatKpi(subjectRows.length - workloadStats.count)} with no session, learning or evaluation data are left out`}
+          icon={<Gauge size={16} />}
+          tone="indigo"
         />
       </div>
       {data.count > 0 && <div className="flex flex-wrap items-center gap-2">
@@ -386,7 +400,7 @@ export default function ContributionPage() {
                 <th className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Total session hours (Lecture + Practice + Other) divided by the number of days the instructor took sessions on (both follow the date filter)">Avg Hrs / Day</th>
                 <th className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Learning hours divided by the number of days the instructor was active on the learning platform (both follow the date filter)">Learning Hrs / Day</th>
                 <th className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Demo hours divided by demo evaluations, plus AI assessment hours divided by AI evaluations (average length of one evaluation of each kind, added together). Uses the exact recorded time, not the rounded hours shown">Avg Demo / AI Hrs</th>
-                <th className="whitespace-nowrap border-l border-border px-4 py-3 text-right font-mono-ui text-[10px] uppercase tracking-[0.12em] text-foreground" title="Workload = Avg Hrs / Day + Learning Hrs / Day + Avg Demo / AI Hrs, added up as shown in those columns. Not calculated for instructors who are not deployed yet (no deployment date)">Workload</th>
+                <th className="whitespace-nowrap border-l border-border px-4 py-3 text-right font-mono-ui text-[10px] uppercase tracking-[0.12em] text-foreground" title="Workload = Avg Hrs / Day + Learning Hrs / Day + Avg Demo / AI Hrs, added up as shown in those columns. Includes instructors still in training, from whatever data they have; blank when they have no session, learning or evaluation data">Workload</th>
                 <th className="whitespace-nowrap border-l border-border px-4 py-3 text-left font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Contribution</th>
                 <th className="whitespace-nowrap border-l border-border px-4 py-3 text-left font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">All Batches</th>
                 <th className="whitespace-nowrap px-4 py-3 text-left font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Batches (Last 30 Days)</th>
@@ -422,7 +436,7 @@ export default function ContributionPage() {
                 <td className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[12px] tabular-nums text-foreground" data-testid={`cell-avg-hours-${row.employee_id ?? row.full_name}`} title={`${formatHours(row.total_hours)} hrs over ${row.session_days ?? 0} days`}>{avgHoursPerDay(row) !== null ? formatAvg(avgHoursPerDay(row)!) : <span className="text-muted-foreground">—</span>}</td>
                 <td className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[12px] tabular-nums text-foreground" data-testid={`cell-learning-per-day-${row.employee_id ?? row.full_name}`}>{row.learning_days > 0 ? formatAvg(row.learning_hours / row.learning_days) : <span className="text-muted-foreground">—</span>}</td>
                 <td className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[12px] tabular-nums text-foreground" data-testid={`cell-eval-avg-hours-${row.employee_id ?? row.full_name}`} title={`Demo ${formatHours(row.demo_hours)} hrs / ${row.demo_evaluations} + AI ${formatHours(row.ai_assessment_hours)} hrs / ${row.ai_assessment_evaluations}`}>{row.eval_avg_hours !== null ? row.eval_avg_hours.toFixed(2) : <span className="text-muted-foreground">—</span>}</td>
-                <td className="whitespace-nowrap border-l border-border px-4 py-3 text-right font-mono-ui text-[12px] font-bold tabular-nums text-foreground" data-testid={`cell-workload-${row.employee_id ?? row.full_name}`} title={row.deployment_date ? 'Avg Hrs / Day + Learning Hrs / Day + Avg Demo / AI Hrs' : 'Not calculated: not deployed yet (no deployment date)'}>{workloadOf(row) !== null ? workloadOf(row)!.toFixed(2) : <span className="font-normal text-muted-foreground">—</span>}</td>
+                <td className="whitespace-nowrap border-l border-border px-4 py-3 text-right font-mono-ui text-[12px] font-bold tabular-nums text-foreground" data-testid={`cell-workload-${row.employee_id ?? row.full_name}`} title={workloadOf(row) !== null ? 'Avg Hrs / Day + Learning Hrs / Day + Avg Demo / AI Hrs' : 'No session, learning or evaluation data yet'}>{workloadOf(row) !== null ? workloadOf(row)!.toFixed(2) : <span className="font-normal text-muted-foreground">—</span>}</td>
                 {row.has_contribution_data
                   ? <>
                     <td className="whitespace-nowrap border-l border-border px-4 py-3 text-[12px] text-foreground">{row.niat_cohorts.length > 0 ? row.niat_cohorts.join(', ') : '—'}</td>
