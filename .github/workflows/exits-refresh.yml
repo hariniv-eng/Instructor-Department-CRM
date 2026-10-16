@@ -1,0 +1,28 @@
+# 2026-10-16, per request: re-syncs ONLY the Darwin exits at 9:00 AM IST.
+# Darwin regenerates its base exit report at about 8:07 AM IST -- after the
+# 5:00 AM daily sync (daily-sync.yml) -- so without this second run the app
+# shows the previous day's exit report until the next morning.
+# Uses the same two repository secrets as daily-sync.yml (SYNC_CRON_SECRET, APP_URL).
+name: Exits refresh
+
+on:
+  schedule:
+    - cron: "30 3 * * *" # 03:30 UTC = 09:00 IST (GitHub may start it a few minutes late)
+  workflow_dispatch: {} # lets you run it by hand from the Actions tab to test
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Call the exits refresh endpoint
+        env:
+          SYNC_CRON_SECRET: ${{ secrets.SYNC_CRON_SECRET }}
+          APP_URL: ${{ secrets.APP_URL }}
+        run: |
+          # The server holds the request open until the sync is finished.
+          curl --silent --show-error --fail-with-body \
+            --max-time 500 --retry 2 --retry-delay 30 --retry-all-errors \
+            -X POST "$APP_URL/api/sync/exits-refresh" \
+            -H "Authorization: Bearer $SYNC_CRON_SECRET"
+          echo
