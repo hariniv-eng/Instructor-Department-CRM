@@ -212,10 +212,29 @@ const atLeast80Rate = (tally: CompletionTally) => (tally.total > 0 ? Math.round(
 // Completion tables (2026-10-16, per request: the overview cards were removed and the "Completion by subject" / "Completion by product" tables
 // brought back, with an 80%+ count and 80%+ rate). Rows arrive sorted by instructor count, largest first.
 function CompletionBreakdown({ title, firstColumn, rows, testId, note }: { title: string; firstColumn: string; rows: { name: string; tally: CompletionTally }[]; testId: string; note?: string }) {
+  // Total row (2026-10-16, per request): every row of the table added together, shown ABOVE the column names. The rates are worked out
+  // from the summed counts (total completed / total instructors), not averaged across rows.
+  const total = rows.reduce<CompletionTally>((sum, { tally }) => ({
+    total: sum.total + tally.total, completed: sum.completed + tally.completed, atLeast80: sum.atLeast80 + tally.atLeast80, inProgress: sum.inProgress + tally.inProgress,
+    notStarted: sum.notStarted + tally.notStarted, noData: sum.noData + tally.noData, untracked: sum.untracked + tally.untracked,
+  }), { total: 0, completed: 0, atLeast80: 0, inProgress: 0, notStarted: 0, noData: 0, untracked: 0 });
+  const totalRate = completionRate(total);
+  const totalRate80 = atLeast80Rate(total);
   return <div data-testid={testId} className="min-w-[320px] flex-1 overflow-x-auto rounded-md border border-border bg-card">
     <p className="border-b border-border px-4 py-2.5 text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">{title}</p>
     <table className="w-full border-collapse text-[12px]">
       <thead>
+        <tr data-testid={`${testId}-total`} className="border-b border-border bg-secondary/60 text-foreground">
+          <td className="whitespace-nowrap px-4 py-2 font-bold">Total</td>
+          <td className="px-3 py-2 text-right font-mono-ui font-bold tabular-nums">{formatKpi(total.total)}</td>
+          <td className="px-3 py-2 text-right font-mono-ui font-bold tabular-nums">{formatKpi(total.completed)}</td>
+          <td className="px-3 py-2 text-right font-mono-ui font-bold tabular-nums">{formatKpi(total.atLeast80)}</td>
+          <td className="px-3 py-2 text-right font-mono-ui font-bold tabular-nums">{formatKpi(total.inProgress)}</td>
+          <td className="px-3 py-2 text-right font-mono-ui font-bold tabular-nums">{formatKpi(total.notStarted)}</td>
+          <td className="px-3 py-2 text-right font-mono-ui font-bold tabular-nums">{formatKpi(total.noData)}</td>
+          <td className="px-3 py-2 text-right font-mono-ui font-bold tabular-nums">{totalRate === null ? '—' : `${totalRate}%`}</td>
+          <td className="px-4 py-2 text-right font-mono-ui font-bold tabular-nums">{totalRate80 === null ? '—' : `${totalRate80}%`}</td>
+        </tr>
         <tr className="border-b border-border text-left font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
           <th className="whitespace-nowrap px-4 py-2 font-normal">{firstColumn}</th>
           <th className="whitespace-nowrap px-3 py-2 text-right font-normal" title="Instructors measured on their own subject's course track">Instructors</th>
