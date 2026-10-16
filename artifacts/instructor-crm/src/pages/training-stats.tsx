@@ -214,13 +214,11 @@ const COURSE_SEMESTER: Record<string, number> = {
 };
 const SEMESTERS = [...new Set(Object.values(COURSE_SEMESTER))].sort((a, b) => a - b);
 
-// `semester` (2026-10-16): when given, each instructor is measured only on that semester's courses of their own track; an instructor
-// whose track has no course in that semester is not counted (untracked).
-function tallyCompletion(rows: TrainingStatsRow[], taxonomy: TrainingCourseDef[], semester?: number): CompletionTally {
+function tallyCompletion(rows: TrainingStatsRow[], taxonomy: TrainingCourseDef[]): CompletionTally {
   const tally: CompletionTally = { total: 0, completed: 0, atLeast80: 0, atLeast50: 0, inProgress: 0, notStarted: 0, noData: 0, untracked: 0 };
   for (const row of rows) {
     const track = row.subject_area ? SUBJECT_TRACK[row.subject_area] : undefined;
-    const defs = track ? taxonomy.filter((def) => def.trackGroup === track && (semester === undefined || COURSE_SEMESTER[def.key] === semester)) : [];
+    const defs = track ? taxonomy.filter((def) => def.trackGroup === track) : [];
     if (defs.length === 0) { tally.untracked += 1; continue; }
     tally.total += 1;
     const pct = subjectCompletion(row, defs);
@@ -238,8 +236,7 @@ const atLeast50Rate = (tally: CompletionTally) => (tally.total > 0 ? Math.round(
 
 // Completion tables (2026-10-16, per request: the overview cards were removed and the "Completion by subject" / "Completion by product" tables
 // brought back, with an 80%+ count and 80%+ rate). Rows arrive sorted by instructor count, largest first.
-// showTotal=false for the semester table: one instructor appears in several semesters, so adding the rows up would count people twice.
-function CompletionBreakdown({ title, firstColumn, rows, testId, note, showTotal = true }: { title: string; firstColumn: string; rows: { name: string; tally: CompletionTally }[]; testId: string; note?: string; showTotal?: boolean }) {
+function CompletionBreakdown({ title, firstColumn, rows, testId, note }: { title: string; firstColumn: string; rows: { name: string; tally: CompletionTally }[]; testId: string; note?: string }) {
   // Total row (2026-10-16, per request): every row of the table added together, shown ABOVE the column names. The rates are worked out
   // from the summed counts (total completed / total instructors), not averaged across rows.
   const total = rows.reduce<CompletionTally>((sum, { tally }) => ({
@@ -253,7 +250,7 @@ function CompletionBreakdown({ title, firstColumn, rows, testId, note, showTotal
     <p className="border-b border-border px-4 py-2.5 text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">{title}</p>
     <table className="w-full border-collapse text-[12px]">
       <thead>
-        {showTotal && <tr data-testid={`${testId}-total`} className="border-b border-border bg-secondary/60 text-foreground">
+        <tr data-testid={`${testId}-total`} className="border-b border-border bg-secondary/60 text-foreground">
           <td className="whitespace-nowrap px-4 py-2 font-bold">Total</td>
           <td className="px-3 py-2 text-right font-mono-ui font-bold tabular-nums">{formatKpi(total.total)}</td>
           <td className="px-3 py-2 text-right font-mono-ui font-bold tabular-nums">{formatKpi(total.completed)}</td>
@@ -265,7 +262,7 @@ function CompletionBreakdown({ title, firstColumn, rows, testId, note, showTotal
           <td className="px-3 py-2 text-right font-mono-ui font-bold tabular-nums">{totalRate === null ? '—' : `${totalRate}%`}</td>
           <td className="px-3 py-2 text-right font-mono-ui font-bold tabular-nums">{totalRate80 === null ? '—' : `${totalRate80}%`}</td>
           <td className="px-4 py-2 text-right font-mono-ui font-bold tabular-nums">{totalRate50 === null ? '—' : `${totalRate50}%`}</td>
-        </tr>}
+        </tr>
         <tr className="border-b border-border text-left font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
           <th className="whitespace-nowrap px-4 py-2 font-normal">{firstColumn}</th>
           <th className="whitespace-nowrap px-3 py-2 text-right font-normal" title="Instructors measured on their own subject's course track">Instructors</th>
@@ -388,14 +385,6 @@ export default function TrainingStatsPage() {
       untracked: all.filter((entry) => entry.tally.total === 0 && entry.tally.untracked > 0).map((entry) => `${entry.name} (${formatKpi(entry.tally.untracked)})`),
     };
   }, [activeRows, subjectOptions, product, productActive, semTaxonomy]);
-  // Completion by semester (2026-10-16, per request): one row per semester, over the same instructors as the subject table (tab, product
-  // and subject filters). Each instructor is measured on THEIR OWN track's courses for that semester (see COURSE_SEMESTER), so a Frontend
-  // instructor's Semester 1 is Static Web + Responsive Design + Modern Responsive UI, a Backend instructor's is Python.
-  const semesterBreakdown = useMemo(() => {
-    const byProduct = productActive ? activeRows.filter((row) => row.product === product) : activeRows;
-    const rows = subjectActive ? byProduct.filter((row) => row.subject_area === subject) : byProduct;
-    return SEMESTERS.map((sem) => ({ name: `Semester ${sem}`, tally: tallyCompletion(rows, activeTaxonomy, sem) })).filter((entry) => entry.tally.total > 0);
-  }, [activeRows, product, productActive, subject, subjectActive, activeTaxonomy]);
   const productBreakdown = useMemo(() => {
     const bySubject = subjectActive ? activeRows.filter((row) => row.subject_area === subject) : activeRows;
     return productOptions.map((name) => ({ name, tally: tallyCompletion(bySubject.filter((row) => row.product === name), semTaxonomy) })).filter((entry) => entry.tally.total > 0).sort(bySize);
@@ -500,21 +489,13 @@ export default function TrainingStatsPage() {
       </div>}
     </div>}
 
-    {data && (subjectBreakdown.rows.length > 0 || productBreakdown.length > 0 || (!semesterActive && semesterBreakdown.length > 0)) && <div data-testid="completion-breakdown" className="mb-6 flex flex-wrap gap-4">
+    {data && (subjectBreakdown.rows.length > 0 || productBreakdown.length > 0) && <div data-testid="completion-breakdown" className="mb-6 flex flex-wrap gap-4">
       {subjectBreakdown.rows.length > 0 && <CompletionBreakdown
         title={`Completion by subject${semesterActive ? ` -- Semester ${semester}` : ''}${productActive ? ` -- ${product}` : ''}`}
         firstColumn="Subject"
         rows={subjectBreakdown.rows}
         testId="completion-by-subject"
         note={subjectBreakdown.untracked.length ? `Not measured (no ${semesterActive ? `Semester ${semester} ` : 'training '}courses for the subject): ${subjectBreakdown.untracked.join(', ')}` : undefined}
-      />}
-      {!semesterActive && semesterBreakdown.length > 0 && <CompletionBreakdown
-        title={`Completion by semester${[subjectActive ? subject : '', productActive ? product : ''].filter(Boolean).map((part) => ` -- ${part}`).join('')}`}
-        firstColumn="Semester"
-        rows={semesterBreakdown}
-        testId="completion-by-semester"
-        showTotal={false}
-        note="Each instructor is counted on their own subject's courses for that semester. DSML has no semesters yet, and Developer Foundation is in none."
       />}
       {productBreakdown.length > 0 && <CompletionBreakdown title={`Completion by product${subjectActive ? ` -- ${subject}` : ` -- ${activeSubTab.label}`}${semesterActive ? ` -- Semester ${semester}` : ''}`} firstColumn="Product" rows={productBreakdown} testId="completion-by-product" />}
     </div>}
