@@ -192,8 +192,8 @@ const percentTone = (value: number) => (value >= 80 ? 'bg-[#e5f3ed] text-[#256e6
 type CompletionTally = { total: number; completed: number; atLeast80: number; atLeast50: number; inProgress: number; notStarted: number; noData: number; untracked: number };
 const NEAR_COMPLETE_PCT = 80;
 const HALF_COMPLETE_PCT = 50;
-// Semester of each course (2026-10-16, per request). Courses not listed here (Developer Foundation, every DSML course) belong to no
-// semester yet and only count in the subject / product tables. DSML to follow.
+// Semester of each course (2026-10-16, per request). Courses not listed here (Developer Foundation, the DSML courses other than ML) belong to
+// no semester yet and only count in the subject / product tables. DSML to follow.
 const COURSE_SEMESTER: Record<string, number> = {
   // Frontend
   static_web: 1, responsive_design: 1, modern_responsive_ui: 1,
@@ -211,6 +211,8 @@ const COURSE_SEMESTER: Record<string, number> = {
   math_for_cs: 1, probability_statistics: 3, linear_algebra_calculus: 4,
   // English
   english_foundation: 1, english_advanced: 2, english_applied: 3, language_analytics: 4,
+  // DSML (2026-10-16): ML in semester 5; the other DSML courses to follow.
+  ml: 5,
 };
 const SEMESTERS = [...new Set(Object.values(COURSE_SEMESTER))].sort((a, b) => a - b);
 

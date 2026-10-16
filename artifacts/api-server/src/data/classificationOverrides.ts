@@ -131,6 +131,7 @@ export interface ConfirmedInstructorOverride {
 // needing to remember to remove it later.
 export const CONFIRMED_INSTRUCTOR_DESPITE_FULL_ROSTER: ConfirmedInstructorOverride[] = [
   { employeeId: "NW0005068", teachosUserId: "ffb204601a7f4e0d881d3e937407744f", fullName: "Saumya Sunil P", whileDepartment: "NIAT_Instructors & Mentors (NWD_NIAT_AC_I&M)", reason: "Active TeachOS instructor (role INSTRUCTOR, category TECH); Darwin full-roster match shows a genuine Instructor designation (\"Software Development Instructor\") under a department using the newer \"NIAT_\" naming scheme the primary Instructors-department sync doesn't currently cover -- confirmed as a real instructor, 2026-10-05, per request (\"add her in the instructor department as an instructor\"; her department is expected to be corrected at the source later, at which point the primary sync will pick her up on its own and this override stops being needed).", decidedDate: "2026-10-05" },
+  { employeeId: "NW0004379", fullName: "Pratheek Pralhdachar", whileDepartment: "NIAT_Instructors & Mentors (NWD_NIAT_AC_I&M)", reason: "Same case as Saumya Sunil Patil: in Darwin's NIAT_Instructors & Mentors department, which the primary Instructors-department sync doesn't cover, so the 2026-10-16 'Instructor Department only' rule dropped him from the Contribution tab. Confirmed as an instructor, 2026-10-16, per request.", decidedDate: "2026-10-16" },
 ];
 
 function normalizeKey(value: string | null | undefined): string {
