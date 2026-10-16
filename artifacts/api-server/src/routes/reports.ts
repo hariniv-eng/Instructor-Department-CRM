@@ -1427,8 +1427,16 @@ router.get("/reports/instructor-contribution", requireAuth, requireRole("admin")
   const toParam = typeof req.query.to === "string" && ISO_DAY.test(req.query.to) ? req.query.to : null;
   const ranged = !!(fromParam || toParam);
   const allRows = await db.select().from(instructorsTable);
+  // Instructor Department only (2026-10-16, per request: "why do we have instructors who are not part of instructor department, e.g. the
+  // robotics team"). Before, anyone active in TeachOS without an excluded classification was listed, so TeachOS users from other Darwin
+  // departments (Robotics etc.) showed up. Now a person must ALSO be in the Instructors tab's own Instructors or Mentors population
+  // (computeDepartmentAndExceptionRows: Darwin Instructors-department tech/non-tech instructors, payroll / TeachOS-only instructors,
+  // and Darwin mentors). The one edge case, Saumya Sunil Patil (NW0005068, CONFIRMED_INSTRUCTOR_DESPITE_FULL_ROSTER), is kept even
+  // though her Darwin department does not match -- that function already counts her as an instructor.
+  const { countedInstructorRows, mentors } = computeDepartmentAndExceptionRows(allRows);
+  const departmentIds = new Set([...countedInstructorRows, ...mentors].map((r) => r.id));
   const people = allRows
-    .filter((r) => r.inTeachos && !TRAINING_STATS_EXCLUDED_CLASSIFICATIONS.has(r.classification ?? ""))
+    .filter((r) => r.inTeachos && departmentIds.has(r.id) && (isConfirmedDespiteFullRoster(r) || !TRAINING_STATS_EXCLUDED_CLASSIFICATIONS.has(r.classification ?? "")))
     .sort((a, b) => a.fullName.localeCompare(b.fullName));
 
   const contributionRows = await db.select().from(instructorContributionTable);
