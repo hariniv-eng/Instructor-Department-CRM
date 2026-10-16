@@ -52,6 +52,10 @@ export const TRAINING_COURSE_TAXONOMY: TrainingCourseDef[] = [
   { key: "modern_responsive_ui", courseIds: ["1d571a66be1e49cda17f5b3b22d6d751"], label: "Modern Responsive UI", trackGroup: "Frontend Development", courseTitles: ["Modern Responsive Web Design"] },
   { key: "javascript_sprint", label: "JavaScript Sprint", trackGroup: "Frontend Development", courseTitles: ["JavaScript Quick Revision"] },
   { key: "javascript_essentials", courseIds: ["7e0446da981d4faab02df4dc605dba66"], label: "JavaScript Essentials", trackGroup: "Frontend Development", courseTitles: ["JS Essentials", "JavaScript Essentials"] },
+  // Dynamic Web Application (2026-10-16, per request: "in Frontend we have a course named Dynamic Applications"). Confirmed in BigQuery with
+  // _tmp_find_dynamic_course.ts: one title under two course ids (c0d9b357... 552 instructors, 5e93210e... 120 instructors). "Dynamic Website
+  // TA Assessment" (a one-unit assessment) and "Phase 4: Dynamic Programming & Graph Theory" (DSA) are deliberately NOT included.
+  { key: "dynamic_web_app", courseIds: ["c0d9b35787a741e2985faffaef636499", "5e93210ef183433da12d79d81deb01be"], label: "Dynamic Web App", trackGroup: "Frontend Development", courseTitles: ["Build Your Own Dynamic Web Application"] },
   { key: "react_js", courseIds: ["f7b58b9d1a424a6681020bad28f37483"], label: "React JS", trackGroup: "Frontend Development", courseTitles: ["React JS", "Introduction to React JS"] },
   // --- Backend Development ---
   { key: "python", courseIds: ["b76ff0b83180494fa9a80e89c56421b1"], label: "Python", trackGroup: "Backend Development", courseTitles: ["Python Programming"] },
