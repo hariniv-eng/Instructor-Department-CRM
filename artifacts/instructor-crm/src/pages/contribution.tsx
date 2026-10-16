@@ -216,6 +216,8 @@ export default function ContributionPage() {
   const [subject, setSubject] = useState('');
   // Product filter (2026-10-15, per request): '' = all products, otherwise one product.
   const [product, setProduct] = useState('');
+  // Role filter (2026-10-16, per request): '' = instructors and mentors together, otherwise only 'Instructor' or only 'Mentor' (the Role column).
+  const [role, setRole] = useState<'' | 'Instructor' | 'Mentor'>('');
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: QUERY_KEY });
 
@@ -243,11 +245,12 @@ export default function ContributionPage() {
   const productOptions = useMemo(() => (data ? ALL_PRODUCTS.filter((name) => data.rows.some((row) => row.product === name)) : []), [data]);
   const subjectRows = useMemo(() => {
     if (!data) return [];
-    const byProduct = product ? data.rows.filter((row) => row.product === product) : data.rows;
+    const byRole = role ? data.rows.filter((row) => row.role === role) : data.rows;
+    const byProduct = product ? byRole.filter((row) => row.product === product) : byRole;
     if (!subject) return byProduct;
     if (subject === 'NONE') return byProduct.filter((row) => !row.subject_area);
     return byProduct.filter((row) => row.subject_area === subject);
-  }, [data, subject, product]);
+  }, [data, subject, product, role]);
   const searchedRows = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return subjectRows;
@@ -266,7 +269,9 @@ export default function ContributionPage() {
     const values = subjectRows.map(workloadOf).filter((v): v is number => v !== null);
     return { count: values.length, average: values.length ? values.reduce((sum, v) => sum + v, 0) / values.length : null };
   }, [subjectRows]);
-  const subjectLabel = [product, subject === 'NONE' ? 'with no subject' : subject].filter(Boolean).join(' · ');
+  const filterLabel = [product, subject === 'NONE' ? 'with no subject' : subject].filter(Boolean).join(' · ');
+  const peopleNoun = `${filterLabel ? `${filterLabel} ` : ''}${role === 'Instructor' ? 'instructors' : role === 'Mentor' ? 'mentors' : 'instructors and mentors'}`;
+  const subjectLabel = [role ? `${role}s` : '', product, subject === 'NONE' ? 'with no subject' : subject].filter(Boolean).join(' · ');
 
   // Download CSV (2026-10-15, per request): everything the current date range, subject filter and search match -- every page, not just the
   // one on screen -- with the same columns as the table. Hours and counts are plain numbers so they sum and sort in a spreadsheet.
@@ -285,7 +290,7 @@ export default function ContributionPage() {
       ];
     });
     const range = dateFrom || dateTo ? `-${dateFrom || 'start'}-to-${dateTo || toIsoDay(new Date())}` : '';
-    const subjectPart = [product, subject && subject !== 'NONE' ? subject : ''].filter(Boolean).map((part) => `-${part.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')}`).join('');
+    const subjectPart = [role ? `${role}s` : '', product, subject && subject !== 'NONE' ? subject : ''].filter(Boolean).map((part) => `-${part.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')}`).join('');
     downloadCsv(`contribution${subjectPart}${range}.csv`, toCsv(headers, rows));
   };
 
@@ -319,6 +324,13 @@ export default function ContributionPage() {
           {hasNoSubject && <option value="NONE">No subject set</option>}
         </select>
       </label>
+      <label className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">Role
+        <select value={role} onChange={(event) => setRole(event.target.value as '' | 'Instructor' | 'Mentor')} data-testid="select-contribution-role" className="mt-1 block h-9 min-w-[140px] rounded-md border border-border bg-background px-2 text-[12px] font-semibold normal-case tracking-normal text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-ring/25">
+          <option value="">Instructors + Mentors</option>
+          <option value="Instructor">Instructors</option>
+          <option value="Mentor">Mentors</option>
+        </select>
+      </label>
       <label className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">Product
         <select value={product} onChange={(event) => setProduct(event.target.value)} data-testid="select-contribution-product" className="mt-1 block h-9 min-w-[160px] rounded-md border border-border bg-background px-2 text-[12px] font-semibold normal-case tracking-normal text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-ring/25">
           <option value="">All products</option>
@@ -339,7 +351,7 @@ export default function ContributionPage() {
     {data && <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
       <div className="grid max-w-3xl grid-cols-1 gap-3 sm:grid-cols-3">
         <TopStat
-          label={subject ? `Instructors + Mentors tracked (${subjectLabel})` : 'Instructors + Mentors tracked'}
+          label={role ? `${role}s tracked${subjectLabel !== `${role}s` ? ` (${subjectLabel})` : ''}` : subjectLabel ? `Instructors + Mentors tracked (${subjectLabel})` : 'Instructors + Mentors tracked'}
           value={formatKpi(subjectRows.length)}
           meta={data.synced_at ? `Last synced -- ${new Date(data.synced_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' })}` : 'Not synced yet -- click Sync Now'}
           icon={<Clock size={16} />}
@@ -348,14 +360,14 @@ export default function ContributionPage() {
         <TopStat
           label="Total hours delivered"
           value={formatHours(totalHoursAllInstructors)}
-          meta={dateFrom || dateTo ? `Across ${subject ? `every ${subjectLabel} instructor and mentor` : 'every instructor and mentor'}, ${dateFrom ? formatDay(dateFrom) : 'the start'} to ${dateTo ? formatDay(dateTo) : 'today'}` : `Across ${subject ? `every ${subjectLabel} instructor and mentor` : 'every instructor and mentor'}, all-time`}
+          meta={dateFrom || dateTo ? `Across all ${peopleNoun}, ${dateFrom ? formatDay(dateFrom) : 'the start'} to ${dateTo ? formatDay(dateTo) : 'today'}` : `Across all ${peopleNoun}, all-time`}
           icon={<Clock size={16} />}
           tone="teal"
         />
         <TopStat
           label="Average workload"
           value={workloadStats.average !== null ? workloadStats.average.toFixed(2) : '—'}
-          meta={`Over ${formatKpi(workloadStats.count)} of ${formatKpi(subjectRows.length)} ${subject || product ? `${subjectLabel} ` : ''}instructors and mentors with a workload; the ${formatKpi(subjectRows.length - workloadStats.count)} with no session, learning or evaluation data are left out`}
+          meta={`Over ${formatKpi(workloadStats.count)} of ${formatKpi(subjectRows.length)} ${peopleNoun} with a workload; the ${formatKpi(subjectRows.length - workloadStats.count)} with no session, learning or evaluation data are left out`}
           icon={<Gauge size={16} />}
           tone="indigo"
         />
