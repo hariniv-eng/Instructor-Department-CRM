@@ -1762,4 +1762,120 @@ router.get("/reports/approved-exits", async (_req, res) => {
   res.json({ people, total: people.length });
 });
 
+// Instructor profile (2026-10-16, per request: "showcase all the data we know about that instructor" on the instructor's own page,
+// design A). Everything the other tabs know about ONE person, all-time: the summary fields the Instructors tab shows, teaching
+// (Contribution), learning time, demo / AI evaluations, Workload and its three parts (worked out exactly as the Contribution tab and
+// loadWorkloadByTeachosId do, so the numbers match), and per-course training status. Public, like GET /instructors/:id and the
+// Instructors tab's Workload column. Semester grouping and completion % are done on the page with the Training Stats tab's own rules.
+router.get("/reports/instructor-profile/:id", async (req, res): Promise<void> => {
+  const id = Number(req.params.id);
+  const [p] = Number.isFinite(id) ? await db.select().from(instructorsTable).where(eq(instructorsTable.id, id)) : [];
+  if (!p) {
+    res.status(404).json({ error: "Instructor not found" });
+    return;
+  }
+  const round1 = (v: number) => Math.round(v * 10) / 10;
+  const round2 = (v: number) => Math.round(v * 100) / 100;
+  const summary = toApiInstructorSummary(p, new Map(), undefined);
+  const joining = resolveJoining(p, await loadJoiningLookups());
+  const tid = p.teachosUserId;
+
+  const [contribution] = tid ? await db.select().from(instructorContributionTable).where(eq(instructorContributionTable.instructorUserId, tid)) : [];
+
+  let learningSeconds = 0;
+  let learningDays = 0;
+  try {
+    if (tid) for (const t of await db.select({ seconds: instructorTimeSpentDailyTable.seconds }).from(instructorTimeSpentDailyTable).where(eq(instructorTimeSpentDailyTable.instructorUserId, tid))) { learningSeconds += t.seconds; learningDays += 1; }
+  } catch (err) {
+    console.warn("[profile] learning hours not readable:", (err as Error).message);
+  }
+
+  const ev = { demoSeconds: 0, demoCount: 0, demoScoreSum: 0, demoScored: 0, aiSeconds: 0, aiCount: 0, aiScoreSum: 0, aiScored: 0 };
+  try {
+    if (tid) for (const e of await db.select().from(instructorEvaluationDailyTable).where(eq(instructorEvaluationDailyTable.instructorUserId, tid))) {
+      if (e.evaluationType === "DEMO") { ev.demoSeconds += e.seconds; ev.demoCount += e.evaluations; ev.demoScoreSum += e.scoreSum; ev.demoScored += e.scored; }
+      else { ev.aiSeconds += e.seconds; ev.aiCount += e.evaluations; ev.aiScoreSum += e.scoreSum; ev.aiScored += e.scored; }
+    }
+  } catch (err) {
+    console.warn("[profile] evaluations not readable:", (err as Error).message);
+  }
+
+  let trainingRows: (typeof instructorTrainingStatusTable.$inferSelect)[] = [];
+  try {
+    if (tid) trainingRows = await db.select().from(instructorTrainingStatusTable).where(eq(instructorTrainingStatusTable.instructorUserId, tid));
+  } catch (err) {
+    console.warn("[profile] training status not readable:", (err as Error).message);
+  }
+  const trainingByKey = new Map(trainingRows.map((r) => [r.courseKey, r]));
+  const hasTrainingData = trainingRows.length > 0;
+
+  const lectureMinutes = contribution?.lectureMinutes ?? 0;
+  const practiceMinutes = contribution?.practiceMinutes ?? 0;
+  const otherMinutes = contribution?.otherMinutes ?? 0;
+  const totalHours = round1((lectureMinutes + practiceMinutes + otherMinutes) / 60);
+  const sessionDays = contribution?.sessionDays ?? 0;
+  const learningHours = round1(learningSeconds / 3600);
+  // Workload parts, same rounding as the Contribution tab (workloadOf in contribution.tsx).
+  const hoursPerDay = contribution && sessionDays > 0 ? round1(totalHours / sessionDays) : null;
+  const learningPerDay = learningDays > 0 ? round1(learningHours / learningDays) : null;
+  const evalAvgHours = ev.demoCount + ev.aiCount > 0 ? round2((ev.demoCount > 0 ? ev.demoSeconds / 3600 / ev.demoCount : 0) + (ev.aiCount > 0 ? ev.aiSeconds / 3600 / ev.aiCount : 0)) : null;
+  const workload = hoursPerDay === null && learningPerDay === null && evalAvgHours === null ? null : round2((hoursPerDay ?? 0) + (learningPerDay ?? 0) + (evalAvgHours ?? 0));
+
+  const exitDay = p.classification === "payroll_converted" ? p.manualExitDate : p.exitLastWorkingDate;
+  const experienceEnd = exitDay ?? new Date().toISOString().slice(0, 10);
+  const experienceDays = joining.date ? (Date.parse(`${experienceEnd}T00:00:00Z`) - Date.parse(`${joining.date}T00:00:00Z`)) / 86400000 : null;
+  const deploymentDay = contribution?.deploymentDate ?? null;
+  const trainingDays = joining.date && deploymentDay ? Math.round((Date.parse(`${deploymentDay}T00:00:00Z`) - Date.parse(`${joining.date}T00:00:00Z`)) / 86400000) : null;
+
+  res.json({
+    id: p.id,
+    subject_area: normalizeSubjectArea(p.deptArea || p.manualDeptArea || null),
+    product: productOf(p),
+    role: p.classification === "mentor" ? "Mentor" : "Instructor",
+    is_payroll: p.classification === "payroll_converted",
+    gender: summary.gender ?? null,
+    institutes: p.institutes ?? [],
+    date_of_joining: joining.date,
+    date_of_joining_source: joining.source,
+    date_of_exit: exitDay ?? null,
+    experience_years: experienceDays !== null && experienceDays >= 0 ? round1(experienceDays / 365.25) : null,
+    deployment_date: deploymentDay,
+    training_days: trainingDays !== null && trainingDays >= 0 ? trainingDays : null,
+    teaching: {
+      has_data: !!contribution,
+      lecture_hours: round1(lectureMinutes / 60),
+      practice_hours: round1(practiceMinutes / 60),
+      other_hours: round1(otherMinutes / 60),
+      total_hours: totalHours,
+      lecture_sessions: contribution?.lectureSessions ?? 0,
+      practice_sessions: contribution?.practiceSessions ?? 0,
+      other_sessions: contribution?.otherSessions ?? 0,
+      sessions_completed: contribution?.sessionsCompleted ?? 0,
+      session_days: sessionDays,
+      all_batches: contribution?.allBatches ?? [],
+      recent_batches: contribution?.recentBatches ?? [],
+      niat_cohorts: contribution?.niatCohorts ?? [],
+    },
+    learning: { hours: learningHours, days: learningDays },
+    evaluations: {
+      demo_hours: round1(ev.demoSeconds / 3600),
+      demo_count: ev.demoCount,
+      demo_avg_hours: ev.demoCount > 0 ? round2(ev.demoSeconds / 3600 / ev.demoCount) : null,
+      demo_avg_score: ev.demoScored > 0 ? round1(ev.demoScoreSum / ev.demoScored) : null,
+      ai_hours: round1(ev.aiSeconds / 3600),
+      ai_count: ev.aiCount,
+      ai_avg_hours: ev.aiCount > 0 ? round2(ev.aiSeconds / 3600 / ev.aiCount) : null,
+      ai_avg_score: ev.aiScored > 0 ? round1(ev.aiScoreSum / ev.aiScored) : null,
+    },
+    workload: { total: workload, hours_per_day: hoursPerDay, learning_per_day: learningPerDay, eval_avg_hours: evalAvgHours },
+    training: {
+      has_data: hasTrainingData,
+      taxonomy: TRAINING_COURSE_TAXONOMY,
+      // Same status rules as GET /reports/training-stats.
+      courses: Object.fromEntries(TRAINING_COURSE_TAXONOMY.map((def) => [def.key, !isResolvedCourse(def) ? "PENDING_MAPPING" : !hasTrainingData ? "NO_DATA" : (trainingByKey.get(def.key)?.status ?? "NOT_STARTED")])),
+      course_progress: Object.fromEntries(trainingRows.filter((r) => r.unitsTotal > 0).map((r) => [r.courseKey, Math.round((r.unitsCompleted / r.unitsTotal) * 1000) / 10])),
+    },
+  });
+});
+
 export default router;

@@ -39,9 +39,9 @@ import { ALL_PRODUCTS, MultiSelectFilter } from './instructors';
 // request) -- Delivery Support / Instructor Team Operations / other-
 // department rows are excluded server-side (see
 // TRAINING_STATS_EXCLUDED_CLASSIFICATIONS in reports.ts).
-type CourseStatus = 'COMPLETED' | 'IN_PROGRESS' | 'NOT_STARTED' | 'PENDING_MAPPING' | 'NO_DATA';
+export type CourseStatus = 'COMPLETED' | 'IN_PROGRESS' | 'NOT_STARTED' | 'PENDING_MAPPING' | 'NO_DATA';
 
-type TrainingCourseDef = {
+export type TrainingCourseDef = {
   key: string;
   label: string;
   trackGroup: string;
@@ -52,7 +52,7 @@ type TrainingCourseDef = {
 // A column is mapped when it has course titles or course ids (2026-10-14, course ids added to match the Faculty-ops app).
 const isResolved = (def: TrainingCourseDef): boolean => def.courseTitles.length > 0 || (def.courseIds?.length ?? 0) > 0;
 
-type TrainingStatsRow = {
+export type TrainingStatsRow = {
   employee_id: string | null;
   full_name: string;
   department: string | null;
@@ -106,7 +106,7 @@ function useTrainingStats() {
 // that measures that subject's training. Selecting a subject shows only that subject's instructors and course columns, and the two
 // overview cards (Completed / In Progress) are worked out over exactly those instructors and that track group. A subject with no
 // course track here just filters the rows.
-const SUBJECT_TRACK: Record<string, string> = {
+export const SUBJECT_TRACK: Record<string, string> = {
   Frontend: 'Frontend Development',
   Backend: 'Backend Development',
   DSA: 'DSA',
@@ -164,7 +164,7 @@ function StatusBadge({ status, progress }: { status: CourseStatus; progress?: nu
 // An instructor with no synced training data at all gets no percentage (null), shown as a dash, rather than a 0% that
 // would look like "has done nothing".
 const STATUS_SCORE: Partial<Record<CourseStatus, number>> = { COMPLETED: 100, IN_PROGRESS: 50, NOT_STARTED: 0, NO_DATA: 0 };
-function subjectCompletion(row: TrainingStatsRow, defs: TrainingCourseDef[]): number | null {
+export function subjectCompletion(row: TrainingStatsRow, defs: TrainingCourseDef[]): number | null {
   if (!row.has_training_data) return null;
   const scores = defs
     .filter((def) => isResolved(def))
@@ -194,7 +194,7 @@ const NEAR_COMPLETE_PCT = 80;
 const HALF_COMPLETE_PCT = 50;
 // Semester of each course (2026-10-16, per request). Courses not listed here (Developer Foundation, the DSML courses other than ML) belong to
 // no semester yet and only count in the subject / product tables. DSML to follow.
-const COURSE_SEMESTER: Record<string, number> = {
+export const COURSE_SEMESTER: Record<string, number> = {
   // Frontend
   static_web: 1, responsive_design: 1, modern_responsive_ui: 1,
   javascript_sprint: 2, javascript_essentials: 2, dynamic_web_app: 2,
