@@ -1056,7 +1056,7 @@ export function CategoryTable({ category, people, backQuery, linkMode = 'row', b
           {category !== 'ops_team' && <><span>Campus</span><span>campus_city</span><span>campus_state</span></>}
           <span>Date of joining</span>
           <span>Experience</span>
-          <span title="Same as the Contribution tab's Workload (all-time): Avg Hrs / Day + Learning Hrs / Day + Avg Demo / AI Hrs">Workload</span>
+          <span className="text-center" title="Same as the Contribution tab's Workload (all-time): Avg Hrs / Day + Learning Hrs / Day + Avg Demo / AI Hrs">Workload</span>
           <span>Capability Manager</span>
           <span>Manager (Darwin)</span>
           <span>Bifurcation</span>
@@ -1137,7 +1137,7 @@ function PersonRow({ category, person, columns, backQuery, linkMode = 'row', bac
         "unknown" placeholder. See date_of_joining's gating in reports.ts. */}
     <div className="truncate font-mono-ui text-[11px] text-muted-foreground">{person.date_of_joining || ''}</div>
     <div data-testid={`cell-experience-${person.id}`} title={experienceOf(person)?.detail} className="truncate text-[12px] font-semibold tabular-nums text-foreground">{experienceOf(person)?.label ?? ''}</div>
-    <div data-testid={`cell-workload-${person.id}`} title="All-time: Avg Hrs / Day + Learning Hrs / Day + Avg Demo / AI Hrs (same as the Contribution tab)" className="truncate text-right text-[12px] font-semibold tabular-nums text-foreground">{person.workload != null ? person.workload.toFixed(2) : ''}</div>
+    <div data-testid={`cell-workload-${person.id}`} title="All-time: Avg Hrs / Day + Learning Hrs / Day + Avg Demo / AI Hrs (same as the Contribution tab)" className="truncate text-center text-[12px] font-semibold tabular-nums text-foreground">{person.workload != null ? person.workload.toFixed(2) : ''}</div>
     <CapabilityManagerCell person={person} />
     <div className="truncate text-[12px] text-muted-foreground">{person.darwin_manager || '—'}</div>
     <BifurcationCell person={person} />
