@@ -505,6 +505,60 @@ export function computeDepartmentAndExceptionRows(rawRows: InstructorRow[]) {
 // Public — no session required. This is what the no-login "Manager view"
 // reads for the Overview + Instructors tabs (see routes/index.ts); Darwin
 // Breakdown and TeachOS Breakdown below stay Admin-only.
+// Workload for the Instructors tab (2026-10-16, per request: "reflect the Workload column in the Instructors tab"). The same figure the
+// Contribution tab shows with no date filter (all-time), worked out the same way and with the same rounding as workloadOf() in
+// contribution.tsx, so the two tabs always show the same number: Avg Hrs / Day (total session hours, one decimal, / session days, one
+// decimal) + Learning Hrs / Day (learning hours, one decimal, / learning days, one decimal) + Avg Demo / AI Hrs (two decimals), a missing
+// part counting as 0, total to two decimals; no entry when the person has none of the three. Keyed by TeachOS user id. Read defensively --
+// if a table is not pushed / synced yet that part is just missing, and the Instructors tab never fails because of it.
+async function loadWorkloadByTeachosId(): Promise<Map<string, number>> {
+  const round1 = (v: number) => Math.round(v * 10) / 10;
+  const hoursPerDay = new Map<string, number>();
+  const learningPerDay = new Map<string, number>();
+  const evalAvg = new Map<string, number>();
+  try {
+    const rows = await db.select({ id: instructorContributionTable.instructorUserId, lecture: instructorContributionTable.lectureMinutes, practice: instructorContributionTable.practiceMinutes, other: instructorContributionTable.otherMinutes, days: instructorContributionTable.sessionDays }).from(instructorContributionTable);
+    for (const r of rows) {
+      if (!r.days || r.days <= 0) continue;
+      const totalHours = round1(((r.lecture ?? 0) + (r.practice ?? 0) + (r.other ?? 0)) / 60);
+      hoursPerDay.set(r.id, round1(totalHours / r.days));
+    }
+  } catch (err) {
+    console.warn("[instructors] workload: session hours not readable:", (err as Error).message);
+  }
+  try {
+    const totals = new Map<string, { seconds: number; days: number }>();
+    for (const t of await db.select({ id: instructorTimeSpentDailyTable.instructorUserId, seconds: instructorTimeSpentDailyTable.seconds }).from(instructorTimeSpentDailyTable)) {
+      const cur = totals.get(t.id) ?? { seconds: 0, days: 0 };
+      cur.seconds += t.seconds;
+      cur.days += 1;
+      totals.set(t.id, cur);
+    }
+    for (const [id, t] of totals) if (t.days > 0) learningPerDay.set(id, round1(round1(t.seconds / 3600) / t.days));
+  } catch (err) {
+    console.warn("[instructors] workload: learning hours not readable:", (err as Error).message);
+  }
+  try {
+    const totals = new Map<string, { demoSeconds: number; demoCount: number; aiSeconds: number; aiCount: number }>();
+    for (const e of await db.select({ id: instructorEvaluationDailyTable.instructorUserId, type: instructorEvaluationDailyTable.evaluationType, seconds: instructorEvaluationDailyTable.seconds, evaluations: instructorEvaluationDailyTable.evaluations }).from(instructorEvaluationDailyTable)) {
+      const t = totals.get(e.id) ?? { demoSeconds: 0, demoCount: 0, aiSeconds: 0, aiCount: 0 };
+      if (e.type === "DEMO") { t.demoSeconds += e.seconds; t.demoCount += e.evaluations; } else { t.aiSeconds += e.seconds; t.aiCount += e.evaluations; }
+      totals.set(e.id, t);
+    }
+    for (const [id, t] of totals) {
+      if (t.demoCount + t.aiCount <= 0) continue;
+      evalAvg.set(id, Math.round(((t.demoCount > 0 ? t.demoSeconds / 3600 / t.demoCount : 0) + (t.aiCount > 0 ? t.aiSeconds / 3600 / t.aiCount : 0)) * 100) / 100);
+    }
+  } catch (err) {
+    console.warn("[instructors] workload: demo / AI evaluations not readable:", (err as Error).message);
+  }
+  const workload = new Map<string, number>();
+  for (const id of new Set([...hoursPerDay.keys(), ...learningPerDay.keys(), ...evalAvg.keys()])) {
+    workload.set(id, Math.round(((hoursPerDay.get(id) ?? 0) + (learningPerDay.get(id) ?? 0) + (evalAvg.get(id) ?? 0)) * 100) / 100);
+  }
+  return workload;
+}
+
 router.get("/reports/instructors", async (_req, res) => {
   const allRows = await db.select().from(instructorsTable);
   const { mentors, opsTeamRows, darwinInstructorsForCount, payrollConvertedForCount, needsReviewForCount, countedInstructorRows, departmentRows, exceptionRows, exceptionRemoveRows, servingNoticeRows, exceptionQueueRows, pendingApprovalRows } = computeDepartmentAndExceptionRows(allRows);
@@ -526,7 +580,12 @@ router.get("/reports/instructors", async (_req, res) => {
   }).from(instructorArchiveTable);
   const archiveByEmployeeId = new Map(archiveRows.filter((a) => a.employeeId).map((a) => [a.employeeId!, a]));
   const archiveByTeachosId = new Map(archiveRows.filter((a) => a.teachosUserId).map((a) => [a.teachosUserId!, a]));
-  const summarize = (row: InstructorRow) => toApiInstructorSummary(row, contributionByTeachosId, (row.employeeId ? archiveByEmployeeId.get(row.employeeId) : undefined) ?? (row.teachosUserId ? archiveByTeachosId.get(row.teachosUserId) : undefined));
+  const workloadByTeachosId = await loadWorkloadByTeachosId();
+  const summarize = (row: InstructorRow) => ({
+    ...toApiInstructorSummary(row, contributionByTeachosId, (row.employeeId ? archiveByEmployeeId.get(row.employeeId) : undefined) ?? (row.teachosUserId ? archiveByTeachosId.get(row.teachosUserId) : undefined)),
+    // All-time Workload, same figure as the Contribution tab with no date filter (2026-10-16) -- see loadWorkloadByTeachosId above.
+    workload: row.teachosUserId ? (workloadByTeachosId.get(row.teachosUserId) ?? null) : null,
+  });
 
   // The "total instructor count" and every breakdown here are anchored on
   // TeachOS's own instructor roster (inTeachos=true) — that's the

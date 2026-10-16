@@ -942,3 +942,7 @@ components:
         niat_cohorts:
           type: array
           items: { type: string }
+        # All-time Workload (2026-10-16, per request) -- the same figure as the
+        # Contribution tab's Workload column with no date filter: Avg Hrs / Day
+        # + Learning Hrs / Day + Avg Demo / AI Hrs. Null when there is no data.
+        workload: { type: ["number", "null"] }
