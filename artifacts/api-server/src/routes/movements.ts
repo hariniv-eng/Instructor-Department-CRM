@@ -32,6 +32,14 @@ const toApiMovement = (row: typeof instructorMovementsTable.$inferSelect) => ({
 
 const cleanText = (value: unknown, max: number): string => (typeof value === "string" ? value.trim().slice(0, max) : "");
 
+// Every Capability Manager on file (2026-10-17, per request: the "CM change" movement picks the new Capability Manager from a
+// list instead of typing it): distinct TeachOS manager / manually entered Capability Manager across all instructors, A-Z.
+router.get("/capability-managers", async (_req, res): Promise<void> => {
+  const rows = await db.select({ teachos: instructorsTable.teachosManager, manual: instructorsTable.manualCapabilityManager }).from(instructorsTable);
+  const names = [...new Set(rows.map((r) => (r.teachos || r.manual || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  res.json({ capability_managers: names });
+});
+
 // Newest first. Small table (one row per logged movement), so no paging.
 router.get("/instructor-movements", async (_req, res): Promise<void> => {
   const rows = await db.select().from(instructorMovementsTable).orderBy(desc(instructorMovementsTable.requestedAt), asc(instructorMovementsTable.id));
