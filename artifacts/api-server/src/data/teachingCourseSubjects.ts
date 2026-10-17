@@ -37,6 +37,9 @@ export const TEACHING_COURSE_SUBJECTS: Record<string, string | null> = {
   "176b34ed85c8496f974b06719b6b4567": "DSA", // Data Structures Using C++
   "34c770296927444ab7fad4dd10869823": "DSA", // DATA STRUCTURE II
 
+  // GenAI
+  d8360c969d994614b1da8f3a26ee57df: "GenAI", // Intro to Generative AI (teaching id; the training course has a different id)
+
   // Artificial Intelligence & Emerging Technologies (DSML)
   // Fundamentals of Artificial Intelligence: two DIFFERENT course ids with the same title, matching none of our Gen AI or DSML course
   // ids or titles -- so a SEPARATE subject of its own, shown by name (2026-10-17, per request; it was GenAI, then AI & Emerging Tech).
@@ -49,6 +52,7 @@ export const TEACHING_COURSE_SUBJECTS: Record<string, string | null> = {
 
   // English
   "5e6b262c3aaa480686a6483662c9d0a7": "English", // Introduction to English Language and Communication
+  "77b1f18aa2e4413a9515a91c399e4831": "English", // Applied Communicative English (teaching id; the training course has a different id)
 
   // Maths / Aptitude
   "62b9cbee9709463cbaa4c947671a0d7b": "Maths", // Linear Algebra - AURORA
