@@ -1551,9 +1551,27 @@ router.get("/reports/instructor-contribution", requireAuth, requireRole("admin")
     }
   }
 
+  // Role by sessions uses the LAST 30 DAYS only (2026-10-17, per request), whatever date range is picked: completed Lecture sessions and
+  // all completed sessions per instructor over the 30 days ending today (IST), from the per-day rows.
+  const last30ByInstructor = new Map<string, { lecture: number; total: number }>();
+  try {
+    const istToday = new Date(Date.now() + 5.5 * 3600 * 1000);
+    istToday.setUTCDate(istToday.getUTCDate() - 29);
+    const last30From = istToday.toISOString().slice(0, 10);
+    for (const d of await db.select({ id: instructorContributionDailyTable.instructorUserId, lecture: instructorContributionDailyTable.lectureSessions, practice: instructorContributionDailyTable.practiceSessions, other: instructorContributionDailyTable.otherSessions }).from(instructorContributionDailyTable).where(gte(instructorContributionDailyTable.sessionDate, last30From))) {
+      const t = last30ByInstructor.get(d.id) ?? { lecture: 0, total: 0 };
+      t.lecture += d.lecture;
+      t.total += d.lecture + d.practice + d.other;
+      last30ByInstructor.set(d.id, t);
+    }
+  } catch (err) {
+    console.warn("[contribution] last-30-day sessions not readable:", (err as Error).message);
+  }
+
   const rows = people.map((p) => {
     const contribution = p.teachosUserId ? byInstructor.get(p.teachosUserId) : undefined;
     const range = ranged && p.teachosUserId ? rangeByInstructor.get(p.teachosUserId) : undefined;
+    const last30 = p.teachosUserId ? last30ByInstructor.get(p.teachosUserId) : undefined;
     const lectureMinutes = ranged ? (range?.lectureMinutes ?? 0) : (contribution?.lectureMinutes ?? 0);
     const practiceMinutes = ranged ? (range?.practiceMinutes ?? 0) : (contribution?.practiceMinutes ?? 0);
     const otherMinutes = ranged ? (range?.otherMinutes ?? 0) : (contribution?.otherMinutes ?? 0);
@@ -1619,6 +1637,11 @@ router.get("/reports/instructor-contribution", requireAuth, requireRole("admin")
       // anything in that table) -- vs. genuinely having zero COMPLETED
       // sessions on file. Mirrors has_training_data above.
       has_contribution_data: !!contribution,
+      // Completed sessions in the last 30 days (always, not the date filter) -- feeds Role (by sessions).
+      last30_lecture_sessions: last30?.lecture ?? 0,
+      last30_sessions: last30?.total ?? 0,
+      // Subject from sessions (2026-10-17): completed sessions per subject in the last 30 days, from the last Contribution sync.
+      session_subjects: contribution?.sessionSubjects ?? {},
       lecture_hours: Math.round((lectureMinutes / 60) * 10) / 10,
       practice_hours: Math.round((practiceMinutes / 60) * 10) / 10,
       other_hours: Math.round((otherMinutes / 60) * 10) / 10,

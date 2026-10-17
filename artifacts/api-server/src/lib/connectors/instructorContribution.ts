@@ -35,6 +35,8 @@
 import { BigQuery } from "@google-cloud/bigquery";
 import { config, missing } from "./config";
 import { runWithHardTimeout, HardTimeout } from "./timeout";
+import { getSchema } from "./instructorLearningStatus";
+import { TRAINING_COURSE_TAXONOMY } from "../../data/trainingCourseTaxonomy";
 
 export class InstructorContributionError extends Error {}
 
@@ -330,6 +332,8 @@ export type ContributionRow = {
   // instructor is CURRENTLY teaching, not every cohort they've ever
   // touched.
   niat_cohorts: string[];
+  // Completed sessions in the last 30 days per subject (2026-10-17) -- see fetchSessionSubjects below.
+  session_subjects: Record<string, number>;
 };
 
 /**
@@ -419,11 +423,67 @@ async function fetchCohortBatchWindows(): Promise<Map<string, { recent: string[]
   return map;
 }
 
+// Subject from sessions (2026-10-17, per request: "depending on the subject that they are taking, we are gonna map them ... if they take
+// two subjects, map them both"). Every COMPLETED session in the last 30 days is matched, by its course id (else its course title), to
+// the Training Stats course list (trainingCourseTaxonomy.ts) and so to a subject; the result is sessions per subject per instructor,
+// plus "__unmatched" for sessions whose course belongs to no subject there. The course columns are found from the view's schema. A
+// failure is logged and ignored (empty map), so the Contribution sync never fails because of it.
+const TRACK_SUBJECT: Record<string, string> = {
+  "Frontend Development": "Frontend", "Backend Development": "Backend", DSA: "DSA", "Gen AI": "GenAI",
+  DSML: "Artificial Intelligence & Emerging Technologies", Aptitude: "Aptitude", Maths: "Maths", English: "English",
+};
+async function fetchSessionSubjects(): Promise<Map<string, Record<string, number>>> {
+  const map = new Map<string, Record<string, number>>();
+  try {
+    const cols = (await getSchema(SESSION_SCHEDULE_TABLE)).map(([name]) => name);
+    const idCol = cols.find((c) => /^course_id$/i.test(c)) ?? cols.find((c) => /course.*id/i.test(c)) ?? null;
+    const titleCol = cols.find((c) => /^course_title$/i.test(c)) ?? cols.find((c) => /course.*(title|name)/i.test(c)) ?? null;
+    if (!idCol && !titleCol) {
+      console.warn(`[contribution] ${SESSION_SCHEDULE_TABLE} has no course column; Subject from sessions stays empty.`);
+      return map;
+    }
+    const byId = new Map<string, string>();
+    const byTitle = new Map<string, string>();
+    for (const def of TRAINING_COURSE_TAXONOMY) {
+      const subject = TRACK_SUBJECT[def.trackGroup];
+      if (!subject) continue;
+      for (const id of def.courseIds ?? []) byId.set(id.replace(/-/g, "").toLowerCase(), subject);
+      for (const title of def.courseTitles) byTitle.set(title.trim().toLowerCase(), subject);
+    }
+    const bq = client();
+    const query = `
+      SELECT instructor_user_id,
+        ${idCol ? `REPLACE(LOWER(CAST(${idCol} AS STRING)), '-', '')` : "NULL"} AS course_id,
+        ${titleCol ? `CAST(${titleCol} AS STRING)` : "NULL"} AS course_title,
+        COUNT(*) AS sessions
+      FROM \`${tableRef(SESSION_SCHEDULE_TABLE)}\`
+      WHERE session_status = 'COMPLETED' AND instructor_user_id IS NOT NULL
+        AND session_start_datetime >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 30 DAY)
+      GROUP BY 1, 2, 3
+    `;
+    const [rows] = await runWithHardTimeout(() => bq.query({ query }), API_TIMEOUT_MS * 3 + 10000);
+    for (const r of rows as Array<Record<string, unknown>>) {
+      const id = String(r.instructor_user_id ?? "");
+      if (!id) continue;
+      const courseId = r.course_id ? String(r.course_id) : "";
+      const title = r.course_title ? String(r.course_title).trim().toLowerCase() : "";
+      const subject = (courseId && byId.get(courseId)) || (title && byTitle.get(title)) || "__unmatched";
+      const entry = map.get(id) ?? {};
+      entry[subject] = (entry[subject] ?? 0) + Number(r.sessions ?? 0);
+      map.set(id, entry);
+    }
+  } catch (e) {
+    console.error(`[contribution] subject-from-sessions query failed, leaving it empty: ${(e as Error).message}`);
+  }
+  return map;
+}
+
 export async function fetchContributionRows(): Promise<ContributionRow[]> {
   const bq = client();
   const ref = tableRef(SESSION_SCHEDULE_TABLE);
   const deploymentDates = await fetchDeploymentDates();
   const cohortWindows = await fetchCohortBatchWindows();
+  const sessionSubjects = await fetchSessionSubjects();
   const query = `
     SELECT
       instructor_user_id,
@@ -467,6 +527,7 @@ export async function fetchContributionRows(): Promise<ContributionRow[]> {
           other_sessions: Number(r.other_sessions ?? 0),
           session_days: Number(r.session_days ?? 0),
           deployment_date: deploymentDates.get(String(r.instructor_user_id ?? "")) ?? null,
+          session_subjects: sessionSubjects.get(String(r.instructor_user_id ?? "")) ?? {},
           all_batches: allBatches,
           recent_batches: recentBatches,
           // Derived from recent_batches (last 30 days), not all_batches

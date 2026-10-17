@@ -541,6 +541,10 @@ export const instructorContributionTable = pgTable("instructor_contribution", {
   // in instructorContribution.ts (business logic Ankush gave directly;
   // not something BigQuery's source table has a column for).
   niatCohorts: text("niat_cohorts").array().notNull().default([]),
+  // Subject from sessions (2026-10-17, per request): completed sessions in the last 30 days per subject, worked out by matching each
+  // session's course to the Training Stats course list (fetchSessionSubjects in instructorContribution.ts), e.g. {"Frontend": 42,
+  // "DSA": 6}; "__unmatched" counts sessions whose course matched no subject. Shown beside Subject on the Contribution tab.
+  sessionSubjects: jsonb("session_subjects").$type<Record<string, number>>().notNull().default({}),
   syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
