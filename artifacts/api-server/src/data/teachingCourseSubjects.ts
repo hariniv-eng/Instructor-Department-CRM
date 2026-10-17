@@ -5,8 +5,8 @@
 // hyphens), to the app's Subject values. Built from _tmp_teaching_courses.ts (Lecture/Practice sessions, last 30 days, 2026-10-17):
 // by what the course teaches, cross-checked with the Subject most of its instructors already have.
 //
-// "Other: <name>" (2026-10-17, per request) = a course that is not one of our subjects (Linux and Git, computer-science core, ...): it is
-// SHOWN in the column by its own name, e.g. "Frontend + Linux and Git", but never counts as a subject (nor in the amber mismatch check).
+// "Other: <name>" (2026-10-17, per request) = a course that is not one of our subjects (computer-science core, Fundamentals of AI, ...): it is
+// SHOWN in the column by its own name, e.g. "Frontend + Operating Systems", but never counts as a subject (nor in the amber mismatch check).
 // null = an orientation-type session every instructor attends (Orientation, Intro to Tech, welcome webinars): left out completely.
 // A course missing from here and from the training list still shows up as "No match" -- add it here.
 export const TEACHING_COURSE_SUBJECTS: Record<string, string | null> = {
@@ -17,6 +17,8 @@ export const TEACHING_COURSE_SUBJECTS: Record<string, string | null> = {
 
   // Backend
   "4b8803cc8ecb42849fcf53c5afd2a93c": "Backend", // Programming Foundations (2026-10-17, per request: Backend)
+  "2250340cd8b54fc2b3ff7475b5a4cacf": "Backend", // Linux and Git Essentials (2026-10-17, per request: Backend)
+  "38fcea13736b4c4b9886b73cbc143542": "Backend", // Introduction to GIT (2026-10-17, per request: Backend, same as Linux and Git)
   c9dce66d77e94815bed089713b098aae: "Backend", // Backend Development Fundamentals
   "128b8668816b44eb9f0486a571b0b495": "Backend", // More NodeJS Concepts
   cfdb2649f4234446b0b4cb8f4b123d9a: "Backend", // Advanced DBMS
@@ -59,8 +61,6 @@ export const TEACHING_COURSE_SUBJECTS: Record<string, string | null> = {
   "2cb08199f3744ca4a94c5d6ff0ea69b5": "Interdisciplinary & Applied Sciences", // Digital Electronics
 
   // Other courses -- shown by name, not counted as a subject
-  "2250340cd8b54fc2b3ff7475b5a4cacf": "Other: Linux and Git", // Linux and Git Essentials
-  "38fcea13736b4c4b9886b73cbc143542": "Other: Linux and Git", // Introduction to GIT
   "2184c3a471384f5f88531f8a323994ab": "Other: Production Ready Practices", // Production Ready Practices
   "3d3d4f4b2df54db5bed585a3e0164ecd": "Other: Software Engineering", // Practical Software Engineering
   "91b2de7926d14101b4f45156a5649ebf": "Other: Operating Systems", // Operating Systems

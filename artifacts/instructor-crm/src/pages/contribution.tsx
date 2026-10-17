@@ -245,6 +245,8 @@ export default function ContributionPage() {
   const [product, setProduct] = useState('');
   // Role filter (2026-10-16, per request): '' = instructors and mentors together, otherwise only 'Instructor' or only 'Mentor' (the Role column).
   const [role, setRole] = useState<'' | 'Instructor' | 'Mentor'>('');
+  // Capability Manager filter (2026-10-17, per request): '' = everyone, NONE = no Capability Manager on file, otherwise one manager.
+  const [manager, setManager] = useState('');
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: QUERY_KEY });
 
@@ -269,15 +271,18 @@ export default function ContributionPage() {
 
   const subjectOptions = useMemo(() => (data ? [...new Set(data.rows.map((row) => row.subject_area).filter((area): area is string => !!area))].sort() : []), [data]);
   const hasNoSubject = useMemo(() => !!data && data.rows.some((row) => !row.subject_area), [data]);
+  const managerOptions = useMemo(() => (data ? [...new Set(data.rows.map((row) => row.capability_manager).filter((name): name is string => !!name))].sort((a, b) => a.localeCompare(b)) : []), [data]);
+  const hasNoManager = useMemo(() => !!data && data.rows.some((row) => !row.capability_manager), [data]);
   const productOptions = useMemo(() => (data ? ALL_PRODUCTS.filter((name) => data.rows.some((row) => row.product === name)) : []), [data]);
   const subjectRows = useMemo(() => {
     if (!data) return [];
-    const byRole = role ? data.rows.filter((row) => row.role === role) : data.rows;
+    const byManager = manager === 'NONE' ? data.rows.filter((row) => !row.capability_manager) : manager ? data.rows.filter((row) => row.capability_manager === manager) : data.rows;
+    const byRole = role ? byManager.filter((row) => row.role === role) : byManager;
     const byProduct = product ? byRole.filter((row) => row.product === product) : byRole;
     if (!subject) return byProduct;
     if (subject === 'NONE') return byProduct.filter((row) => !row.subject_area);
     return byProduct.filter((row) => row.subject_area === subject);
-  }, [data, subject, product, role]);
+  }, [data, subject, product, role, manager]);
   const searchedRows = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return subjectRows;
@@ -296,9 +301,10 @@ export default function ContributionPage() {
     const values = subjectRows.map(workloadOf).filter((v): v is number => v !== null);
     return { count: values.length, average: values.length ? values.reduce((sum, v) => sum + v, 0) / values.length : null };
   }, [subjectRows]);
-  const filterLabel = [product, subject === 'NONE' ? 'with no subject' : subject].filter(Boolean).join(' · ');
+  const managerLabel = manager === 'NONE' ? 'no Capability Manager' : manager;
+  const filterLabel = [product, subject === 'NONE' ? 'with no subject' : subject, managerLabel].filter(Boolean).join(' · ');
   const peopleNoun = `${filterLabel ? `${filterLabel} ` : ''}${role === 'Instructor' ? 'instructors' : role === 'Mentor' ? 'mentors' : 'instructors and mentors'}`;
-  const subjectLabel = [role ? `${role}s` : '', product, subject === 'NONE' ? 'with no subject' : subject].filter(Boolean).join(' · ');
+  const subjectLabel = [role ? `${role}s` : '', product, subject === 'NONE' ? 'with no subject' : subject, managerLabel].filter(Boolean).join(' · ');
 
   // Download CSV (2026-10-15, per request): everything the current date range, subject filter and search match -- every page, not just the
   // one on screen -- with the same columns as the table. Hours and counts are plain numbers so they sum and sort in a spreadsheet.
@@ -317,7 +323,7 @@ export default function ContributionPage() {
       ];
     });
     const range = dateFrom || dateTo ? `-${dateFrom || 'start'}-to-${dateTo || toIsoDay(new Date())}` : '';
-    const subjectPart = [role ? `${role}s` : '', product, subject && subject !== 'NONE' ? subject : ''].filter(Boolean).map((part) => `-${part.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')}`).join('');
+    const subjectPart = [role ? `${role}s` : '', product, subject && subject !== 'NONE' ? subject : '', manager && manager !== 'NONE' ? manager : ''].filter(Boolean).map((part) => `-${part.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')}`).join('');
     downloadCsv(`contribution${subjectPart}${range}.csv`, toCsv(headers, rows));
   };
 
@@ -356,6 +362,13 @@ export default function ContributionPage() {
           <option value="">Instructors + Mentors</option>
           <option value="Instructor">Instructors</option>
           <option value="Mentor">Mentors</option>
+        </select>
+      </label>
+      <label className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">Capability Manager
+        <select value={manager} onChange={(event) => setManager(event.target.value)} data-testid="select-contribution-manager" className="mt-1 block h-9 min-w-[180px] max-w-[240px] rounded-md border border-border bg-background px-2 text-[12px] font-semibold normal-case tracking-normal text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-ring/25">
+          <option value="">All managers</option>
+          {managerOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+          {hasNoManager && <option value="NONE">No Capability Manager</option>}
         </select>
       </label>
       <label className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">Product
