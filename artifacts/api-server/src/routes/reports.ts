@@ -1369,6 +1369,10 @@ router.get("/reports/training-stats", requireAuth, requireRole("admin"), async (
     .sort((a, b) => a.fullName.localeCompare(b.fullName));
 
   const statusRows = await db.select().from(instructorTrainingStatusTable);
+  // NIAT cohort per instructor (2026-10-17, per request) -- the same Contribution column -- so the Training tab can tell which semester
+  // each person teaches now (NIAT 2026 = Sem 1, 2025 = Sem 3, 2024 = Sem 5) and how ready they are for the next one.
+  const cohortRows = await db.select({ id: instructorContributionTable.instructorUserId, niatCohorts: instructorContributionTable.niatCohorts }).from(instructorContributionTable);
+  const cohortsByTeachosId = new Map(cohortRows.map((c) => [c.id, c.niatCohorts]));
   // instructor_user_id (BigQuery's own hex ID) -> courseKey -> that row.
   // Joined here, at read time, against instructorsTable.teachosUserId --
   // the same key reconcileCapabilityManager() already uses to match this
@@ -1428,6 +1432,7 @@ router.get("/reports/training-stats", requireAuth, requireRole("admin"), async (
       has_training_data: hasTrainingData,
       courses,
       course_progress: courseProgress,
+      niat_cohorts: p.teachosUserId ? (cohortsByTeachosId.get(p.teachosUserId) ?? []) : [],
     };
   });
 
@@ -1844,6 +1849,40 @@ router.get("/reports/instructor-profile/:id", async (req, res): Promise<void> =>
   const evalAvgHours = ev.demoCount + ev.aiCount > 0 ? round2((ev.demoCount > 0 ? ev.demoSeconds / 3600 / ev.demoCount : 0) + (ev.aiCount > 0 ? ev.aiSeconds / 3600 / ev.aiCount : 0)) : null;
   const workload = hoursPerDay === null && learningPerDay === null && evalAvgHours === null ? null : round2((hoursPerDay ?? 0) + (learningPerDay ?? 0) + (evalAvgHours ?? 0));
 
+  // Workload over a recent window (2026-10-17, per request: "mention for how many days the workload is ... freeze it for the last 30 days
+  // and give an option for the last 7 days"). Same formula and rounding as above, but from the per-day tables over the last N days
+  // ending today (IST): session hours / days with a completed session, learning hours / days with learning, demo + AI average length.
+  const istDayMinus = (n: number) => { const d = new Date(Date.now() + 5.5 * 3600 * 1000); d.setUTCDate(d.getUTCDate() - n); return d.toISOString().slice(0, 10); };
+  const windowWorkload = async (days: number) => {
+    const from = istDayMinus(days - 1);
+    let minutes = 0, sessionDaysW = 0, sessions = 0, secs = 0, lDays = 0;
+    const e = { demoSeconds: 0, demoCount: 0, aiSeconds: 0, aiCount: 0 };
+    try {
+      if (tid) for (const d of await db.select().from(instructorContributionDailyTable).where(and(eq(instructorContributionDailyTable.instructorUserId, tid), gte(instructorContributionDailyTable.sessionDate, from)))) {
+        minutes += d.lectureMinutes + d.practiceMinutes + d.otherMinutes;
+        const n = d.lectureSessions + d.practiceSessions + d.otherSessions;
+        sessions += n;
+        if (n > 0) sessionDaysW += 1;
+      }
+      if (tid) for (const t of await db.select({ seconds: instructorTimeSpentDailyTable.seconds }).from(instructorTimeSpentDailyTable).where(and(eq(instructorTimeSpentDailyTable.instructorUserId, tid), gte(instructorTimeSpentDailyTable.activityDate, from)))) { secs += t.seconds; lDays += 1; }
+      if (tid) for (const x of await db.select().from(instructorEvaluationDailyTable).where(and(eq(instructorEvaluationDailyTable.instructorUserId, tid), gte(instructorEvaluationDailyTable.sessionDate, from)))) {
+        if (x.evaluationType === "DEMO") { e.demoSeconds += x.seconds; e.demoCount += x.evaluations; } else { e.aiSeconds += x.seconds; e.aiCount += x.evaluations; }
+      }
+    } catch (err) {
+      console.warn(`[profile] ${days}-day workload not readable:`, (err as Error).message);
+    }
+    const hrs = sessionDaysW > 0 ? round1(round1(minutes / 60) / sessionDaysW) : null;
+    const learn = lDays > 0 ? round1(round1(secs / 3600) / lDays) : null;
+    const evalH = e.demoCount + e.aiCount > 0 ? round2((e.demoCount > 0 ? e.demoSeconds / 3600 / e.demoCount : 0) + (e.aiCount > 0 ? e.aiSeconds / 3600 / e.aiCount : 0)) : null;
+    return {
+      days, from,
+      total: hrs === null && learn === null && evalH === null ? null : round2((hrs ?? 0) + (learn ?? 0) + (evalH ?? 0)),
+      hours_per_day: hrs, learning_per_day: learn, eval_avg_hours: evalH,
+      session_days: sessionDaysW, sessions, learning_days: lDays, evaluations: e.demoCount + e.aiCount,
+    };
+  };
+  const [workload7, workload30] = [await windowWorkload(7), await windowWorkload(30)];
+
   const exitDay = p.classification === "payroll_converted" ? p.manualExitDate : p.exitLastWorkingDate;
   const experienceEnd = exitDay ?? new Date().toISOString().slice(0, 10);
   const experienceDays = joining.date ? (Date.parse(`${experienceEnd}T00:00:00Z`) - Date.parse(`${joining.date}T00:00:00Z`)) / 86400000 : null;
@@ -1891,6 +1930,8 @@ router.get("/reports/instructor-profile/:id", async (req, res): Promise<void> =>
       ai_avg_score: ev.aiScored > 0 ? round1(ev.aiScoreSum / ev.aiScored) : null,
     },
     workload: { total: workload, hours_per_day: hoursPerDay, learning_per_day: learningPerDay, eval_avg_hours: evalAvgHours },
+    // Last 7 / last 30 days (2026-10-17) -- the profile's Workload card shows 30 by default with a 7-day option.
+    workload_windows: { "7": workload7, "30": workload30 },
     training: {
       has_data: hasTrainingData,
       taxonomy: TRAINING_COURSE_TAXONOMY,
