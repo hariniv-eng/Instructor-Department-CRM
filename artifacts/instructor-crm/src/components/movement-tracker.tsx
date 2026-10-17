@@ -119,7 +119,7 @@ export function MovementCell({ instructorId, fullName, movements }: { instructor
         ? <div className="min-w-0 flex-1 space-y-1.5">
           {group.map((movement) => <div key={movement.id} title={`${movementLabel(movement.movement_type)}: ${movement.remark} -- logged on ${formatWhen(movement.requested_at)}`}>
             <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-[0.05em] ${TYPE_TONES[movement.movement_type] ?? 'bg-secondary text-muted-foreground'}`}>{movementLabel(movement.movement_type)}</span>
-            <div className="truncate text-muted-foreground">{movement.remark}</div>
+            <div className="truncate text-muted-foreground">{movement.remark.replace(/\n/g, ' · ')}</div>
           </div>)}
         </div>
         : <span className="flex-1 text-muted-foreground">—</span>}
@@ -136,14 +136,25 @@ function MovementDialog({ open, onOpenChange, instructorId, fullName, movements 
   // Several changes can be logged in one go (2026-10-10, per request): e.g. a product move that also changes the
   // Capability Manager. Each "+" adds another Movement + Remark pair.
   const MAX_CHANGES = 6;
-  const blankChange = () => ({ type: 'cm_change', remark: '' });
+  // CM change (2026-10-17, per request): the new Capability Manager is picked from a list of every Capability Manager, plus a
+  // reason. Saved in the movement's remark as "Change to: <name>" and "Reason: <text>" on two lines, so the table, the history and
+  // the CSV all show both without a database change.
+  const blankChange = () => ({ type: 'cm_change', remark: '', newManager: '' });
   const [changes, setChanges] = useState([blankChange()]);
-  const updateChange = (index: number, patch: Partial<{ type: string; remark: string }>) => setChanges((list) => list.map((change, i) => (i === index ? { ...change, ...patch } : change)));
+  const updateChange = (index: number, patch: Partial<{ type: string; remark: string; newManager: string }>) => setChanges((list) => list.map((change, i) => (i === index ? { ...change, ...patch } : change)));
+  const managersQuery = useQuery<{ capability_managers: string[] }>({
+    queryKey: ['capability-managers'],
+    enabled: open,
+    queryFn: async () => readJson(await fetch('/api/capability-managers')),
+  });
+  const managers = managersQuery.data?.capability_managers ?? [];
+  const remarkFor = (change: { type: string; remark: string; newManager: string }) => (change.type === 'cm_change' ? `Change to: ${change.newManager}\nReason: ${change.remark.trim()}` : change.remark);
+  const isComplete = (change: { type: string; remark: string; newManager: string }) => !!change.remark.trim() && (change.type !== 'cm_change' || !!change.newManager);
   const log = useMutation({
     mutationFn: async () => readJson<{ movements: Movement[] }>(await fetch(`/api/instructors/${instructorId}/movements`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ changes: changes.map((change) => ({ movement_type: change.type, remark: change.remark })) }),
+      body: JSON.stringify({ changes: changes.map((change) => ({ movement_type: change.type, remark: remarkFor(change) })) }),
     })),
     onSuccess: () => {
       const count = changes.length;
@@ -172,13 +183,19 @@ function MovementDialog({ open, onOpenChange, instructorId, fullName, movements 
             </select>
           </label>
           <SopNote id={change.type} focus="cm" />
-          <label className="block text-[12px] font-bold">Remark
-            <textarea value={change.remark} onChange={(event) => updateChange(index, { remark: event.target.value })} rows={2} maxLength={1000} data-testid={`input-movement-remark-${index}`} placeholder={change.type === 'cm_change' ? 'Which Capability Manager should this instructor move to?' : 'What is changing, and to what?'} className={`${inputClass} mt-1 resize-y`} />
+          {change.type === 'cm_change' && <label className="block text-[12px] font-bold">Change to (Capability Manager)
+            <select value={change.newManager} onChange={(event) => updateChange(index, { newManager: event.target.value })} data-testid={`select-new-capability-manager-${index}`} className={`${inputClass} mt-1`}>
+              <option value="">{managersQuery.isLoading ? 'Loading Capability Managers…' : 'Select the new Capability Manager'}</option>
+              {managers.map((name) => <option key={name} value={name}>{name}</option>)}
+            </select>
+          </label>}
+          <label className="block text-[12px] font-bold">{change.type === 'cm_change' ? 'Reason' : 'Remark'}
+            <textarea value={change.remark} onChange={(event) => updateChange(index, { remark: event.target.value })} rows={2} maxLength={900} data-testid={`input-movement-remark-${index}`} placeholder={change.type === 'cm_change' ? 'Why is the Capability Manager changing?' : 'What is changing, and to what?'} className={`${inputClass} mt-1 resize-y`} />
           </label>
           {index === changes.length - 1 && changes.length < MAX_CHANGES && <button type="button" onClick={() => setChanges((list) => [...list, blankChange()])} data-testid="button-add-change" className="inline-flex items-center gap-1 rounded-md border border-dashed border-border px-2.5 py-1 text-[11px] font-bold text-primary transition-colors hover:bg-secondary"><Plus size={12} /> Add another change</button>}
         </div>)}
         <div className="flex justify-end">
-          <button type="submit" disabled={log.isPending || changes.some((change) => !change.remark.trim())} data-testid="button-submit-movement" className="rounded-lg bg-primary px-4 py-2 text-[12px] font-bold text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50">{log.isPending ? 'Saving…' : changes.length > 1 ? `Log ${changes.length} movements` : 'Log movement'}</button>
+          <button type="submit" disabled={log.isPending || changes.some((change) => !isComplete(change))} data-testid="button-submit-movement" className="rounded-lg bg-primary px-4 py-2 text-[12px] font-bold text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50">{log.isPending ? 'Saving…' : changes.length > 1 ? `Log ${changes.length} movements` : 'Log movement'}</button>
         </div>
       </form>
       <div>
