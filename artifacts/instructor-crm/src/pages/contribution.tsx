@@ -4,28 +4,7 @@ import { CalendarClock, Clock, Gauge, RefreshCw } from 'lucide-react';
 import { PageIntro, EmptyState, QueryError, SkeletonBlock, TopStat, TablePager, TableSearchInput, DownloadCsvButton, usePagedRows, formatKpi } from '@/components/ui-pieces';
 import { downloadCsv, toCsv } from '@/lib/csv';
 import { ALL_PRODUCTS } from './instructors';
-import { COURSE_SEMESTER, SUBJECT_TRACK, subjectCompletion, type TrainingCourseDef, type TrainingStatsRow } from './training-stats';
 
-// Next-semester readiness (2026-10-17, per request). The semester an instructor teaches NOW comes from the NIAT cohort they contribute to
-// (Contribution column): NIAT 2026 -> Semester 1, NIAT 2025 -> Semester 3, NIAT 2024 -> Semester 5. Next term each moves up one
-// (1 -> 2, 3 -> 4, 5 -> 6), so readiness = their training completion % on THEIR OWN subject's courses of that next semester (the
-// Training Stats semester list, COURSE_SEMESTER, scored exactly like Subject completion %). Ready = 100%; 80%+ and 50%+ are shown too.
-const COHORT_SEMESTER: Record<string, number> = { 'NIAT 2026': 1, 'NIAT 2025': 3, 'NIAT 2024': 5 };
-type ReadinessStatus = 'ready' | 'p80' | 'p50' | 'progress' | 'not_started' | 'no_data' | 'no_courses';
-type ReadinessItem = { sem: number; next: number; pct: number | null; status: ReadinessStatus; courses: string[] };
-const READINESS_LABEL: Record<ReadinessStatus, string> = { ready: 'Ready', p80: '80%+', p50: '50%+', progress: 'In progress', not_started: 'Not started', no_data: 'No training data', no_courses: 'No courses mapped' };
-const READINESS_TONE: Record<ReadinessStatus, string> = { ready: 'bg-[#e5f3ed] text-[#256e65]', p80: 'bg-[#e6f0fb] text-[#2b59c3]', p50: 'bg-[#fff3d6] text-[#8a6a12]', progress: 'bg-[#fff3d6] text-[#8a6a12]', not_started: 'bg-[#fdeae5] text-[#9b4434]', no_data: 'bg-secondary text-muted-foreground', no_courses: 'bg-secondary text-muted-foreground' };
-type TrainingData = { taxonomy: TrainingCourseDef[]; rows: (TrainingStatsRow & { employee_id: string | null; full_name: string })[] };
-function useTrainingForReadiness() {
-  return useQuery<TrainingData>({
-    queryKey: ['reports', 'training-stats'],
-    queryFn: async () => {
-      const response = await fetch('/api/reports/training-stats');
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      return response.json();
-    },
-  });
-}
 
 // "Contribution" (2026-09-24, per request): each instructor's actual
 // session-teaching hours delivered -- distinct from Training Stats, which
@@ -322,41 +301,6 @@ export default function ContributionPage() {
   // Average session hours per day (2026-10-17, per request: "the workload of sessions only"): the mean of the Avg Hrs / Day column
   // (Lecture + Practice + Other hours / session days, as each row shows it to one decimal) over the same rows as the other cards. People
   // with no session day in the range are left out, not counted as 0.
-  const training = useTrainingForReadiness().data;
-  const trainingByPerson = useMemo(() => {
-    const map = new Map<string, TrainingData['rows'][number]>();
-    for (const t of training?.rows ?? []) {
-      if (t.employee_id) map.set(`id:${t.employee_id}`, t);
-      map.set(`name:${t.full_name.trim().toLowerCase()}`, t);
-    }
-    return map;
-  }, [training]);
-  const readinessOf = (row: ContributionRow): ReadinessItem[] => {
-    const sems = [...new Set(row.niat_cohorts.map((c) => COHORT_SEMESTER[c]).filter((v): v is number => v !== undefined))].sort((a, b) => a - b);
-    const track = row.subject_area ? SUBJECT_TRACK[row.subject_area] : undefined;
-    const t = (row.employee_id && trainingByPerson.get(`id:${row.employee_id}`)) || trainingByPerson.get(`name:${row.full_name.trim().toLowerCase()}`);
-    return sems.map((sem) => {
-      const next = sem + 1;
-      const defs = track && training ? training.taxonomy.filter((d) => d.trackGroup === track && COURSE_SEMESTER[d.key] === next && (d.courseTitles.length > 0 || (d.courseIds?.length ?? 0) > 0)) : [];
-      if (!defs.length) return { sem, next, pct: null, status: 'no_courses' as const, courses: [] };
-      const pct = t ? subjectCompletion(t, defs) : null;
-      const status: ReadinessStatus = pct === null ? 'no_data' : pct >= 100 ? 'ready' : pct >= 80 ? 'p80' : pct >= 50 ? 'p50' : pct > 0 ? 'progress' : 'not_started';
-      return { sem, next, pct, status, courses: defs.map((d) => d.label) };
-    });
-  };
-  // Readiness table: one row per move (Sem 1 -> 2, 3 -> 4, 5 -> 6) over the same people as the cards. Someone teaching two cohorts is
-  // counted in both rows. "Measured" leaves out those whose subject has no courses mapped for the next semester.
-  const readinessTable = useMemo(() => [1, 3, 5].map((sem) => {
-    const items = subjectRows.flatMap((row) => readinessOf(row).filter((it) => it.sem === sem));
-    const measured = items.filter((it) => it.status !== 'no_courses');
-    const atLeast = (min: number) => measured.filter((it) => it.pct !== null && it.pct >= min).length;
-    return {
-      sem, next: sem + 1, teaching: items.length, measured: measured.length, ready: atLeast(100), p80: atLeast(80), p50: atLeast(50),
-      notStarted: measured.filter((it) => it.status === 'not_started').length, noData: measured.filter((it) => it.status === 'no_data').length,
-      noCourses: items.length - measured.length,
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [subjectRows, training, trainingByPerson]);
   const sessionHoursStats = useMemo(() => {
     const values = subjectRows.map(avgHoursPerDay).filter((v): v is number => v !== null).map((v) => Math.round(v * 10) / 10);
     return { count: values.length, average: values.length ? values.reduce((sum, v) => sum + v, 0) / values.length : null };
@@ -373,7 +317,7 @@ export default function ContributionPage() {
   // Download CSV (2026-10-15, per request): everything the current date range, subject filter and search match -- every page, not just the
   // one on screen -- with the same columns as the table. Hours and counts are plain numbers so they sum and sort in a spreadsheet.
   const downloadTable = () => {
-    const headers = ['Employee ID', 'Name', 'Role', 'Role (by sessions, last 30 days)', 'Department', 'Subject', 'Subject (from sessions, last 30 days)', 'Product', 'Capability Manager', 'Date of Joining', 'Date of Joining Source', 'Deployment Date', 'Training Duration (days)', 'Experience (years)', 'Lecture Hrs', 'Lecture Sessions', 'Practice Hrs', 'Practice Sessions', 'Other Hrs', 'Other Sessions', 'Total Hrs', 'Sessions', 'Session Days', 'Demo Hrs', 'Demo Evaluations', 'AI Assessment Hrs', 'AI Assessment Evaluations', 'Learning Hrs', 'Learning Days', 'Avg Sessions / Day', 'Avg Hrs / Day', 'Learning Hrs / Day', 'Avg Demo / AI Hrs', 'Workload', 'Contribution', 'All Batches', 'Batches (Last 30 Days)', 'Teaching now (semester)', 'Next-semester readiness'];
+    const headers = ['Employee ID', 'Name', 'Role', 'Role (by sessions, last 30 days)', 'Department', 'Subject', 'Subject (from sessions, last 30 days)', 'Product', 'Capability Manager', 'Date of Joining', 'Date of Joining Source', 'Deployment Date', 'Training Duration (days)', 'Experience (years)', 'Lecture Hrs', 'Lecture Sessions', 'Practice Hrs', 'Practice Sessions', 'Other Hrs', 'Other Sessions', 'Total Hrs', 'Sessions', 'Session Days', 'Demo Hrs', 'Demo Evaluations', 'AI Assessment Hrs', 'AI Assessment Evaluations', 'Learning Hrs', 'Learning Days', 'Avg Sessions / Day', 'Avg Hrs / Day', 'Learning Hrs / Day', 'Avg Demo / AI Hrs', 'Workload', 'Contribution', 'All Batches', 'Batches (Last 30 Days)'];
     const rows = searchedRows.map((row) => {
       const has = row.has_contribution_data;
       return [
@@ -384,8 +328,6 @@ export default function ContributionPage() {
         row.ai_assessment_evaluations > 0 ? row.ai_assessment_hours : '', row.ai_assessment_evaluations > 0 ? row.ai_assessment_evaluations : '',
         row.learning_days > 0 ? row.learning_hours : '', row.learning_days > 0 ? row.learning_days : '', avgSessionsPerDay(row) !== null ? Math.round(avgSessionsPerDay(row)!) : '', avgHoursPerDay(row) !== null ? Math.round(avgHoursPerDay(row)! * 10) / 10 : '', row.learning_days > 0 ? Math.round((row.learning_hours / row.learning_days) * 10) / 10 : '', row.eval_avg_hours ?? '', workloadOf(row) ?? '',
         row.niat_cohorts.join(', '), row.all_batches.join(', '), row.recent_batches.join(', '),
-        readinessOf(row).map((it) => `Sem ${it.sem}`).join(', '),
-        readinessOf(row).map((it) => `Sem ${it.next}: ${it.pct !== null ? `${Math.round(it.pct * 10) / 10}%` : READINESS_LABEL[it.status]}`).join('; '),
       ];
     });
     const range = dateFrom || dateTo ? `-${dateFrom || 'start'}-to-${dateTo || toIsoDay(new Date())}` : '';
@@ -491,42 +433,6 @@ export default function ContributionPage() {
       </div>}
     </div>}
 
-    {data && data.count > 0 && readinessTable.some((r) => r.teaching > 0) && <div data-testid="next-semester-readiness" className="mb-6 overflow-x-auto rounded-md border border-border bg-card">
-      <p className="border-b border-border px-4 py-2.5 text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">Next-semester readiness <span className="font-normal normal-case tracking-normal">· teaching now from the NIAT cohort (2026 = Sem 1, 2025 = Sem 3, 2024 = Sem 5) · readiness = training on their subject's next-semester courses</span></p>
-      <table className="w-full border-collapse text-[12px]">
-        <thead>
-          <tr className="border-b border-border text-left font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-            <th className="whitespace-nowrap px-4 py-2 font-normal">Move</th>
-            <th className="whitespace-nowrap px-3 py-2 text-right font-normal" title="Teaching this semester now">Teaching now</th>
-            <th className="whitespace-nowrap px-3 py-2 text-right font-normal" title="Their subject has courses mapped for the next semester">Measured</th>
-            <th className="whitespace-nowrap px-3 py-2 text-right font-normal" title="100% of next-semester training">Ready</th>
-            <th className="whitespace-nowrap px-3 py-2 text-right font-normal">80%+</th>
-            <th className="whitespace-nowrap px-3 py-2 text-right font-normal">50%+</th>
-            <th className="whitespace-nowrap px-3 py-2 text-right font-normal">Not started</th>
-            <th className="whitespace-nowrap px-3 py-2 text-right font-normal">No training data</th>
-            <th className="whitespace-nowrap px-3 py-2 text-right font-normal" title="Subject has no next-semester courses mapped yet">No courses mapped</th>
-            <th className="whitespace-nowrap px-3 py-2 text-right font-normal" title="Ready / Measured">Ready rate</th>
-            <th className="whitespace-nowrap px-4 py-2 text-right font-normal" title="80%+ / Measured">80%+ rate</th>
-          </tr>
-        </thead>
-        <tbody>
-          {readinessTable.filter((r) => r.teaching > 0).map((r) => <tr key={r.sem} className="border-b border-border last:border-b-0">
-            <td className="whitespace-nowrap px-4 py-2 font-semibold text-foreground">Sem {r.sem} → Sem {r.next}</td>
-            <td className="px-3 py-2 text-right font-mono-ui tabular-nums">{formatKpi(r.teaching)}</td>
-            <td className="px-3 py-2 text-right font-mono-ui tabular-nums">{formatKpi(r.measured)}</td>
-            <td className="px-3 py-2 text-right font-mono-ui tabular-nums">{formatKpi(r.ready)}</td>
-            <td className="px-3 py-2 text-right font-mono-ui tabular-nums">{formatKpi(r.p80)}</td>
-            <td className="px-3 py-2 text-right font-mono-ui tabular-nums">{formatKpi(r.p50)}</td>
-            <td className="px-3 py-2 text-right font-mono-ui tabular-nums text-muted-foreground">{formatKpi(r.notStarted)}</td>
-            <td className="px-3 py-2 text-right font-mono-ui tabular-nums text-muted-foreground">{formatKpi(r.noData)}</td>
-            <td className="px-3 py-2 text-right font-mono-ui tabular-nums text-muted-foreground">{formatKpi(r.noCourses)}</td>
-            <td className="px-3 py-2 text-right font-mono-ui font-bold tabular-nums">{r.measured ? `${Math.round((r.ready / r.measured) * 1000) / 10}%` : '—'}</td>
-            <td className="px-4 py-2 text-right font-mono-ui font-bold tabular-nums">{r.measured ? `${Math.round((r.p80 / r.measured) * 1000) / 10}%` : '—'}</td>
-          </tr>)}
-        </tbody>
-      </table>
-    </div>}
-
     {data && data.count === 0 && <EmptyState title="No contribution data yet" description="Click Sync Now to pull the latest from BigQuery." />}
 
     {data && data.count > 0 && searchedRows.length === 0 && <EmptyState title="No one matches this search" description="Try a broader search or clear the search box." />}
@@ -545,8 +451,6 @@ export default function ContributionPage() {
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Department</th>
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Subject</th>
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="From the courses of the Lecture and Practice sessions they completed in the last 30 days (exams and other sessions left out), whatever range is picked. Amber = differs from Subject. Hover a cell for session counts.">Subject (sessions, 30 days)</th>
-                <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="From the NIAT cohort: NIAT 2026 = Sem 1, NIAT 2025 = Sem 3, NIAT 2024 = Sem 5">Teaching now</th>
-                <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Training completion on their subject's courses of the NEXT semester (Ready = 100%)">Next-sem readiness</th>
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Same Product as the Instructors tab">Product</th>
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Capability Manager</th>
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Date of joining from Darwinbox">Date of Joining</th>
@@ -583,13 +487,6 @@ export default function ContributionPage() {
                   const ss = sessionSubjects(row);
                   const differs = ss.list.length > 0 && !!row.subject_area && !ss.list.includes(row.subject_area);
                   return <td className={`whitespace-nowrap border-r border-border px-4 py-3 text-[12px] ${differs ? 'bg-[#fff6e0] font-semibold text-[#8a5a00]' : 'text-foreground'}`} title={ss.detail || 'No completed sessions in the last 30 days'} data-testid={`cell-session-subject-${row.employee_id ?? row.full_name}`}>{ss.list.length || ss.otherList.length ? <>{ss.list.join(' + ')}{ss.otherList.length > 0 && <span className="text-muted-foreground">{ss.list.length ? ' + ' : ''}{ss.otherList.join(' + ')}</span>}</> : ss.unmatched ? <span className="text-muted-foreground">No match</span> : ss.general ? <span className="text-muted-foreground">Orientation only</span> : <span className="text-muted-foreground">—</span>}</td>;
-                })()}
-                {(() => {
-                  const items = readinessOf(row);
-                  return <>
-                    <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-foreground" data-testid={`cell-teaching-now-${row.employee_id ?? row.full_name}`}>{items.length ? items.map((it) => `Sem ${it.sem}`).join(' + ') : <span className="text-muted-foreground">—</span>}</td>
-                    <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px]" data-testid={`cell-readiness-${row.employee_id ?? row.full_name}`}>{items.length ? <div className="flex flex-wrap gap-1">{items.map((it) => <span key={it.sem} title={it.courses.length ? `Sem ${it.next} courses: ${it.courses.join(', ')}` : `No Sem ${it.next} courses mapped for this subject yet`} className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${READINESS_TONE[it.status]}`}>Sem {it.next}: {it.pct !== null ? `${Math.round(it.pct * 10) / 10}%` : READINESS_LABEL[it.status]}</span>)}</div> : <span className="text-muted-foreground">—</span>}</td>
-                  </>;
                 })()}
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-foreground" data-testid={`cell-product-${row.employee_id ?? row.full_name}`}>{row.product || '—'}</td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-muted-foreground">{row.capability_manager || '—'}</td>

@@ -40,6 +40,8 @@ type InstructorProfile = {
     ai_hours: number; ai_count: number; ai_avg_hours: number | null; ai_avg_score: number | null;
   };
   workload: { total: number | null; hours_per_day: number | null; learning_per_day: number | null; eval_avg_hours: number | null };
+  // Last 7 / last 30 days (2026-10-17) -- the Workload card's period.
+  workload_windows?: Record<'7' | '30', { days: number; from: string; total: number | null; hours_per_day: number | null; learning_per_day: number | null; eval_avg_hours: number | null; session_days: number; sessions: number; learning_days: number; evaluations: number }>;
   training: { has_data: boolean; taxonomy: TrainingCourseDef[]; courses: Record<string, CourseStatus>; course_progress: Record<string, number> };
 };
 
@@ -79,6 +81,8 @@ export default function InstructorDetailPage() {
   const profile = profileQuery.data;
   const [form, setForm] = useState<InstructorUpdate>({ manual_status: '', exit_date: '', converted_university_name: '', notes: '' });
   const [saved, setSaved] = useState(false);
+  // Workload period (2026-10-17, per request): last 30 days by default, last 7 days as the option.
+  const [workloadDays, setWorkloadDays] = useState<'30' | '7'>('30');
 
   useEffect(() => {
     if (instructor) setForm({ manual_status: instructor.manual_status || '', exit_date: instructor.exit_date || '', converted_university_name: instructor.converted_university_name || '', notes: instructor.notes || '' });
@@ -105,7 +109,9 @@ export default function InstructorDetailPage() {
   const subject = profile?.subject_area ?? null;
   const location = [instructor.current_city, instructor.current_state].filter(Boolean).join(', ') || instructor.work_location;
   const teaching = profile?.teaching;
-  const wl = profile?.workload;
+  // wl = the Workload card's period (last 30 / 7 days); wlAll = all-time, still used by the Teaching and Learning lines.
+  const wl = profile?.workload_windows?.[workloadDays] ?? null;
+  const wlAll = profile?.workload;
 
   // Compact layout (2026-10-16, per request: "decrease the font size and the element size ... the name, the workload, the teaching
   // should be at one page, and the profile in the sidebar"): a slim header, small headline cards, and a right sidebar (Profile, Systems,
@@ -135,7 +141,9 @@ export default function InstructorDetailPage() {
 
     {/* Headline cards */}
     <section aria-label="Key numbers" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-      <Kpi label="Workload" value={wl?.total != null ? wl.total.toFixed(2) : '—'} testId="kpi-workload">
+      <Kpi label={`Workload · last ${workloadDays} days`} value={wl?.total != null ? wl.total.toFixed(2) : '—'} testId="kpi-workload" action={<div role="group" aria-label="Workload period" className="flex rounded-md bg-[#EEF1F5] p-0.5">
+          {(['30', '7'] as const).map((d) => <button key={d} type="button" aria-pressed={workloadDays === d} onClick={() => setWorkloadDays(d)} data-testid={`button-workload-${d}`} className={`rounded px-1.5 py-0.5 font-mono-ui text-[10px] font-bold ${workloadDays === d ? 'bg-card text-foreground shadow-xs' : 'text-[#5A6B80] hover:text-foreground'}`}>{d}d</button>)}
+        </div>}>
         {wl?.total ? <>
           <div className="flex h-1.5 overflow-hidden rounded bg-[#EEF1F5]" aria-hidden="true">
             <div style={{ width: `${((wl.hours_per_day ?? 0) / wl.total) * 100}%` }} className="bg-[#2B59C3]" />
@@ -143,7 +151,8 @@ export default function InstructorDetailPage() {
             <div style={{ width: `${((wl.eval_avg_hours ?? 0) / wl.total) * 100}%` }} className="bg-[#7E57C2]" />
           </div>
           <p className="text-[11px] text-[#5A6B80]">{num1(wl.hours_per_day ?? 0)} teaching + {num1(wl.learning_per_day ?? 0)} learning + {(wl.eval_avg_hours ?? 0).toFixed(2)} eval hrs / day</p>
-        </> : <p className="text-[11px] text-[#5A6B80]">No session, learning or evaluation data yet</p>}
+          <p className="text-[10px] text-[#8A96A6]">Since {formatDate(wl.from)} · {count(wl.session_days)} teaching days · {count(wl.learning_days)} learning days · {count(wl.evaluations)} evaluations</p>
+        </> : <p className="text-[11px] text-[#5A6B80]">No session, learning or evaluation data in the last {workloadDays} days</p>}
       </Kpi>
       <Kpi label="Hours taught" value={teaching ? num1(teaching.total_hours) : '—'} testId="kpi-hours">
         <p className="text-[11px] text-[#5A6B80]">{teaching?.has_data ? `${count(teaching.sessions_completed)} sessions over ${count(teaching.session_days)} days` : 'No completed sessions yet'}</p>
@@ -178,7 +187,7 @@ export default function InstructorDetailPage() {
             </div>
             <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-3">
               <MiniTile label="Avg sessions / day" value={teaching.session_days > 0 ? String(Math.round(teaching.sessions_completed / teaching.session_days)) : '—'} />
-              <MiniTile label="Avg hrs / day" value={wl?.hours_per_day != null ? num1(wl.hours_per_day) : '—'} />
+              <MiniTile label="Avg hrs / day" value={wlAll?.hours_per_day != null ? num1(wlAll.hours_per_day) : '—'} />
               <MiniTile label="Cohort" value={teaching.niat_cohorts.length ? teaching.niat_cohorts.join(', ') : '—'} />
             </div>
             {teaching.all_batches.length > 0 && <div className="mt-2.5 flex flex-wrap gap-1">{teaching.all_batches.map((batch) => <span key={batch} className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${teaching.recent_batches.includes(batch) ? 'bg-[#E6ECFA] text-[#2B4C9B]' : 'bg-[#F1F3F6] text-[#5A6B80]'}`}>{batch}</span>)}</div>}
@@ -199,7 +208,7 @@ export default function InstructorDetailPage() {
                   {group.courses.map((course) => <div key={course.key} className="flex items-center justify-between gap-3 text-[12px]"><span className="min-w-0 truncate">{course.label}</span><span className={`shrink-0 font-bold ${course.tone}`}>{course.text}</span></div>)}
                 </div>)}
               </div>}
-          {profile && <p className="mt-2.5 text-[11px] text-[#5A6B80]">Learning time: {profile.learning.days > 0 ? `${num1(profile.learning.hours)} h over ${count(profile.learning.days)} days · ${num1(wl?.learning_per_day ?? 0)} h / day` : 'none on file'}</p>}
+          {profile && <p className="mt-2.5 text-[11px] text-[#5A6B80]">Learning time: {profile.learning.days > 0 ? `${num1(profile.learning.hours)} h over ${count(profile.learning.days)} days · ${num1(wlAll?.learning_per_day ?? 0)} h / day` : 'none on file'}</p>}
         </section>
 
         {/* Evaluations */}
@@ -318,9 +327,9 @@ function Chip({ children }: { children: React.ReactNode }) {
   return <span className="rounded-full bg-[#1E3350] px-2.5 py-1 text-[11px] font-bold text-[#CFDAE8]">{children}</span>;
 }
 
-function Kpi({ label, value, testId, children }: { label: string; value: string; testId: string; children?: React.ReactNode }) {
+function Kpi({ label, value, testId, children, action }: { label: string; value: string; testId: string; children?: React.ReactNode; action?: React.ReactNode }) {
   return <div data-testid={testId} className="flex flex-col gap-1.5 rounded-xl bg-card p-3.5 shadow-[0_4px_16px_rgba(14,26,43,0.06)]">
-    <p className={EYEBROW}>{label}</p>
+    <div className="flex items-center justify-between gap-2"><p className={EYEBROW}>{label}</p>{action}</div>
     <p className="text-[22px] font-extrabold leading-none tabular-nums">{value}</p>
     {children}
   </div>;
