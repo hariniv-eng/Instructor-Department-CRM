@@ -423,6 +423,8 @@ async function fetchCohortBatchWindows(): Promise<Map<string, { recent: string[]
   return map;
 }
 
+// Only Lecture and Practice sessions count (2026-10-17, per request): exams and other session types are often invigilated outside the
+// person's own subject (e.g. an Aptitude instructor showed "English + Aptitude" because of English exams), so they are left out.
 // Subject from sessions (2026-10-17, per request: "depending on the subject that they are taking, we are gonna map them ... if they take
 // two subjects, map them both"). Every COMPLETED session in the last 30 days is matched, by its course id (else its course title), to
 // the Training Stats course list (trainingCourseTaxonomy.ts) and so to a subject; the result is sessions per subject per instructor,
@@ -459,6 +461,7 @@ async function fetchSessionSubjects(): Promise<Map<string, Record<string, number
       FROM \`${tableRef(SESSION_SCHEDULE_TABLE)}\`
       WHERE session_status = 'COMPLETED' AND instructor_user_id IS NOT NULL
         AND session_start_datetime >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 30 DAY)
+        AND session_type IN ('LECTURE', 'PRACTICE')
       GROUP BY 1, 2, 3
     `;
     const [rows] = await runWithHardTimeout(() => bq.query({ query }), API_TIMEOUT_MS * 3 + 10000);

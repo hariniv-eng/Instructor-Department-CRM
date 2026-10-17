@@ -41,6 +41,7 @@ async function main() {
     FROM \`${ref}\`
     WHERE session_status = 'COMPLETED' AND instructor_user_id IS NOT NULL
       AND session_start_datetime >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 30 DAY)
+      AND session_type IN ('LECTURE', 'PRACTICE')
     GROUP BY 1, 2, 3`;
   const [rows] = await bq.query({ query });
 
