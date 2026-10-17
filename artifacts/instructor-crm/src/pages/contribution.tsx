@@ -178,14 +178,21 @@ function RoleBadge({ role }: { role: ContributionRow['role'] }) {
 // Subject from sessions (2026-10-17, per request: shown beside Subject to compare). Subjects taught in the last 30 days, biggest first;
 // a subject is listed when it is at least 20% of the person's matched sessions (so someone teaching two subjects shows both).
 const SESSION_SUBJECT_MIN_SHARE = 0.2;
-function sessionSubjects(row: ContributionRow): { list: string[]; detail: string; matched: number; unmatched: number } {
+function sessionSubjects(row: ContributionRow): { list: string[]; otherList: string[]; detail: string; matched: number; unmatched: number; general: number } {
   const entries = Object.entries(row.session_subjects ?? {});
   const unmatched = entries.find(([k]) => k === '__unmatched')?.[1] ?? 0;
-  const subjects = entries.filter(([k]) => k !== '__unmatched').sort((a, b) => b[1] - a[1]);
+  // "__general" (2026-10-17): sessions of general courses (orientation, shared foundations, CS core) -- not a subject, left out.
+  const general = entries.find(([k]) => k === '__general')?.[1] ?? 0;
+  // "Other: <name>" (2026-10-17): a course that is not one of our subjects (e.g. Linux and Git) -- shown by name after the subjects,
+  // never used as a subject (nor in the amber mismatch check). Same 20% rule, over all counted sessions.
+  const subjects = entries.filter(([k]) => k !== '__unmatched' && k !== '__general' && !k.startsWith('Other: ')).sort((a, b) => b[1] - a[1]);
+  const others = entries.filter(([k]) => k.startsWith('Other: ')).sort((a, b) => b[1] - a[1]);
   const matched = subjects.reduce((sum, [, n]) => sum + n, 0);
+  const counted = matched + others.reduce((sum, [, n]) => sum + n, 0);
   const list = subjects.filter(([, n], i) => i === 0 || n / matched >= SESSION_SUBJECT_MIN_SHARE).map(([k]) => k);
-  const detail = [...subjects.map(([k, n]) => `${k}: ${n} sessions`), unmatched ? `No subject match: ${unmatched} sessions` : ''].filter(Boolean).join(' · ');
-  return { list, detail, matched, unmatched };
+  const otherList = others.filter(([, n], i) => (i === 0 && list.length === 0) || n / counted >= SESSION_SUBJECT_MIN_SHARE).map(([k]) => k.slice('Other: '.length));
+  const detail = [...subjects.map(([k, n]) => `${k}: ${n} sessions`), ...others.map(([k, n]) => `${k.slice('Other: '.length)} (other course): ${n} sessions`), general ? `Orientation: ${general} sessions (left out)` : '', unmatched ? `No subject match: ${unmatched} sessions` : ''].filter(Boolean).join(' · ');
+  return { list, otherList, detail, matched, unmatched, general };
 }
 
 function sessionRole(row: ContributionRow): ContributionRow['role'] | null {
@@ -300,7 +307,7 @@ export default function ContributionPage() {
     const rows = searchedRows.map((row) => {
       const has = row.has_contribution_data;
       return [
-        row.employee_id, row.full_name, row.role, sessionRole(row), row.department, row.subject_area, sessionSubjects(row).list.join(' + '), row.product, row.capability_manager,
+        row.employee_id, row.full_name, row.role, sessionRole(row), row.department, row.subject_area, [...sessionSubjects(row).list, ...sessionSubjects(row).otherList].join(' + '), row.product, row.capability_manager,
         row.date_of_joining, row.date_of_joining_source, row.deployment_date, row.training_days, row.experience_years,
         has ? row.lecture_hours : '', has ? row.lecture_sessions : '', has ? row.practice_hours : '', has ? row.practice_sessions : '', has ? row.other_hours : '', has ? row.other_sessions : '', has ? row.total_hours : '', has ? row.sessions_completed : '', has ? row.session_days : '',
         row.demo_evaluations > 0 ? row.demo_hours : '', row.demo_evaluations > 0 ? row.demo_evaluations : '',
@@ -451,7 +458,7 @@ export default function ContributionPage() {
                 {(() => {
                   const ss = sessionSubjects(row);
                   const differs = ss.list.length > 0 && !!row.subject_area && !ss.list.includes(row.subject_area);
-                  return <td className={`whitespace-nowrap border-r border-border px-4 py-3 text-[12px] ${differs ? 'bg-[#fff6e0] font-semibold text-[#8a5a00]' : 'text-foreground'}`} title={ss.detail || 'No completed sessions in the last 30 days'} data-testid={`cell-session-subject-${row.employee_id ?? row.full_name}`}>{ss.list.length ? ss.list.join(' + ') : ss.unmatched ? <span className="text-muted-foreground">No match</span> : <span className="text-muted-foreground">—</span>}</td>;
+                  return <td className={`whitespace-nowrap border-r border-border px-4 py-3 text-[12px] ${differs ? 'bg-[#fff6e0] font-semibold text-[#8a5a00]' : 'text-foreground'}`} title={ss.detail || 'No completed sessions in the last 30 days'} data-testid={`cell-session-subject-${row.employee_id ?? row.full_name}`}>{ss.list.length || ss.otherList.length ? <>{ss.list.join(' + ')}{ss.otherList.length > 0 && <span className="text-muted-foreground">{ss.list.length ? ' + ' : ''}{ss.otherList.join(' + ')}</span>}</> : ss.unmatched ? <span className="text-muted-foreground">No match</span> : ss.general ? <span className="text-muted-foreground">Orientation only</span> : <span className="text-muted-foreground">—</span>}</td>;
                 })()}
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-foreground" data-testid={`cell-product-${row.employee_id ?? row.full_name}`}>{row.product || '—'}</td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-muted-foreground">{row.capability_manager || '—'}</td>
