@@ -49,6 +49,10 @@ type ContributionRow = {
   // Instructors tab's own bifurcation column/badge styling.
   role: 'Instructor' | 'Mentor';
   has_contribution_data: boolean;
+  last30_lecture_sessions?: number;
+  last30_sessions?: number;
+  // Completed sessions per subject in the last 30 days (2026-10-17); "__unmatched" = course matched no subject.
+  session_subjects?: Record<string, number>;
   lecture_hours: number;
   practice_hours: number;
   other_hours: number;
@@ -164,14 +168,29 @@ function RoleBadge({ role }: { role: ContributionRow['role'] }) {
   return <span className={`inline-flex rounded-full px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] ${toneClass}`}>{role}</span>;
 }
 
+// 2026-10-17, per request: worked out from the LAST 30 DAYS only (last30_* from the server), whatever date range is picked; nobody with
+// a completed session in the last 30 days -> blank.
 // Role by sessions (2026-10-13, per request): a second Instructor / Mentor bifurcation that lives ONLY on this table and
 // changes nothing else (the Instructors tab and everywhere else keep the designation-based Role above). It is read from
 // what the person actually taught: any completed Lecture session -> Instructor (lecture only, or lecture + practice);
 // anyone who has taught but never a Lecture (Practice only, Practice / Other, or Other only such as exams) -> Mentor;
 // no session data at all (no data, or zero completed hours) -> blank.
+// Subject from sessions (2026-10-17, per request: shown beside Subject to compare). Subjects taught in the last 30 days, biggest first;
+// a subject is listed when it is at least 20% of the person's matched sessions (so someone teaching two subjects shows both).
+const SESSION_SUBJECT_MIN_SHARE = 0.2;
+function sessionSubjects(row: ContributionRow): { list: string[]; detail: string; matched: number; unmatched: number } {
+  const entries = Object.entries(row.session_subjects ?? {});
+  const unmatched = entries.find(([k]) => k === '__unmatched')?.[1] ?? 0;
+  const subjects = entries.filter(([k]) => k !== '__unmatched').sort((a, b) => b[1] - a[1]);
+  const matched = subjects.reduce((sum, [, n]) => sum + n, 0);
+  const list = subjects.filter(([, n], i) => i === 0 || n / matched >= SESSION_SUBJECT_MIN_SHARE).map(([k]) => k);
+  const detail = [...subjects.map(([k, n]) => `${k}: ${n} sessions`), unmatched ? `No subject match: ${unmatched} sessions` : ''].filter(Boolean).join(' · ');
+  return { list, detail, matched, unmatched };
+}
+
 function sessionRole(row: ContributionRow): ContributionRow['role'] | null {
-  if (!row.has_contribution_data || row.total_hours <= 0) return null;
-  return row.lecture_hours > 0 ? 'Instructor' : 'Mentor';
+  if (!row.last30_sessions) return null;
+  return (row.last30_lecture_sessions ?? 0) > 0 ? 'Instructor' : 'Mentor';
 }
 
 const todayIso = () => toIsoDay(new Date());
@@ -205,8 +224,9 @@ function JoiningDateCell({ row, onSaved }: { row: ContributionRow; onSaved: () =
 
 export default function ContributionPage() {
   const queryClient = useQueryClient();
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  // Opens on the last 30 days by default (2026-10-17, per request); "All time" is still one click away.
+  const [dateFrom, setDateFrom] = useState(() => daysAgo(30));
+  const [dateTo, setDateTo] = useState(() => toIsoDay(new Date()));
   const query = useContribution(dateFrom, dateTo);
   const data = query.data;
   const [syncing, setSyncing] = useState(false);
@@ -276,11 +296,11 @@ export default function ContributionPage() {
   // Download CSV (2026-10-15, per request): everything the current date range, subject filter and search match -- every page, not just the
   // one on screen -- with the same columns as the table. Hours and counts are plain numbers so they sum and sort in a spreadsheet.
   const downloadTable = () => {
-    const headers = ['Employee ID', 'Name', 'Role', 'Role (by sessions)', 'Department', 'Subject', 'Product', 'Capability Manager', 'Date of Joining', 'Date of Joining Source', 'Deployment Date', 'Training Duration (days)', 'Experience (years)', 'Lecture Hrs', 'Lecture Sessions', 'Practice Hrs', 'Practice Sessions', 'Other Hrs', 'Other Sessions', 'Total Hrs', 'Sessions', 'Session Days', 'Demo Hrs', 'Demo Evaluations', 'AI Assessment Hrs', 'AI Assessment Evaluations', 'Learning Hrs', 'Learning Days', 'Avg Sessions / Day', 'Avg Hrs / Day', 'Learning Hrs / Day', 'Avg Demo / AI Hrs', 'Workload', 'Contribution', 'All Batches', 'Batches (Last 30 Days)'];
+    const headers = ['Employee ID', 'Name', 'Role', 'Role (by sessions, last 30 days)', 'Department', 'Subject', 'Subject (from sessions, last 30 days)', 'Product', 'Capability Manager', 'Date of Joining', 'Date of Joining Source', 'Deployment Date', 'Training Duration (days)', 'Experience (years)', 'Lecture Hrs', 'Lecture Sessions', 'Practice Hrs', 'Practice Sessions', 'Other Hrs', 'Other Sessions', 'Total Hrs', 'Sessions', 'Session Days', 'Demo Hrs', 'Demo Evaluations', 'AI Assessment Hrs', 'AI Assessment Evaluations', 'Learning Hrs', 'Learning Days', 'Avg Sessions / Day', 'Avg Hrs / Day', 'Learning Hrs / Day', 'Avg Demo / AI Hrs', 'Workload', 'Contribution', 'All Batches', 'Batches (Last 30 Days)'];
     const rows = searchedRows.map((row) => {
       const has = row.has_contribution_data;
       return [
-        row.employee_id, row.full_name, row.role, sessionRole(row), row.department, row.subject_area, row.product, row.capability_manager,
+        row.employee_id, row.full_name, row.role, sessionRole(row), row.department, row.subject_area, sessionSubjects(row).list.join(' + '), row.product, row.capability_manager,
         row.date_of_joining, row.date_of_joining_source, row.deployment_date, row.training_days, row.experience_years,
         has ? row.lecture_hours : '', has ? row.lecture_sessions : '', has ? row.practice_hours : '', has ? row.practice_sessions : '', has ? row.other_hours : '', has ? row.other_sessions : '', has ? row.total_hours : '', has ? row.sessions_completed : '', has ? row.session_days : '',
         row.demo_evaluations > 0 ? row.demo_hours : '', row.demo_evaluations > 0 ? row.demo_evaluations : '',
@@ -392,9 +412,10 @@ export default function ContributionPage() {
                 <th className="sticky left-0 z-10 whitespace-nowrap border-r border-border bg-[#f4f7f9] px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Name</th>
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Employee ID</th>
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Role</th>
-                <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Instructor if they took any Lecture session; Mentor if they took sessions but no Lecture; blank if no session data">Role (by sessions)</th>
+                <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Last 30 days, whatever range is picked: Instructor if they took any Lecture session; Mentor if they took sessions but no Lecture; blank if no completed session in the last 30 days">Role (by sessions, 30 days)</th>
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Department</th>
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Subject</th>
+                <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="From the courses of the sessions they completed in the last 30 days, whatever range is picked. Amber = differs from Subject. Hover a cell for session counts.">Subject (sessions, 30 days)</th>
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Same Product as the Instructors tab">Product</th>
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Capability Manager</th>
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Date of joining from Darwinbox">Date of Joining</th>
@@ -427,6 +448,11 @@ export default function ContributionPage() {
                 <td className="whitespace-nowrap border-r border-border px-4 py-3" data-testid={`cell-session-role-${row.employee_id ?? row.full_name}`}>{(() => { const derived = sessionRole(row); return derived ? <RoleBadge role={derived} /> : null; })()}</td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-muted-foreground">{row.department || '—'}</td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-foreground" data-testid={`cell-subject-${row.employee_id ?? row.full_name}`}>{row.subject_area || '—'}</td>
+                {(() => {
+                  const ss = sessionSubjects(row);
+                  const differs = ss.list.length > 0 && !!row.subject_area && !ss.list.includes(row.subject_area);
+                  return <td className={`whitespace-nowrap border-r border-border px-4 py-3 text-[12px] ${differs ? 'bg-[#fff6e0] font-semibold text-[#8a5a00]' : 'text-foreground'}`} title={ss.detail || 'No completed sessions in the last 30 days'} data-testid={`cell-session-subject-${row.employee_id ?? row.full_name}`}>{ss.list.length ? ss.list.join(' + ') : ss.unmatched ? <span className="text-muted-foreground">No match</span> : <span className="text-muted-foreground">—</span>}</td>;
+                })()}
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-foreground" data-testid={`cell-product-${row.employee_id ?? row.full_name}`}>{row.product || '—'}</td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-muted-foreground">{row.capability_manager || '—'}</td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-foreground" data-testid={`cell-date-of-joining-${row.employee_id ?? row.full_name}`}><JoiningDateCell row={row} onSaved={refresh} /></td>
