@@ -37,6 +37,7 @@ import { config, missing } from "./config";
 import { runWithHardTimeout, HardTimeout } from "./timeout";
 import { getSchema } from "./instructorLearningStatus";
 import { TRAINING_COURSE_TAXONOMY } from "../../data/trainingCourseTaxonomy";
+import { TEACHING_COURSE_SUBJECTS } from "../../data/teachingCourseSubjects";
 
 export class InstructorContributionError extends Error {}
 
@@ -470,7 +471,10 @@ async function fetchSessionSubjects(): Promise<Map<string, Record<string, number
       if (!id) continue;
       const courseId = r.course_id ? String(r.course_id) : "";
       const title = r.course_title ? String(r.course_title).trim().toLowerCase() : "";
-      const subject = (courseId && byId.get(courseId)) || (title && byTitle.get(title)) || "__unmatched";
+      // Teaching-course list first (2026-10-17: the courses instructors teach -- see teachingCourseSubjects.ts; null there = a general
+      // course, kept as "__general" and left out of the subject), then the training course list, else "__unmatched".
+      const teaching = courseId && courseId in TEACHING_COURSE_SUBJECTS ? TEACHING_COURSE_SUBJECTS[courseId] : undefined;
+      const subject = teaching !== undefined ? (teaching ?? "__general") : ((courseId && byId.get(courseId)) || (title && byTitle.get(title)) || "__unmatched");
       const entry = map.get(id) ?? {};
       entry[subject] = (entry[subject] ?? 0) + Number(r.sessions ?? 0);
       map.set(id, entry);
