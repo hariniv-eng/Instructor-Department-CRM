@@ -485,7 +485,8 @@ export default function ContributionPage() {
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-foreground" data-testid={`cell-subject-${row.employee_id ?? row.full_name}`}>{row.subject_area || '—'}</td>
                 {(() => {
                   const ss = sessionSubjects(row);
-                  const differs = ss.list.length > 0 && !!row.subject_area && !ss.list.includes(row.subject_area);
+                  // "Math for Computer Science" is a Maths course shown by name (2026-10-17), so it agrees with a Maths Subject.
+                  const differs = ss.list.length > 0 && !!row.subject_area && !ss.list.map((x) => (x === 'Math for Computer Science' ? 'Maths' : x)).includes(row.subject_area);
                   return <td className={`whitespace-nowrap border-r border-border px-4 py-3 text-[12px] ${differs ? 'bg-[#fff6e0] font-semibold text-[#8a5a00]' : 'text-foreground'}`} title={ss.detail || 'No completed sessions in the last 30 days'} data-testid={`cell-session-subject-${row.employee_id ?? row.full_name}`}>{ss.list.length || ss.otherList.length ? <>{ss.list.join(' + ')}{ss.otherList.length > 0 && <span className="text-muted-foreground">{ss.list.length ? ' + ' : ''}{ss.otherList.join(' + ')}</span>}</> : ss.unmatched ? <span className="text-muted-foreground">No match</span> : ss.general ? <span className="text-muted-foreground">Orientation only</span> : <span className="text-muted-foreground">—</span>}</td>;
                 })()}
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-foreground" data-testid={`cell-product-${row.employee_id ?? row.full_name}`}>{row.product || '—'}</td>

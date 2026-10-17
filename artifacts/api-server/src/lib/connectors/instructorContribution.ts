@@ -447,7 +447,9 @@ async function fetchSessionSubjects(): Promise<Map<string, Record<string, number
     }
     const byId = new Map<string, string>();
     for (const def of TRAINING_COURSE_TAXONOMY) {
-      const subject = TRACK_SUBJECT[def.trackGroup];
+      // Mathematics for Computer Science is shown by its own name instead of "Maths" (2026-10-17, per request); it still counts as
+      // Maths for the Contribution tab's mismatch check.
+      const subject = def.key === "math_for_cs" ? "Math for Computer Science" : TRACK_SUBJECT[def.trackGroup];
       if (!subject) continue;
       for (const id of def.courseIds ?? []) byId.set(id.replace(/-/g, "").toLowerCase(), subject);
     }
