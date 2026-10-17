@@ -13,7 +13,7 @@ import { SESSION_SCHEDULE_TABLE } from "./instructorContribution";
 async function main() {
   const args = process.argv.slice(2).filter((a) => a !== "--");
   const employeeId = (args[0] ?? "").trim().toUpperCase();
-  const courseId = (args[1] ?? "").replace(/-/g, "").trim().toLowerCase();
+  const courseId = (args[1] ?? "").toLowerCase().replace(/[^0-9a-f]/g, ""); // keep only the hex id: a stray "~" or space pasted with it matched nothing
   const days = Math.max(1, Number(args[2]) || 30);
   if (!employeeId || !courseId) { console.log("Usage: _tmp_course_sessions.ts <EMPLOYEE_ID> <COURSE_ID> [days]"); process.exit(1); }
   const [p] = await db.select().from(instructorsTable).where(eq(instructorsTable.employeeId, employeeId));
