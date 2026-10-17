@@ -427,7 +427,7 @@ async function fetchCohortBatchWindows(): Promise<Map<string, { recent: string[]
 // Only Lecture and Practice sessions count (2026-10-17, per request): exams and other session types are often invigilated outside the
 // person's own subject (e.g. an Aptitude instructor showed "English + Aptitude" because of English exams), so they are left out.
 // Subject from sessions (2026-10-17, per request: "depending on the subject that they are taking, we are gonna map them ... if they take
-// two subjects, map them both"). Every COMPLETED session in the last 30 days is matched, by its course id (else its course title), to
+// two subjects, map them both"). Every COMPLETED session in the last 30 days is matched by its course id (2026-10-17: id only, no titles) to
 // the Training Stats course list (trainingCourseTaxonomy.ts) and so to a subject; the result is sessions per subject per instructor,
 // plus "__unmatched" for sessions whose course belongs to no subject there. The course columns are found from the view's schema. A
 // failure is logged and ignored (empty map), so the Contribution sync never fails because of it.
@@ -446,12 +446,10 @@ async function fetchSessionSubjects(): Promise<Map<string, Record<string, number
       return map;
     }
     const byId = new Map<string, string>();
-    const byTitle = new Map<string, string>();
     for (const def of TRAINING_COURSE_TAXONOMY) {
       const subject = TRACK_SUBJECT[def.trackGroup];
       if (!subject) continue;
       for (const id of def.courseIds ?? []) byId.set(id.replace(/-/g, "").toLowerCase(), subject);
-      for (const title of def.courseTitles) byTitle.set(title.trim().toLowerCase(), subject);
     }
     const bq = client();
     const query = `
@@ -470,11 +468,11 @@ async function fetchSessionSubjects(): Promise<Map<string, Record<string, number
       const id = String(r.instructor_user_id ?? "");
       if (!id) continue;
       const courseId = r.course_id ? String(r.course_id) : "";
-      const title = r.course_title ? String(r.course_title).trim().toLowerCase() : "";
       // Teaching-course list first (2026-10-17: the courses instructors teach -- see teachingCourseSubjects.ts; null there = a general
       // course, kept as "__general" and left out of the subject), then the training course list, else "__unmatched".
       const teaching = courseId && courseId in TEACHING_COURSE_SUBJECTS ? TEACHING_COURSE_SUBJECTS[courseId] : undefined;
-      const subject = teaching !== undefined ? (teaching ?? "__general") : ((courseId && byId.get(courseId)) || (title && byTitle.get(title)) || "__unmatched");
+      // Course ID only (2026-10-17, per request: "only map the subject depending on the course id") -- titles are no longer used.
+      const subject = teaching !== undefined ? (teaching ?? "__general") : ((courseId && byId.get(courseId)) || "__unmatched");
       const entry = map.get(id) ?? {};
       entry[subject] = (entry[subject] ?? 0) + Number(r.sessions ?? 0);
       map.set(id, entry);

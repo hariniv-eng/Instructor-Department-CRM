@@ -63,7 +63,7 @@ async function main() {
     const teaching = cid && cid in TEACHING_COURSE_SUBJECTS ? TEACHING_COURSE_SUBJECTS[cid] : undefined;
     const subject = teaching !== undefined
       ? (teaching === null ? "orientation (left out)" : `${teaching} (teaching-course list)`)
-      : ((cid && byId.get(cid)) || (title && byTitle.get(title.trim().toLowerCase())) || "no subject match");
+      : ((cid && byId.get(cid)) || "no subject match"); // course ID only (2026-10-17)
     const counted = String(r.session_status) !== "COMPLETED" ? "  [not counted: not completed]" : ["LECTURE", "PRACTICE"].includes(String(r.session_type)) ? "" : "  [not counted: not Lecture/Practice]";
     console.log(`  ${r.session_status} | ${r.session_type} | ${title || "(no title)"} [${cid || "-"}] | ${subject} | ${r.sessions}${extra.map((c) => ` | ${r[c] ?? "-"}`).join("")}${counted}`);
   }

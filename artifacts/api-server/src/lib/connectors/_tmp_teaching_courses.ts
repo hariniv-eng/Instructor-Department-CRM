@@ -9,6 +9,7 @@ import { config } from "./config";
 import { getSchema } from "./instructorLearningStatus";
 import { SESSION_SCHEDULE_TABLE } from "./instructorContribution";
 import { TRAINING_COURSE_TAXONOMY } from "../../data/trainingCourseTaxonomy";
+import { TEACHING_COURSE_SUBJECTS } from "../../data/teachingCourseSubjects";
 
 async function main() {
   const cols = (await getSchema(SESSION_SCHEDULE_TABLE)).map(([n]) => n);
@@ -42,7 +43,8 @@ async function main() {
     total += n;
     const id = r.course_id ?? "";
     const title = r.course_title ?? "";
-    if ((id && knownIds.has(id)) || (title && knownTitles.has(title.trim().toLowerCase()))) continue;
+    // Course ID only (2026-10-17): a course is known when its id is in the training list or the teaching-course list.
+    if (id && (knownIds.has(id) || id in TEACHING_COURSE_SUBJECTS)) continue;
     unmatchedTotal += n;
     const key = `${id}|${title}`;
     const c = courses.get(key) ?? { title, id, sessions: 0, instructors: new Set<string>(), subjects: new Map<string, number>() };
