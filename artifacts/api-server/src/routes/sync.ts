@@ -394,7 +394,9 @@ router.get("/sync/health", async (_req, res) => {
   const generatedMs = generated && generated !== "unknown" ? Date.parse(generated) : NaN;
   const baseAgeHours = Number.isNaN(generatedMs) ? null : Math.round(((now.getTime() - generatedMs) / 3600000) * 10) / 10;
   const exitWarnings: string[] = [];
-  if (baseAgeHours !== null && baseAgeHours > 36) exitWarnings.push(`Darwin's base exit report was last generated ${baseAgeHours} hours ago (${generated}). Resignations raised since then come only from the Offboarding-tracking fallback. Ask the Darwin admin to refresh that report daily.`);
+  // Darwin regenerates the base report WEEKLY (Fridays ~8:07 AM IST; confirmed 2026-10-19 with _tmp_exit_staleness.ts: our syncs ran
+  // several times a day and Darwin's live copy was still the 16 Oct one). So 3-6 days old is normal; only warn past 8 days (= a missed week).
+  if (baseAgeHours !== null && baseAgeHours > 8 * 24) exitWarnings.push(`Darwin's base exit report was last generated ${baseAgeHours} hours ago (${generated}) -- it normally refreshes every Friday morning, so this week's refresh was missed. Resignations raised since then come only from the Offboarding-tracking fallback. Ask the Darwin admin to check the report's weekly schedule.`);
   if (keptRows > 0) exitWarnings.push(`${keptRows} exit row(s) were kept from earlier syncs because Darwin no longer returns them.`);
   res.json({
     generated_at: now.toISOString(),
