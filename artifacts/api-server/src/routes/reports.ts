@@ -8,7 +8,7 @@ import { TRAINING_COURSE_TAXONOMY, isResolvedCourse } from "../data/trainingCour
 import { TECH_AREAS, normalizeSubjectArea } from "../lib/departmentTaxonomy";
 import { isPinnedConfirmedInstructor } from "../data/classificationOverrides";
 import { productOf } from "../lib/product";
-import { taughtSubjectColumn, displayCourseTitle, TAUGHT_SUBJECT_COLUMNS } from "../lib/connectors/taughtTraining";
+import { taughtSubjectColumn, displayCourseTitle, mergedCourseOf, TAUGHT_SUBJECT_COLUMNS } from "../lib/connectors/taughtTraining";
 
 // Pinned edge-case instructors (NW0005068): see isPinnedConfirmedInstructor() in
 // data/classificationOverrides.ts. Kept counted on every sync until their Darwin
@@ -1484,12 +1484,19 @@ router.get("/reports/taught-training", requireAuth, requireRole("admin"), async 
     if (!byUid.has(t.instructorUserId) || t.curriculumSessions <= 0) continue;
     const subject = taughtSubjectColumn(t.courseId, t.courseTitle);
     if (!subject) continue; // orientation / intro course
-    const c = courses.get(t.courseId) ?? { course_id: t.courseId, title: displayCourseTitle(t.courseTitle), subject, instructors: 0, curriculum_max: 0 };
-    c.instructors += 1;
-    c.curriculum_max = Math.max(c.curriculum_max, t.curriculumSessions);
-    courses.set(t.courseId, c);
+    // Two course ids shown as one column (mergedCourseOf, e.g. Intro to Generative AI + Generative AI): sessions added together.
+    const merged = mergedCourseOf(t.courseId, t.courseTitle);
+    const key = merged?.key ?? t.courseId;
     if (!cellsByUid.has(t.instructorUserId)) cellsByUid.set(t.instructorUserId, {});
-    cellsByUid.get(t.instructorUserId)![t.courseId] = { completed: t.completedSessions, curriculum: t.curriculumSessions, scheduled: t.scheduledSessions, pct: pct(t.completedSessions, t.curriculumSessions), last_taught_date: t.lastTaughtDate, institutes: t.institutes };
+    const cells = cellsByUid.get(t.instructorUserId)!;
+    const prev = cells[key];
+    const completed = (prev?.completed ?? 0) + t.completedSessions, curriculum = (prev?.curriculum ?? 0) + t.curriculumSessions;
+    const lastDate = [prev?.last_taught_date, t.lastTaughtDate].filter((d): d is string => !!d).sort().pop() ?? null;
+    cells[key] = { completed, curriculum, scheduled: (prev?.scheduled ?? 0) + t.scheduledSessions, pct: pct(completed, curriculum), last_taught_date: lastDate, institutes: [...new Set([...(prev?.institutes ?? []), ...t.institutes])] };
+    const c = courses.get(key) ?? { course_id: key, title: merged?.title ?? displayCourseTitle(t.courseTitle), subject, instructors: 0, curriculum_max: 0 };
+    if (!prev) c.instructors += 1;
+    c.curriculum_max = Math.max(c.curriculum_max, curriculum);
+    courses.set(key, c);
   }
   const rows = [...cellsByUid].map(([uid, cells]) => {
     const p = byUid.get(uid)!;

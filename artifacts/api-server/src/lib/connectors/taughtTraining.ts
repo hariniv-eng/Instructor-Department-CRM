@@ -58,6 +58,14 @@ export const TAUGHT_SUBJECT_COLUMNS = ["Frontend", "Backend", "DSA", "GenAI", "A
 // (Intro to ML / AI), Aptitude Orientation, Orientation, welcome webinars. Left out of the view entirely. Real courses whose title just
 // starts with "Introduction to" (React JS, Databases, Programming, TypeScript, Logic, Quantum Physics...) are NOT matched.
 export const ORIENTATION_COURSE = /^(intro|introduction) to (tech|software( development)?|operating systems?|os|computers?)\b|orientation|welcome webinar|webinar/i;
+// Courses shown as ONE column (2026-10-19, per request: "Intro to Generative AI" and "Generative AI" are two course ids with mostly the
+// same content). Key = title in lower case, letters/digits only; value = the merged column's key and title. An instructor's sessions
+// in both are added together (completed and total).
+const MERGED_COURSES: Record<string, { key: string; title: string }> = {
+  introtogenerativeai: { key: "merged:generativeai", title: "Generative AI (incl. Intro to Generative AI)" },
+  generativeai: { key: "merged:generativeai", title: "Generative AI (incl. Intro to Generative AI)" },
+};
+export const mergedCourseOf = (courseId: string, title: string): { key: string; title: string } | null => MERGED_COURSES[norm(title)] ?? null;
 // Programming Foundations is the Python course (2026-10-19, per request): shown as "Programming Foundations (Python)", under Backend.
 export const displayCourseTitle = (title: string): string => (/^programming foundations$/i.test(title.trim()) ? "Programming Foundations (Python)" : title);
 export function taughtSubjectColumn(courseId: string, courseTitle: string): string | null {
