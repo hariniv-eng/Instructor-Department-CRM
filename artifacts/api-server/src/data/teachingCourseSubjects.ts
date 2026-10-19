@@ -78,3 +78,34 @@ export const TEACHING_COURSE_SUBJECTS: Record<string, string | null> = {
   "7d0368088a26411b966194ec2e0e143e": null, // Orientation
   "18763c94ec7b453da84693e32941f7cb": null, // Welcome Webinar - IIT KGP OCN - Generative and Agentic AI
 };
+
+// Fallback BY COURSE TITLE, used only by the "Taught in class" training view (2026-10-19, per request: one row per instructor with a
+// column per subject). Many big taught courses are not in the id list above yet (Modern Responsive Web Design, NIAT - DSA,
+// Quantitative Aptitude...), so without this they would all land in "Other". Key = title in lower case, letters/digits only. An id in
+// TEACHING_COURSE_SUBJECTS or the Training Stats course list always wins over this. Courses not listed here stay in "Other".
+export const TAUGHT_COURSE_TITLE_SUBJECTS: Record<string, string> = {
+  // Frontend
+  modernresponsivewebdesign: "Frontend", introductiontoreactjs: "Frontend", reactjs: "Frontend", jsessentials: "Frontend",
+  buildyourownstaticwebsite: "Frontend", buildyourownresponsivewebsite: "Frontend", nextjs: "Frontend", introductiontotypescript: "Frontend",
+  fundamentalsofwebdevelopment: "Frontend", htmlcss: "Frontend", jsprogramming: "Frontend",
+  // Backend
+  programmingfoundations: "Backend", morepythonproblemsolving: "Backend", problemsolvingwithpythonprogramming2: "Backend",
+  morepythonconcepts: "Backend", nodejs: "Backend", morenodejsconcepts: "Backend", programmingwithpython: "Backend",
+  introductiontodatabases: "Backend", advanceddbms: "Backend",
+  // DSA
+  niatdsa: "DSA", designandanalysisofalgorithms: "DSA", algorithmdesign: "DSA", patternsandmathematicalfoundations: "DSA",
+  niatdsaphase2course: "DSA", phase2advanceddsa: "DSA", datastructuresusingc: "DSA",
+  // GenAI
+  buildingllmapplications: "GenAI", generativeai: "GenAI", aiforfinance: "GenAI", introtogenerativeai: "GenAI",
+  // Artificial Intelligence & Emerging Technologies
+  unsupervisedlearning: "Artificial Intelligence & Emerging Technologies",
+  // Aptitude
+  quantitativeaptitude: "Aptitude", numericalability: "Aptitude", logicalreasoning: "Aptitude", advancedaptitude: "Aptitude", aptitudeorientation: "Aptitude",
+  // Maths
+  probabilityandstatisticsps: "Maths", probabilitystatistics: "Maths", mathforcomputerscience: "Maths", mathforcse: "Maths",
+  mathematicsforcomputerscienceau: "Maths", calculusdifferentialequations: "Maths", linearalgebraandoptimization: "Maths",
+  linearalgebraandcalculus: "Maths", calculus: "Maths", discretemathematics: "Maths", matrixintroduction: "Maths",
+  // English
+  communicativeenglishfoundation: "English", communicativeenglishadvanced: "English", appliedcommunicativeenglish: "English",
+  englishb1levellearnerprogram: "English", languageanalytics: "English", writingpractice: "English", communicativeenglishfoundationi: "English",
+};

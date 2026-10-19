@@ -239,7 +239,7 @@ async function runTrainingStatusSync(): Promise<SyncResult> {
     // failure here never fails the learning-portal Training Status sync above.
     try {
       const taught = await storeTaughtCourses(await fetchTaughtCourseRows());
-      await db.insert(uploadsTable).values({ source: "Instructor Taught Training", filename: "BigQuery sync (completed sessions matched to course topics, per instructor + course)", rowCount: taught });
+      await db.insert(uploadsTable).values({ source: "Instructor Taught Training", filename: "BigQuery sync (NIAT session ids completed vs course curriculum, per instructor + course)", rowCount: taught });
     } catch (e) {
       console.error("[taught-training] sync failed:", e);
     }

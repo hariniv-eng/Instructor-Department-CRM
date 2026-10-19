@@ -5,41 +5,23 @@ import { PageIntro, EmptyState, QueryError, SkeletonBlock, TablePager, TableSear
 import { downloadCsv, toCsv } from '@/lib/csv';
 import { MultiSelectFilter } from './instructors';
 
-// "Taught in class" training (2026-10-19, per request): a second Training view beside the learning-portal one, built from what each
-// instructor has actually TAUGHT. One row per (instructor, course they have taught): topics of that course covered by their completed
-// Lecture/Practice sessions / the course's topics (assignments, mock tests, quizzes/exams, interview prep and projects left out).
-// All time. Completed = 80%+. Server side: connectors/taughtTraining.ts (built by the Training Status sync) and
+// "Taught in class" training, SESSION-ID version (2026-10-19, per request). NIAT instructors only. Every curriculum session of a course
+// has its own session id; for each instructor and course: sessions they completed / the course's sessions at their NIAT institutes.
+// Pick a subject with the buttons (Frontend, Backend, DSA...): its courses become the columns, one row per instructor who has taught
+// at least one of them, plus their overall % for the subject. Completed = 80%+. Server: connectors/taughtTraining.ts and
 // GET /reports/taught-training.
 
-type TaughtRow = {
-  employee_id: string | null;
-  full_name: string;
-  subject_area: string | null;
-  capability_manager: string | null;
-  product: string | null;
-  course_id: string;
-  course_title: string;
-  course_subject: string | null;
-  topics_total: number;
-  topics_taught: number;
-  taught_pct: number;
-  completed: boolean;
-  taught_topics: string[];
-  sessions_completed: number;
-  first_taught_date: string | null;
-  last_taught_date: string | null;
-};
-type TaughtResponse = { rows: TaughtRow[]; completed_pct: number; synced_at: string | null };
+type Cell = { completed: number; curriculum: number; scheduled: number; pct: number; last_taught_date: string | null; institutes: string[] };
+type TaughtRow = { employee_id: string | null; full_name: string; subject_area: string | null; capability_manager: string | null; courses: Record<string, Cell> };
+type CourseCol = { course_id: string; title: string; subject: string; instructors: number; curriculum_max: number };
+type TaughtResponse = { rows: TaughtRow[]; courses: CourseCol[]; subject_columns: string[]; completed_pct: number; synced_at: string | null };
 
 const QUERY_KEY = ['reports', 'taught-training'];
-const BANDS = [
-  { key: 'done', label: '80%+ (completed)', test: (p: number) => p >= 80 },
-  { key: 'mid', label: '50–79%', test: (p: number) => p >= 50 && p < 80 },
-  { key: 'low', label: 'Below 50%', test: (p: number) => p < 50 },
-];
 const NONE = '—';
+const SHORT: Record<string, string> = { 'Artificial Intelligence & Emerging Technologies': 'AI & ET' };
 const tone = (p: number) => (p >= 80 ? 'bg-[#e5f3ed] text-[#256e65]' : p >= 50 ? 'bg-[#fff5dc] text-[#8a6212]' : 'bg-[#fff0ec] text-[#9b4434]');
 const fmtDate = (d: string | null) => (d ? new Date(`${d}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : NONE);
+const pctOf = (done: number, total: number) => (total > 0 ? Math.min(100, Math.round((done / total) * 1000) / 10) : 0);
 const th = 'whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground';
 const td = 'whitespace-nowrap border-r border-border px-4 py-3 text-[12px]';
 
@@ -54,11 +36,12 @@ export function TaughtTrainingView() {
     },
   });
   const all = query.data?.rows ?? [];
-  const [subjects, setSubjects] = useState<string[]>([]);
-  const [courses, setCourses] = useState<string[]>([]);
+  const allCourses = query.data?.courses ?? [];
+  const subjectsWithCourses = useMemo(() => (query.data?.subject_columns ?? []).filter((s) => allCourses.some((c) => c.subject === s)), [query.data, allCourses]);
+  const [subject, setSubject] = useState<string | null>(null);
+  const activeSubject = subject && subjectsWithCourses.includes(subject) ? subject : subjectsWithCourses[0] ?? null;
+  const [instructorSubjects, setInstructorSubjects] = useState<string[]>([]);
   const [managers, setManagers] = useState<string[]>([]);
-  const [products, setProducts] = useState<string[]>([]);
-  const [bands, setBands] = useState<string[]>([]);
   const [search, setSearch] = useState('');
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState<{ ok: boolean; text: string } | null>(null);
@@ -68,7 +51,7 @@ export function TaughtTrainingView() {
     setSyncing(true);
     setSyncMessage(null);
     try {
-      // Same sync as the learning-portal view: it rebuilds this table right after the training status.
+      // Same sync as the learning-portal view: it rebuilds this data right after the training status.
       const response = await fetch('/api/sync/training-status', { method: 'POST' });
       const result = await response.json();
       setSyncMessage(result.ok ? { ok: true, text: 'Synced. Taught-in-class data rebuilt.' } : { ok: false, text: result.error || 'Sync failed.' });
@@ -80,42 +63,49 @@ export function TaughtTrainingView() {
     }
   };
 
-  // Each filter's options are counted over the rows the OTHER filters leave, so the counts always add up to what you would see.
-  const subjectOf = (r: TaughtRow) => r.course_subject ?? 'Unmapped';
-  const pass = (r: TaughtRow, skip: string) =>
-    (skip === 'subject' || !subjects.length || subjects.includes(subjectOf(r))) &&
-    (skip === 'course' || !courses.length || courses.includes(r.course_title)) &&
-    (skip === 'cm' || !managers.length || managers.includes(r.capability_manager ?? NONE)) &&
-    (skip === 'product' || !products.length || products.includes(r.product ?? NONE)) &&
-    (skip === 'band' || !bands.length || BANDS.some((b) => bands.includes(b.key) && b.test(r.taught_pct)));
-  const optionsFor = (skip: string, value: (r: TaughtRow) => string) => {
+  const columns = useMemo(() => allCourses.filter((c) => c.subject === activeSubject), [allCourses, activeSubject]);
+  // Rows of this subject: instructors who have taught at least one of its courses, with their overall % over those courses.
+  const subjectRows = useMemo(() => all.flatMap((r) => {
+    const cells = columns.map((c) => r.courses[c.course_id]).filter((x): x is Cell => !!x);
+    if (!cells.length) return [];
+    const done = cells.reduce((a, x) => a + Math.min(x.completed, x.curriculum), 0), total = cells.reduce((a, x) => a + x.curriculum, 0);
+    return [{ ...r, overall: { done, total, pct: pctOf(done, total) } }];
+  }), [all, columns]);
+  type SubjectRow = (typeof subjectRows)[number];
+  const pass = (r: SubjectRow, skip: string) =>
+    (skip === 'subject' || !instructorSubjects.length || instructorSubjects.includes(r.subject_area ?? NONE)) &&
+    (skip === 'cm' || !managers.length || managers.includes(r.capability_manager ?? NONE));
+  const optionsFor = (skip: string, value: (r: SubjectRow) => string) => {
     const counts = new Map<string, number>();
-    for (const r of all) if (pass(r, skip)) counts.set(value(r), (counts.get(value(r)) ?? 0) + 1);
+    for (const r of subjectRows) if (pass(r, skip)) counts.set(value(r), (counts.get(value(r)) ?? 0) + 1);
     return [...counts].sort((a, b) => a[0].localeCompare(b[0])).map(([key, count]) => ({ key, label: key, count }));
   };
-  const filtered = useMemo(() => all.filter((r) => pass(r, '')), [all, subjects, courses, managers, products, bands]); // eslint-disable-line react-hooks/exhaustive-deps
+  const filtered = useMemo(() => subjectRows.filter((r) => pass(r, '')), [subjectRows, instructorSubjects, managers]); // eslint-disable-line react-hooks/exhaustive-deps
   const searched = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return q ? filtered.filter((r) => r.full_name.toLowerCase().includes(q) || (r.employee_id ?? '').toLowerCase().includes(q) || r.course_title.toLowerCase().includes(q)) : filtered;
+    return q ? filtered.filter((r) => r.full_name.toLowerCase().includes(q) || (r.employee_id ?? '').toLowerCase().includes(q)) : filtered;
   }, [filtered, search]);
   const pager = usePagedRows(searched, 50);
-  const anyFilter = subjects.length + courses.length + managers.length + products.length + bands.length > 0;
-
-  const people = new Set(searched.map((r) => r.employee_id ?? r.full_name)).size;
-  const courseCount = new Set(searched.map((r) => r.course_id)).size;
-  const completed = searched.filter((r) => r.completed).length;
+  const anyFilter = instructorSubjects.length + managers.length > 0;
+  const colTotals = useMemo(() => Object.fromEntries(columns.map((c) => {
+    const cells = searched.map((r) => r.courses[c.course_id]).filter(Boolean);
+    return [c.course_id, { taught: cells.length, completed: cells.filter((x) => x.pct >= 80).length }];
+  })), [columns, searched]);
+  const overallCompleted = searched.filter((r) => r.overall.pct >= 80).length;
 
   const downloadTable = () => {
-    const headers = ['Name', 'Employee ID', 'Instructor subject', 'Capability Manager', 'Product', 'Course', 'Course subject', 'Topics taught', 'Course topics', 'Taught %', 'Completed (80%+)', 'Sessions completed', 'First taught', 'Last taught', 'Topics taught (list)'];
-    const rows = searched.map((r) => [r.full_name, r.employee_id ?? '', r.subject_area ?? '', r.capability_manager ?? '', r.product ?? '', r.course_title, r.course_subject ?? 'Unmapped', r.topics_taught, r.topics_total, r.taught_pct, r.completed ? 'Yes' : 'No', r.sessions_completed, r.first_taught_date ?? '', r.last_taught_date ?? '', r.taught_topics.join('; ')]);
-    downloadCsv('training-taught-in-class.csv', toCsv(headers, rows));
+    const headers = ['Name', 'Employee ID', 'Instructor subject', 'Capability Manager', ...columns.flatMap((c) => [`${c.title} %`, `${c.title} completed / sessions`]), `${activeSubject} overall %`, `${activeSubject} completed / sessions`];
+    const rows = searched.map((r) => [r.full_name, r.employee_id ?? '', r.subject_area ?? '', r.capability_manager ?? '',
+      ...columns.flatMap((c) => { const x = r.courses[c.course_id]; return x ? [x.pct, `${x.completed}/${x.curriculum}`] : ['', '']; }),
+      r.overall.pct, `${r.overall.done}/${r.overall.total}`]);
+    downloadCsv(`training-taught-${(activeSubject ?? 'all').toLowerCase().replace(/[^a-z0-9]+/g, '-')}.csv`, toCsv(headers, rows));
   };
 
   return <div>
     <PageIntro
-      eyebrow="BigQuery / completed sessions matched to each course's topics"
+      eyebrow="BigQuery / NIAT session schedule, by session id"
       title="Training Stats -- Taught in class"
-      description="How much of each course an instructor has actually taught to students: course topics covered by their completed lecture/practice sessions (all time) out of the course's topics. Assignments, mock tests, quizzes/exams, interview prep and projects are not counted as topics. 80% or more = Completed."
+      description="NIAT instructors only. Every session of a course has its own session ID; each cell is the course's sessions this instructor has completed out of the course's sessions at their NIAT institute(s) (lecture and practice). Pick a subject to see its courses. Orientation / intro courses are left out. 80% or more = Completed."
       action={<div className="flex items-center gap-2">
         <button type="button" data-testid="button-refresh-taught-training" onClick={refresh} className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3.5 py-2.5 text-[12px] font-bold text-foreground transition-colors hover:bg-secondary"><RefreshCw size={14} /> Refresh</button>
         <button type="button" data-testid="button-sync-taught-training" onClick={syncNow} disabled={syncing} className="inline-flex items-center gap-2 rounded-lg bg-primary px-3.5 py-2.5 text-[12px] font-bold text-primary-foreground shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-45">{syncing ? 'Syncing…' : 'Sync Now'}</button>
@@ -126,63 +116,77 @@ export function TaughtTrainingView() {
     {query.isLoading && <SkeletonBlock className="h-[520px]" />}
     {query.isError && <QueryError message="Taught-in-class training is unavailable right now." />}
 
-    {query.data && <>
+    {query.data && (all.length === 0 || !activeSubject ? <EmptyState title="No taught-in-class data yet" description="Run the database push, publish, then click Sync Now to build it." /> : <>
+      <div data-testid="taught-subject-buttons" className="mb-4 flex flex-wrap gap-2 border-b border-border pb-3">
+        {subjectsWithCourses.map((s) => {
+          const ids = new Set(allCourses.filter((c) => c.subject === s).map((c) => c.course_id));
+          const count = all.filter((r) => Object.keys(r.courses).some((id) => ids.has(id))).length;
+          return <button key={s} type="button" data-testid={`button-taught-subject-${s}`} onClick={() => { setSubject(s); setInstructorSubjects([]); setManagers([]); }}
+            className={`rounded-full px-4 py-2 text-[12px] font-bold transition-colors ${s === activeSubject ? 'bg-primary text-primary-foreground shadow-sm' : 'bg-secondary text-muted-foreground hover:text-foreground'}`}>
+            {SHORT[s] ?? s} <span className="ml-1 tabular-nums opacity-75">{formatKpi(count)}</span>
+          </button>;
+        })}
+      </div>
+
       <div data-testid="taught-filters" className="mb-5 flex flex-wrap items-center gap-4">
-        <MultiSelectFilter label="Course subject" options={optionsFor('subject', subjectOf)} selected={subjects} onChange={setSubjects} testId="select-taught-subject" />
-        <MultiSelectFilter label="Course" options={optionsFor('course', (r) => r.course_title)} selected={courses} onChange={setCourses} testId="select-taught-course" widthClass="max-w-[260px]" />
+        <MultiSelectFilter label="Instructor subject" options={optionsFor('subject', (r) => r.subject_area ?? NONE)} selected={instructorSubjects} onChange={setInstructorSubjects} testId="select-taught-subject" />
         <MultiSelectFilter label="Capability Manager" options={optionsFor('cm', (r) => r.capability_manager ?? NONE)} selected={managers} onChange={setManagers} testId="select-taught-cm" />
-        <MultiSelectFilter label="Product" options={optionsFor('product', (r) => r.product ?? NONE)} selected={products} onChange={setProducts} testId="select-taught-product" />
-        <MultiSelectFilter label="Taught %" options={BANDS.map((b) => ({ key: b.key, label: b.label, count: all.filter((r) => pass(r, 'band') && b.test(r.taught_pct)).length }))} selected={bands} onChange={setBands} testId="select-taught-band" />
-        {anyFilter && <button type="button" onClick={() => { setSubjects([]); setCourses([]); setManagers([]); setProducts([]); setBands([]); }} className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-[11px] font-bold text-foreground transition-colors hover:bg-secondary"><X size={13} /> Clear filters</button>}
+        {anyFilter && <button type="button" onClick={() => { setInstructorSubjects([]); setManagers([]); }} className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-[11px] font-bold text-foreground transition-colors hover:bg-secondary"><X size={13} /> Clear filters</button>}
       </div>
 
       <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
-        <p className="text-[11px] text-muted-foreground">{formatKpi(searched.length)} instructor-course rows · {formatKpi(people)} instructors · {formatKpi(courseCount)} courses · {formatKpi(completed)} completed (80%+) · {query.data.synced_at ? `last synced ${new Date(query.data.synced_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' })}` : 'not synced yet -- click Sync Now'}</p>
-        {all.length > 0 && <div className="flex flex-wrap items-center gap-2">
+        <p className="text-[11px] text-muted-foreground">{formatKpi(searched.length)} NIAT instructors · {formatKpi(columns.length)} {SHORT[activeSubject] ?? activeSubject} courses · {formatKpi(overallCompleted)} at 80%+ overall · {query.data.synced_at ? `last synced ${new Date(query.data.synced_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' })}` : 'not synced yet -- click Sync Now'}</p>
+        <div className="flex flex-wrap items-center gap-2">
           <DownloadCsvButton onClick={downloadTable} disabled={searched.length === 0} label={`Download CSV (${formatKpi(searched.length)})`} testId="button-download-taught-csv" />
-          <TableSearchInput value={search} onChange={setSearch} placeholder="Search name, employee ID or course..." testId="input-search-taught" />
-        </div>}
+          <TableSearchInput value={search} onChange={setSearch} testId="input-search-taught" />
+        </div>
       </div>
 
-      {all.length === 0 ? <EmptyState title="No taught-in-class data yet" description="Run the database push, publish, then click Sync Now to build it." />
-        : searched.length === 0 ? <EmptyState title="No rows match" description="Change or clear the filters." />
+      {searched.length === 0 ? <EmptyState title="No instructors match" description="Pick another subject or clear the filters." />
         : <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1200px] border-collapse text-left">
+            <table className="w-full border-collapse text-left">
               <thead>
                 <tr className="border-b border-border bg-[#f4f7f9]">
                   <th className={`sticky left-0 z-10 bg-[#f4f7f9] ${th}`}>Name</th>
                   <th className={th}>Employee ID</th>
                   <th className={th}>Instructor subject</th>
                   <th className={th}>Capability Manager</th>
-                  <th className={th}>Product</th>
-                  <th className={th}>Course</th>
-                  <th className={th}>Course subject</th>
-                  <th className={`${th} text-center`} title="Course topics covered by their completed sessions / the course's topics">Topics taught</th>
-                  <th className={`${th} text-center`}>Taught %</th>
-                  <th className={`${th} text-center`}>Sessions</th>
-                  <th className={th}>Last taught</th>
+                  {columns.map((c, i) => <th key={c.course_id} className={`${th} text-center ${i === 0 ? 'border-l-2' : ''}`} title={`Up to ${c.curriculum_max} sessions; taught by ${c.instructors} NIAT instructors`}>
+                    <div className="normal-case tracking-normal font-sans text-[11px] font-bold text-foreground">{c.title}</div>
+                    <div className="mt-1 font-sans text-[10px] normal-case tracking-normal text-muted-foreground/80">{formatKpi(colTotals[c.course_id]?.completed ?? 0)} of {formatKpi(colTotals[c.course_id]?.taught ?? 0)} at 80%+</div>
+                  </th>)}
+                  <th className={`${th} border-l-2 bg-[#eef4ee] text-center`}>{SHORT[activeSubject] ?? activeSubject} overall</th>
                 </tr>
               </thead>
               <tbody>
-                {pager.pageRows.map((r) => <tr key={`${r.employee_id ?? r.full_name}-${r.course_id}`} className="border-b border-border/70 last:border-0 hover:bg-[#f8fafb]">
+                {pager.pageRows.map((r) => <tr key={r.employee_id ?? r.full_name} className="border-b border-border/70 last:border-0 hover:bg-[#f8fafb]">
                   <td className={`sticky left-0 z-10 bg-card font-semibold text-foreground ${td}`}>{r.full_name}</td>
                   <td className={`${td} font-mono-ui text-[11px]`}>{r.employee_id || NONE}</td>
                   <td className={td}>{r.subject_area || NONE}</td>
                   <td className={`${td} text-muted-foreground`}>{r.capability_manager || NONE}</td>
-                  <td className={td}>{r.product || NONE}</td>
-                  <td className={`${td} font-semibold`}>{r.course_title}</td>
-                  <td className={td}>{r.course_subject ?? <span className="text-muted-foreground">Unmapped</span>}</td>
-                  <td className={`${td} text-center tabular-nums`} title={r.taught_topics.length ? `Taught: ${r.taught_topics.join(', ')}` : 'No topic matched yet'}>{r.topics_taught} / {r.topics_total}</td>
-                  <td className={`${td} text-center`}><span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold tabular-nums ${tone(r.taught_pct)}`}>{r.taught_pct}%</span></td>
-                  <td className={`${td} text-center tabular-nums`}>{formatKpi(r.sessions_completed)}</td>
-                  <td className={`${td} text-muted-foreground`}>{fmtDate(r.last_taught_date)}</td>
+                  {columns.map((c, i) => {
+                    const x = r.courses[c.course_id];
+                    return <td key={c.course_id} className={`${td} text-center ${i === 0 ? 'border-l-2' : ''}`}
+                      title={x ? `Completed ${x.completed} of ${x.curriculum} sessions (${x.scheduled} scheduled for them) · last taught ${fmtDate(x.last_taught_date)}${x.institutes.length ? ` · ${x.institutes.join(', ')}` : ''}` : 'Not taught'}>
+                      {x ? <div className="flex flex-col items-center gap-0.5">
+                        <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold tabular-nums ${tone(x.pct)}`}>{x.pct}%</span>
+                        <span className="text-[10px] tabular-nums text-muted-foreground">{x.completed}/{x.curriculum}</span>
+                      </div> : <span className="text-[11px] text-muted-foreground">{NONE}</span>}
+                    </td>;
+                  })}
+                  <td className={`${td} border-l-2 bg-[#f6faf6] text-center`}>
+                    <div className="flex flex-col items-center gap-0.5">
+                      <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold tabular-nums ${tone(r.overall.pct)}`}>{r.overall.pct}%</span>
+                      <span className="text-[10px] tabular-nums text-muted-foreground">{r.overall.done}/{r.overall.total}</span>
+                    </div>
+                  </td>
                 </tr>)}
               </tbody>
             </table>
           </div>
           <TablePager page={pager.page} pageCount={pager.pageCount} pageSize={pager.pageSize} start={pager.start} end={pager.end} total={pager.total} onPageChange={pager.setPage} onPageSizeChange={pager.setPageSize} />
         </div>}
-    </>}
+    </>)}
   </div>;
 }

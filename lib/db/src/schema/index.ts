@@ -495,6 +495,14 @@ export const instructorTaughtCourseTable = pgTable("instructor_taught_course", {
   sessionsCompleted: integer("sessions_completed").notNull().default(0),
   firstTaughtDate: date("first_taught_date"),
   lastTaughtDate: date("last_taught_date"),
+  // Session-id based (2026-10-19, per request -- replaces the topic matching above, whose columns are no longer filled): every
+  // curriculum session of a course has its own session_id, shared by every section that takes it. curriculumSessions = distinct
+  // Lecture/Practice session ids scheduled for this course at the NIAT institutes this instructor teaches it at; completedSessions =
+  // the distinct ones THEY completed; scheduledSessions = the distinct ones scheduled for them (completed + pending).
+  curriculumSessions: integer("curriculum_sessions").notNull().default(0),
+  completedSessions: integer("completed_sessions").notNull().default(0),
+  scheduledSessions: integer("scheduled_sessions").notNull().default(0),
+  institutes: jsonb("institutes").$type<string[]>().notNull().default([]),
   syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
 });
 export type InstructorTaughtCourse = typeof instructorTaughtCourseTable.$inferSelect;

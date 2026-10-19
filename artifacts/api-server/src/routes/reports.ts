@@ -8,6 +8,7 @@ import { TRAINING_COURSE_TAXONOMY, isResolvedCourse } from "../data/trainingCour
 import { TECH_AREAS, normalizeSubjectArea } from "../lib/departmentTaxonomy";
 import { isPinnedConfirmedInstructor } from "../data/classificationOverrides";
 import { productOf } from "../lib/product";
+import { taughtSubjectColumn, displayCourseTitle, TAUGHT_SUBJECT_COLUMNS } from "../lib/connectors/taughtTraining";
 
 // Pinned edge-case instructors (NW0005068): see isPinnedConfirmedInstructor() in
 // data/classificationOverrides.ts. Kept counted on every sync until their Darwin
@@ -1456,45 +1457,58 @@ router.get("/reports/training-stats", requireAuth, requireRole("admin"), async (
   });
 });
 
-// "Taught in class" training (2026-10-19, per request): one row per (instructor, course they have taught), from
-// instructorTaughtCourseTable (connectors/taughtTraining.ts, built by the Training Status sync). Same population as the learning-portal
-// Training Stats above. A course counts as Completed at 80%+ of its topics taught. Admin-only, like Training Stats. Reads defensively so
-// the page shows "not synced yet" instead of failing before the database push.
+// "Taught in class" training, SESSION-ID version (2026-10-19, per request): NIAT instructors only (Product NIAT (Deployed), and their
+// TeachOS enrolled plan NIAT when one is recorded). For every course they teach: curriculum = distinct Lecture/Practice session ids of
+// that course at their NIAT institutes; completed = the distinct ones they completed; % = completed / curriculum (see
+// connectors/taughtTraining.ts, built by the Training Status sync). The page shows one subject at a time (Frontend, Backend, DSA...),
+// its courses as columns and one row per instructor. Course -> subject is worked out here (taughtSubjectColumn: by id, else by title;
+// orientation/intro courses left out), so changing it needs no re-sync. Completed = 80%+. Admin-only. Reads defensively.
 const TAUGHT_COMPLETED_PCT = 80;
+const isNiatInstructor = (p: typeof instructorsTable.$inferSelect) =>
+  productOf(p) === "NIAT (Deployed)" && (!p.enrolledPlans || /niat/i.test(p.enrolledPlans));
 router.get("/reports/taught-training", requireAuth, requireRole("admin"), async (_req, res) => {
   const allRows = await db.select().from(instructorsTable);
-  const people = allRows.filter((r) => r.inTeachos && r.teachosUserId && !TRAINING_STATS_EXCLUDED_CLASSIFICATIONS.has(r.classification ?? ""));
-  const byTeachosId = new Map(people.map((p) => [p.teachosUserId!, p]));
+  const people = allRows.filter((r) => r.inTeachos && r.teachosUserId && !TRAINING_STATS_EXCLUDED_CLASSIFICATIONS.has(r.classification ?? "") && isNiatInstructor(r));
+  const byUid = new Map(people.map((p) => [p.teachosUserId!, p]));
   let taughtRows: (typeof instructorTaughtCourseTable.$inferSelect)[] = [];
   try {
     taughtRows = await db.select().from(instructorTaughtCourseTable);
   } catch (err) {
     console.warn("[taught-training] instructor_taught_course is not readable yet (run the database push):", (err as Error).message);
   }
-  const rows = taughtRows.flatMap((t) => {
-    const p = byTeachosId.get(t.instructorUserId);
-    if (!p) return [];
-    const pct = t.topicsTotal > 0 ? Math.round((t.topicsTaught / t.topicsTotal) * 1000) / 10 : 0;
-    return [{
+  const pct = (done: number, total: number) => (total > 0 ? Math.min(100, Math.round((done / total) * 1000) / 10) : 0);
+  type Cell = { completed: number; curriculum: number; scheduled: number; pct: number; last_taught_date: string | null; institutes: string[] };
+  const courses = new Map<string, { course_id: string; title: string; subject: string; instructors: number; curriculum_max: number }>();
+  const cellsByUid = new Map<string, Record<string, Cell>>();
+  for (const t of taughtRows) {
+    if (!byUid.has(t.instructorUserId) || t.curriculumSessions <= 0) continue;
+    const subject = taughtSubjectColumn(t.courseId, t.courseTitle);
+    if (!subject) continue; // orientation / intro course
+    const c = courses.get(t.courseId) ?? { course_id: t.courseId, title: displayCourseTitle(t.courseTitle), subject, instructors: 0, curriculum_max: 0 };
+    c.instructors += 1;
+    c.curriculum_max = Math.max(c.curriculum_max, t.curriculumSessions);
+    courses.set(t.courseId, c);
+    if (!cellsByUid.has(t.instructorUserId)) cellsByUid.set(t.instructorUserId, {});
+    cellsByUid.get(t.instructorUserId)![t.courseId] = { completed: t.completedSessions, curriculum: t.curriculumSessions, scheduled: t.scheduledSessions, pct: pct(t.completedSessions, t.curriculumSessions), last_taught_date: t.lastTaughtDate, institutes: t.institutes };
+  }
+  const rows = [...cellsByUid].map(([uid, cells]) => {
+    const p = byUid.get(uid)!;
+    return {
       employee_id: p.employeeId,
       full_name: p.fullName,
       subject_area: normalizeSubjectArea(p.deptArea || p.manualDeptArea || null),
       capability_manager: p.teachosManager || p.manualCapabilityManager || null,
-      product: productOf(p),
-      course_id: t.courseId,
-      course_title: t.courseTitle,
-      course_subject: t.courseSubject,
-      topics_total: t.topicsTotal,
-      topics_taught: t.topicsTaught,
-      taught_pct: pct,
-      completed: pct >= TAUGHT_COMPLETED_PCT,
-      taught_topics: t.taughtTopics,
-      sessions_completed: t.sessionsCompleted,
-      first_taught_date: t.firstTaughtDate,
-      last_taught_date: t.lastTaughtDate,
-    }];
-  }).sort((a, b) => a.full_name.localeCompare(b.full_name) || b.taught_pct - a.taught_pct || a.course_title.localeCompare(b.course_title));
-  res.json({ rows, completed_pct: TAUGHT_COMPLETED_PCT, synced_at: taughtRows[0]?.syncedAt ?? null });
+      courses: cells,
+    };
+  }).sort((a, b) => a.full_name.localeCompare(b.full_name));
+  res.json({
+    rows,
+    // Courses in subject order, then most-taught first.
+    courses: [...courses.values()].sort((a, b) => TAUGHT_SUBJECT_COLUMNS.indexOf(a.subject as (typeof TAUGHT_SUBJECT_COLUMNS)[number]) - TAUGHT_SUBJECT_COLUMNS.indexOf(b.subject as (typeof TAUGHT_SUBJECT_COLUMNS)[number]) || b.instructors - a.instructors || a.title.localeCompare(b.title)),
+    subject_columns: TAUGHT_SUBJECT_COLUMNS,
+    completed_pct: TAUGHT_COMPLETED_PCT,
+    synced_at: taughtRows[0]?.syncedAt ?? null,
+  });
 });
 
 // Manual Date of joining (2026-10-14, per request): sets or clears the typed-in joining date for someone Darwin has no date for
