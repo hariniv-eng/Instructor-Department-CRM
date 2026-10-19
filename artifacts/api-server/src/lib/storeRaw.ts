@@ -130,6 +130,10 @@ export async function storeTaughtCourses(rows: TaughtCourseRow[]): Promise<numbe
         sessionsCompleted: row.sessions_completed,
         firstTaughtDate: row.first_taught_date,
         lastTaughtDate: row.last_taught_date,
+        curriculumSessions: row.curriculum_sessions,
+        completedSessions: row.completed_sessions,
+        scheduledSessions: row.scheduled_sessions,
+        institutes: row.institutes,
       }));
       if (batch.length) await tx.insert(instructorTaughtCourseTable).values(batch);
     }
