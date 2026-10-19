@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, instructorsTable, instructorArchiveTable, darwinboxActiveTable, darwinboxFullRosterTable, darwinboxExitsTable, instructorTrainingStatusTable, instructorContributionTable, instructorContributionDailyTable, instructorManualJoiningTable, instructorEvaluationDailyTable, instructorTimeSpentDailyTable } from "@workspace/db";
+import { db, instructorsTable, instructorArchiveTable, darwinboxActiveTable, darwinboxFullRosterTable, darwinboxExitsTable, instructorTrainingStatusTable, instructorTaughtCourseTable, instructorContributionTable, instructorContributionDailyTable, instructorManualJoiningTable, instructorEvaluationDailyTable, instructorTimeSpentDailyTable } from "@workspace/db";
 import { and, eq, gte, lte } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/auth";
 import { cell, parseLooseDate, toISODate } from "../lib/reconcile";
@@ -1454,6 +1454,47 @@ router.get("/reports/training-stats", requireAuth, requireRole("admin"), async (
     rows,
     synced_at: statusRows[0]?.syncedAt ?? null,
   });
+});
+
+// "Taught in class" training (2026-10-19, per request): one row per (instructor, course they have taught), from
+// instructorTaughtCourseTable (connectors/taughtTraining.ts, built by the Training Status sync). Same population as the learning-portal
+// Training Stats above. A course counts as Completed at 80%+ of its topics taught. Admin-only, like Training Stats. Reads defensively so
+// the page shows "not synced yet" instead of failing before the database push.
+const TAUGHT_COMPLETED_PCT = 80;
+router.get("/reports/taught-training", requireAuth, requireRole("admin"), async (_req, res) => {
+  const allRows = await db.select().from(instructorsTable);
+  const people = allRows.filter((r) => r.inTeachos && r.teachosUserId && !TRAINING_STATS_EXCLUDED_CLASSIFICATIONS.has(r.classification ?? ""));
+  const byTeachosId = new Map(people.map((p) => [p.teachosUserId!, p]));
+  let taughtRows: (typeof instructorTaughtCourseTable.$inferSelect)[] = [];
+  try {
+    taughtRows = await db.select().from(instructorTaughtCourseTable);
+  } catch (err) {
+    console.warn("[taught-training] instructor_taught_course is not readable yet (run the database push):", (err as Error).message);
+  }
+  const rows = taughtRows.flatMap((t) => {
+    const p = byTeachosId.get(t.instructorUserId);
+    if (!p) return [];
+    const pct = t.topicsTotal > 0 ? Math.round((t.topicsTaught / t.topicsTotal) * 1000) / 10 : 0;
+    return [{
+      employee_id: p.employeeId,
+      full_name: p.fullName,
+      subject_area: normalizeSubjectArea(p.deptArea || p.manualDeptArea || null),
+      capability_manager: p.teachosManager || p.manualCapabilityManager || null,
+      product: productOf(p),
+      course_id: t.courseId,
+      course_title: t.courseTitle,
+      course_subject: t.courseSubject,
+      topics_total: t.topicsTotal,
+      topics_taught: t.topicsTaught,
+      taught_pct: pct,
+      completed: pct >= TAUGHT_COMPLETED_PCT,
+      taught_topics: t.taughtTopics,
+      sessions_completed: t.sessionsCompleted,
+      first_taught_date: t.firstTaughtDate,
+      last_taught_date: t.lastTaughtDate,
+    }];
+  }).sort((a, b) => a.full_name.localeCompare(b.full_name) || b.taught_pct - a.taught_pct || a.course_title.localeCompare(b.course_title));
+  res.json({ rows, completed_pct: TAUGHT_COMPLETED_PCT, synced_at: taughtRows[0]?.syncedAt ?? null });
 });
 
 // Manual Date of joining (2026-10-14, per request): sets or clears the typed-in joining date for someone Darwin has no date for

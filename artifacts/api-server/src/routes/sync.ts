@@ -16,9 +16,10 @@ import { fetchCourseStatusRows, InstructorLearningStatusError } from "../lib/con
 import { fetchContributionRows, fetchContributionDailyRows, InstructorContributionError } from "../lib/connectors/instructorContribution";
 import { fetchEvaluationDailyRows } from "../lib/connectors/instructorEvaluations";
 import { fetchTimeSpentDailyRows } from "../lib/connectors/instructorTimeSpent";
+import { fetchTaughtCourseRows } from "../lib/connectors/taughtTraining";
 import { snapshotTeachosDataIntoArchive } from "../lib/archiveInstructors";
 import { resolvedCourseDefs } from "../data/trainingCourseTaxonomy";
-import { storeDarwinboxActive, storeDarwinboxExits, storeDarwinboxFullRoster, storeTeachosDeployment, storeTrainingStatus, storeContribution, storeContributionDaily, storeEvaluationDaily, storeTimeSpentDaily } from "../lib/storeRaw";
+import { storeDarwinboxActive, storeDarwinboxExits, storeDarwinboxFullRoster, storeTeachosDeployment, storeTrainingStatus, storeTaughtCourses, storeContribution, storeContributionDaily, storeEvaluationDaily, storeTimeSpentDaily } from "../lib/storeRaw";
 import { reconcileDarwin, reconcileDarwinFullRosterFallback, reconcileTeachos, reconcileTeachosEmployeeIdReference, reconcileCapabilityManager, recomputeStatuses } from "../lib/reconcile";
 import { sdb, inSyncTransaction, inSavepoint, withSyncLock } from "../lib/syncContext";
 import { LAST_SYNC, LAST_CAPABILITY_MANAGER_SYNC, setLastCapabilityManagerSync, DAILY_AUTO_SYNC_INTERVAL_HOURS, type SyncResult } from "../lib/syncState";
@@ -234,6 +235,14 @@ async function runTrainingStatusSync(): Promise<SyncResult> {
     // Keep the Instructor Archive's copy of the training data current (2026-10-13).
     await snapshotTeachosDataIntoArchive().catch((e) => console.error("[archive] training snapshot failed:", e));
     await db.insert(uploadsTable).values({ source: "Instructor Training Status", filename: "BigQuery sync (niat_instructor_unit_wise_completion_and_best_attempt_details, aggregated per course)", rowCount: stored });
+    // "Taught in class" training (2026-10-19): built right after, from the session view + the same training table. Its own try, so a
+    // failure here never fails the learning-portal Training Status sync above.
+    try {
+      const taught = await storeTaughtCourses(await fetchTaughtCourseRows());
+      await db.insert(uploadsTable).values({ source: "Instructor Taught Training", filename: "BigQuery sync (completed sessions matched to course topics, per instructor + course)", rowCount: taught });
+    } catch (e) {
+      console.error("[taught-training] sync failed:", e);
+    }
     return { ok: true, source: "training_status_live", stored, synced_at: new Date().toISOString() };
   } catch (e) {
     const message = e instanceof InstructorLearningStatusError ? e.message : describeUnexpectedError(e);

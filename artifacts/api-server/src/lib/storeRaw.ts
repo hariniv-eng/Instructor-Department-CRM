@@ -16,6 +16,7 @@ import {
   darwinboxFullRosterTable,
   teachosDeploymentTable,
   instructorTrainingStatusTable,
+  instructorTaughtCourseTable,
   instructorContributionTable,
   instructorContributionDailyTable,
   instructorEvaluationDailyTable,
@@ -24,6 +25,7 @@ import {
 import { sdb as db } from "./syncContext";
 import { cell, type SheetRow } from "./reconcile";
 import type { CourseStatusRow } from "./connectors/instructorLearningStatus";
+import type { TaughtCourseRow } from "./connectors/taughtTraining";
 import type { ContributionRow, ContributionDailyRow } from "./connectors/instructorContribution";
 import type { EvaluationDailyRow } from "./connectors/instructorEvaluations";
 import type { TimeSpentDailyRow } from "./connectors/instructorTimeSpent";
@@ -107,6 +109,29 @@ export async function storeTrainingStatus(rows: CourseStatusRow[]): Promise<numb
         unitsCompleted: row.units_completed,
       }));
       if (batch.length) await tx.insert(instructorTrainingStatusTable).values(batch);
+    }
+  });
+  return rows.length;
+}
+
+// "Taught in class" training (2026-10-19): fully replaced on every Training Status sync, like storeTrainingStatus() above.
+export async function storeTaughtCourses(rows: TaughtCourseRow[]): Promise<number> {
+  await db.transaction(async (tx) => {
+    await tx.delete(instructorTaughtCourseTable);
+    for (let i = 0; i < rows.length; i += CHUNK) {
+      const batch = rows.slice(i, i + CHUNK).map((row) => ({
+        instructorUserId: row.instructor_user_id,
+        courseId: row.course_id,
+        courseTitle: row.course_title,
+        courseSubject: row.course_subject,
+        topicsTotal: row.topics_total,
+        topicsTaught: row.topics_taught,
+        taughtTopics: row.taught_topics,
+        sessionsCompleted: row.sessions_completed,
+        firstTaughtDate: row.first_taught_date,
+        lastTaughtDate: row.last_taught_date,
+      }));
+      if (batch.length) await tx.insert(instructorTaughtCourseTable).values(batch);
     }
   });
   return rows.length;

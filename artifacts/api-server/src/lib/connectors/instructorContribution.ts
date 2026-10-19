@@ -431,7 +431,7 @@ async function fetchCohortBatchWindows(): Promise<Map<string, { recent: string[]
 // the Training Stats course list (trainingCourseTaxonomy.ts) and so to a subject; the result is sessions per subject per instructor,
 // plus "__unmatched" for sessions whose course belongs to no subject there. The course columns are found from the view's schema. A
 // failure is logged and ignored (empty map), so the Contribution sync never fails because of it.
-const TRACK_SUBJECT: Record<string, string> = {
+export const TRACK_SUBJECT: Record<string, string> = {
   "Frontend Development": "Frontend", "Backend Development": "Backend", DSA: "DSA", "Gen AI": "GenAI",
   DSML: "Artificial Intelligence & Emerging Technologies", Aptitude: "Aptitude", Maths: "Maths", English: "English",
 };
