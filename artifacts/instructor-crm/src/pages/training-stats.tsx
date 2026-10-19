@@ -4,6 +4,7 @@ import { RefreshCw, X } from 'lucide-react';
 import { PageIntro, EmptyState, QueryError, SkeletonBlock, TablePager, TableSearchInput, DownloadCsvButton, usePagedRows, formatKpi } from '@/components/ui-pieces';
 import { downloadCsv, slugify, toCsv } from '@/lib/csv';
 import { ALL_PRODUCTS, MultiSelectFilter } from './instructors';
+import { TaughtTrainingView } from './taught-training';
 
 // "Training Stats" (2026-09-23, per request): an instructor's OWN
 // training/upskilling progress, distinct from every other tab here, which
@@ -329,7 +330,29 @@ function CompletionBreakdown({ title, firstColumn, rows, testId, note }: { title
   </div>;
 }
 
+// Two views (2026-10-19, per request): the learning-portal Training Stats below (unchanged) and "Taught in class" (taught-training.tsx),
+// built from the topics each instructor has actually taught in completed sessions.
+const TRAINING_VIEWS = [
+  { key: 'portal', label: 'Learning portal' },
+  { key: 'taught', label: 'Taught in class' },
+] as const;
 export default function TrainingStatsPage() {
+  const [view, setView] = useState<'portal' | 'taught'>('portal');
+  return <div className="mx-auto max-w-[1600px]">
+    <div data-testid="training-view-toggle" className="mb-4 inline-flex rounded-lg border border-border bg-card p-1 shadow-sm">
+      {TRAINING_VIEWS.map((v) => <button
+        key={v.key}
+        type="button"
+        data-testid={`button-training-view-${v.key}`}
+        onClick={() => setView(v.key)}
+        className={`rounded-md px-3.5 py-1.5 text-[12px] font-bold transition-colors ${view === v.key ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+      >{v.label}</button>)}
+    </div>
+    {view === 'portal' ? <LearningPortalStats /> : <TaughtTrainingView />}
+  </div>;
+}
+
+function LearningPortalStats() {
   const queryClient = useQueryClient();
   const query = useTrainingStats();
   const data = query.data;
@@ -457,7 +480,7 @@ export default function TrainingStatsPage() {
   };
   const pendingCount = displayTaxonomy.filter((d) => !isResolved(d)).length;
 
-  return <div className="mx-auto max-w-[1600px]">
+  return <div>
     <PageIntro
       eyebrow="BigQuery / niat_instructor_unit_wise_completion_and_best_attempt_details, aggregated per course"
       title="Training Stats"

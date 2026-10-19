@@ -476,6 +476,29 @@ export const instructorTrainingStatusTable = pgTable("instructor_training_status
   syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// "Taught in class" training (2026-10-19, per request): how much of each course an instructor has TAUGHT to students, a second view
+// beside the learning-portal Training Stats above (which stays as it is). One row per (instructor, course they have taught). The
+// session view's learning_portal_course_id is the same id as the training table's course_id, so each course taught to students has
+// its own topics there; a topic counts as taught when one of the instructor's COMPLETED Lecture/Practice sessions under that course is
+// titled like the topic or one of its units (see connectors/taughtTraining.ts). Built by the Training Status sync.
+export const instructorTaughtCourseTable = pgTable("instructor_taught_course", {
+  id: serial("id").primaryKey(),
+  instructorUserId: text("instructor_user_id").notNull(),
+  courseId: text("course_id").notNull(),
+  courseTitle: text("course_title").notNull(),
+  // The course's subject: the teaching-course list first, then the Training Stats course list; "General" for orientation-type
+  // courses; null when the course is on neither list.
+  courseSubject: text("course_subject"),
+  topicsTotal: integer("topics_total").notNull().default(0),
+  topicsTaught: integer("topics_taught").notNull().default(0),
+  taughtTopics: jsonb("taught_topics").$type<string[]>().notNull().default([]),
+  sessionsCompleted: integer("sessions_completed").notNull().default(0),
+  firstTaughtDate: date("first_taught_date"),
+  lastTaughtDate: date("last_taught_date"),
+  syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
+});
+export type InstructorTaughtCourse = typeof instructorTaughtCourseTable.$inferSelect;
+
 export const insertInstructorTrainingStatusSchema = createInsertSchema(instructorTrainingStatusTable);
 export type InstructorTrainingStatus = typeof instructorTrainingStatusTable.$inferSelect;
 export type InsertInstructorTrainingStatus = z.infer<typeof insertInstructorTrainingStatusSchema>;
