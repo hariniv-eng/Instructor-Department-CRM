@@ -69,7 +69,14 @@ export async function fetchCapabilityManagerRows(): Promise<SheetRow[]> {
   const bq = client();
   const ref = tableRef();
   const colsSql = Object.entries(EXPECTED_COLUMNS).map(([alias, col]) => `${col} AS ${alias}`).join(", ");
-  const query = `SELECT DISTINCT ${colsSql} FROM \`${ref}\` WHERE ${EXPECTED_COLUMNS.instructor_manager} IS NOT NULL AND ${EXPECTED_COLUMNS.instructor_manager} != ''`;
+  // Manager's own user id (2026-10-19, per request -- see CAPABILITY_MANAGER_BY_USER_ID): found from the table's schema, since its exact
+  // column name was never confirmed. When present it is pulled as instructor_manager_user_id, and rows that carry only the id (no name)
+  // are kept too.
+  const idCol = await findManagerIdColumn(bq).catch(() => null);
+  const query = idCol
+    ? `SELECT DISTINCT ${colsSql}, REPLACE(LOWER(CAST(${idCol} AS STRING)), '-', '') AS instructor_manager_user_id FROM \`${ref}\`
+       WHERE (${EXPECTED_COLUMNS.instructor_manager} IS NOT NULL AND ${EXPECTED_COLUMNS.instructor_manager} != '') OR ${idCol} IS NOT NULL`
+    : `SELECT DISTINCT ${colsSql} FROM \`${ref}\` WHERE ${EXPECTED_COLUMNS.instructor_manager} IS NOT NULL AND ${EXPECTED_COLUMNS.instructor_manager} != ''`;
   try {
     const [rows] = await runWithHardTimeout(() => bq.query({ query }), API_TIMEOUT_MS * 3 + 10000);
     return rows as SheetRow[];
@@ -78,3 +85,16 @@ export async function fetchCapabilityManagerRows(): Promise<SheetRow[]> {
     throw new CapabilityManagerError(`Query against ${ref} failed: ${(e as Error).message}`);
   }
 }
+
+// The column holding the MANAGER's user id in the manager table, if any: a column whose name mentions both "manager" and "id" (e.g.
+// instructor_manager_user_id / manager_id). null when there is none.
+export async function findManagerIdColumn(bq?: BigQuery): Promise<string | null> {
+  const client_ = bq ?? client();
+  const [rows] = await runWithHardTimeout(() => client_.query({
+    query: `SELECT column_name FROM \`${config.BIGQUERY_PROJECT_ID}.${config.BIGQUERY_DATASET}.INFORMATION_SCHEMA.COLUMNS\` WHERE table_name = @t ORDER BY ordinal_position`,
+    params: { t: TABLE_NAME },
+  }), API_TIMEOUT_MS + 10000);
+  const names = (rows as { column_name: string }[]).map((r) => r.column_name);
+  return names.find((n) => /manager/i.test(n) && /(^|_)(user_)?id$/i.test(n)) ?? null;
+}
+export const CAPABILITY_MANAGER_TABLE_NAME = TABLE_NAME;

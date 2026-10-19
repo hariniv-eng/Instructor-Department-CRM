@@ -85,3 +85,11 @@ export const CAPABILITY_MANAGER_ALIASES: Record<string, string> = {
   Pradeep: "Pradeep Jat",
   Akhil: "Akhilendar Reddy",
 };
+
+// Capability Manager by the MANAGER'S TeachOS user id (2026-10-19, per request): "whoever is mapped as an instructor to that manager's
+// user id, consider them as Akhilendar". His instructors are recorded under this manager user id with a different (or missing) name,
+// so they were not getting him as their Capability Manager. Key = manager user id, lower case without hyphens; value = the canonical
+// name above. An instructor mapped to one of these ids gets that manager, ahead of any other candidate.
+export const CAPABILITY_MANAGER_BY_USER_ID: Record<string, string> = {
+  ff6c284ace5d4a0b979f5a7f5a83ff45: "Akhilendar Reddy",
+};
