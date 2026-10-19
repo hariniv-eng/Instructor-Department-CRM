@@ -1688,7 +1688,7 @@ router.get("/reports/instructor-contribution", requireAuth, requireRole("admin")
 // between instructorsTable and instructorArchiveTable even though the
 // column names line up). Admin-only, same gating as Darwin Exit Details
 // and Contribution -- this surfaces exit history, not just a live roster.
-async function loadArchivePeople() {
+export async function loadArchivePeople() { // exported for _tmp_archive_vs_overview_exits.ts (2026-10-19)
   let allRows = await db.select().from(instructorArchiveTable);
   // Self-healing baseline (2026-10-06): if no row has the inArchiveScope
   // marker yet (first load after the column was added, or a startup seed
