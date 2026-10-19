@@ -8,7 +8,7 @@ import { and, eq } from "drizzle-orm";
 import { instructorsTable, darwinboxExitsTable, teachosIdReferenceTable } from "@workspace/db";
 import { sdb as db, inSavepoint } from "./syncContext";
 import { hasConfirmedInstructorDesignation, EXCLUDED_EMPLOYEES, type ExcludedOverride, OTHER_DEPARTMENT_EMPLOYEES, type OtherDepartmentOverride } from "../data/classificationOverrides";
-import { VALID_CAPABILITY_MANAGERS, CAPABILITY_MANAGER_ALIASES } from "../data/validCapabilityManagers";
+import { VALID_CAPABILITY_MANAGERS, CAPABILITY_MANAGER_ALIASES, CAPABILITY_MANAGER_BY_USER_ID } from "../data/validCapabilityManagers";
 import { classifyDepartment, classifyDeployment, subjectFromDesignation, subjectFromTeachosCategory } from "./departmentTaxonomy";
 import { archiveInstructors } from "./archiveInstructors";
 
@@ -917,9 +917,13 @@ export async function reconcileCapabilityManager(rows: SheetRow[]) {
   // decide anything per-row anymore now that Prudhvi's priority depends on
   // what ELSE that same instructor was mapped to among their up-to-8 rows.
   const validCandidatesByTeachosId = new Map<string, string[]>();
+  const forcedByTeachosId = new Map<string, string>();
   for (const item of rows) {
     const teachosUserId = cell(item, "instructor_user_id", "Instructor User Id");
     const manager = cell(item, "instructor_manager", "Instructor Manager");
+    // Manager picked by the manager's own user id (2026-10-19, see CAPABILITY_MANAGER_BY_USER_ID) -- wins over every name candidate.
+    const managerUserId = (cell(item, "instructor_manager_user_id") ?? "").replace(/-/g, "").toLowerCase();
+    if (teachosUserId && managerUserId && CAPABILITY_MANAGER_BY_USER_ID[managerUserId]) forcedByTeachosId.set(teachosUserId, CAPABILITY_MANAGER_BY_USER_ID[managerUserId]);
     if (!teachosUserId || !manager) continue;
     const canonicalManager = CANONICAL_CAPABILITY_MANAGER_BY_NORMALIZED.get(normalize(manager));
     if (!canonicalManager) {
@@ -931,6 +935,7 @@ export async function reconcileCapabilityManager(rows: SheetRow[]) {
     validCandidatesByTeachosId.set(teachosUserId, list);
   }
 
+  for (const [teachosUserId, forced] of forcedByTeachosId) validCandidatesByTeachosId.set(teachosUserId, [forced]);
   for (const [teachosUserId, candidates] of validCandidatesByTeachosId) {
     const nonLowPriority = candidates.filter((c) => normalize(c) !== LOW_PRIORITY_MANAGER);
     let manager: string;
