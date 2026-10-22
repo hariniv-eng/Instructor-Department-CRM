@@ -1136,7 +1136,8 @@ function collectDynamicColumns(stored: { rawData: unknown }[]): string[] {
 }
 
 function pinIdentityColumnsFirst(columns: string[]): string[] {
-  const priority = ["Employee Id", "Full Name"];
+  // Department and its Head of Department right after the name (2026-10-22, per request).
+  const priority = ["Employee Id", "Full Name", "Department", "Head of Department"];
   const present = priority.filter((name) => columns.includes(name));
   const rest = columns.filter((name) => !priority.includes(name));
   return [...present, ...rest];
