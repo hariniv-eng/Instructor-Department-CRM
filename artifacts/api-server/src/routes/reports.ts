@@ -1482,7 +1482,8 @@ router.get("/reports/taught-training", requireAuth, requireRole("admin"), async 
   const cellsByUid = new Map<string, Record<string, Cell>>();
   for (const t of taughtRows) {
     if (!byUid.has(t.instructorUserId) || t.curriculumSessions <= 0) continue;
-    if (taughtSubjectColumn(t.courseId, t.courseTitle) === null) continue; // orientation / intro course
+    // Only learning-portal courses are shown (2026-10-22, per request: campus-only courses are not shown here).
+    if (!t.portalCourseKey) continue;
     // Column (2026-10-19, per request: "first get the courses we have in the learning portal, map what instructors teach in the campus
     // to those courses"): the learning-portal course whose topics this course's sessions match (portalCourseKey, set by the sync), so
     // every campus / version of a course lands in ONE column. Courses that match no portal course keep their own column (by name).
@@ -1496,12 +1497,12 @@ router.get("/reports/taught-training", requireAuth, requireRole("admin"), async 
     const completed = (prev?.completed ?? 0) + t.completedSessions, curriculum = (prev?.curriculum ?? 0) + t.curriculumSessions;
     const lastDate = [prev?.last_taught_date, t.lastTaughtDate].filter((d): d is string => !!d).sort().pop() ?? null;
     cells[key] = { completed, curriculum, scheduled: (prev?.scheduled ?? 0) + t.scheduledSessions, pct: pct(completed, curriculum), last_taught_date: lastDate,
-      institutes: [...new Set([...(prev?.institutes ?? []), ...t.institutes])], taught_as: [...new Set([...(prev?.taught_as ?? []), t.courseTitle])] };
+      institutes: [...new Set([...(prev?.institutes ?? []), ...t.institutes])], taught_as: [...new Set([...(prev?.taught_as ?? []), ...(t.taughtTopics ?? [])])] };
     const order = portal ? TRAINING_COURSE_TAXONOMY.findIndex((d) => `portal:${d.key}` === key) : 10000;
     const c = courses.get(key) ?? { course_id: key, title: portal?.title ?? named.title, subject, instructors: 0, curriculum_max: 0, portal: !!portal, order, taught_as: [] };
     if (!prev) c.instructors += 1;
     c.curriculum_max = Math.max(c.curriculum_max, curriculum);
-    if (!c.taught_as.includes(t.courseTitle)) c.taught_as.push(t.courseTitle);
+    for (const name of t.taughtTopics ?? []) if (!c.taught_as.includes(name)) c.taught_as.push(name);
     courses.set(key, c);
   }
   const rows = [...cellsByUid].map(([uid, cells]) => {

@@ -165,50 +165,112 @@ export async function matchToPortalCourses(bq: BigQuery, ds: string, cid: (c: st
   return out;
 }
 
+// SESSION-LEVEL mapping (2026-10-22, per request: "Frontend only shows Static Web -- where are Responsive and Modern Responsive? Where
+// is MongoDB? Campus-only courses should not be shown"). One campus course often covers SEVERAL learning-portal courses (e.g. Modern
+// Responsive Web Design = Static + Responsive + Modern Responsive UI; Introduction to Databases = SQL + MongoDB), so matching the whole
+// campus course to one portal course put everything under the first one. Now EACH SESSION goes to the portal course whose topic/unit
+// titles contain that session's title:
+//   * candidates for a campus course = portal courses sharing at least MATCH_MIN_TITLES of its session titles (avoids stray hits);
+//   * a title found in several candidates goes to the earliest one in the Training Stats course order (the foundational course);
+//   * sessions matching no portal course, and orientation / intro campus courses, are left out -- so only portal courses are shown.
+// Per instructor and portal course: curriculum = distinct session ids mapped to it at their NIAT institutes; completed = theirs.
+export async function buildSessionTitleMap(bq: BigQuery, ds: string, cid: (c: string) => string): Promise<{ cids: string[]; titles: string[]; keys: string[] }> {
+  const defs = TRAINING_COURSE_TAXONOMY.filter((d) => d.courseTitles.length || d.courseIds?.length);
+  const order = new Map(TRAINING_COURSE_TAXONOMY.map((d, i) => [d.key, i]));
+  const ids = [...new Set(defs.flatMap((d) => d.courseIds ?? []).map(cleanId))];
+  const ptitles = [...new Set(defs.flatMap((d) => d.courseTitles))];
+  const [portalRows] = await runWithHardTimeout(() => bq.query({
+    query: `SELECT DISTINCT ${cid("course_id")} AS cid, course_title, topic_title, unit_title FROM \`${ds}.${UNIT_COMPLETION_TABLE}\`
+            WHERE ${cid("course_id")} IN UNNEST(@ids) OR course_title IN UNNEST(@titles)`,
+    params: { ids, titles: ptitles },
+  }), QUERY_TIMEOUT_MS);
+  const portalKeys = new Map<string, Set<string>>();
+  for (const def of defs) portalKeys.set(def.key, new Set());
+  for (const r of portalRows as Record<string, unknown>[]) {
+    const rc = plain(r.cid), rt = plain(r.course_title), topic = plain(r.topic_title), unit = plain(r.unit_title);
+    for (const def of defs) {
+      if (!((def.courseIds ?? []).some((i) => cleanId(i) === rc) || def.courseTitles.includes(rt))) continue;
+      if (def.topicTitles && !def.topicTitles.includes(topic)) continue;
+      for (const k of [...titleKeys(topic), ...titleKeys(unit)]) portalKeys.get(def.key)!.add(k);
+    }
+  }
+  const [taughtRows] = await runWithHardTimeout(() => bq.query({
+    query: `SELECT ${cid("learning_portal_course_id")} AS cid, ANY_VALUE(learning_portal_course_title) AS course, ARRAY_AGG(DISTINCT session_title IGNORE NULLS) AS titles
+            FROM \`${ds}.${SESSION_SCHEDULE_TABLE}\`
+            WHERE institute_type = 'NIAT_OFFLINE' AND session_type IN ('LECTURE', 'PRACTICE') AND learning_portal_course_id IS NOT NULL
+            GROUP BY 1`,
+  }), QUERY_TIMEOUT_MS);
+  const out = { cids: [] as string[], titles: [] as string[], keys: [] as string[] };
+  for (const r of taughtRows as Record<string, unknown>[]) {
+    if (ORIENTATION_COURSE.test(plain(r.course).trim())) continue;
+    const raw = ((r.titles as unknown[]) ?? []).map(plain).filter(Boolean);
+    const withKeys = raw.map((t) => ({ t, keys: titleKeys(t) })).filter((x) => x.keys.length);
+    const hitsBy = new Map<string, number>();
+    for (const [key, set] of portalKeys) hitsBy.set(key, withKeys.filter((x) => x.keys.some((k) => set.has(k))).length);
+    const candidates = [...hitsBy].filter(([, n]) => n >= MATCH_MIN_TITLES).map(([k]) => k).sort((a, b) => (order.get(a) ?? 0) - (order.get(b) ?? 0));
+    if (!candidates.length) continue;
+    for (const x of withKeys) {
+      const key = candidates.find((k) => x.keys.some((kk) => portalKeys.get(k)!.has(kk)));
+      if (key) { out.cids.push(plain(r.cid)); out.titles.push(x.t); out.keys.push(key); }
+    }
+  }
+  return out;
+}
+
 export async function fetchTaughtCourseRows(): Promise<TaughtCourseRow[]> {
   const bq = config.BIGQUERY_CREDENTIALS_JSON
     ? new BigQuery({ projectId: config.BIGQUERY_PROJECT_ID, credentials: JSON.parse(config.BIGQUERY_CREDENTIALS_JSON) })
     : new BigQuery({ projectId: config.BIGQUERY_PROJECT_ID });
   const ds = `${config.BIGQUERY_PROJECT_ID}.${config.BIGQUERY_DATASET}`;
   const cid = (c: string) => `REPLACE(LOWER(CAST(${c} AS STRING)), '-', '')`;
+  const map = await buildSessionTitleMap(bq, ds, cid);
+  if (!map.cids.length) return [];
   const [rows] = await runWithHardTimeout(() => bq.query({
     query: `
-      WITH s AS (
-        SELECT instructor_user_id AS uid, ${cid("learning_portal_course_id")} AS cid, learning_portal_course_title AS course,
-               institute_id, institute_name, CAST(session_id AS STRING) AS sid, session_status, DATE(session_start_datetime) AS d
-        FROM \`${ds}.${SESSION_SCHEDULE_TABLE}\`
-        WHERE institute_type = 'NIAT_OFFLINE' AND session_type IN ('LECTURE', 'PRACTICE')
-          AND session_id IS NOT NULL AND learning_portal_course_id IS NOT NULL
+      WITH m AS (
+        SELECT c AS cid, t AS title, k AS pk FROM UNNEST(@cids) AS c WITH OFFSET i
+        JOIN UNNEST(@titles) AS t WITH OFFSET j ON i = j
+        JOIN UNNEST(@keys) AS k WITH OFFSET l ON i = l
       ),
-      curriculum AS (SELECT DISTINCT cid, institute_id, sid FROM s),
+      s AS (
+        SELECT x.instructor_user_id AS uid, m.pk, x.learning_portal_course_title AS course,
+               x.institute_id, x.institute_name, CAST(x.session_id AS STRING) AS sid, x.session_status, DATE(x.session_start_datetime) AS d
+        FROM \`${ds}.${SESSION_SCHEDULE_TABLE}\` x
+        JOIN m ON m.cid = ${cid("x.learning_portal_course_id")} AND m.title = x.session_title
+        WHERE x.institute_type = 'NIAT_OFFLINE' AND x.session_type IN ('LECTURE', 'PRACTICE') AND x.session_id IS NOT NULL
+      ),
+      curriculum AS (SELECT DISTINCT pk, institute_id, sid FROM s),
       mine AS (
-        SELECT uid, cid, ANY_VALUE(course) AS course,
+        SELECT uid, pk,
                COUNT(DISTINCT IF(session_status = 'COMPLETED', sid, NULL)) AS completed,
                COUNT(DISTINCT sid) AS scheduled,
                CAST(MIN(IF(session_status = 'COMPLETED', d, NULL)) AS STRING) AS first_d,
                CAST(MAX(IF(session_status = 'COMPLETED', d, NULL)) AS STRING) AS last_d,
-               ARRAY_AGG(DISTINCT institute_name IGNORE NULLS) AS institutes
+               ARRAY_AGG(DISTINCT institute_name IGNORE NULLS) AS institutes,
+               ARRAY_AGG(DISTINCT course IGNORE NULLS) AS taught_as
         FROM s WHERE uid IS NOT NULL GROUP BY 1, 2
       ),
-      mine_inst AS (SELECT DISTINCT uid, cid, institute_id FROM s WHERE uid IS NOT NULL),
+      mine_inst AS (SELECT DISTINCT uid, pk, institute_id FROM s WHERE uid IS NOT NULL),
       totals AS (
-        SELECT m.uid, m.cid, COUNT(DISTINCT c.sid) AS curriculum
-        FROM mine_inst m JOIN curriculum c ON c.cid = m.cid AND c.institute_id = m.institute_id
+        SELECT mi.uid, mi.pk, COUNT(DISTINCT c.sid) AS curriculum
+        FROM mine_inst mi JOIN curriculum c ON c.pk = mi.pk AND c.institute_id = mi.institute_id
         GROUP BY 1, 2
       )
-      SELECT mine.*, totals.curriculum FROM mine JOIN totals USING (uid, cid)`,
+      SELECT mine.*, totals.curriculum FROM mine JOIN totals USING (uid, pk)`,
+    params: { cids: map.cids, titles: map.titles, keys: map.keys },
   }), QUERY_TIMEOUT_MS);
-  const portalMatch = await matchToPortalCourses(bq, ds, cid).catch((e) => { console.error("[taught-training] portal-course match failed:", e); return new Map<string, { key: string; pct: number }>(); });
   return (rows as Record<string, unknown>[]).map((r) => {
-    const c = plain(r.cid);
+    const pk = plain(r.pk);
+    const def = TRAINING_COURSE_TAXONOMY.find((d) => d.key === pk);
     return {
       instructor_user_id: plain(r.uid),
-      course_id: c,
-      course_title: plain(r.course) || c,
-      course_subject: courseSubjectOf(c),
+      course_id: `portal:${pk}`,
+      course_title: def?.label ?? pk,
+      course_subject: def ? (def.key === "math_for_cs" ? "Maths" : TRACK_SUBJECT[def.trackGroup] ?? null) : null,
       topics_total: 0,
       topics_taught: 0,
-      taught_topics: [],
+      // Campus course names these sessions were taught under (shown on hover).
+      taught_topics: ((r.taught_as as unknown[]) ?? []).map(plain).filter(Boolean),
       sessions_completed: Number(plain(r.completed)) || 0,
       first_taught_date: plain(r.first_d) || null,
       last_taught_date: plain(r.last_d) || null,
@@ -216,8 +278,8 @@ export async function fetchTaughtCourseRows(): Promise<TaughtCourseRow[]> {
       completed_sessions: Number(plain(r.completed)) || 0,
       scheduled_sessions: Number(plain(r.scheduled)) || 0,
       institutes: ((r.institutes as unknown[]) ?? []).map(plain).filter(Boolean),
-      portal_course_key: portalMatch.get(c)?.key ?? null,
-      portal_match_pct: portalMatch.get(c)?.pct ?? 0,
+      portal_course_key: pk,
+      portal_match_pct: 100,
     };
   });
 }
