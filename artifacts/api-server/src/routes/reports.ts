@@ -8,7 +8,7 @@ import { TRAINING_COURSE_TAXONOMY, isResolvedCourse } from "../data/trainingCour
 import { TECH_AREAS, normalizeSubjectArea } from "../lib/departmentTaxonomy";
 import { isPinnedConfirmedInstructor } from "../data/classificationOverrides";
 import { productOf } from "../lib/product";
-import { taughtSubjectColumn, displayCourseTitle, mergedCourseOf, TAUGHT_SUBJECT_COLUMNS } from "../lib/connectors/taughtTraining";
+import { taughtSubjectColumn, courseColumnOf, portalColumnOf, TAUGHT_SUBJECT_COLUMNS } from "../lib/connectors/taughtTraining";
 
 // Pinned edge-case instructors (NW0005068): see isPinnedConfirmedInstructor() in
 // data/classificationOverrides.ts. Kept counted on every sync until their Darwin
@@ -1477,25 +1477,31 @@ router.get("/reports/taught-training", requireAuth, requireRole("admin"), async 
     console.warn("[taught-training] instructor_taught_course is not readable yet (run the database push):", (err as Error).message);
   }
   const pct = (done: number, total: number) => (total > 0 ? Math.min(100, Math.round((done / total) * 1000) / 10) : 0);
-  type Cell = { completed: number; curriculum: number; scheduled: number; pct: number; last_taught_date: string | null; institutes: string[] };
-  const courses = new Map<string, { course_id: string; title: string; subject: string; instructors: number; curriculum_max: number }>();
+  type Cell = { completed: number; curriculum: number; scheduled: number; pct: number; last_taught_date: string | null; institutes: string[]; taught_as: string[] };
+  const courses = new Map<string, { course_id: string; title: string; subject: string; instructors: number; curriculum_max: number; portal: boolean; order: number; taught_as: string[] }>();
   const cellsByUid = new Map<string, Record<string, Cell>>();
   for (const t of taughtRows) {
     if (!byUid.has(t.instructorUserId) || t.curriculumSessions <= 0) continue;
-    const subject = taughtSubjectColumn(t.courseId, t.courseTitle);
-    if (!subject) continue; // orientation / intro course
-    // Two course ids shown as one column (mergedCourseOf, e.g. Intro to Generative AI + Generative AI): sessions added together.
-    const merged = mergedCourseOf(t.courseId, t.courseTitle);
-    const key = merged?.key ?? t.courseId;
+    if (taughtSubjectColumn(t.courseId, t.courseTitle) === null) continue; // orientation / intro course
+    // Column (2026-10-19, per request: "first get the courses we have in the learning portal, map what instructors teach in the campus
+    // to those courses"): the learning-portal course whose topics this course's sessions match (portalCourseKey, set by the sync), so
+    // every campus / version of a course lands in ONE column. Courses that match no portal course keep their own column (by name).
+    const portal = portalColumnOf(t.portalCourseKey ?? null);
+    const named = courseColumnOf(t.courseId, t.courseTitle);
+    const key = portal?.key ?? named.key;
+    const subject = portal?.subject ?? taughtSubjectColumn(t.courseId, t.courseTitle)!;
     if (!cellsByUid.has(t.instructorUserId)) cellsByUid.set(t.instructorUserId, {});
     const cells = cellsByUid.get(t.instructorUserId)!;
     const prev = cells[key];
     const completed = (prev?.completed ?? 0) + t.completedSessions, curriculum = (prev?.curriculum ?? 0) + t.curriculumSessions;
     const lastDate = [prev?.last_taught_date, t.lastTaughtDate].filter((d): d is string => !!d).sort().pop() ?? null;
-    cells[key] = { completed, curriculum, scheduled: (prev?.scheduled ?? 0) + t.scheduledSessions, pct: pct(completed, curriculum), last_taught_date: lastDate, institutes: [...new Set([...(prev?.institutes ?? []), ...t.institutes])] };
-    const c = courses.get(key) ?? { course_id: key, title: merged?.title ?? displayCourseTitle(t.courseTitle), subject, instructors: 0, curriculum_max: 0 };
+    cells[key] = { completed, curriculum, scheduled: (prev?.scheduled ?? 0) + t.scheduledSessions, pct: pct(completed, curriculum), last_taught_date: lastDate,
+      institutes: [...new Set([...(prev?.institutes ?? []), ...t.institutes])], taught_as: [...new Set([...(prev?.taught_as ?? []), t.courseTitle])] };
+    const order = portal ? TRAINING_COURSE_TAXONOMY.findIndex((d) => `portal:${d.key}` === key) : 10000;
+    const c = courses.get(key) ?? { course_id: key, title: portal?.title ?? named.title, subject, instructors: 0, curriculum_max: 0, portal: !!portal, order, taught_as: [] };
     if (!prev) c.instructors += 1;
     c.curriculum_max = Math.max(c.curriculum_max, curriculum);
+    if (!c.taught_as.includes(t.courseTitle)) c.taught_as.push(t.courseTitle);
     courses.set(key, c);
   }
   const rows = [...cellsByUid].map(([uid, cells]) => {
@@ -1511,7 +1517,8 @@ router.get("/reports/taught-training", requireAuth, requireRole("admin"), async 
   res.json({
     rows,
     // Courses in subject order, then most-taught first.
-    courses: [...courses.values()].sort((a, b) => TAUGHT_SUBJECT_COLUMNS.indexOf(a.subject as (typeof TAUGHT_SUBJECT_COLUMNS)[number]) - TAUGHT_SUBJECT_COLUMNS.indexOf(b.subject as (typeof TAUGHT_SUBJECT_COLUMNS)[number]) || b.instructors - a.instructors || a.title.localeCompare(b.title)),
+    // Learning-portal courses first, in the Training Stats order; unmatched courses after them, most-taught first.
+    courses: [...courses.values()].sort((a, b) => TAUGHT_SUBJECT_COLUMNS.indexOf(a.subject as (typeof TAUGHT_SUBJECT_COLUMNS)[number]) - TAUGHT_SUBJECT_COLUMNS.indexOf(b.subject as (typeof TAUGHT_SUBJECT_COLUMNS)[number]) || a.order - b.order || b.instructors - a.instructors || a.title.localeCompare(b.title)),
     subject_columns: TAUGHT_SUBJECT_COLUMNS,
     completed_pct: TAUGHT_COMPLETED_PCT,
     synced_at: taughtRows[0]?.syncedAt ?? null,

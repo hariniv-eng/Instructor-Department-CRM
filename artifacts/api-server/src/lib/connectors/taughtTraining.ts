@@ -21,6 +21,7 @@ import { BigQuery } from "@google-cloud/bigquery";
 import { config } from "./config";
 import { runWithHardTimeout } from "./timeout";
 import { SESSION_SCHEDULE_TABLE, TRACK_SUBJECT } from "./instructorContribution";
+import { UNIT_COMPLETION_TABLE } from "./instructorLearningStatus";
 import { TEACHING_COURSE_SUBJECTS, TAUGHT_COURSE_TITLE_SUBJECTS } from "../../data/teachingCourseSubjects";
 import { TRAINING_COURSE_TAXONOMY } from "../../data/trainingCourseTaxonomy";
 
@@ -39,6 +40,9 @@ export type TaughtCourseRow = {
   completed_sessions: number;
   scheduled_sessions: number;
   institutes: string[];
+  // The learning-portal course (Training Stats course list key) this course's content matches -- see matchToPortalCourses().
+  portal_course_key: string | null;
+  portal_match_pct: number;
 };
 
 // Topics that are not taught in class, left out of a course's topic count.
@@ -66,6 +70,21 @@ const MERGED_COURSES: Record<string, { key: string; title: string }> = {
   generativeai: { key: "merged:generativeai", title: "Generative AI (incl. Intro to Generative AI)" },
 };
 export const mergedCourseOf = (courseId: string, title: string): { key: string; title: string } | null => MERGED_COURSES[norm(title)] ?? null;
+// The column a course goes into (2026-10-19, per request: "why two Quantitative Aptitude / two Logical Reasoning columns?"): the same
+// course exists under several course ids (one per university / cohort / version), so courses are grouped by TITLE (lower case,
+// letters/digits only), plus the MERGED_COURSES pairs above. An instructor's sessions across those ids are added together.
+// Learning-portal course of a key from the Training Stats course list: its column (key + label) and subject.
+export function portalColumnOf(portalKey: string | null): { key: string; title: string; subject: string } | null {
+  const def = portalKey ? TRAINING_COURSE_TAXONOMY.find((d) => d.key === portalKey) : undefined;
+  if (!def) return null;
+  return { key: `portal:${def.key}`, title: def.label, subject: TRACK_SUBJECT[def.trackGroup] ?? "Other" };
+}
+export const courseColumnOf = (courseId: string, title: string): { key: string; title: string } => {
+  const merged = mergedCourseOf(courseId, title);
+  if (merged) return merged;
+  const t = displayCourseTitle(title);
+  return { key: `title:${norm(t) || courseId}`, title: t };
+};
 // Programming Foundations is the Python course (2026-10-19, per request): shown as "Programming Foundations (Python)", under Backend.
 export const displayCourseTitle = (title: string): string => (/^programming foundations$/i.test(title.trim()) ? "Programming Foundations (Python)" : title);
 export function taughtSubjectColumn(courseId: string, courseTitle: string): string | null {
@@ -83,6 +102,67 @@ function courseSubjectOf(courseId: string): string | null {
     if ((def.courseIds ?? []).some((id) => cleanId(id) === courseId)) return def.key === "math_for_cs" ? "Math for Computer Science" : (TRACK_SUBJECT[def.trackGroup] ?? null);
   }
   return null;
+}
+
+// CONTENT MATCH to the learning-portal courses (2026-10-19, per request: "four Math for CS columns... check what the course is and if it
+// is the same, make it one; do it for every subject; e.g. English has four courses in the learning portal -- tag every course's
+// sessions across campuses to one of them"). The same course is taught under many course ids and names (one per university /
+// version), so each taught course is matched by CONTENT to one course of the Training Stats course list (trainingCourseTaxonomy.ts):
+//   * its distinct Lecture/Practice session titles at NIAT institutes (generic ones such as "MCQ Practice" / "Coding Practice" dropped),
+//   * against each portal course's topic and unit titles,
+//   * share = session titles found in that portal course / the taught course's session titles. Best share wins, if it is at least
+//     MATCH_MIN_SHARE and MATCH_MIN_TITLES titles; otherwise the course keeps its own column (grouped by name).
+const MATCH_MIN_SHARE = 0.2;
+const MATCH_MIN_TITLES = 3;
+const GENERIC_TITLE = /^(mcq|mcqs|mcqpractice|codingpractice|practice|practiceset|practicesession|readingmaterial|quiz|video|ppt|assignment|cheatsheet|summary|learn|introduction|courseoverview|lab|selflearning|theoreticalconcepts|revision|doubtclearing|doubtsession|practical|aboutthecourse|coursequiz|courseexam)\d*$/;
+// Title keys: the plain normalised title, plus the same title with trailing "practice / mcq / part N / coding practice" words removed,
+// so "Loops MCQ Practice" and "Loops Coding Practice" still find the unit "Loops".
+function titleKeys(title: string): string[] {
+  const k = norm(title);
+  if (!k || GENERIC_TITLE.test(k)) return [];
+  const stripped = norm(title.replace(/\b(mcq|mcqs|coding|practice|practise|session|part|reading material|implementation|daily|ppt|video|lab)\b/gi, " ").replace(/\b(\d+|i{1,3}|iv|v)\b/gi, " "));
+  return stripped && stripped !== k && stripped.length >= 4 && !GENERIC_TITLE.test(stripped) ? [k, stripped] : [k];
+}
+export async function matchToPortalCourses(bq: BigQuery, ds: string, cid: (c: string) => string): Promise<Map<string, { key: string; pct: number }>> {
+  const defs = TRAINING_COURSE_TAXONOMY.filter((d) => d.courseTitles.length || d.courseIds?.length);
+  const ids = [...new Set(defs.flatMap((d) => d.courseIds ?? []).map(cleanId))];
+  const titles = [...new Set(defs.flatMap((d) => d.courseTitles))];
+  const [portalRows] = await runWithHardTimeout(() => bq.query({
+    query: `SELECT DISTINCT ${cid("course_id")} AS cid, course_title, topic_title, unit_title FROM \`${ds}.${UNIT_COMPLETION_TABLE}\`
+            WHERE ${cid("course_id")} IN UNNEST(@ids) OR course_title IN UNNEST(@titles)`,
+    params: { ids, titles },
+  }), QUERY_TIMEOUT_MS);
+  const portalKeys = new Map<string, Set<string>>();
+  for (const def of defs) portalKeys.set(def.key, new Set());
+  for (const r of portalRows as Record<string, unknown>[]) {
+    const rc = plain(r.cid), rt = plain(r.course_title), topic = plain(r.topic_title), unit = plain(r.unit_title);
+    for (const def of defs) {
+      if (!((def.courseIds ?? []).some((i) => cleanId(i) === rc) || def.courseTitles.includes(rt))) continue;
+      if (def.topicTitles && !def.topicTitles.includes(topic)) continue;
+      const set = portalKeys.get(def.key)!;
+      for (const k of [...titleKeys(topic), ...titleKeys(unit)]) set.add(k);
+    }
+  }
+  const [taughtRows] = await runWithHardTimeout(() => bq.query({
+    query: `SELECT ${cid("learning_portal_course_id")} AS cid, ARRAY_AGG(DISTINCT session_title IGNORE NULLS) AS titles
+            FROM \`${ds}.${SESSION_SCHEDULE_TABLE}\`
+            WHERE institute_type = 'NIAT_OFFLINE' AND session_type IN ('LECTURE', 'PRACTICE') AND learning_portal_course_id IS NOT NULL
+            GROUP BY 1`,
+  }), QUERY_TIMEOUT_MS);
+  const out = new Map<string, { key: string; pct: number }>();
+  for (const r of taughtRows as Record<string, unknown>[]) {
+    const titleSets = ((r.titles as unknown[]) ?? []).map((t) => titleKeys(plain(t))).filter((k) => k.length);
+    if (!titleSets.length) continue;
+    let best: { key: string; hits: number } | null = null;
+    for (const [key, set] of portalKeys) {
+      const hits = titleSets.filter((keys) => keys.some((k) => set.has(k))).length;
+      if (!best || hits > best.hits) best = { key, hits };
+    }
+    if (best && best.hits >= MATCH_MIN_TITLES && best.hits / titleSets.length >= MATCH_MIN_SHARE) {
+      out.set(plain(r.cid), { key: best.key, pct: Math.round((best.hits / titleSets.length) * 100) });
+    }
+  }
+  return out;
 }
 
 export async function fetchTaughtCourseRows(): Promise<TaughtCourseRow[]> {
@@ -118,6 +198,7 @@ export async function fetchTaughtCourseRows(): Promise<TaughtCourseRow[]> {
       )
       SELECT mine.*, totals.curriculum FROM mine JOIN totals USING (uid, cid)`,
   }), QUERY_TIMEOUT_MS);
+  const portalMatch = await matchToPortalCourses(bq, ds, cid).catch((e) => { console.error("[taught-training] portal-course match failed:", e); return new Map<string, { key: string; pct: number }>(); });
   return (rows as Record<string, unknown>[]).map((r) => {
     const c = plain(r.cid);
     return {
@@ -135,6 +216,8 @@ export async function fetchTaughtCourseRows(): Promise<TaughtCourseRow[]> {
       completed_sessions: Number(plain(r.completed)) || 0,
       scheduled_sessions: Number(plain(r.scheduled)) || 0,
       institutes: ((r.institutes as unknown[]) ?? []).map(plain).filter(Boolean),
+      portal_course_key: portalMatch.get(c)?.key ?? null,
+      portal_match_pct: portalMatch.get(c)?.pct ?? 0,
     };
   });
 }
