@@ -234,7 +234,12 @@ export async function fetchTaughtCourseRows(): Promise<TaughtCourseRow[]> {
       ),
       s AS (
         SELECT x.instructor_user_id AS uid, m.pk, x.learning_portal_course_title AS course,
-               x.institute_id, x.institute_name, CAST(x.session_id AS STRING) AS sid, x.session_status, DATE(x.session_start_datetime) AS d
+               x.institute_id, x.institute_name,
+               -- A curriculum session is counted by its TITLE, not its session id (2026-10-22, per request: "Static has 23 sessions for one
+               -- instructor and 52 for another"): every campus, batch and course version has its own session ids for the same session, so
+               -- an instructor teaching two batches/versions/campuses had the same sessions counted twice. Same title = one session.
+               REGEXP_REPLACE(LOWER(x.session_title), r'[^a-z0-9]+', '') AS sid,
+               x.session_status, DATE(x.session_start_datetime) AS d
         FROM \`${ds}.${SESSION_SCHEDULE_TABLE}\` x
         JOIN m ON m.cid = ${cid("x.learning_portal_course_id")} AND m.title = x.session_title
         WHERE x.institute_type = 'NIAT_OFFLINE' AND x.session_type IN ('LECTURE', 'PRACTICE') AND x.session_id IS NOT NULL
