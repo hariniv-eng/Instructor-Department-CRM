@@ -1166,13 +1166,51 @@ function pinIdentityColumnsFirst(columns: string[]): string[] {
 router.get("/reports/darwin-full-roster", requireAuth, requireRole("admin"), async (_req, res) => {
   const stored = await db.select().from(darwinboxFullRosterTable).orderBy(darwinboxFullRosterTable.id);
 
-  const columns: string[] = pinIdentityColumnsFirst(collectDynamicColumns(stored));
+  const columns: string[] = pinIdentityColumnsFirst([...new Set([...collectDynamicColumns(stored), "Head of Department"])]);
   const rows = stored.map((r) => {
     const data = r.rawData as Record<string, unknown>;
     const row: Record<string, unknown> = {};
     for (const key of columns) row[key] = data[key] ?? null;
     return row;
   });
+  // Head of Department WORKED OUT FROM THE REPORTING LINE (2026-10-22, per request: Darwin sends no HOD field, so the column was empty).
+  // For each employee, follow Direct Manager upwards while the manager is in the SAME department; the last person reached is that
+  // department's head for this employee (the one whose own manager sits in another department). Someone at the top of their own
+  // department is their own HOD. Managers are found by the employee id inside "Direct Manager" (e.g. "Name (NW0001234)"), else by
+  // exact name. A value Darwin sends itself (if any) is kept.
+  {
+    const s = (v: unknown) => (v === null || v === undefined ? "" : String(v).trim());
+    const byId = new Map<string, Record<string, unknown>>();
+    const byName = new Map<string, Record<string, unknown> | null>();
+    for (const row of rows) {
+      const id = s(row["Employee Id"]).toUpperCase();
+      if (id) byId.set(id, row);
+      const n = s(row["Full Name"]).toLowerCase();
+      if (n) byName.set(n, byName.has(n) ? null : row); // a name shared by two people is not used
+    }
+    const managerOf = (row: Record<string, unknown>) => {
+      const dm = s(row["Direct Manager"]);
+      if (!dm) return undefined;
+      const id = dm.match(/NW\d{7}/i)?.[0]?.toUpperCase();
+      if (id && byId.has(id)) return byId.get(id);
+      const name = dm.replace(/\(.*?\)|NW\d{7}/gi, "").replace(/[-|,]+$/, "").trim().toLowerCase();
+      return byName.get(name) ?? undefined;
+    };
+    for (const row of rows) {
+      if (s(row["Head of Department"])) continue;
+      const dept = s(row["Department"]);
+      if (!dept) continue;
+      let cur = row;
+      const seen = new Set<Record<string, unknown>>([row]);
+      for (;;) {
+        const mgr = managerOf(cur);
+        if (!mgr || seen.has(mgr) || s(mgr["Department"]) !== dept) break;
+        seen.add(mgr);
+        cur = mgr;
+      }
+      row["Head of Department"] = `${s(cur["Full Name"])}${s(cur["Employee Id"]) ? ` (${s(cur["Employee Id"])})` : ""}`;
+    }
+  }
 
   res.json({
     count: rows.length,
