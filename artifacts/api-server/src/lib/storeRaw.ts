@@ -134,6 +134,8 @@ export async function storeTaughtCourses(rows: TaughtCourseRow[]): Promise<numbe
         completedSessions: row.completed_sessions,
         scheduledSessions: row.scheduled_sessions,
         institutes: row.institutes,
+        portalCourseKey: row.portal_course_key,
+        portalMatchPct: row.portal_match_pct,
       }));
       if (batch.length) await tx.insert(instructorTaughtCourseTable).values(batch);
     }

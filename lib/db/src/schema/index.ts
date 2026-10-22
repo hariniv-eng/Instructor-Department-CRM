@@ -503,6 +503,9 @@ export const instructorTaughtCourseTable = pgTable("instructor_taught_course", {
   completedSessions: integer("completed_sessions").notNull().default(0),
   scheduledSessions: integer("scheduled_sessions").notNull().default(0),
   institutes: jsonb("institutes").$type<string[]>().notNull().default([]),
+  // Learning-portal course this course's content matches (Training Stats course key) and how well (% of its session titles found).
+  portalCourseKey: text("portal_course_key"),
+  portalMatchPct: integer("portal_match_pct").notNull().default(0),
   syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
 });
 export type InstructorTaughtCourse = typeof instructorTaughtCourseTable.$inferSelect;
