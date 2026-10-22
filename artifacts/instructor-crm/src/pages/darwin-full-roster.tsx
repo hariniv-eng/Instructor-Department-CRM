@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { RefreshCw, Users } from 'lucide-react';
-import { PageIntro, EmptyState, QueryError, SkeletonBlock, TopStat, TablePager, TableSearchInput, usePagedRows, formatKpi } from '@/components/ui-pieces';
+import { PageIntro, EmptyState, QueryError, SkeletonBlock, TopStat, TablePager, TableSearchInput, DownloadCsvButton, usePagedRows, formatKpi } from '@/components/ui-pieces';
+import { downloadCsv, toCsv } from '@/lib/csv';
 
 // A flat, unreconciled dump of Darwin's full company roster (2026-09-18, per
 // request: "I don't need any breakdown there, I just want to see the whole
@@ -58,6 +59,12 @@ export default function DarwinFullRosterPage() {
     return data.rows.filter((row) => data.columns.some((column) => cellText(row[column]).toLowerCase().includes(query)));
   }, [data, search]);
   const pager = usePagedRows(searchedRows, 50);
+  // Download (2026-10-22, per request): every column, for the rows currently shown (all rows, or only those matching the search).
+  const download = () => {
+    if (!data) return;
+    const stamp = new Date().toISOString().slice(0, 10);
+    downloadCsv(`darwin-full-roster-${stamp}${search.trim() ? '-filtered' : ''}.csv`, toCsv(data.columns, searchedRows.map((row) => data.columns.map((column) => cellText(row[column])))));
+  };
 
   return <div className="mx-auto max-w-[1500px]">
     <PageIntro
@@ -80,7 +87,10 @@ export default function DarwinFullRosterPage() {
           tone="navy"
         />
       </div>
-      {data.count > 0 && <TableSearchInput value={search} onChange={setSearch} testId="input-search-darwin-full-roster" />}
+      {data.count > 0 && <div className="flex flex-wrap items-center gap-2">
+        <DownloadCsvButton onClick={download} disabled={searchedRows.length === 0} label={`Download CSV (${formatKpi(searchedRows.length)})`} testId="button-download-darwin-full-roster" />
+        <TableSearchInput value={search} onChange={setSearch} testId="input-search-darwin-full-roster" />
+      </div>}
     </div>}
 
     {data && data.count === 0 && <EmptyState title="No full-roster data yet" description="Sync Darwinbox (or upload a full-roster CSV) to see every record here." />}
