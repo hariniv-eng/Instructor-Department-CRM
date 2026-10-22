@@ -125,6 +125,28 @@ function mapRecordToRow(rec: Record<string, unknown>): SheetRow {
   return row;
 }
 
+// Head of Department (2026-10-22, per request: "for each employee, the department they work in and who is the HOD of that
+// department"). Darwin's field name for it is not confirmed, so any raw field whose name says HOD / head of department / department
+// head is used. NOT added to ALIASES on purpose: assertMappedSomething() fails the whole sync when an ALIASES column is empty everywhere.
+const HOD_FIELD = /(^|_)hod($|_)|head_?of_?(the_?)?dep|dep(artment|t)?_?head/i;
+function hodOf(rec: Record<string, unknown>): unknown {
+  const key = Object.keys(rec).find((k) => HOD_FIELD.test(k) && rec[k] !== null && rec[k] !== "");
+  return key ? rec[key] : null;
+}
+// Full-roster row (2026-10-22, per request: "are we showing all the data Darwin gives in the full roster?" -- no, only the 15 ALIASES
+// fields were kept): the 15 canonical columns first (unchanged, so the fallback match keeps working), then "Head of Department", then
+// EVERY other field Darwin sent, under its own name. Raw fields already used for a canonical column are not repeated; nested values are
+// stored as text so they display in the table.
+const ALIAS_KEYS = new Set(Object.values(ALIASES).flat().map((k) => k.toLowerCase()));
+function mapRecordToFullRosterRow(rec: Record<string, unknown>): SheetRow {
+  const row: SheetRow = { ...mapRecordToRow(rec), "Head of Department": hodOf(rec) as SheetRow[string] };
+  for (const [k, v] of Object.entries(rec)) {
+    if (ALIAS_KEYS.has(k.toLowerCase()) || k in row) continue;
+    row[k] = (v !== null && typeof v === "object" ? JSON.stringify(v) : v) as SheetRow[string];
+  }
+  return row;
+}
+
 function assertMappedSomething(rows: SheetRow[], records: Record<string, unknown>[]) {
   if (!rows.length) return;
   const missingCanonical = Object.keys(ALIASES).filter((c) => rows.every((r) => r[c] == null));
@@ -152,7 +174,7 @@ function assertMappedSomething(rows: SheetRow[], records: Record<string, unknown
 export async function fetchDarwinRowsBoth(): Promise<{ instructorRows: SheetRow[]; fullRosterRows: SheetRow[] }> {
   const raw = await fetchRaw();
   const records = extractRecordsArray(raw);
-  const fullRosterRows = records.map(mapRecordToRow);
+  const fullRosterRows = records.map(mapRecordToFullRosterRow);
   assertMappedSomething(fullRosterRows, records);
   const instructorRows = records.filter(isInstructorRecord).map(mapRecordToRow);
   return { instructorRows, fullRosterRows };
