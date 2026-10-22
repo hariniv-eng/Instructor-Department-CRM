@@ -27,9 +27,10 @@ async function main() {
       if (meta.type === "VIEW" || meta.type === "MATERIALIZED_VIEW") {
         console.log(`${pad}${id}: ${meta.type}${meta.type === "MATERIALIZED_VIEW" && meta.materializedView?.lastRefreshTime ? `, last refreshed ${ist(Number(meta.materializedView.lastRefreshTime))} IST` : ""}`);
         const sql: string = meta.view?.query ?? meta.materializedView?.query ?? "";
+        console.log(`${pad}  view SQL (${sql.length} chars): ${sql ? sql.replace(/\s+/g, " ").slice(0, 1500) : "(empty -- this account may not be allowed to read the view's definition)"}`);
         const refs = new Set<string>();
-        for (const mm of sql.matchAll(/`([\w-]+)\.([\w-]+)\.([\w$-]+)`|`([\w-]+)\.([\w$-]+)`|\b([\w-]+)\.([\w-]+)\.([\w$]+)\b/g)) {
-          const [p, d, tt] = mm[1] ? [mm[1], mm[2], mm[3]] : mm[4] ? [project, mm[4], mm[5]] : [mm[6], mm[7], mm[8]];
+        for (const mm of sql.replace(/`\.`/g, ".").matchAll(/`([\w-]+)\.([\w-]+)\.([\w$-]+)`|`([\w-]+)\.([\w$-]+)`|\b([\w-]+)\.([\w-]+)\.([\w$]+)\b|(?:FROM|JOIN)\s+([\w-]+)\.([\w$]+)\b/gi)) {
+          const [p, d, tt] = mm[1] ? [mm[1], mm[2], mm[3]] : mm[4] ? [project, mm[4], mm[5]] : mm[6] ? [mm[6], mm[7], mm[8]] : [project, mm[9], mm[10]];
           if (p && d && tt) refs.add(`${p}|${d}|${tt}`);
         }
         if (depth >= 3) { console.log(`${pad}  (stopping: 3 levels deep) reads: ${[...refs].map((r) => r.replace(/\|/g, ".")).join(", ")}`); return; }
