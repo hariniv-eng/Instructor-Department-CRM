@@ -24,7 +24,7 @@ async function main() {
   for (const key of keys) {
     const def = TRAINING_COURSE_TAXONOMY.find((d) => d.key === key);
     const l = lectures.get(key);
-    console.log(`\n=== ${def?.label ?? key} [${key}]: ${l?.units.length ?? 0} class sessions${l ? ` (course version ${l.version})` : " -- no lessons found"}`);
+    console.log(`\n=== ${def?.label ?? key} [${key}]: ${l?.units.length ?? 0} class sessions${l ? ` (course version ${l.version}; ${l.dropped ?? 0} self-study lessons never taught as a lecture left out)` : " -- no lessons found"}`);
     l?.units.forEach((u, i) => {
       console.log(`  ${String(i + 1).padStart(2)}. ${u.title}`);
       csv.push([def?.trackGroup ?? "", def?.label ?? key, key, l.version, String(i + 1), u.title].map(q).join(","));

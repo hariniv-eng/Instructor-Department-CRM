@@ -47,7 +47,7 @@ export type TaughtCourseRow = {
 
 // Topics that are not taught in class, left out of a course's topic count.
 // Lessons that are not a class of their own: reading material, cheat sheets, notes, getting-started pages.
-export const NOT_A_SESSION = /reading material|cheat ?sheet|a note on|getting started|^notes?\b|\bnotes$|summary|quiz|mcq|coding practice|assignment/i;
+export const NOT_A_SESSION = /reading material|cheat ?sheet|a note on|getting started|^notes?\b|\bnotes$|summary|quiz|mcq|coding practice|practice set|assignment|self learning|interview question|mock test|contest/i;
 export const NOT_TAUGHT_TOPIC = /assignment|mock|quiz|exam|interview|question bank|assessment|project|^learn$|cheat ?sheet|revision/i;
 const QUERY_TIMEOUT_MS = 180000;
 
@@ -148,7 +148,7 @@ export async function matchToPortalCourses(bq: BigQuery, ds: string, cid: (c: st
   const [taughtRows] = await runWithHardTimeout(() => bq.query({
     query: `SELECT ${cid("learning_portal_course_id")} AS cid, ARRAY_AGG(DISTINCT session_title IGNORE NULLS) AS titles
             FROM \`${ds}.${SESSION_SCHEDULE_TABLE}\`
-            WHERE institute_type = 'NIAT_OFFLINE' AND session_type IN ('LECTURE', 'PRACTICE') AND learning_portal_course_id IS NOT NULL
+            WHERE institute_type = 'NIAT_OFFLINE' AND session_type = 'LECTURE' AND learning_portal_course_id IS NOT NULL
             GROUP BY 1`,
   }), QUERY_TIMEOUT_MS);
   const out = new Map<string, { key: string; pct: number }>();
@@ -181,7 +181,9 @@ export async function matchToPortalCourses(bq: BigQuery, ds: string, cid: (c: st
 // in several versions of the course = one lecture). Each lecture keeps the title keys a session can match: its own unit title, and its
 // topic's title (a session titled like the topic covers that topic's first lecture not yet covered).
 // units = the course's CLASS SESSIONS (lessons) -- see below. title = the lesson's name as the portal shows it.
-export type PortalLectures = { units: { key: string; keys: string[]; topic: string; ord: number; title: string }[]; version: string };
+export type PortalLectures = { units: { key: string; keys: string[]; topic: string; ord: number; title: string }[]; version: string; dropped?: number };
+// LECTURE sessions only (2026-10-23, per request: "make sure we count only lecture sessions") -- practice sessions are not counted, in
+// matching campus courses to portal courses or in what an instructor has taught.
 export async function buildSessionTitleMap(bq: BigQuery, ds: string, cid: (c: string) => string): Promise<{ cids: string[]; titles: string[]; keys: string[]; lectures: Map<string, PortalLectures> }> {
   const defs = TRAINING_COURSE_TAXONOMY.filter((d) => d.courseTitles.length || d.courseIds?.length);
   const order = new Map(TRAINING_COURSE_TAXONOMY.map((d, i) => [d.key, i]));
@@ -238,9 +240,19 @@ export async function buildSessionTitleMap(bq: BigQuery, ds: string, cid: (c: st
   const [taughtRows] = await runWithHardTimeout(() => bq.query({
     query: `SELECT ${cid("learning_portal_course_id")} AS cid, ANY_VALUE(learning_portal_course_title) AS course, ARRAY_AGG(DISTINCT session_title IGNORE NULLS) AS titles
             FROM \`${ds}.${SESSION_SCHEDULE_TABLE}\`
-            WHERE institute_type = 'NIAT_OFFLINE' AND session_type IN ('LECTURE', 'PRACTICE') AND learning_portal_course_id IS NOT NULL
+            WHERE institute_type = 'NIAT_OFFLINE' AND session_type = 'LECTURE' AND learning_portal_course_id IS NOT NULL
             GROUP BY 1`,
   }), QUERY_TIMEOUT_MS);
+  // Keep only lessons that are actually TAUGHT AS A LECTURE somewhere (2026-10-23, per request: "how are there 124 sessions -- are we
+  // counting MCQ and everything?"). Besides the reading material / quizzes / MCQ / coding practice already left out by name and type, a
+  // portal course also has many self-study lessons (e.g. one explainer per coding problem in DSA) that are never scheduled as a class.
+  // A lesson now counts towards the course total only if some NIAT campus has scheduled a LECTURE session with its title.
+  const lectureKeys = new Set<string>();
+  for (const r of taughtRows as Record<string, unknown>[]) for (const t of ((r.titles as unknown[]) ?? []).map(plain)) { lectureKeys.add(norm(t)); for (const k of titleKeys(t)) lectureKeys.add(k); }
+  for (const [key, l] of lectures) {
+    const taught = l.units.filter((u) => u.keys.some((k) => lectureKeys.has(k)));
+    lectures.set(key, { ...l, units: taught, dropped: l.units.length - taught.length });
+  }
   const out = { cids: [] as string[], titles: [] as string[], keys: [] as string[], lectures };
   for (const r of taughtRows as Record<string, unknown>[]) {
     if (ORIENTATION_COURSE.test(plain(r.course).trim())) continue;
@@ -283,7 +295,7 @@ export async function fetchTaughtCourseRows(): Promise<TaughtCourseRow[]> {
                x.session_title AS title, x.session_status, DATE(x.session_start_datetime) AS d
         FROM \`${ds}.${SESSION_SCHEDULE_TABLE}\` x
         JOIN m ON m.cid = ${cid("x.learning_portal_course_id")} AND m.title = x.session_title
-        WHERE x.institute_type = 'NIAT_OFFLINE' AND x.session_type IN ('LECTURE', 'PRACTICE') AND x.session_id IS NOT NULL
+        WHERE x.institute_type = 'NIAT_OFFLINE' AND x.session_type = 'LECTURE' AND x.session_id IS NOT NULL
       ),
       curriculum AS (SELECT DISTINCT pk, institute_id, sid FROM s),
       mine AS (
