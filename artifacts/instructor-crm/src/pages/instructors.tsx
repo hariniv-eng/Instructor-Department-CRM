@@ -920,14 +920,10 @@ export function productLabel(person: InstructorSummary): string {
   // Academy (rule changed 2026-10-13, per request): Campus (institutes) has ANY entry containing "academy"
   // (case-insensitive) -- replaces the old TeachOS Enrolled Plans (CCBP_ACADEMY_GENIUS_CAREER_PLUS) test.
   if ((person.institutes ?? []).some((i) => i.toLowerCase().includes('academy'))) return 'Academy';
-  // IIT X DSA (rule changed 2026-10-08, per request -- designation no longer matters): Darwin
-  // location is KKH AND the TeachOS Capability Manager is missing AND the
-  // Darwin manager is Jashwanth Dandu (NW0005864) -- all three, not "or" -- OR (2026-10-09) the
-  // Darwin manager is Jashwanth Dandu (NW0005864) on his own, at any location.
-  // (The KKH + no-Capability-Manager conditions are implied: that rule already needed this same manager.)
-  const darwinManager = (person.darwin_manager ?? '').toLowerCase();
-  const reportsToJashwanth = darwinManager.includes('nw0005864') || darwinManager.includes('jashwanth dandu');
-  if (reportsToJashwanth) return 'IIT X DSA';
+  // IIT X DSA (rule changed 2026-10-23, per request: "only focus on the campus"): Campus is "NxtWave Institute of Advanced
+  // Technology - DSA" (ignoring case, spaces, punctuation). The old Darwin-manager (Jashwanth Dandu) / KKH-location rule is gone.
+  // Same rule as isIitxDsaCampus() in api-server/src/lib/product.ts -- keep the two in step.
+  if ((person.institutes ?? []).some((i) => { const k = i.toLowerCase().replace(/[^a-z0-9]+/g, ''); return /^n(e)?xtwaveinstituteofadvancedtechnology/.test(k) && k.endsWith('dsa'); })) return 'IIT X DSA';
   if ((person.institutes ?? []).some((i) => i.toLowerCase().includes('intensive'))) return 'Intensive';
   if ((person.institutes ?? []).includes('Training Institute')) return 'NIAT (Training)';
   // Blank campus = NIAT training instructor (2026-10-08, per request: "if the campus
