@@ -129,9 +129,9 @@ export default function InstructorArchivePage() {
   // Downloads EVERYTHING the current search + status filter matches (all
   // pages, not just the one on screen), same columns as the table.
   const handleDownload = () => {
-    const headers = ['Name', 'Employee ID', 'Designation', 'Bifurcation', 'Subject', 'Department', 'Campus', 'Capability Manager', 'Manager (Darwin)', 'Date of joining', 'Payroll', 'Status', 'Date of Exit', 'Exit Status (Darwin)'];
+    const headers = ['Name', 'Employee ID', 'Gender', 'Designation', 'Bifurcation', 'Subject', 'Department', 'Campus', 'Capability Manager', 'Manager (Darwin)', 'Date of joining', 'Payroll', 'Status', 'Date of Exit', 'Exit Status (Darwin)'];
     const rows = filteredRows.map((row) => [
-      row.full_name, row.employee_id ?? '', row.designation ?? '', bifurcationLabel(row.classification), row.dept_area ?? '', row.department ?? '',
+      row.full_name, row.employee_id ?? '', row.gender ?? '', row.designation ?? '', bifurcationLabel(row.classification), row.dept_area ?? '', row.department ?? '',
       row.institutes.join(', '), row.capability_manager ?? '', row.darwin_manager ?? '', row.date_of_joining ?? '', row.is_payroll ? 'Payroll' : 'Nxtwave',
       row.status, row.date_of_exit ?? '', row.exit_status ?? '',
     ]);
@@ -217,6 +217,7 @@ export default function InstructorArchivePage() {
               <tr className="border-b border-border bg-[#f4f7f9]">
                 <th className="sticky left-0 z-10 whitespace-nowrap border-r border-border bg-[#f4f7f9] px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Name</th>
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Employee ID</th>
+                <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Gender</th>
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Designation</th>
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Bifurcation</th>
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Subject</th>
@@ -235,6 +236,7 @@ export default function InstructorArchivePage() {
               {pager.pageRows.map((row) => <tr key={row.id} className="border-b border-border/70 last:border-0 hover:bg-[#f8fafb]">
                 <td className="sticky left-0 z-10 whitespace-nowrap border-r border-border bg-card px-4 py-3 text-[12px] font-semibold text-foreground">{row.full_name}</td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[11px] text-muted-foreground">{row.employee_id || '—'}</td>
+                <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-muted-foreground" data-testid={`cell-archive-gender-${row.id}`}>{row.gender || '—'}</td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-muted-foreground">{row.designation || '—'}</td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-muted-foreground">{bifurcationLabel(row.classification)}</td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-muted-foreground">{row.dept_area || '—'}</td>
