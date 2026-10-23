@@ -46,6 +46,8 @@ export type TaughtCourseRow = {
 };
 
 // Topics that are not taught in class, left out of a course's topic count.
+// Lessons that are not a class of their own: reading material, cheat sheets, notes, getting-started pages.
+export const NOT_A_SESSION = /reading material|cheat ?sheet|a note on|getting started|^notes?\b|\bnotes$|summary|quiz|mcq|coding practice|assignment/i;
 export const NOT_TAUGHT_TOPIC = /assignment|mock|quiz|exam|interview|question bank|assessment|project|^learn$|cheat ?sheet|revision/i;
 const QUERY_TIMEOUT_MS = 180000;
 
@@ -178,20 +180,23 @@ export async function matchToPortalCourses(bq: BigQuery, ds: string, cid: (c: st
 // the learning portal, not the sessions scheduled to the instructor"). A lecture = a LEARNING_SET unit of the portal course (same title
 // in several versions of the course = one lecture). Each lecture keeps the title keys a session can match: its own unit title, and its
 // topic's title (a session titled like the topic covers that topic's first lecture not yet covered).
-export type PortalLectures = { units: { key: string; keys: string[]; topic: string; ord: number }[] }; // units = the course's TOPICS
+// units = the course's CLASS SESSIONS (lessons) -- see below. title = the lesson's name as the portal shows it.
+export type PortalLectures = { units: { key: string; keys: string[]; topic: string; ord: number; title: string }[]; version: string };
 export async function buildSessionTitleMap(bq: BigQuery, ds: string, cid: (c: string) => string): Promise<{ cids: string[]; titles: string[]; keys: string[]; lectures: Map<string, PortalLectures> }> {
   const defs = TRAINING_COURSE_TAXONOMY.filter((d) => d.courseTitles.length || d.courseIds?.length);
   const order = new Map(TRAINING_COURSE_TAXONOMY.map((d, i) => [d.key, i]));
   const ids = [...new Set(defs.flatMap((d) => d.courseIds ?? []).map(cleanId))];
   const ptitles = [...new Set(defs.flatMap((d) => d.courseTitles))];
   const [portalRows] = await runWithHardTimeout(() => bq.query({
-    query: `SELECT ${cid("course_id")} AS cid, course_title, topic_title, unit_title, unit_type, MIN(course_unit_order) AS ord FROM \`${ds}.${UNIT_COMPLETION_TABLE}\`
+    query: `SELECT ${cid("course_id")} AS cid, course_title, version_id, topic_title, unit_title, unit_type, MIN(course_unit_order) AS ord,
+                   COUNT(DISTINCT instructor_user_id) AS ins
+            FROM \`${ds}.${UNIT_COMPLETION_TABLE}\`
             WHERE ${cid("course_id")} IN UNNEST(@ids) OR course_title IN UNNEST(@titles)
-            GROUP BY 1, 2, 3, 4, 5`,
+            GROUP BY 1, 2, 3, 4, 5, 6`,
     params: { ids, titles: ptitles },
   }), QUERY_TIMEOUT_MS);
   const lectures = new Map<string, PortalLectures>();
-  const lectureSeen = new Map<string, Set<string>>();
+  const lessonRows = new Map<string, Map<string, { ins: number; lessons: Map<string, { title: string; topic: string; ord: number }> }>>();
   const portalKeys = new Map<string, Set<string>>();
   for (const def of defs) portalKeys.set(def.key, new Set());
   for (const r of portalRows as Record<string, unknown>[]) {
@@ -200,28 +205,36 @@ export async function buildSessionTitleMap(bq: BigQuery, ds: string, cid: (c: st
       if (!((def.courseIds ?? []).some((i) => cleanId(i) === rc) || def.courseTitles.includes(rt))) continue;
       if (def.topicTitles && !def.topicTitles.includes(topic)) continue;
       for (const k of [...titleKeys(topic), ...titleKeys(unit)]) portalKeys.get(def.key)!.add(k);
-      // TOPICS of the portal course (2026-10-23, per request: "out of ALL the topics the course has in the learning portal, how many has
-      // this person taken sessions on"). One entry per distinct topic title (versions of the course share topics), leaving out topics
-      // never taught in class (assignments, mock tests, quizzes/exams, interview prep, projects). A topic's match keys = its own title
-      // plus the titles of its units, so a session titled like the topic or like any of its lessons covers the topic.
-      if (NOT_TAUGHT_TOPIC.test(topic)) continue;
-      const tKey = norm(topic);
-      if (!tKey) continue;
-      if (!lectureSeen.has(def.key)) { lectureSeen.set(def.key, new Set()); lectures.set(def.key, { units: [] }); }
-      const list = lectures.get(def.key)!.units;
-      let entry = list.find((u) => u.key === tKey);
-      if (!entry) { entry = { key: tKey, keys: [...titleKeys(topic)], topic: tKey, ord: Number(plain(r.ord)) || 0 }; list.push(entry); }
-      entry.ord = Math.min(entry.ord, Number(plain(r.ord)) || entry.ord);
-      for (const k of titleKeys(unit)) if (!entry.keys.includes(k)) entry.keys.push(k);
+      // Candidate CLASS SESSION (lesson) of this course version -- picked per course below.
+      if (NOT_TAUGHT_TOPIC.test(topic) || plain(r.unit_type).toUpperCase() !== "LEARNING_SET" || NOT_A_SESSION.test(unit) || !norm(unit)) continue;
+      const ver = `${rc}|${plain(r.version_id)}`;
+      if (!lessonRows.has(def.key)) lessonRows.set(def.key, new Map());
+      const byVer = lessonRows.get(def.key)!;
+      if (!byVer.has(ver)) byVer.set(ver, { ins: 0, lessons: new Map() });
+      const v = byVer.get(ver)!;
+      v.ins = Math.max(v.ins, Number(plain(r.ins)) || 0);
+      const k = norm(unit);
+      const prev = v.lessons.get(k);
+      const ord = Number(plain(r.ord)) || 0;
+      if (!prev || ord < prev.ord) v.lessons.set(k, { title: unit, topic: norm(topic), ord });
     }
   }
-  // A unit title found in several topics of the same course (e.g. "Loops MCQ Practice" style names) does not say which topic -- drop it.
-  for (const l of lectures.values()) {
-    const count = new Map<string, number>();
-    for (const u of l.units) for (const k of new Set(u.keys)) count.set(k, (count.get(k) ?? 0) + 1);
-    for (const u of l.units) u.keys = u.keys.filter((k) => k === u.topic || (count.get(k) ?? 0) < 2);
+  // CLASS SESSIONS of each portal course (2026-10-23, per request: "Static Web has ~26 sessions, not 13 topics -- count sessions"). A class
+  // session = a lesson (LEARNING_SET unit) such as "Introduction to CSS | Part 2", NOT its Reading Material / Cheat Sheet / notes, and not
+  // the quizzes, MCQ / coding practice or daily / module quizzes (those are other unit types). The same course exists in several versions
+  // with slightly different lessons, so the version with the MOST instructors on it is used (the one most people see), not a mix.
+  // A session covers a lesson when its title equals the lesson's title; the shorter form without "Part N" etc. is also accepted, but only
+  // when no other lesson of the course shortens to the same text (so "Part 1" never counts as "Part 2").
+  for (const [key, byVer] of lessonRows) {
+    const [ver, v] = [...byVer].sort((a, b) => b[1].ins - a[1].ins || b[1].lessons.size - a[1].lessons.size)[0];
+    const units = [...v.lessons].map(([k, x]) => ({ key: k, keys: [k], topic: x.topic, ord: x.ord, title: x.title }));
+    const shortCount = new Map<string, number>();
+    const shortOf = (t: string) => titleKeys(t).find((x) => x !== norm(t));
+    for (const u of units) { const sk = shortOf(u.title); if (sk) shortCount.set(sk, (shortCount.get(sk) ?? 0) + 1); }
+    for (const u of units) { const sk = shortOf(u.title); if (sk && shortCount.get(sk) === 1 && !units.some((o) => o.key === sk && o !== u)) u.keys.push(sk); }
+    units.sort((a, b) => a.ord - b.ord);
+    lectures.set(key, { units, version: ver });
   }
-  for (const l of lectures.values()) l.units.sort((a, b) => a.ord - b.ord);
   const [taughtRows] = await runWithHardTimeout(() => bq.query({
     query: `SELECT ${cid("learning_portal_course_id")} AS cid, ANY_VALUE(learning_portal_course_title) AS course, ARRAY_AGG(DISTINCT session_title IGNORE NULLS) AS titles
             FROM \`${ds}.${SESSION_SCHEDULE_TABLE}\`
@@ -298,19 +311,18 @@ export async function fetchTaughtCourseRows(): Promise<TaughtCourseRow[]> {
   }), QUERY_TIMEOUT_MS);
   // Lectures of the portal course covered by a list of session titles: a session matching a lecture's own title covers it; a session
   // matching only a topic title covers that topic's first lecture not covered yet.
-  // Topics of the portal course covered by a list of session titles: a session covers every topic whose title or lesson titles it matches.
+  // Class sessions (lessons) of the portal course covered by a list of session titles (see the lesson keys above).
   const covered = (pk: string, titles: string[]): number | null => {
     const lec = map.lectures.get(pk);
     if (!lec || !lec.units.length) return null;
-    const keys = new Set(titles.flatMap((t) => titleKeys(t)));
+    const keys = new Set(titles.flatMap((t) => [norm(t), ...titleKeys(t)]));
     return lec.units.filter((u) => u.keys.some((k) => keys.has(k))).length;
   };
   return (rows as Record<string, unknown>[]).map((r) => {
     const pk = plain(r.pk);
     const def = TRAINING_COURSE_TAXONOMY.find((d) => d.key === pk);
-    // Total = the course's TOPICS in the learning portal (the same for every instructor); completed = topics covered by their completed
-    // sessions; scheduled = topics covered by any session scheduled for them. Fallback to the schedule-based figures only if the portal
-    // has no topics for the course.
+    // Total = the course's CLASS SESSIONS in the learning portal (the same for every instructor); completed = those sessions they have
+    // taught (completed); scheduled = those scheduled for them. Fallback to the schedule-based figures only if the portal has no lessons.
     const total = map.lectures.get(pk)?.units.length ?? 0;
     const doneTitles = ((r.done_titles as unknown[]) ?? []).map(plain);
     const allTitles = ((r.all_titles as unknown[]) ?? []).map(plain);
