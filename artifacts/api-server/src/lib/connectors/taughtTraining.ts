@@ -128,7 +128,7 @@ export async function matchToPortalCourses(bq: BigQuery, ds: string, cid: (c: st
   const ids = [...new Set(defs.flatMap((d) => d.courseIds ?? []).map(cleanId))];
   const titles = [...new Set(defs.flatMap((d) => d.courseTitles))];
   const [portalRows] = await runWithHardTimeout(() => bq.query({
-    query: `SELECT ${cid("course_id")} AS cid, course_title, topic_title, unit_title, unit_type, MIN(course_unit_order) AS ord FROM \`${ds}.${UNIT_COMPLETION_TABLE}\`
+    query: `SELECT DISTINCT ${cid("course_id")} AS cid, course_title, topic_title, unit_title FROM \`${ds}.${UNIT_COMPLETION_TABLE}\`
             WHERE ${cid("course_id")} IN UNNEST(@ids) OR course_title IN UNNEST(@titles)`,
     params: { ids, titles },
   }), QUERY_TIMEOUT_MS);
@@ -185,7 +185,7 @@ export async function buildSessionTitleMap(bq: BigQuery, ds: string, cid: (c: st
   const ids = [...new Set(defs.flatMap((d) => d.courseIds ?? []).map(cleanId))];
   const ptitles = [...new Set(defs.flatMap((d) => d.courseTitles))];
   const [portalRows] = await runWithHardTimeout(() => bq.query({
-    query: `SELECT DISTINCT ${cid("course_id")} AS cid, course_title, topic_title, unit_title FROM \`${ds}.${UNIT_COMPLETION_TABLE}\`
+    query: `SELECT ${cid("course_id")} AS cid, course_title, topic_title, unit_title, unit_type, MIN(course_unit_order) AS ord FROM \`${ds}.${UNIT_COMPLETION_TABLE}\`
             WHERE ${cid("course_id")} IN UNNEST(@ids) OR course_title IN UNNEST(@titles)
             GROUP BY 1, 2, 3, 4, 5`,
     params: { ids, titles: ptitles },
