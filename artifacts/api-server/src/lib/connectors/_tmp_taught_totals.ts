@@ -10,6 +10,8 @@ async function main() {
   const logs = await db.select().from(uploadsTable).where(eq(uploadsTable.source, "Instructor Taught Training")).orderBy(desc(uploadsTable.uploadedAt)).limit(3);
   console.log("Last taught-data rebuilds:");
   for (const l of logs) console.log(`  ${l.uploadedAt.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })} IST | ${l.rowCount} rows | ${l.filename}`);
+  const [fail] = await db.select().from(uploadsTable).where(eq(uploadsTable.source, "Instructor Taught Training FAILED")).orderBy(desc(uploadsTable.uploadedAt)).limit(1);
+  if (fail) console.log(`Last FAILED rebuild: ${fail.uploadedAt.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })} IST | ${fail.filename}`);
   const [ts] = await db.select().from(uploadsTable).where(eq(uploadsTable.source, "Instructor Training Status")).orderBy(desc(uploadsTable.uploadedAt)).limit(1);
   console.log(`Last Training Status sync: ${ts ? ts.uploadedAt.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }) + " IST" : "never"} (if this is LATER than the last rebuild above, the taught step failed on that sync)\n`);
   const rows = await db.select({
