@@ -510,6 +510,19 @@ export const instructorTaughtCourseTable = pgTable("instructor_taught_course", {
 });
 export type InstructorTaughtCourse = typeof instructorTaughtCourseTable.$inferSelect;
 
+// Daily copy of the Overview's "Exit data" list (2026-10-23, per request: "from now keep yesterday's list" -- the count went 21 -> 20 and
+// there was no way to see who dropped off). One set of rows per IST day: today's set is refreshed every time the list is read (and after
+// the daily sync), earlier days stay as they were last seen, so the Overview can show who was added / removed since the previous day.
+export const exitCardSnapshotTable = pgTable("exit_card_snapshot", {
+  id: serial("id").primaryKey(),
+  snapshotDate: date("snapshot_date").notNull(),
+  employeeId: text("employee_id"),
+  fullName: text("full_name").notNull(),
+  exitDate: date("exit_date"),
+  dateOfExit: date("date_of_exit"),
+  takenAt: timestamp("taken_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const insertInstructorTrainingStatusSchema = createInsertSchema(instructorTrainingStatusTable);
 export type InstructorTrainingStatus = typeof instructorTrainingStatusTable.$inferSelect;
 export type InsertInstructorTrainingStatus = z.infer<typeof insertInstructorTrainingStatusSchema>;
