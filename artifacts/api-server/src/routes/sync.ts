@@ -242,6 +242,8 @@ async function runTrainingStatusSync(): Promise<SyncResult> {
       await db.insert(uploadsTable).values({ source: "Instructor Taught Training", filename: "BigQuery sync (NIAT session ids completed vs course curriculum, per instructor + course)", rowCount: taught });
     } catch (e) {
       console.error("[taught-training] sync failed:", e);
+      // Record the failure where it can be seen (2026-10-23): the uploads log, so _tmp_taught_totals.ts / Sync health show the reason.
+      await db.insert(uploadsTable).values({ source: "Instructor Taught Training FAILED", filename: `taught-in-class step failed: ${String((e as Error)?.message ?? e).slice(0, 900)}`, rowCount: 0 }).catch(() => {});
     }
     return { ok: true, source: "training_status_live", stored, synced_at: new Date().toISOString() };
   } catch (e) {
