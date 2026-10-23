@@ -105,7 +105,7 @@ export function TaughtTrainingView() {
     <PageIntro
       eyebrow="BigQuery / NIAT session schedule, by session id"
       title="Training Stats -- Taught in class"
-      description="NIAT instructors only. Every session of a course has its own session ID; each cell is the course's sessions this instructor has completed out of the course's sessions at their NIAT institute(s) (lecture and practice). Pick a subject to see its courses. Orientation / intro courses are left out. 80% or more = Completed."
+      description="NIAT instructors only. Columns are the learning-portal courses. Each cell = the course's CLASS SESSIONS in the learning portal (its lessons, e.g. 'Introduction to CSS | Part 2' -- not reading material, quizzes or practice; the same total for every instructor) that this instructor has taught in a completed lecture/practice session. Hover a cell for details. 80% or more = Completed."
       action={<div className="flex items-center gap-2">
         <button type="button" data-testid="button-refresh-taught-training" onClick={refresh} className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3.5 py-2.5 text-[12px] font-bold text-foreground transition-colors hover:bg-secondary"><RefreshCw size={14} /> Refresh</button>
         <button type="button" data-testid="button-sync-taught-training" onClick={syncNow} disabled={syncing} className="inline-flex items-center gap-2 rounded-lg bg-primary px-3.5 py-2.5 text-[12px] font-bold text-primary-foreground shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-45">{syncing ? 'Syncing…' : 'Sync Now'}</button>
@@ -168,7 +168,7 @@ export function TaughtTrainingView() {
                   {columns.map((c, i) => {
                     const x = r.courses[c.course_id];
                     return <td key={c.course_id} className={`${td} text-center ${i === 0 ? 'border-l-2' : ''}`}
-                      title={x ? `Completed ${x.completed} of ${x.curriculum} sessions (${x.scheduled} scheduled for them) · last taught ${fmtDate(x.last_taught_date)}${x.institutes.length ? ` · ${x.institutes.join(', ')}` : ''}` : 'Not taught'}>
+                      title={x ? `Taught ${x.completed} of the course's ${x.curriculum} class sessions (${x.scheduled} scheduled for them) · last taught ${fmtDate(x.last_taught_date)}${x.institutes.length ? ` · ${x.institutes.join(', ')}` : ''}` : 'Not taught'}>
                       {x ? <div className="flex flex-col items-center gap-0.5">
                         <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold tabular-nums ${tone(x.pct)}`}>{x.pct}%</span>
                         <span className="text-[10px] tabular-nums text-muted-foreground">{x.completed}/{x.curriculum}</span>
