@@ -11,9 +11,9 @@ import { MultiSelectFilter } from './instructors';
 // at least one of them, plus their overall % for the subject. Completed = 80%+. Server: connectors/taughtTraining.ts and
 // GET /reports/taught-training.
 
-type Cell = { completed: number; curriculum: number; scheduled: number; pct: number; last_taught_date: string | null; institutes: string[]; taught_as?: string[] };
+type Cell = { completed: number; curriculum: number; scheduled: number; pct: number; last_taught_date: string | null; institutes: string[] };
 type TaughtRow = { employee_id: string | null; full_name: string; subject_area: string | null; capability_manager: string | null; courses: Record<string, Cell> };
-type CourseCol = { course_id: string; title: string; subject: string; instructors: number; curriculum_max: number; portal?: boolean; taught_as?: string[] };
+type CourseCol = { course_id: string; title: string; subject: string; instructors: number; curriculum_max: number };
 type TaughtResponse = { rows: TaughtRow[]; courses: CourseCol[]; subject_columns: string[]; completed_pct: number; synced_at: string | null };
 
 const QUERY_KEY = ['reports', 'taught-training'];
@@ -105,7 +105,7 @@ export function TaughtTrainingView() {
     <PageIntro
       eyebrow="BigQuery / NIAT session schedule, by session id"
       title="Training Stats -- Taught in class"
-      description="NIAT instructors only. Columns are the learning-portal courses: every campus course (each university / version) is matched by its session content to one of them, so all campuses land in one column; hover a header to see which campus courses were counted. Each cell = that course's sessions (by session ID) the instructor completed out of its sessions at their NIAT institute(s). Courses that match no portal course are marked (campus). Orientation / intro courses are left out. 80% or more = Completed."
+      description="NIAT instructors only. Every session of a course has its own session ID; each cell is the course's sessions this instructor has completed out of the course's sessions at their NIAT institute(s) (lecture and practice). Pick a subject to see its courses. Orientation / intro courses are left out. 80% or more = Completed."
       action={<div className="flex items-center gap-2">
         <button type="button" data-testid="button-refresh-taught-training" onClick={refresh} className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3.5 py-2.5 text-[12px] font-bold text-foreground transition-colors hover:bg-secondary"><RefreshCw size={14} /> Refresh</button>
         <button type="button" data-testid="button-sync-taught-training" onClick={syncNow} disabled={syncing} className="inline-flex items-center gap-2 rounded-lg bg-primary px-3.5 py-2.5 text-[12px] font-bold text-primary-foreground shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-45">{syncing ? 'Syncing…' : 'Sync Now'}</button>
@@ -152,8 +152,8 @@ export function TaughtTrainingView() {
                   <th className={th}>Employee ID</th>
                   <th className={th}>Instructor subject</th>
                   <th className={th}>Capability Manager</th>
-                  {columns.map((c, i) => <th key={c.course_id} className={`${th} text-center ${i === 0 ? 'border-l-2' : ''}`} title={`${c.portal ? 'Learning-portal course' : 'Campus course with no matching learning-portal course'} · taught by ${c.instructors} NIAT instructors${c.taught_as?.length ? `\nCampus courses counted here: ${c.taught_as.join(', ')}` : ''}`}>
-                    <div className="normal-case tracking-normal font-sans text-[11px] font-bold text-foreground">{c.title}{!c.portal && <span className="ml-1 font-normal text-muted-foreground">(campus)</span>}</div>
+                  {columns.map((c, i) => <th key={c.course_id} className={`${th} text-center ${i === 0 ? 'border-l-2' : ''}`} title={`Up to ${c.curriculum_max} sessions; taught by ${c.instructors} NIAT instructors`}>
+                    <div className="normal-case tracking-normal font-sans text-[11px] font-bold text-foreground">{c.title}</div>
                     <div className="mt-1 font-sans text-[10px] normal-case tracking-normal text-muted-foreground/80">{formatKpi(colTotals[c.course_id]?.completed ?? 0)} of {formatKpi(colTotals[c.course_id]?.taught ?? 0)} at 80%+</div>
                   </th>)}
                   <th className={`${th} border-l-2 bg-[#eef4ee] text-center`}>{SHORT[activeSubject] ?? activeSubject} overall</th>
@@ -168,7 +168,7 @@ export function TaughtTrainingView() {
                   {columns.map((c, i) => {
                     const x = r.courses[c.course_id];
                     return <td key={c.course_id} className={`${td} text-center ${i === 0 ? 'border-l-2' : ''}`}
-                      title={x ? `Completed ${x.completed} of ${x.curriculum} sessions (${x.scheduled} scheduled for them) · last taught ${fmtDate(x.last_taught_date)}${x.institutes.length ? ` · ${x.institutes.join(', ')}` : ''}${x.taught_as?.length ? `\nTaught as: ${x.taught_as.join(', ')}` : ''}` : 'Not taught'}>
+                      title={x ? `Completed ${x.completed} of ${x.curriculum} sessions (${x.scheduled} scheduled for them) · last taught ${fmtDate(x.last_taught_date)}${x.institutes.length ? ` · ${x.institutes.join(', ')}` : ''}` : 'Not taught'}>
                       {x ? <div className="flex flex-col items-center gap-0.5">
                         <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold tabular-nums ${tone(x.pct)}`}>{x.pct}%</span>
                         <span className="text-[10px] tabular-nums text-muted-foreground">{x.completed}/{x.curriculum}</span>
