@@ -597,10 +597,13 @@ function CapabilityManagersCard({ people }: { people: InstructorSummary[] }) {
 // Exit data tile in the KPI row (2026-10-09, per request): the big number is the approved exits recorded so far
 // (Instructor Archive: status Exited, exit record Approved). Clicking it opens a pop-up with every approved name and
 // every name still pending approval (Exception 3's list), so the counts can be checked against real people.
+// Change since the previous day's list (2026-10-23, per request: "keep yesterday's list") -- see snapshotExitCard() in reports.ts.
+type ExitCardChange = { previous_date: string; previous_total: number; added: { full_name: string; employee_id: string | null }[]; removed: { full_name: string; employee_id: string | null; reason: string }[] };
+const fmtDay = (d: string) => new Date(`${d}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 const REVIEW_LABELS: Record<string, string> = { exited: 'Exited', absconded: 'Absconded', serving_notice_period: 'Serving notice', payroll_converted: 'Payroll converted' };
 function ExitKpiCard({ exitCandidates }: { exitCandidates: InstructorSummary[] }) {
   const [open, setOpen] = useState(false);
-  const archiveQuery = useQuery<{ people: ArchiveExitRow[] }>({
+  const archiveQuery = useQuery<{ people: ArchiveExitRow[]; change?: ExitCardChange | null }>({
     queryKey: ['reports', 'approved-exits'],
     queryFn: async () => {
       const response = await fetch('/api/reports/approved-exits');
@@ -645,6 +648,9 @@ function ExitKpiCard({ exitCandidates }: { exitCandidates: InstructorSummary[] }
       <div className="relative mt-3">
         <p className="text-[28px] font-extrabold leading-none tracking-[-0.04em]" data-testid="exit-approved-count">{value}</p>
         <p className="mt-1 text-[10px] font-semibold text-primary-foreground/75">Approved exits</p>
+        {archiveQuery.data?.change && (archiveQuery.data.change.added.length > 0 || archiveQuery.data.change.removed.length > 0) && <p data-testid="exit-change-since" className="mt-0.5 text-[10px] font-semibold text-primary-foreground/90">
+          {archiveQuery.data.change.added.length > 0 ? `+${archiveQuery.data.change.added.length}` : ''}{archiveQuery.data.change.added.length > 0 && archiveQuery.data.change.removed.length > 0 ? ' / ' : ''}{archiveQuery.data.change.removed.length > 0 ? `−${archiveQuery.data.change.removed.length}` : ''} since {fmtDay(archiveQuery.data.change.previous_date)}
+        </p>}
       </div>
       <p className="relative mt-3 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.08em] text-primary-foreground/90">{archiveQuery.isError ? 'Archive unavailable right now' : 'View exit details'} <ArrowRight size={11} className="transition-transform group-hover:translate-x-0.5" /></p>
     </button>
@@ -657,6 +663,14 @@ function ExitKpiCard({ exitCandidates }: { exitCandidates: InstructorSummary[] }
           </DialogDescription>
         </DialogHeader>
         <div className="max-h-[65vh] space-y-5 overflow-auto pr-1" data-testid="exit-dialog-combined">
+          {archiveQuery.data?.change && <section data-testid="exit-section-change" className="rounded-lg border border-border bg-[#f8fafb] px-3 py-2.5">
+            <h3 className="text-[13px] font-extrabold">Since {fmtDay(archiveQuery.data.change.previous_date)}: {archiveQuery.data.change.previous_total} → {exitRows.length}</h3>
+            {archiveQuery.data.change.added.length === 0 && archiveQuery.data.change.removed.length === 0 && <p className="text-[11px] text-muted-foreground">No change to the exits list.</p>}
+            {archiveQuery.data.change.added.length > 0 && <p className="mt-1 text-[12px]"><span className="font-bold text-[#256e65]">Added:</span> {archiveQuery.data.change.added.map((p) => `${p.full_name}${p.employee_id ? ` (${p.employee_id})` : ''}`).join(', ')}</p>}
+            {archiveQuery.data.change.removed.length > 0 && <ul className="mt-1 text-[12px]">
+              {archiveQuery.data.change.removed.map((p) => <li key={`${p.employee_id}-${p.full_name}`}><span className="font-bold text-[#9b4434]">Removed:</span> {p.full_name}{p.employee_id ? ` (${p.employee_id})` : ''} <span className="text-muted-foreground">— {p.reason}</span></li>)}
+            </ul>}
+          </section>}
           {([
             { key: 'exits', title: 'Exits', note: 'Approved exits', rows: exitRows, showMarked: false, empty: 'No approved exits yet.' },
             { key: 'pending', title: 'Upcoming exits — Exited / Absconded', note: 'Marked by the Capability Manager, waiting for approval', rows: pendingExitRows, showMarked: true, empty: 'No exits are waiting for approval.' },

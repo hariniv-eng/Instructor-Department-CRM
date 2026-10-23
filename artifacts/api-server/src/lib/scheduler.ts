@@ -124,7 +124,11 @@ export async function runDailySyncIfDue(graceMs = 0): Promise<DailySyncOutcome> 
   const overdue = await overdueSources(dueSince);
   if (overdue.size === 0) return { ran: false, reason: "up_to_date" };
   logger.info({ dueSince, overdue: [...overdue] }, "Daily auto-sync due -- running now");
-  return runSources(overdue);
+  const outcome = await runSources(overdue);
+  // Keep a copy of the day's Exit data list even on days nobody opens the Overview (2026-10-23). Loaded lazily: routes/reports imports
+  // a lot, and a failure here must never affect the sync.
+  await import("../routes/reports").then((m) => m.snapshotExitCard()).catch((err) => logger.warn({ err }, "Exit data snapshot failed"));
+  return outcome;
 }
 
 // Second, exits-only run at 9:00 AM IST (2026-10-16, per request: exit data "not reflecting correctly"). Darwin regenerates the

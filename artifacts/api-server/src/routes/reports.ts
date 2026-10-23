@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { db, instructorsTable, instructorArchiveTable, darwinboxActiveTable, darwinboxFullRosterTable, darwinboxExitsTable, instructorTrainingStatusTable, instructorTaughtCourseTable, instructorContributionTable, instructorContributionDailyTable, instructorManualJoiningTable, instructorEvaluationDailyTable, instructorTimeSpentDailyTable } from "@workspace/db";
-import { and, eq, gte, lte } from "drizzle-orm";
+import { db, instructorsTable, instructorArchiveTable, darwinboxActiveTable, darwinboxFullRosterTable, darwinboxExitsTable, instructorTrainingStatusTable, instructorTaughtCourseTable, exitCardSnapshotTable, instructorContributionTable, instructorContributionDailyTable, instructorManualJoiningTable, instructorEvaluationDailyTable, instructorTimeSpentDailyTable } from "@workspace/db";
+import { and, desc, eq, gte, lt, lte } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/auth";
 import { cell, parseLooseDate, toISODate } from "../lib/reconcile";
 import { archiveInstructors } from "../lib/archiveInstructors";
@@ -1888,9 +1888,26 @@ router.get("/reports/instructor-archive", requireAuth, requireRole("admin"), asy
 // visible"). Manager view has no login, and the full archive route above is Admin-only, so the card got a 401 there.
 // This public route returns ONLY the approved, non-payroll exits and only the few fields the card shows (no emails, no
 // TeachOS ids) -- the same names, Capability Managers and exit dates Manager view already sees in the Exceptions lists.
+// Exit data list + day-to-day change (2026-10-23, per request: "from now keep yesterday's list"). snapshotExitCard() stores today's list
+// (IST date) in exit_card_snapshot, replacing today's earlier copy; the route compares it with the latest earlier day and says who was
+// added and who dropped off, with the reason the person no longer counts. Reads/writes the snapshot defensively (before the DB push the
+// list still works, just without the comparison).
+const istToday = () => new Date(Date.now() + 5.5 * 3600 * 1000).toISOString().slice(0, 10);
+type ArchivePerson = Awaited<ReturnType<typeof loadArchivePeople>>[number];
+const onExitCard = (p: ArchivePerson) => p.status === "Exited" && (p.exit_status ?? "").trim().toLowerCase() === "approved" && !p.is_payroll;
+export async function snapshotExitCard(people?: ArchivePerson[]) {
+  const all = people ?? (await loadArchivePeople());
+  const card = all.filter(onExitCard);
+  const today = istToday();
+  await db.transaction(async (tx) => {
+    await tx.delete(exitCardSnapshotTable).where(eq(exitCardSnapshotTable.snapshotDate, today));
+    if (card.length) await tx.insert(exitCardSnapshotTable).values(card.map((p) => ({ snapshotDate: today, employeeId: p.employee_id, fullName: p.full_name, exitDate: p.exit_date, dateOfExit: p.date_of_exit })));
+  });
+  return { all, card, today };
+}
 router.get("/reports/approved-exits", async (_req, res) => {
-  const people = (await loadArchivePeople())
-    .filter((p) => p.status === "Exited" && (p.exit_status ?? "").trim().toLowerCase() === "approved" && !p.is_payroll)
+  const all = await loadArchivePeople();
+  const people = all.filter(onExitCard)
     .map((p) => ({
       id: p.id,
       full_name: p.full_name,
@@ -1904,7 +1921,40 @@ router.get("/reports/approved-exits", async (_req, res) => {
       exit_date: p.exit_date,
       status: p.status,
     }));
-  res.json({ people, total: people.length });
+  let change: { previous_date: string; previous_total: number; added: { full_name: string; employee_id: string | null }[]; removed: { full_name: string; employee_id: string | null; reason: string }[] } | null = null;
+  try {
+    const { today } = await snapshotExitCard(all);
+    const [prev] = await db.select({ d: exitCardSnapshotTable.snapshotDate }).from(exitCardSnapshotTable).where(lt(exitCardSnapshotTable.snapshotDate, today)).orderBy(desc(exitCardSnapshotTable.snapshotDate)).limit(1);
+    if (prev) {
+      const prevRows = await db.select().from(exitCardSnapshotTable).where(eq(exitCardSnapshotTable.snapshotDate, prev.d));
+      const key = (id: string | null, name: string) => id || `name:${name.toLowerCase()}`;
+      const nowKeys = new Set(people.map((p) => key(p.employee_id, p.full_name)));
+      const prevKeys = new Set(prevRows.map((r) => key(r.employeeId, r.fullName)));
+      const byKey = new Map(all.map((p) => [key(p.employee_id, p.full_name), p]));
+      // Archive rows hold the Capability Manager's Employee Status, which says WHY someone left the list.
+      const archiveRows = await db.select({ employeeId: instructorArchiveTable.employeeId, exitVerification: instructorArchiveTable.exitVerification }).from(instructorArchiveTable);
+      const cmMark = new Map(archiveRows.filter((a) => a.employeeId).map((a) => [a.employeeId!, a.exitVerification]));
+      const reasonOf = (id: string | null, name: string) => {
+        const p = byKey.get(key(id, name));
+        if (!p) return "no longer in the department population";
+        const mark = id ? cmMark.get(id) : null;
+        if (p.is_payroll || mark === "payroll_converted") return "Capability Manager marked Payroll Converted";
+        if (p.status === "SNP" || mark === "serving_notice_period") return "Capability Manager marked Serving Notice Period";
+        if (p.status === "Active") return `no approved Darwin exit any more (Darwin status: ${p.exit_status ?? "none"})`;
+        if ((p.exit_status ?? "").toLowerCase() !== "approved") return `Darwin exit status is now ${p.exit_status}`;
+        return "changed since the last list";
+      };
+      change = {
+        previous_date: prev.d,
+        previous_total: prevRows.length,
+        added: people.filter((p) => !prevKeys.has(key(p.employee_id, p.full_name))).map((p) => ({ full_name: p.full_name, employee_id: p.employee_id })),
+        removed: prevRows.filter((r) => !nowKeys.has(key(r.employeeId, r.fullName))).map((r) => ({ full_name: r.fullName, employee_id: r.employeeId, reason: reasonOf(r.employeeId, r.fullName) })),
+      };
+    }
+  } catch (err) {
+    console.warn("[exit-card] snapshot unavailable (run the database push):", (err as Error).message);
+  }
+  res.json({ people, total: people.length, change });
 });
 
 // Instructor profile (2026-10-16, per request: "showcase all the data we know about that instructor" on the instructor's own page,
