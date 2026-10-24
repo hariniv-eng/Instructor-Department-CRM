@@ -59,7 +59,10 @@ type ArchiveRow = typeof instructorArchiveTable.$inferSelect;
 // live exit flag, Exception queue, Darwin Exit Details and sync are untouched.
 // Payroll (2026-10-24, per request): back to the rule used before 2026-10-16 -- Payroll = the payroll_converted
 // classification (TeachOS-only: no Darwin record anywhere, not IIT Kharagpur). The Employee Status dropdown does not change it.
-export const isPayrollPerson = (r: { classification?: string | null }): boolean => r.classification === "payroll_converted";
+// Plus (2026-10-24, per request) people converted recently (e.g. after 16 Oct) whom Darwin has not dropped yet: anyone with a
+// Darwin exit record whose Capability Manager marked Payroll Converted also counts as Payroll.
+export const isPayrollPerson = (r: { classification?: string | null; exitFlag?: boolean | null; exitVerification?: string | null }): boolean =>
+  r.classification === "payroll_converted" || (!!r.exitFlag && r.exitVerification === "payroll_converted");
 
 // `lastWorkingDate` (2026-10-08): the exit record's own "Date Of Exit" column (last working day) -- the archive's Date of Exit column. `date` stays the request date ("Exit Date"), used only to rank records and decide Exited.
 type ApprovedExitFallback = { status: string; date: string; lastWorkingDate: string | null };
