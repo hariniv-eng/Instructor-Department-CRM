@@ -47,7 +47,9 @@ export type TaughtCourseRow = {
 
 // Topics that are not taught in class, left out of a course's topic count.
 // Lessons that are not a class of their own: reading material, cheat sheets, notes, getting-started pages.
-export const NOT_A_SESSION = /reading material|cheat ?sheet|a note on|getting started|^notes?\b|\bnotes$|summary|quiz|mcq|coding practice|practice set|assignment|self learning|interview question|mock test|contest/i;
+// Extended 2026-10-23 (Maths / Aptitude lists showed them as "sessions"): study material, PPTs, tutorials, prerequisites and practice sets
+// are material that goes WITH a class, not classes of their own.
+export const NOT_A_SESSION = /reading material|study material|cheat ?sheet|a note on|getting started|^notes?\b|\bnotes$|summary|quiz|mcq|coding practice|practi[cs]e ?set|\bppt\b|^tutorial\b|\btutorial \||prerequisite|prerequsite|assignment|self learning|interview question|mock test|contest/i;
 export const NOT_TAUGHT_TOPIC = /assignment|mock|quiz|exam|interview|question bank|assessment|project|^learn$|cheat ?sheet|revision/i;
 const QUERY_TIMEOUT_MS = 180000;
 

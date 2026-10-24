@@ -927,7 +927,10 @@ export function productLabel(person: InstructorSummary): string {
   // (The KKH + no-Capability-Manager conditions are implied: that rule already needed this same manager.)
   const darwinManager = (person.darwin_manager ?? '').toLowerCase();
   const reportsToJashwanth = darwinManager.includes('nw0005864') || darwinManager.includes('jashwanth dandu');
-  if (reportsToJashwanth) return 'IIT X DSA';
+  // OR (2026-10-24, per request) any Campus is "NxtWave Institute of Advanced Technology - DSA" (case / spaces / punctuation ignored).
+  // Same rule as isIitxDsaCampus() in api-server/src/lib/product.ts -- keep the two in step.
+  const dsaCampus = (person.institutes ?? []).some((i) => { const k = i.toLowerCase().replace(/[^a-z0-9]+/g, ''); return /^n(e)?xtwaveinstituteofadvancedtechnology/.test(k) && k.endsWith('dsa'); });
+  if (reportsToJashwanth || dsaCampus) return 'IIT X DSA';
   if ((person.institutes ?? []).some((i) => i.toLowerCase().includes('intensive'))) return 'Intensive';
   if ((person.institutes ?? []).includes('Training Institute')) return 'NIAT (Training)';
   // Blank campus = NIAT training instructor (2026-10-08, per request: "if the campus
