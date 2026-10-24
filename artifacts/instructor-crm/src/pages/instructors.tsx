@@ -1263,11 +1263,13 @@ function ExitCell({ person }: { person: InstructorSummary }) {
   // manual entry, default Payroll Converted, that managers can change later).
   // Only people WITH an exit record get the manual Employee Status (2026-10-24, per request: "for no-exit-record people the manual entry
   // should not be activated"). Payroll alone no longer opens it.
-  if (!person.exit_flag) {
+  // Back to the pre-2026-10-16 rule (2026-10-24, per request): dropdown for anyone with a Darwin exit record AND every payroll
+  // instructor. A payroll person with nothing saved yet shows Payroll Converted (worked out here, not written by the sync).
+  if (!person.exit_flag && !person.is_payroll) {
     return <div className="truncate text-[12px] text-muted-foreground">—</div>;
   }
 
-  const value = person.exit_verification ?? '';
+  const value = person.exit_verification ?? (person.is_payroll && !person.exit_flag ? 'payroll_converted' : '');
   return <div onClick={(event) => { event.preventDefault(); event.stopPropagation(); }} className="text-[12px]">
     <select
       value={value}
@@ -1317,8 +1319,8 @@ function DateOfExitCell({ person }: { person: InstructorSummary }) {
     },
   });
 
-  // Manual date only for payroll people who also have an exit record (2026-10-24).
-  if (!person.is_payroll || !person.exit_flag) {
+  // Manual date for payroll people (TeachOS-only, or CM-marked Payroll Converted) -- 2026-10-24 (later).
+  if (!person.is_payroll) {
     return <div className="truncate font-mono-ui text-[11px] text-muted-foreground">{person.date_of_exit || ''}</div>;
   }
   // A complete, believable date only: typing a year digit by digit passes through values like 0002-10-15 and 0020-10-15, which must
