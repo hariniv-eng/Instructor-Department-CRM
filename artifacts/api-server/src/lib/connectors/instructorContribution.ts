@@ -437,8 +437,23 @@ export const TRACK_SUBJECT: Record<string, string> = {
 };
 // Orientation / intro courses (same rule as ORIENTATION_COURSE in taughtTraining.ts -- kept as a copy to avoid a circular import).
 const ORIENTATION_TITLE = /^(intro|introduction) to (tech|software( development)?|operating systems?|os|computers?)\b|orientation|welcome webinar|webinar/i;
+// Subject from words in a course name or course category (2026-10-24): the last resort before showing the course by name.
+function subjectFromWords(text: string): string | null {
+  const t = text.toLowerCase();
+  if (!t.trim()) return null;
+  if (/aptitude|reasoning|numerical ability|verbal ability/.test(t)) return "Aptitude";
+  if (/english|communicat|language analytics|grammar|writing/.test(t)) return "English";
+  if (/probability|statistic|linear algebra|calculus|discrete math|mathemat|\bmaths?\b/.test(t)) return "Maths";
+  if (/generative ai|\bgen ?ai\b|\bllm/.test(t)) return "GenAI";
+  if (/machine learning|deep learning|data science|\bdsml\b|\bml\b|data visuali|\bnlp\b/.test(t)) return "Artificial Intelligence & Emerging Technologies";
+  if (/data structure|algorithm|\bdsa\b/.test(t)) return "DSA";
+  if (/html|css|javascript|\bjs\b|react|frontend|front end|responsive|web design/.test(t)) return "Frontend";
+  if (/python|node|backend|back end|database|dbms|sql|django|java\b|spring|express/.test(t)) return "Backend";
+  return null;
+}
 async function fetchSessionSubjects(): Promise<Map<string, Record<string, number>>> {
   const map = new Map<string, Record<string, number>>();
+  const previous = new Map<string, Record<string, number>>();
   try {
     const cols = (await getSchema(SESSION_SCHEDULE_TABLE)).map(([name]) => name);
     const idCol = cols.find((c) => /^course_id$/i.test(c)) ?? cols.find((c) => /course.*id/i.test(c)) ?? null;
@@ -460,12 +475,17 @@ async function fetchSessionSubjects(): Promise<Map<string, Record<string, number
       SELECT instructor_user_id,
         ${idCol ? `REPLACE(LOWER(CAST(${idCol} AS STRING)), '-', '')` : "NULL"} AS course_id,
         ${titleCol ? `CAST(${titleCol} AS STRING)` : "NULL"} AS course_title,
+        ${cols.includes("semester_course_title") ? "CAST(semester_course_title AS STRING)" : "NULL"} AS semester_title,
+        ${cols.includes("course_category") ? "CAST(course_category AS STRING)" : "NULL"} AS category,
+        -- Last 30 days = "recent"; the 30 days before that = "previous" (2026-10-24: used only for people with no recent sessions).
+        IF(session_start_datetime >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 30 DAY), 'recent', 'previous') AS period,
         COUNT(*) AS sessions
       FROM \`${tableRef(SESSION_SCHEDULE_TABLE)}\`
       WHERE session_status = 'COMPLETED' AND instructor_user_id IS NOT NULL
-        AND session_start_datetime >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 30 DAY)
+        AND session_start_datetime >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 60 DAY)
+        AND session_start_datetime <= CURRENT_DATETIME()
         AND session_type IN ('LECTURE', 'PRACTICE')
-      GROUP BY 1, 2, 3
+      GROUP BY 1, 2, 3, 4, 5, 6
     `;
     const [rows] = await runWithHardTimeout(() => bq.query({ query }), API_TIMEOUT_MS * 3 + 10000);
     for (const r of rows as Array<Record<string, unknown>>) {
@@ -482,15 +502,27 @@ async function fetchSessionSubjects(): Promise<Map<string, Record<string, number
       const byIdSubject = teaching !== undefined ? (teaching ?? "__general") : (courseId && byId.get(courseId)) || null;
       const title = r.course_title ? String(r.course_title).trim() : "";
       const titleKey = title.toLowerCase().replace(/[^a-z0-9]+/g, "");
+      // Then (2026-10-24, "Arpita shows No match"): many campus sessions carry NO learning-portal course at all, only the semester course
+      // ("Quantitative Aptitude - II") and a course category ("APTITUDE"). Those are used next, so such sessions still get a subject.
+      const semTitle = r.semester_title ? String(r.semester_title).trim() : "";
+      const semKey = semTitle.toLowerCase().replace(/[^a-z0-9]+/g, "");
+      const byName = (t: string, k: string): string | null => !t ? null
+        : ORIENTATION_TITLE.test(t) ? "__general"
+        : /^(math|mathematics)forc(omputerscience|se)/.test(k) ? "Math for Computer Science"
+        : TAUGHT_COURSE_TITLE_SUBJECTS[k] ?? subjectFromWords(t);
       const subject = byIdSubject
-        ?? (!title ? "__unmatched"
-          : ORIENTATION_TITLE.test(title) ? "__general"
-          : /^(math|mathematics)forc(omputerscience|se)/.test(titleKey) ? "Math for Computer Science"
-          : TAUGHT_COURSE_TITLE_SUBJECTS[titleKey] ?? `Other: ${title}`);
-      const entry = map.get(id) ?? {};
+        ?? byName(title, titleKey)
+        ?? byName(semTitle, semKey)
+        ?? subjectFromWords(String(r.category ?? ""))
+        ?? (title ? `Other: ${title}` : semTitle ? `Other: ${semTitle}` : "__unmatched");
+      const target = String(r.period) === "recent" ? map : previous;
+      const entry = target.get(id) ?? {};
       entry[subject] = (entry[subject] ?? 0) + Number(r.sessions ?? 0);
-      map.set(id, entry);
+      target.set(id, entry);
     }
+    // No lecture/practice sessions in the last 30 days -> use the month before (2026-10-24, per request: "if there are no sessions in
+    // 30 days, check the month before"). Marked with "__previous_month" so the Contribution tab can say the subject is from then.
+    for (const [id, entry] of previous) if (!map.has(id)) map.set(id, { ...entry, __previous_month: 1 });
   } catch (e) {
     console.error(`[contribution] subject-from-sessions query failed, leaving it empty: ${(e as Error).message}`);
   }
