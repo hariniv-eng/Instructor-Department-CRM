@@ -128,6 +128,9 @@ export async function runDailySyncIfDue(graceMs = 0): Promise<DailySyncOutcome> 
   // Keep a copy of the day's Exit data list even on days nobody opens the Overview (2026-10-23). Loaded lazily: routes/reports imports
   // a lot, and a failure here must never affect the sync.
   await import("../routes/reports").then((m) => m.snapshotExitCard()).catch((err) => logger.warn({ err }, "Exit data snapshot failed"));
+  // Copy the Instructor Archive into the separate cache database (2026-10-24). Skipped when ARCHIVE_CACHE_DATABASE_URL is not set; a
+  // failure here never affects the sync.
+  await import("./archiveCache").then((m) => m.refreshArchiveCache()).catch((err) => logger.warn({ err }, "Archive cache refresh failed"));
   return outcome;
 }
 
