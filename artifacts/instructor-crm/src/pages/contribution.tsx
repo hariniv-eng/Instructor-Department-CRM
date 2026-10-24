@@ -179,8 +179,10 @@ function RoleBadge({ role }: { role: ContributionRow['role'] }) {
 // Subject from sessions (2026-10-17, per request: shown beside Subject to compare). Subjects taught in the last 30 days, biggest first;
 // a subject is listed when it is at least 20% of the person's matched sessions (so someone teaching two subjects shows both).
 const SESSION_SUBJECT_MIN_SHARE = 0.2;
-function sessionSubjects(row: ContributionRow): { list: string[]; otherList: string[]; detail: string; matched: number; unmatched: number; general: number } {
-  const entries = Object.entries(row.session_subjects ?? {});
+function sessionSubjects(row: ContributionRow): { list: string[]; otherList: string[]; detail: string; matched: number; unmatched: number; general: number; previousMonth: boolean } {
+  // "__previous_month" (2026-10-24): no lecture/practice sessions in the last 30 days, so the subject comes from the month before.
+  const previousMonth = !!row.session_subjects?.['__previous_month'];
+  const entries = Object.entries(row.session_subjects ?? {}).filter(([k]) => k !== '__previous_month');
   const unmatched = entries.find(([k]) => k === '__unmatched')?.[1] ?? 0;
   // "__general" (2026-10-17): sessions of general courses (orientation, shared foundations, CS core) -- not a subject, left out.
   const general = entries.find(([k]) => k === '__general')?.[1] ?? 0;
@@ -193,13 +195,13 @@ function sessionSubjects(row: ContributionRow): { list: string[]; otherList: str
   const list = subjects.filter(([, n], i) => i === 0 || n / matched >= SESSION_SUBJECT_MIN_SHARE).map(([k]) => k);
   const otherList = others.filter(([, n], i) => (i === 0 && list.length === 0) || n / counted >= SESSION_SUBJECT_MIN_SHARE).map(([k]) => k.slice('Other: '.length));
   const detail = [...subjects.map(([k, n]) => `${k}: ${n} sessions`), ...others.map(([k, n]) => `${k.slice('Other: '.length)} (other course): ${n} sessions`), general ? `Orientation: ${general} sessions (left out)` : '', unmatched ? `No subject match: ${unmatched} sessions` : ''].filter(Boolean).join(' · ');
-  return { list, otherList, detail, matched, unmatched, general };
+  return { list, otherList, detail: previousMonth ? `From the PREVIOUS month (no sessions in the last 30 days) · ${detail}` : detail, matched, unmatched, general, previousMonth };
 }
 
 // Text of the Subject-from-sessions column for the CSV (2026-10-24): never blank -- the subjects, else why there is none.
 function sessionSubjectText(row: ContributionRow): string {
   const ss = sessionSubjects(row);
-  if (ss.list.length || ss.otherList.length) return [...ss.list, ...ss.otherList].join(' + ');
+  if (ss.list.length || ss.otherList.length) return [...ss.list, ...ss.otherList].join(' + ') + (ss.previousMonth ? ' (previous month)' : '');
   return ss.unmatched ? 'No match' : ss.general ? 'Orientation only' : 'No lecture/practice sessions';
 }
 
@@ -494,7 +496,7 @@ export default function ContributionPage() {
                   const ss = sessionSubjects(row);
                   // "Math for Computer Science" is a Maths course shown by name (2026-10-17), so it agrees with a Maths Subject.
                   const differs = ss.list.length > 0 && !!row.subject_area && !ss.list.map((x) => (x === 'Math for Computer Science' ? 'Maths' : x)).includes(row.subject_area);
-                  return <td className={`whitespace-nowrap border-r border-border px-4 py-3 text-[12px] ${differs ? 'bg-[#fff6e0] font-semibold text-[#8a5a00]' : 'text-foreground'}`} title={ss.detail || 'No completed sessions in the last 30 days'} data-testid={`cell-session-subject-${row.employee_id ?? row.full_name}`}>{ss.list.length || ss.otherList.length ? <>{ss.list.join(' + ')}{ss.otherList.length > 0 && <span className="text-muted-foreground">{ss.list.length ? ' + ' : ''}{ss.otherList.join(' + ')}</span>}</> : ss.unmatched ? <span className="text-muted-foreground">No match</span> : ss.general ? <span className="text-muted-foreground">Orientation only</span> : <span className="text-muted-foreground">No sessions</span>}</td>;
+                  return <td className={`whitespace-nowrap border-r border-border px-4 py-3 text-[12px] ${differs ? 'bg-[#fff6e0] font-semibold text-[#8a5a00]' : 'text-foreground'}`} title={ss.detail || 'No completed sessions in the last 30 days'} data-testid={`cell-session-subject-${row.employee_id ?? row.full_name}`}>{ss.list.length || ss.otherList.length ? <>{ss.list.join(' + ')}{ss.otherList.length > 0 && <span className="text-muted-foreground">{ss.list.length ? ' + ' : ''}{ss.otherList.join(' + ')}</span>}{ss.previousMonth && <span className="ml-1 text-[10px] font-normal text-muted-foreground">(prev. month)</span>}</> : ss.unmatched ? <span className="text-muted-foreground">No match</span> : ss.general ? <span className="text-muted-foreground">Orientation only</span> : <span className="text-muted-foreground">No sessions</span>}</td>;
                 })()}
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-foreground" data-testid={`cell-product-${row.employee_id ?? row.full_name}`}>{row.product || '—'}</td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-muted-foreground">{row.capability_manager || '—'}</td>

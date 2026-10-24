@@ -1261,7 +1261,9 @@ function ExitCell({ person }: { person: InstructorSummary }) {
   // Dropdown for anyone with a Darwin exit record AND for every payroll
   // instructor (2026-10-07: payroll people have no exit record but carry a
   // manual entry, default Payroll Converted, that managers can change later).
-  if (!person.exit_flag && !person.is_payroll) {
+  // Only people WITH an exit record get the manual Employee Status (2026-10-24, per request: "for no-exit-record people the manual entry
+  // should not be activated"). Payroll alone no longer opens it.
+  if (!person.exit_flag) {
     return <div className="truncate text-[12px] text-muted-foreground">—</div>;
   }
 
@@ -1315,7 +1317,8 @@ function DateOfExitCell({ person }: { person: InstructorSummary }) {
     },
   });
 
-  if (!person.is_payroll) {
+  // Manual date only for payroll people who also have an exit record (2026-10-24).
+  if (!person.is_payroll || !person.exit_flag) {
     return <div className="truncate font-mono-ui text-[11px] text-muted-foreground">{person.date_of_exit || ''}</div>;
   }
   // A complete, believable date only: typing a year digit by digit passes through values like 0002-10-15 and 0020-10-15, which must

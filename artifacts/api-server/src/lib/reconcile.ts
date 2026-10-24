@@ -390,9 +390,11 @@ export const recomputeStatuses = async (options: { grantTeachosOnlyScope?: boole
       // Converted leaves the queue; Exited / Absconded / Serving Notice Period
       // go to Exception 2 (Admin actions) -- see reports.ts. A review set by a
       // CM is never overwritten here once the exit record is already known.
-      ...(classification === "payroll_converted" && !exit && !row.exitVerification
-        ? { exitVerification: "payroll_converted" }
-        : (!!exit && !row.exitFlag && row.exitVerification === "payroll_converted")
+      // NO AUTOMATIC "Payroll Converted" any more (2026-10-24, per request: "it should not get payroll converted automatically -- only
+      // people with an exit record get the manual Employee Status, and the Capability Manager marks them Payroll Converted if they are").
+      // The sync never fills Employee Status in. It only still clears an old automatic mark when an exit record newly appears, so that
+      // person lands in the CM actions queue for review.
+      ...((!!exit && !row.exitFlag && row.exitVerification === "payroll_converted")
           ? { exitVerification: null }
           : {}),
       exitDepartment: isTeachosOnlyLeftover ? (exit?.department ?? null) : null,
