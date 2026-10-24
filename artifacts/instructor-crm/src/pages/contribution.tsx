@@ -196,6 +196,13 @@ function sessionSubjects(row: ContributionRow): { list: string[]; otherList: str
   return { list, otherList, detail, matched, unmatched, general };
 }
 
+// Text of the Subject-from-sessions column for the CSV (2026-10-24): never blank -- the subjects, else why there is none.
+function sessionSubjectText(row: ContributionRow): string {
+  const ss = sessionSubjects(row);
+  if (ss.list.length || ss.otherList.length) return [...ss.list, ...ss.otherList].join(' + ');
+  return ss.unmatched ? 'No match' : ss.general ? 'Orientation only' : 'No lecture/practice sessions';
+}
+
 function sessionRole(row: ContributionRow): ContributionRow['role'] | null {
   if (!row.last30_sessions) return null;
   return (row.last30_lecture_sessions ?? 0) > 0 ? 'Instructor' : 'Mentor';
@@ -321,7 +328,7 @@ export default function ContributionPage() {
     const rows = searchedRows.map((row) => {
       const has = row.has_contribution_data;
       return [
-        row.employee_id, row.full_name, row.role, sessionRole(row), row.department, row.subject_area, [...sessionSubjects(row).list, ...sessionSubjects(row).otherList].join(' + '), row.product, row.capability_manager,
+        row.employee_id, row.full_name, row.role, sessionRole(row), row.department, row.subject_area, sessionSubjectText(row), row.product, row.capability_manager,
         row.date_of_joining, row.date_of_joining_source, row.deployment_date, row.training_days, row.experience_years,
         has ? row.lecture_hours : '', has ? row.lecture_sessions : '', has ? row.practice_hours : '', has ? row.practice_sessions : '', has ? row.other_hours : '', has ? row.other_sessions : '', has ? row.total_hours : '', has ? row.sessions_completed : '', has ? row.session_days : '',
         row.demo_evaluations > 0 ? row.demo_hours : '', row.demo_evaluations > 0 ? row.demo_evaluations : '',
@@ -487,7 +494,7 @@ export default function ContributionPage() {
                   const ss = sessionSubjects(row);
                   // "Math for Computer Science" is a Maths course shown by name (2026-10-17), so it agrees with a Maths Subject.
                   const differs = ss.list.length > 0 && !!row.subject_area && !ss.list.map((x) => (x === 'Math for Computer Science' ? 'Maths' : x)).includes(row.subject_area);
-                  return <td className={`whitespace-nowrap border-r border-border px-4 py-3 text-[12px] ${differs ? 'bg-[#fff6e0] font-semibold text-[#8a5a00]' : 'text-foreground'}`} title={ss.detail || 'No completed sessions in the last 30 days'} data-testid={`cell-session-subject-${row.employee_id ?? row.full_name}`}>{ss.list.length || ss.otherList.length ? <>{ss.list.join(' + ')}{ss.otherList.length > 0 && <span className="text-muted-foreground">{ss.list.length ? ' + ' : ''}{ss.otherList.join(' + ')}</span>}</> : ss.unmatched ? <span className="text-muted-foreground">No match</span> : ss.general ? <span className="text-muted-foreground">Orientation only</span> : <span className="text-muted-foreground">—</span>}</td>;
+                  return <td className={`whitespace-nowrap border-r border-border px-4 py-3 text-[12px] ${differs ? 'bg-[#fff6e0] font-semibold text-[#8a5a00]' : 'text-foreground'}`} title={ss.detail || 'No completed sessions in the last 30 days'} data-testid={`cell-session-subject-${row.employee_id ?? row.full_name}`}>{ss.list.length || ss.otherList.length ? <>{ss.list.join(' + ')}{ss.otherList.length > 0 && <span className="text-muted-foreground">{ss.list.length ? ' + ' : ''}{ss.otherList.join(' + ')}</span>}</> : ss.unmatched ? <span className="text-muted-foreground">No match</span> : ss.general ? <span className="text-muted-foreground">Orientation only</span> : <span className="text-muted-foreground">No sessions</span>}</td>;
                 })()}
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-foreground" data-testid={`cell-product-${row.employee_id ?? row.full_name}`}>{row.product || '—'}</td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-muted-foreground">{row.capability_manager || '—'}</td>
