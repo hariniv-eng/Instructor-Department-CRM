@@ -272,6 +272,16 @@ router.patch("/instructors/:id/exit-verification", async (req, res): Promise<voi
     res.status(400).json({ error: 'exit_verification must be "exited", "serving_notice_period", "payroll_converted", "absconded", or null' });
     return;
   }
+  // Employee Status can only be SET for someone with an exit record (2026-10-24, per request); clearing it (null) is always allowed.
+  const [current] = await db.select({ exitFlag: instructorsTable.exitFlag }).from(instructorsTable).where(eq(instructorsTable.id, Number(req.params.id)));
+  if (!current) {
+    res.status(404).json({ error: "Instructor not found" });
+    return;
+  }
+  if (raw !== null && !current.exitFlag) {
+    res.status(400).json({ error: "Employee Status can only be set for someone with a Darwin exit record." });
+    return;
+  }
   const [row] = await db.update(instructorsTable).set({ exitVerification: raw }).where(eq(instructorsTable.id, Number(req.params.id))).returning();
   if (!row) {
     res.status(404).json({ error: "Instructor not found" });
