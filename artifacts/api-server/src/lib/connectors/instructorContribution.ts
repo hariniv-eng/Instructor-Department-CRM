@@ -37,7 +37,7 @@ import { config, missing } from "./config";
 import { runWithHardTimeout, HardTimeout } from "./timeout";
 import { getSchema } from "./instructorLearningStatus";
 import { TRAINING_COURSE_TAXONOMY } from "../../data/trainingCourseTaxonomy";
-import { TEACHING_COURSE_SUBJECTS } from "../../data/teachingCourseSubjects";
+import { TEACHING_COURSE_SUBJECTS, TAUGHT_COURSE_TITLE_SUBJECTS } from "../../data/teachingCourseSubjects";
 
 export class InstructorContributionError extends Error {}
 
@@ -435,6 +435,8 @@ export const TRACK_SUBJECT: Record<string, string> = {
   "Frontend Development": "Frontend", "Backend Development": "Backend", DSA: "DSA", "Gen AI": "GenAI",
   DSML: "Artificial Intelligence & Emerging Technologies", Aptitude: "Aptitude", Maths: "Maths", English: "English",
 };
+// Orientation / intro courses (same rule as ORIENTATION_COURSE in taughtTraining.ts -- kept as a copy to avoid a circular import).
+const ORIENTATION_TITLE = /^(intro|introduction) to (tech|software( development)?|operating systems?|os|computers?)\b|orientation|welcome webinar|webinar/i;
 async function fetchSessionSubjects(): Promise<Map<string, Record<string, number>>> {
   const map = new Map<string, Record<string, number>>();
   try {
@@ -473,8 +475,18 @@ async function fetchSessionSubjects(): Promise<Map<string, Record<string, number
       // Teaching-course list first (2026-10-17: the courses instructors teach -- see teachingCourseSubjects.ts; null there = a general
       // course, kept as "__general" and left out of the subject), then the training course list, else "__unmatched".
       const teaching = courseId && courseId in TEACHING_COURSE_SUBJECTS ? TEACHING_COURSE_SUBJECTS[courseId] : undefined;
-      // Course ID only (2026-10-17, per request: "only map the subject depending on the course id") -- titles are no longer used.
-      const subject = teaching !== undefined ? (teaching ?? "__general") : ((courseId && byId.get(courseId)) || "__unmatched");
+      // Course ID first (2026-10-17). FALLBACK BY COURSE NAME (2026-10-24, per request: "fill the subject for everyone who doesn't have
+      // one" -- 70 instructors taught only courses whose ids were never listed, e.g. each university's own copy of Quantitative Aptitude
+      // or Math for CSE): an id on neither list uses the course-name list (TAUGHT_COURSE_TITLE_SUBJECTS); an orientation course is left
+      // out; any other course is shown by its own name ("Other: <course>") instead of leaving the column blank.
+      const byIdSubject = teaching !== undefined ? (teaching ?? "__general") : (courseId && byId.get(courseId)) || null;
+      const title = r.course_title ? String(r.course_title).trim() : "";
+      const titleKey = title.toLowerCase().replace(/[^a-z0-9]+/g, "");
+      const subject = byIdSubject
+        ?? (!title ? "__unmatched"
+          : ORIENTATION_TITLE.test(title) ? "__general"
+          : /^(math|mathematics)forc(omputerscience|se)/.test(titleKey) ? "Math for Computer Science"
+          : TAUGHT_COURSE_TITLE_SUBJECTS[titleKey] ?? `Other: ${title}`);
       const entry = map.get(id) ?? {};
       entry[subject] = (entry[subject] ?? 0) + Number(r.sessions ?? 0);
       map.set(id, entry);
