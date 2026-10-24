@@ -57,6 +57,10 @@ type ArchiveRow = typeof instructorArchiveTable.$inferSelect;
 // one; a Revoked/Rejected request or a cancelled pending one never does. A manually set exit date (Manual Status
 // control) is kept for people with no Approved record. Archive page only: the
 // live exit flag, Exception queue, Darwin Exit Details and sync are untouched.
+// Payroll (2026-10-24, per request): back to the rule used before 2026-10-16 -- Payroll = the payroll_converted
+// classification (TeachOS-only: no Darwin record anywhere, not IIT Kharagpur). The Employee Status dropdown does not change it.
+export const isPayrollPerson = (r: { classification?: string | null }): boolean => r.classification === "payroll_converted";
+
 // `lastWorkingDate` (2026-10-08): the exit record's own "Date Of Exit" column (last working day) -- the archive's Date of Exit column. `date` stays the request date ("Exit Date"), used only to rank records and decide Exited.
 type ApprovedExitFallback = { status: string; date: string; lastWorkingDate: string | null };
 
@@ -125,7 +129,7 @@ const toApiArchiveSummary = (row: ArchiveRow, approvedExit?: ApprovedExitFallbac
     // payroll_converted classification: that tag also lands on people who resigned (Darwin drops their active record when they leave),
     // e.g. Rahul Kumar Singh -- CM-marked Exited, Darwin Approved -- showed as Payroll and was hidden from the Overview's exits.
     // Payroll people with no exit record still get Payroll Converted filled in by default by the sync (reconcile.ts), so they keep it.
-    is_payroll: row.exitVerification === "payroll_converted",
+    is_payroll: isPayrollPerson(row),
     exit_date: exitDate,
     // Date of Exit column: ONLY the Darwin exit data's "Date Of Exit" (last working day); blank when the record has none, never the request date. Payroll people are Active, so blank.
     // Enforced explicitly (2026-10-08): an Active person never shows a Date of Exit, payroll or not.
@@ -204,7 +208,7 @@ const toApiInstructorSummary = (row: InstructorRow, contributionByTeachosId: Map
   // payroll_converted classification: that tag also lands on people who resigned (Darwin drops their active record when they leave),
   // e.g. Rahul Kumar Singh -- CM-marked Exited, Darwin Approved -- showed as Payroll and was hidden from the Overview's exits.
   // Payroll people with no exit record still get Payroll Converted filled in by default by the sync (reconcile.ts), so they keep it.
-  is_payroll: row.exitVerification === "payroll_converted",
+  is_payroll: isPayrollPerson(row),
   deployment_status: row.deploymentStatus,
   institutes: row.institutes,
   // Capability Manager (TeachOS's own instructor_manager assignment, see
@@ -2061,7 +2065,7 @@ router.get("/reports/instructor-profile/:id", async (req, res): Promise<void> =>
     subject_area: normalizeSubjectArea(p.deptArea || p.manualDeptArea || null),
     product: productOf(p),
     role: p.classification === "mentor" ? "Mentor" : "Instructor",
-    is_payroll: p.exitVerification === "payroll_converted", // CM's manual status only (2026-10-19), as on the Instructors tab
+    is_payroll: isPayrollPerson(p), // same rule as the Instructors tab (2026-10-24)
     gender: summary.gender ?? null,
     institutes: p.institutes ?? [],
     date_of_joining: joining.date,
