@@ -45,28 +45,28 @@ Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,43,List Methods,231
 Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,44,Tuples & Sequences,b90fb5d1-aef9-419c-8c35-dccc8c2920ed
 Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,45,Sets,0e50a0ea-32fe-409e-ab0d-77c582e45f45
 Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,46,Set Operations,2877fa6d-132d-4872-8c7c-93ad6ad3de38
-Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,47,Problem Solving and Debugging - Part 6,6aa1e88e-0163-4f68-a272-a8ea867c0fbd
-Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,48,Nested Lists & String Formatting,
-Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,49,Introduction to Matrices,
-Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,50,Introduction to Shorthand expressions,
-Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,51,Introduction to List comprehensions,
-Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,52,Dictionaries,
-Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,53,Working with Dictionaries,
-Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,54,Problem Solving and Debugging - Part 7,
-Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,55,Introduction to Object Oriented Programming,
-Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,56,Object Oriented Programming - Part 2,
-Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,57,Classes & Objects,
-Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,58,Attributes and Methods,
-Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,59,Encapsulation,
-Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,60,Inheritance,
-Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,61,Inheritance - Part 2,
-Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,62,Abstraction,
-Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,63,Polymorphism,
-Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,64,OOP: On-Demand Session,
-Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,65,Python Standard Library,
-Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,66,Scope & Namespaces,
+Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,47,Problem Solving and Debugging - Part 6,ef100c53-d27a-46d1-930f-d3510e296a08
+Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,48,Nested Lists & String Formatting,a7015141-acd5-413b-8137-fe80f1633299
+Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,49,Introduction to Matrices,092fba9c-4a73-46ba-8114-eb3366990c7a
+Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,50,Introduction to Shorthand expressions,6f562082-47fe-45e8-b2c1-e32496b0c706
+Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,51,Introduction to List comprehensions,fe8b5be2-5815-4745-ab88-4ded92afcbbb
+Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,52,Dictionaries,954c6f8d-557f-43ee-ab13-dd634bedb1d5
+Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,53,Working with Dictionaries,ba84e1b2-13c7-4f53-be9f-911779168bb5
+Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,54,Problem Solving and Debugging - Part 7,d76d66c4-28ef-423f-8b90-c7587472c901
+Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,55,Introduction to Object Oriented Programming,c206eea7-91e2-4f47-8ab5-37efae6a775d
+Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,56,Object Oriented Programming - Part 2,e4c13d55-b0bb-4fca-a14c-25f84db68903
+Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,57,Classes & Objects,d635299b-dc05-441d-866d-0607d4cf7fe3
+Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,58,Attributes and Methods,d92d4334-459a-4e1c-b365-6561cae4586b
+Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,59,Encapsulation,ef73f0be-79c2-4d08-a19c-7ac876e659dc
+Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,60,Inheritance,7a970304-4557-4c4b-9ce8-3f0f9871a273
+Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,61,Inheritance - Part 2,37de3141-c702-43db-95aa-67a82d62faf1
+Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,62,Abstraction,cec526e1-614c-4fda-981f-9d6d077a65e2
+Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,63,Polymorphism,34e227ff-0a48-4090-844f-094ba3d6a0e1
+Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,64,OOP: On-Demand Session,f7a1a09f-0f21-46e2-b93c-fa2d1b50bd20
+Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,65,Python Standard Library,6ae1c51c-fed4-40fb-b52d-4947ea1b8b60
+Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,66,Scope & Namespaces,073e838e-23fc-4447-a716-434b072f43d6
 Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,67,Errors & Exceptions,
-Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,68,Working with Dates & Times,
+Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,68,Working with Dates & Times,17332dc3-780f-4f5a-b1bc-abea5d100738
 Build Your Own Static Website,,1,Introduction to GenAI in Frontend Development,7bf8ee08-c794-4a81-96fb-a2225d6157ae
 Build Your Own Static Website,,2,Your first Frontend Project | Getting started,518fdb60-e4f5-4972-9c32-dc2d3c09b355
 Build Your Own Static Website,,3,Introduction to HTML,5d952538-0589-43ea-965d-ddb3aa314862
@@ -129,32 +129,32 @@ Modern Responsive Web Design,,18,Introduction to Tailwind CSS,d4c4dbf0-d742-496c
 Modern Responsive Web Design,,19,Introduction to Tailwind CSS | Part 2,01b56d48-8181-47b5-89a5-f150d6b68f7f
 Modern Responsive Web Design,,20,Building Responsive Website using Tailwind CSS,90e157d1-a561-4503-8f71-768ea60684c9
 Modern Responsive Web Design,,21,Building a Responsive Website using GenAI,f7db93dd-3b49-4d47-966d-c5cbea4e9dda
-Build Your Own Dynamic Web Application,c0d9b357-87a7-41e2-985f-affaef636499,1,Introduction to Dynamic Web Applications,2d9adc90-3ef2-4400-8ecc-4aa4a85c3926
-Build Your Own Dynamic Web Application,c0d9b357-87a7-41e2-985f-affaef636499,2,DOM and Event Fundamentals,f012ed04-c18f-460c-81b5-983713efd673
-Build Your Own Dynamic Web Application,c0d9b357-87a7-41e2-985f-affaef636499,3,Primitive Types & Conditionals,386962c4-17e3-4235-b7af-22de28c1c1aa
-Build Your Own Dynamic Web Application,c0d9b357-87a7-41e2-985f-affaef636499,4,Input Element & Math Functions,62f9a32e-3729-46bd-b7c2-a863fa7e2402
-Build Your Own Dynamic Web Application,c0d9b357-87a7-41e2-985f-affaef636499,5,Arrays & More DOM Manipulations,b846fac0-9ada-47bd-8de4-3a7fc10ee728
-Build Your Own Dynamic Web Application,c0d9b357-87a7-41e2-985f-affaef636499,6,JS Coding Platform Walk-through,fdc47066-16eb-4a8e-9135-a98a4ee4db01
-Build Your Own Dynamic Web Application,c0d9b357-87a7-41e2-985f-affaef636499,7,Objects,e1ff0afb-77ea-4c72-9e46-aeaceffb5395
-Build Your Own Dynamic Web Application,c0d9b357-87a7-41e2-985f-affaef636499,8,Callbacks & Schedulers,3e3cdc78-efd1-4a6c-98a4-2a4c86140765
-Build Your Own Dynamic Web Application,c0d9b357-87a7-41e2-985f-affaef636499,9,Event Listeners and More Events,211830ce-f7fe-4a0e-8db1-0581d01ee745
-Build Your Own Dynamic Web Application,c0d9b357-87a7-41e2-985f-affaef636499,10,Hypertext Transfer Protocol (HTTP),0a1c94b0-b297-48b4-97b5-c6655893d6d9
-Build Your Own Dynamic Web Application,c0d9b357-87a7-41e2-985f-affaef636499,11,HTTP Requests using JS,f2048273-5371-46d3-8d1f-d668fa06f97f
-Build Your Own Dynamic Web Application,c0d9b357-87a7-41e2-985f-affaef636499,12,Wikipedia Search Application,7acffb59-7766-4c14-984c-4fb1e78be485
-Build Your Own Dynamic Web Application,c0d9b357-87a7-41e2-985f-affaef636499,13,Forms,1514e857-02c9-48de-9c25-6683fc22fe65
-Build Your Own Dynamic Web Application,c0d9b357-87a7-41e2-985f-affaef636499,14,Forms | Part 2,d925e342-f922-4de8-8e06-c0f2db163e11
-Build Your Own Dynamic Web Application,c0d9b357-87a7-41e2-985f-affaef636499,15,Building a Dynamic Website using Gen AI,831d64e2-c389-4ce3-898b-49acd535085a
+Build Your Own Dynamic Web Application,c0d9b357-87a7-41e2-985f-affaef636499,1,Introduction to Dynamic Web Applications,6dc39559-a901-4fb2-a723-0a45875d28b9
+Build Your Own Dynamic Web Application,c0d9b357-87a7-41e2-985f-affaef636499,2,DOM and Event Fundamentals,0533bf2c-fd79-4718-b3a1-da9dddd1d8a5
+Build Your Own Dynamic Web Application,c0d9b357-87a7-41e2-985f-affaef636499,3,Primitive Types & Conditionals,e1ff0afb-77ea-4c72-9e46-aeaceffb5395
+Build Your Own Dynamic Web Application,c0d9b357-87a7-41e2-985f-affaef636499,4,Input Element & Math Functions,391bcb9c-044d-441d-9a47-4e13923790dd
+Build Your Own Dynamic Web Application,c0d9b357-87a7-41e2-985f-affaef636499,5,Arrays & More DOM Manipulations,5adfaa3c-5647-4c88-b993-ed1ea350cb9d
+Build Your Own Dynamic Web Application,c0d9b357-87a7-41e2-985f-affaef636499,6,JS Coding Platform Walk-through,ef638130-8a10-4c91-accf-54dd36ce6d18
+Build Your Own Dynamic Web Application,c0d9b357-87a7-41e2-985f-affaef636499,7,Objects,0a1c94b0-b297-48b4-97b5-c6655893d6d9
+Build Your Own Dynamic Web Application,c0d9b357-87a7-41e2-985f-affaef636499,8,Callbacks & Schedulers,3f71dfa5-df78-4281-ac26-0cae2dc6c911
+Build Your Own Dynamic Web Application,c0d9b357-87a7-41e2-985f-affaef636499,9,Event Listeners and More Events,7d2ea791-8b7b-4635-9145-88f086dbc728
+Build Your Own Dynamic Web Application,c0d9b357-87a7-41e2-985f-affaef636499,10,Hypertext Transfer Protocol (HTTP),831d64e2-c389-4ce3-898b-49acd535085a
+Build Your Own Dynamic Web Application,c0d9b357-87a7-41e2-985f-affaef636499,11,HTTP Requests using JS,0e281315-6638-4d01-a0e8-2d933027dbc8
+Build Your Own Dynamic Web Application,c0d9b357-87a7-41e2-985f-affaef636499,12,Wikipedia Search Application,d7a9243c-05c5-4d46-85aa-6f6fc0c76fb5
+Build Your Own Dynamic Web Application,c0d9b357-87a7-41e2-985f-affaef636499,13,Forms,42af8d6f-d0d9-48eb-b353-02cd623b88c0
+Build Your Own Dynamic Web Application,c0d9b357-87a7-41e2-985f-affaef636499,14,Forms | Part 2,9d6dcc03-48dc-49e6-b56d-258d28ce0368
+Build Your Own Dynamic Web Application,c0d9b357-87a7-41e2-985f-affaef636499,15,Building a Dynamic Website using Gen AI,955eb3b4-0839-4149-b4d7-a15b88d10eba
 Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,1,Course Overview,d858c9b2-838e-4e84-943b-d8c9c6252666; 2a2cd020-25cb-4409-b2ea-dca2ce96e2fb
 Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,2,Number Systems: Decimal & Binary,052d86d7-3e4d-422f-a214-b33d615f0a5e; d952920c-3840-404a-bba3-2feeeac425a1
 Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,3,Number Systems: Octal & Hexadecimal,4df8747d-2281-4e66-a1ac-d8d6a146a5cc; 36a97e72-683a-4e39-a3c9-5c5da78c9cdd
 Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,4,Basic Arithmetic Operations,28631164-d86c-4fcc-94a4-2ee06a599d77; 9fa4f214-5bb2-40bc-8033-bc71f3e411b7
 Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,5,Bitwise Operators,0da80d31-a2d8-432d-9b46-746e3b5c53c4; d12f1e22-0190-418c-9e63-2002199b7689
-Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,6,Applications of Bitwise Operators,92742248-8770-4edb-82ac-6dfc8218d8e9
+Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,6,Applications of Bitwise Operators,
 Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,7,Representation of Signed & Unsigned Integers - I,99b4c829-8f45-4107-9857-c07be3565122; 0f83c4a4-47d4-4eae-8f82-37da1602c4b4
-Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,8,Representation of Signed & Unsigned Integers - II,83f012b8-7eb4-4411-85b7-adf9bbf8a7e0
+Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,8,Representation of Signed & Unsigned Integers - II,92742248-8770-4edb-82ac-6dfc8218d8e9
 Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,9,GCD & LCM,484562fd-5390-4dbf-a97a-6fb5264d54ca; 4007257f-070f-4491-82a4-c8c8568dac03
 Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,10,Modulo Arithmetic - I,d18152e9-eacf-43f1-a94d-dc2f060bbe38; 48c07ca7-ccaa-4b2e-a414-484fd2259915
-Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,11,Modulo Arithmetic - II,
+Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,11,Modulo Arithmetic - II,83f012b8-7eb4-4411-85b7-adf9bbf8a7e0
 Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,12,Error Detection Techniques,78326daf-e803-43b2-b5a6-4b42a2c15567; 6352ad66-e26e-4562-bbc7-2e1a366376b2
 Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,13,Conditional Probability,498be89e-6309-4135-acb2-611a2e0d8d7f; 89b720c9-aa1b-40d1-82c5-ee58eb45c49d
 Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,14,Baye's Theorem & Expected Value,6c027719-3010-4a22-afd0-c2c0c5d8a43c; 6fb02d68-8278-4a9c-a6c0-ea6a14006a1d
