@@ -31,12 +31,15 @@ async function main() {
   const here = path.dirname(fileURLToPath(import.meta.url));
   const [header, ...rows] = parseCsv(fs.readFileSync(path.join(here, "../../data/lecture_sessions_master.csv"), "utf8"));
   const ci = (n: string) => header.indexOf(n);
-  const unitToLecture = new Map<string, { course: string; name: string }>();
+  const unitToLecture = new Map<string, { course: string; name: string; key: string }>();
+  const noId: { course: string; name: string }[] = [];
   const lecturesPerCourse = new Map<string, number>();
   for (const r of rows) {
     const course = r[ci("Course")], name = r[ci("Session name")];
     lecturesPerCourse.set(course, (lecturesPerCourse.get(course) ?? 0) + 1);
-    for (const u of (r[ci("Unit ID")] ?? "").split(/[;,\s]+/).map(norm).filter((x) => x.length === 32)) unitToLecture.set(u, { course, name });
+    const ids = (r[ci("Unit ID")] ?? "").split(/[;,\s]+/).map(norm).filter((x) => x.length === 32);
+    if (!ids.length) noId.push({ course, name });
+    for (const u of ids) unitToLecture.set(u, { course, name, key: `${course}#${r[ci("#")]}` });
   }
   console.log(`Master list: ${rows.length} lecture sessions, ${lecturesPerCourse.size} courses, ${unitToLecture.size} unit IDs\n`);
 
@@ -70,9 +73,10 @@ async function main() {
   for (const r of all) { const k = r.session_type ?? "(null)"; const v = byType.get(k) ?? [0, 0]; v[0]++; if (unitToLecture.has(norm(r.resource_id))) v[1]++; byType.set(k, v); }
   console.log(`MATCH: ${matched.length} of ${all.length} rows (${((100 * matched.length) / Math.max(1, all.length)).toFixed(1)}%) point at a master lecture unit.`);
   for (const [k, [n, m]] of byType) console.log(`  ${k}: ${m}/${n} matched`);
-  const hitUnits = new Set(matched.map((r) => norm(r.resource_id)));
+  // Count LECTURES (master rows), not unit IDs: an English slot carries several unit IDs.
+  const hitLectures = new Set(matched.map((r) => unitToLecture.get(norm(r.resource_id))!.key));
   const perCourseHit = new Map<string, number>();
-  for (const u of hitUnits) { const c = unitToLecture.get(u)!.course; perCourseHit.set(c, (perCourseHit.get(c) ?? 0) + 1); }
+  for (const k of hitLectures) { const c = k.slice(0, k.lastIndexOf("#")); perCourseHit.set(c, (perCourseHit.get(c) ?? 0) + 1); }
   console.log(`\nPer course: master lecture sessions that were scheduled at least once (by unit ID):`);
   for (const [c, n] of [...lecturesPerCourse].sort((a, b) => b[1] - a[1])) console.log(`  ${c}: ${perCourseHit.get(c) ?? 0} / ${n}`);
 
@@ -82,6 +86,23 @@ async function main() {
   console.log(`\nTop 25 LECTURE resources NOT in the master list (course | resource title: rows):`);
   for (const [k, v] of [...um].sort((a, b) => b[1] - a[1]).slice(0, 25)) console.log(`  ${k}: ${v}`);
 
+  // Lectures in the master list with no Unit ID: look for a scheduled LECTURE resource with the same title (case/space-insensitive).
+  const t = (x: string) => (x ?? "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const byTitle = new Map<string, Map<string, { id: string; course: string; n: number }>>();
+  for (const r of all) {
+    if (!/lecture/i.test(r.session_type ?? "")) continue;
+    const m = byTitle.get(t(r.resource_title)) ?? new Map(); const e = m.get(r.resource_id) ?? { id: r.resource_id, course: r.portal_course, n: 0 }; e.n++; m.set(r.resource_id, e); byTitle.set(t(r.resource_title), m);
+  }
+  const sugg = [["Course", "Session name", "Suggested Unit ID", "Portal course in BigQuery", "Times scheduled", "Other IDs with same title"].join(",")];
+  let found = 0;
+  for (const l of noId) {
+    const m = [...(byTitle.get(t(l.name)) ?? new Map()).values()].sort((a, b) => b.n - a.n);
+    if (m.length) found++;
+    sugg.push([l.course, l.name, m[0]?.id ?? "", m[0]?.course ?? "", m[0]?.n ?? 0, m.slice(1, 4).map((x) => `${x.id} (${x.course}, ${x.n})`).join(" ; ")].map((x) => `"${String(x).replace(/"/g, '""')}"`).join(","));
+  }
+  fs.writeFileSync("lecture_unit_id_suggestions.csv", sugg.join("\n"));
+  console.log(`\nLectures with no Unit ID: ${noId.length}; a same-title scheduled lecture found for ${found}. Written to lecture_unit_id_suggestions.csv`);
+
   // Per instructor x course.
   const HELD = /complet|ended|done|conducted|finished/i;
   type Agg = { name: string; institute: string; course: string; units: Set<string>; heldUnits: Set<string>; sessions: Set<string> };
@@ -90,8 +111,8 @@ async function main() {
     const l = unitToLecture.get(norm(r.resource_id))!;
     const k = `${r.instructor_user_id}|${l.course}`;
     const a = agg.get(k) ?? { name: r.instructor_name, institute: r.institute_name, course: l.course, units: new Set(), heldUnits: new Set(), sessions: new Set() };
-    a.units.add(norm(r.resource_id)); a.sessions.add(r.session_id);
-    if (HELD.test(r.session_status ?? "")) a.heldUnits.add(norm(r.resource_id));
+    a.units.add(l.key); a.sessions.add(r.session_id);
+    if (HELD.test(r.session_status ?? "")) a.heldUnits.add(l.key);
     agg.set(k, a);
   }
   const lines = [["Instructor", "Institute", "Course", "Lecture sessions in course", "Lectures scheduled (distinct)", "Lectures held (distinct, status completed)", "Class sessions"].join(",")];
