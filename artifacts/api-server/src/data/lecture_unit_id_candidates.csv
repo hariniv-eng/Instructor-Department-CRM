@@ -1,0 +1,55 @@
+Course,Session name,Candidate Unit ID,Source
+Programming Foundations,Lists,a489b3de-43e4-4b6f-825a-44619f8c7df7,Python sheet 1 (in master)
+Programming Foundations,Lists,e47819d5-8351-4eb7-ab05-a138175b7265,Python sheet 2
+Programming Foundations,Working with Lists,e932ecb8-f08c-44cc-a561-1f153b96786c,Python sheet 1 (in master)
+Programming Foundations,Working with Lists,ddb43d47-f837-421c-8361-f9b035af1706,Python sheet 2
+Programming Foundations,Lists and Strings,9c5518b5-d5d2-4b52-a2a6-7c403b68b084,Python sheet 1 (in master)
+Programming Foundations,Lists and Strings,3b21cfa9-82ba-4809-8503-8bf2e921c077,Python sheet 2
+Programming Foundations,Functions,f32c7dfb-6685-4f54-a744-b41833093370,Python sheet 1 (in master)
+Programming Foundations,Functions,58e96f5d-114b-48b1-911c-dc045b125f32,Python sheet 2
+Programming Foundations,Function Arguments,3cdc557a-b412-4782-8bfb-2dcf2466334b,Python sheet 1 (in master)
+Programming Foundations,Function Arguments,f734929b-223e-4f8d-acf5-b916379819d2,Python sheet 2
+Programming Foundations,Built-in Functions,8721e72a-cb65-45d6-8487-d657f921a230,Python sheet 1 (in master)
+Programming Foundations,Built-in Functions,72b88a6f-9a34-462e-a74c-147f1433c485,Python sheet 2
+Programming Foundations,Function Call Stack & Recursion,fa498f31-e4d7-407e-b437-7971ca833094,Python sheet 1 (in master)
+Programming Foundations,Function Call Stack & Recursion,94c9b202-2fdd-430e-bf5c-41f76fcc777d,Python sheet 2
+Programming Foundations,Understanding Recursion,26f9ce3c-0c9f-45ba-82cc-ea6e1ae7b86f,Python sheet 1 (in master)
+Programming Foundations,Understanding Recursion,1af0c44e-63b5-4824-bb78-1b61b4ab77b5,Python sheet 2
+Programming Foundations,Problem solving using Recursion - 1,964c48c7-8e86-4158-b534-98603fdc9838,Python sheet 1 (in master)
+Programming Foundations,Problem solving using Recursion - 1,c6e45c51-c0aa-4984-8606-c8d4f01b595c,Python sheet 2
+Programming Foundations,Problem solving using Recursion - 2,0445bba7-f3e0-4e1f-b904-bb177a1c9e80,Python sheet 1 (in master)
+Programming Foundations,Problem solving using Recursion - 2,8721e72a-cb65-45d6-8487-d657f921a230,Python sheet 2
+Programming Foundations,List Methods,2318a109-8e32-4c6b-a703-7cb2c57c8f18,Python sheet 1 (in master)
+Programming Foundations,List Methods,0c1862f6-1f3f-474f-8db4-f4c74f501ce4,Python sheet 2
+Programming Foundations,Tuples & Sequences,b90fb5d1-aef9-419c-8c35-dccc8c2920ed,Python sheet 1 (in master)
+Programming Foundations,Tuples & Sequences,28ed3133-f960-49ae-80a9-80ce3d41ce83,Python sheet 2
+Programming Foundations,Sets,0e50a0ea-32fe-409e-ab0d-77c582e45f45,Python sheet 1 (in master)
+Programming Foundations,Sets,64143f2d-4330-4318-be91-3d32eee32ba9,Python sheet 2
+Programming Foundations,Set Operations,2877fa6d-132d-4872-8c7c-93ad6ad3de38,Python sheet 1 (in master)
+Programming Foundations,Set Operations,be05b322-564c-4303-9e09-f1239b150ed2,Python sheet 2
+Programming Foundations,Problem Solving and Debugging - Part 6,6aa1e88e-0163-4f68-a272-a8ea867c0fbd,Python sheet 1 (in master)
+Programming Foundations,Problem Solving and Debugging - Part 6,efaa14e6-913e-41ae-b575-e2a588294405,Python sheet 2
+Programming Foundations,Nested Lists & String Formatting,2318a109-8e32-4c6b-a703-7cb2c57c8f18,Python sheet 2 (in master)
+Programming Foundations,Introduction to Matrices,092fba9c-4a73-46ba-8114-eb3366990c7a,Python sheet 2 (in master)
+Programming Foundations,Introduction to Shorthand expressions,6f562082-47fe-45e8-b2c1-e32496b0c706,Python sheet 2 (in master)
+Programming Foundations,Introduction to List comprehensions,fe8b5be2-5815-4745-ab88-4ded92afcbbb,Python sheet 2 (in master)
+Programming Foundations,Dictionaries,954c6f8d-557f-43ee-ab13-dd634bedb1d5,Python sheet 2 (in master)
+Programming Foundations,Working with Dictionaries,ba84e1b2-13c7-4f53-be9f-911779168bb5,Python sheet 2 (in master)
+Programming Foundations,Problem Solving and Debugging - Part 7,d76d66c4-28ef-423f-8b90-c7587472c901,Python sheet 2 (in master)
+Programming Foundations,Introduction to Object Oriented Programming,c206eea7-91e2-4f47-8ab5-37efae6a775d,Python sheet 2 (in master)
+Programming Foundations,Object Oriented Programming - Part 2,e4c13d55-b0bb-4fca-a14c-25f84db68903,Python sheet 2 (in master)
+Programming Foundations,Classes & Objects,d635299b-dc05-441d-866d-0607d4cf7fe3,Python sheet 2 (in master)
+Programming Foundations,Attributes and Methods,d92d4334-459a-4e1c-b365-6561cae4586b,Python sheet 2 (in master)
+Programming Foundations,Encapsulation,ef73f0be-79c2-4d08-a19c-7ac876e659dc,Python sheet 2 (in master)
+Programming Foundations,Inheritance,7a970304-4557-4c4b-9ce8-3f0f9871a273,Python sheet 2 (in master)
+Programming Foundations,Inheritance - Part 2,37de3141-c702-43db-95aa-67a82d62faf1,Python sheet 2 (in master)
+Programming Foundations,Abstraction,cec526e1-614c-4fda-981f-9d6d077a65e2,Python sheet 2 (in master)
+Programming Foundations,Polymorphism,34e227ff-0a48-4090-844f-094ba3d6a0e1,Python sheet 2 (in master)
+Programming Foundations,OOP: On-Demand Session,f7a1a09f-0f21-46e2-b93c-fa2d1b50bd20,Python sheet 2 (in master)
+Programming Foundations,Python Standard Library,6ae1c51c-fed4-40fb-b52d-4947ea1b8b60,Python sheet 2 (in master)
+Programming Foundations,Scope & Namespaces,073e838e-23fc-4447-a716-434b072f43d6,Python sheet 2 (in master)
+Programming Foundations,Errors & Exceptions,6ae1c51c-fed4-40fb-b52d-4947ea1b8b60,Python sheet 2 (same ID as Python Standard Library)
+Programming Foundations,Working with Dates & Times,17332dc3-780f-4f5a-b1bc-abea5d100738,Python sheet 2 (in master)
+Build Your Own Dynamic Web Application,DOM and Event Fundamentals,f012ed04-c18f-460c-81b5-983713efd673,Dynamic sheet (in master); Modern Responsive sheet says Tailwind MCQ Practice
+Build Your Own Dynamic Web Application,Input Element & Math Functions,62f9a32e-3729-46bd-b7c2-a863fa7e2402,Dynamic sheet (in master); Modern Responsive sheet says Tailwind Coding Practice
+Mathematics for Computer Science,Modulo Arithmetic - II,83f012b8-7eb4-4411-85b7-adf9bbf8a7e0,Maths sheet (same ID as Signed & Unsigned II)
