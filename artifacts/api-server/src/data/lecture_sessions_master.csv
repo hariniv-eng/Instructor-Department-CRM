@@ -108,25 +108,27 @@ Build Your Own Responsive Website,,16,CSS Animations,b002d44d-6d6e-4331-957a-f6d
 Build Your Own Responsive Website,,17,Building a Responsive Website using Gen AI,53965839-648c-4b52-9d33-ac0417698299
 Build Your Own Responsive Website,,18,Debugging using Chrome Dev Tools - 2,38b14c8b-9c18-4ae8-b8dd-694921dc00d0
 Build Your Own Responsive Website,,19,Framer,
-Modern Responsive Web Design,,1,Sizing Elements and Handling Overflow,
-Modern Responsive Web Design,,2,Box Sizing,
-Modern Responsive Web Design,,3,Introduction to CSS Flexbox,
-Modern Responsive Web Design,,4,Introduction to CSS Flexbox | Part 2,
-Modern Responsive Web Design,,5,Introduction to CSS Flexbox | Part 3,
-Modern Responsive Web Design,,6,Flexbox Froggy Game,
-Modern Responsive Web Design,,7,CSS Media Queries,
-Modern Responsive Web Design,,8,Flexbox Sizing,
-Modern Responsive Web Design,,9,On-Demand Session,
-Modern Responsive Web Design,,10,CSS Grid | Part 1,
-Modern Responsive Web Design,,11,CSS Grid | Part 2,
-Modern Responsive Web Design,,12,CSS Grid | Part 3,
-Modern Responsive Web Design,,13,CSS Grid | Part 4,
-Modern Responsive Web Design,,14,CSS Grid | Learning by Playing,
-Modern Responsive Web Design,,15,CSS Positioning | Part 1,
-Modern Responsive Web Design,,16,CSS Positioning | Part 2,
-Modern Responsive Web Design,,17,Introduction to Tailwind CSS,
-Modern Responsive Web Design,,18,Introduction to Tailwind CSS | Part 2,
-Modern Responsive Web Design,,19,Building a Responsive Website with Tailwind CSS,
+Modern Responsive Web Design,,1,Sizing Elements and Handling Overflow,4490aacc-70cc-45e5-a020-42fc8b437dfa
+Modern Responsive Web Design,,2,Box Sizing,8bb17750-78c3-4653-b656-33dd85193be9
+Modern Responsive Web Design,,3,Introduction to CSS Flexbox,4ef3a893-82fa-4e06-a242-4346037a2c9e
+Modern Responsive Web Design,,4,Introduction to CSS Flexbox | Part 2,22a59a92-a1ae-401f-9911-14eb63e76f8d
+Modern Responsive Web Design,,5,Introduction to CSS Flexbox | Part 3,9642cb7f-ad20-4d8f-ab13-e7177a4da609
+Modern Responsive Web Design,,6,CSS Media Queries,665857e3-52ed-48ff-ba18-7048eb2631c4
+Modern Responsive Web Design,,7,Flexbox Sizing,f5671e6c-0bb3-40da-87bb-b4c37fd5a66c
+Modern Responsive Web Design,,8,Building Responsive Web Page | Part - 1,684b2566-44d7-42a1-92c7-33a8c724ae57
+Modern Responsive Web Design,,9,Building Responsive Web Page | Part - 2,0494f896-82bb-4e71-95c3-3ca1b3a864d5
+Modern Responsive Web Design,,10,Building Responsive Web Page | Part - 3,a20f5368-f0e3-4ab1-90b0-8c593e722a3d
+Modern Responsive Web Design,,11,Building a Website Using VS Code,5b9d3d5c-3a3c-419e-947b-07c3e8004d41
+Modern Responsive Web Design,,12,CSS Grid - 1 (+ CSS Grid - 1 | Properties),d9c3b62b-88fa-41a7-8758-027289315f46; 892611df-ee91-4231-9228-0e4dbcb165a2
+Modern Responsive Web Design,,13,CSS Grid - 2,5a556365-1d91-413a-ac4d-ef58945a31f3
+Modern Responsive Web Design,,14,CSS Grid - 3,0e3e1d38-c053-46d0-bad4-fb9086dfda81
+Modern Responsive Web Design,,15,CSS Grid - 4 (+ Flexbox vs Grid),b7ce76dc-81b5-49cd-a329-adcd844e36fe; e8223d96-de34-436e-8115-0a38ef08660e
+Modern Responsive Web Design,,16,CSS Positioning | Part 1,5c88d5e1-f288-4445-9af6-54f5470e3f5d
+Modern Responsive Web Design,,17,CSS Positioning | Part 2,61348839-aa7a-495e-8d77-93cd9adc2094
+Modern Responsive Web Design,,18,Introduction to Tailwind CSS,d4c4dbf0-d742-496c-8277-1694ffa6cbbd
+Modern Responsive Web Design,,19,Introduction to Tailwind CSS | Part 2,01b56d48-8181-47b5-89a5-f150d6b68f7f
+Modern Responsive Web Design,,20,Building Responsive Website using Tailwind CSS,90e157d1-a561-4503-8f71-768ea60684c9
+Modern Responsive Web Design,,21,Building a Responsive Website using GenAI,f7db93dd-3b49-4d47-966d-c5cbea4e9dda
 Build Your Own Dynamic Web Application,,1,Introduction to Dynamic Web Applications,
 Build Your Own Dynamic Web Application,,2,DOM and Event Fundamentals,
 Build Your Own Dynamic Web Application,,3,Primitive Types & Conditionals,
@@ -142,36 +144,27 @@ Build Your Own Dynamic Web Application,,12,Wikipedia Search Application,
 Build Your Own Dynamic Web Application,,13,Forms,
 Build Your Own Dynamic Web Application,,14,Forms | Part 2,
 Build Your Own Dynamic Web Application,,15,Building a Dynamic Website using Gen AI,
-Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,1,Course overview,2a2cd020-25cb-4409-b2ea-dca2ce96e2fb
-Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,2,Number Systems: Decimal and Binary,d952920c-3840-404a-bba3-2feeeac425a1
-Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,3,Number Systems: Octal and Hexadecimal,36a97e72-683a-4e39-a3c9-5c5da78c9cdd
-Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,4,Basic Arithmetic Operations,9fa4f214-5bb2-40bc-8033-bc71f3e411b7
-Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,5,Bitwise Operators,d12f1e22-0190-418c-9e63-2002199b7689
-Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,6,Representation of Signed & Unsigned Integers,0f83c4a4-47d4-4eae-8f82-37da1602c4b4
-Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,7,Floating Point Representation,62785106-0dd3-49e7-9017-088a6367928b
-Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,8,GCD and LCM,4007257f-070f-4491-82a4-c8c8568dac03
-Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,9,Modulo Arithmetic,48c07ca7-ccaa-4b2e-a414-484fd2259915
-Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,10,Applications in Computing: Error Detection Techniques,6352ad66-e26e-4562-bbc7-2e1a366376b2
-Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,11,Basic Principles of Counting,7b747e63-30fd-456b-a8a0-6553e589d626
-Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,12,Permutations,20ea1da2-4dcd-4b72-a4e0-1d7af0c4fe02
-Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,13,Combinations and Applications of PNC,ca332590-ea5b-4107-97e4-731d2a0c78e2
-Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,14,Introduction to Probability,5ea34698-fa27-47d2-bea0-4b41f6307695
-Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,15,Conditional Probability,89b720c9-aa1b-40d1-82c5-ee58eb45c49d
-Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,16,Bayes' Theorem + Expected Value,6fb02d68-8278-4a9c-a6c0-ea6a14006a1d
-Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,17,Matrix Introduction,
-Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,18,Matrix Multiplication,
-Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,19,Determinants,
-Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,20,Adjoint and Inverse of a Matrix,
-Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,21,Matrix Applications,
-Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,22,Arithmetic Progression,
-Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,23,Geometric Progression,
-Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,24,"HP, Relation b/w AM, GM and HM",
-Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,25,AGP Series,
-Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,26,Fundamentals of Set Theory,
-Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,27,Set Operations,
-Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,28,Venn Diagrams and Applications,
-Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,29,Cartesian Products,
-Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,30,Binary Operations,
+Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,1,Course Overview,d858c9b2-838e-4e84-943b-d8c9c6252666; 2a2cd020-25cb-4409-b2ea-dca2ce96e2fb
+Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,2,Number Systems: Decimal & Binary,052d86d7-3e4d-422f-a214-b33d615f0a5e; d952920c-3840-404a-bba3-2feeeac425a1
+Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,3,Number Systems: Octal & Hexadecimal,4df8747d-2281-4e66-a1ac-d8d6a146a5cc; 36a97e72-683a-4e39-a3c9-5c5da78c9cdd
+Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,4,Basic Arithmetic Operations,28631164-d86c-4fcc-94a4-2ee06a599d77; 9fa4f214-5bb2-40bc-8033-bc71f3e411b7
+Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,5,Bitwise Operators,0da80d31-a2d8-432d-9b46-746e3b5c53c4; d12f1e22-0190-418c-9e63-2002199b7689
+Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,6,Applications of Bitwise Operators,92742248-8770-4edb-82ac-6dfc8218d8e9
+Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,7,Representation of Signed & Unsigned Integers - I,99b4c829-8f45-4107-9857-c07be3565122; 0f83c4a4-47d4-4eae-8f82-37da1602c4b4
+Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,8,Representation of Signed & Unsigned Integers - II,83f012b8-7eb4-4411-85b7-adf9bbf8a7e0
+Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,9,GCD & LCM,484562fd-5390-4dbf-a97a-6fb5264d54ca; 4007257f-070f-4491-82a4-c8c8568dac03
+Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,10,Modulo Arithmetic - I,d18152e9-eacf-43f1-a94d-dc2f060bbe38; 48c07ca7-ccaa-4b2e-a414-484fd2259915
+Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,11,Modulo Arithmetic - II,
+Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,12,Error Detection Techniques,78326daf-e803-43b2-b5a6-4b42a2c15567; 6352ad66-e26e-4562-bbc7-2e1a366376b2
+Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,13,Conditional Probability,498be89e-6309-4135-acb2-611a2e0d8d7f; 89b720c9-aa1b-40d1-82c5-ee58eb45c49d
+Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,14,Baye's Theorem & Expected Value,6c027719-3010-4a22-afd0-c2c0c5d8a43c; 6fb02d68-8278-4a9c-a6c0-ea6a14006a1d
+Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,15,Matrix Applications,54c53f1d-05eb-4191-b944-b7a914312c7a
+Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,16,"HP, Relation between AM, GM, & HM",859ff95c-a98a-4a04-b303-811fd0c4bc37
+Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,17,AGP Series,116b1da0-c0c2-4b0e-b97e-52cb41199f1e
+Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,18,Venn Diagrams and Applications,04d2a8aa-3d0a-41ca-b8f3-c6ed1b10bad9
+Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,19,Cartesian Products,b17f618f-f2bf-49df-a3c1-4c3b55e7070f
+Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,20,Functions and Properties,1e49fd4c-54cb-42d0-a31c-fd689e2f5105
+Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,21,Binary Operations,c2bb5123-08f5-4c2d-94ba-6a9817a120b0
 Quantitative Aptitude,97671af2-f44f-4eed-978c-d65d5c0c55c9,1,Introduction,d0d6e6c5-075b-4450-978e-d247a4c10944
 Quantitative Aptitude,97671af2-f44f-4eed-978c-d65d5c0c55c9,2,Numbers 1,879557a3-518c-4dd3-9da2-effaac444fea
 Quantitative Aptitude,97671af2-f44f-4eed-978c-d65d5c0c55c9,3,Power Cycles,126be18c-23f9-4d76-a92b-f43b3f94dc5a
