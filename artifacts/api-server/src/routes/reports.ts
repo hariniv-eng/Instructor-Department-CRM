@@ -1536,7 +1536,8 @@ router.get("/reports/taught-training", requireAuth, requireRole("admin"), async 
     const portal = portalColumnOf(t.portalCourseKey ?? null);
     const named = courseColumnOf(t.courseId, t.courseTitle);
     const key = portal?.key ?? named.key;
-    const subject = portal?.subject ?? taughtSubjectColumn(t.courseId, t.courseTitle)!;
+    // Courses of the lecture list that are not on the Training Stats list carry their own subject (2026-10-26).
+    const subject = portal?.subject ?? t.courseSubject ?? taughtSubjectColumn(t.courseId, t.courseTitle)!;
     if (!cellsByUid.has(t.instructorUserId)) cellsByUid.set(t.instructorUserId, {});
     const cells = cellsByUid.get(t.instructorUserId)!;
     const prev = cells[key];

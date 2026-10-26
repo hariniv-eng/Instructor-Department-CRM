@@ -24,6 +24,7 @@ import { SESSION_SCHEDULE_TABLE, TRACK_SUBJECT } from "./instructorContribution"
 import { UNIT_COMPLETION_TABLE } from "./instructorLearningStatus";
 import { TEACHING_COURSE_SUBJECTS, TAUGHT_COURSE_TITLE_SUBJECTS } from "../../data/teachingCourseSubjects";
 import { TRAINING_COURSE_TAXONOMY } from "../../data/trainingCourseTaxonomy";
+import { LECTURE_COURSES } from "../../data/lectureSessions";
 
 export type TaughtCourseRow = {
   instructor_user_id: string;
@@ -272,7 +273,8 @@ export async function buildSessionTitleMap(bq: BigQuery, ds: string, cid: (c: st
   return out;
 }
 
-export async function fetchTaughtCourseRows(): Promise<TaughtCourseRow[]> {
+// Previous method (title matching against portal lessons), kept for reference / fallback -- no longer called by the sync (2026-10-26).
+export async function fetchTaughtCourseRowsByTitle(): Promise<TaughtCourseRow[]> {
   const bq = config.BIGQUERY_CREDENTIALS_JSON
     ? new BigQuery({ projectId: config.BIGQUERY_PROJECT_ID, credentials: JSON.parse(config.BIGQUERY_CREDENTIALS_JSON) })
     : new BigQuery({ projectId: config.BIGQUERY_PROJECT_ID });
@@ -362,6 +364,75 @@ export async function fetchTaughtCourseRows(): Promise<TaughtCourseRow[]> {
       scheduled_sessions: Math.min(scheduledN, curriculumN),
       institutes: ((r.institutes as unknown[]) ?? []).map(plain).filter(Boolean),
       portal_course_key: pk,
+      portal_match_pct: 100,
+    };
+  });
+}
+
+// "Taught in class" by UNIT ID (2026-10-26, per request -- replaces the title matching above, after checking it with
+// _tmp_lecture_unit_match.ts: every course's lectures were found in the schedule by unit id).
+//   * The official lecture sessions of each course come from src/data/lectureSessions.ts (built from the prod-sequence sheets, every
+//     Unit ID checked against the learning portal). Total = number of lectures of the course -- the same for every instructor.
+//   * A scheduled class session points at the unit it covers (resource_id in niat_scheduled_session_wise_resource_details).
+//     Completed = distinct lectures of the course with a COMPLETED session of this instructor; scheduled = with any session.
+//   * LECTURE sessions at NIAT_OFFLINE institutes only, as before. A lecture with several unit ids (e.g. an English slot with its
+//     activities, or a lesson in two versions) counts once.
+const RESOURCE_TABLE = "niat_scheduled_session_wise_resource_details";
+export async function fetchTaughtCourseRows(): Promise<TaughtCourseRow[]> {
+  const bq = config.BIGQUERY_CREDENTIALS_JSON
+    ? new BigQuery({ projectId: config.BIGQUERY_PROJECT_ID, credentials: JSON.parse(config.BIGQUERY_CREDENTIALS_JSON) })
+    : new BigQuery({ projectId: config.BIGQUERY_PROJECT_ID });
+  const ds = `${config.BIGQUERY_PROJECT_ID}.${config.BIGQUERY_DATASET}`;
+  // unit id -> lecture (course index + lecture number)
+  const byUnit = new Map<string, { ci: number; n: number }>();
+  LECTURE_COURSES.forEach((c, ci) => { for (const l of c.lectures) for (const u of l.unitIds) byUnit.set(u, { ci, n: l.n }); });
+  if (!byUnit.size) return [];
+  const [rows] = await runWithHardTimeout(() => bq.query({
+    query: `SELECT instructor_user_id AS uid, REPLACE(LOWER(resource_id), '-', '') AS unit, session_status AS status,
+                   CAST(DATE(session_start_datetime) AS STRING) AS d, institute_name, learning_portal_course_title AS course
+            FROM \`${ds}.${RESOURCE_TABLE}\`
+            WHERE institute_type = 'NIAT_OFFLINE' AND UPPER(session_type) = 'LECTURE' AND instructor_user_id IS NOT NULL
+              AND REPLACE(LOWER(resource_id), '-', '') IN UNNEST(@units)`,
+    params: { units: [...byUnit.keys()] },
+  }), QUERY_TIMEOUT_MS);
+  type Agg = { uid: string; ci: number; done: Set<number>; sched: Set<number>; first: string | null; last: string | null; institutes: Set<string>; taughtAs: Set<string>; doneRows: number };
+  const agg = new Map<string, Agg>();
+  for (const r of rows as Record<string, unknown>[]) {
+    const lec = byUnit.get(plain(r.unit));
+    const uid = plain(r.uid);
+    if (!lec || !uid) continue;
+    const k = `${uid}|${lec.ci}`;
+    const a = agg.get(k) ?? { uid, ci: lec.ci, done: new Set<number>(), sched: new Set<number>(), first: null, last: null, institutes: new Set<string>(), taughtAs: new Set<string>(), doneRows: 0 };
+    a.sched.add(lec.n);
+    if (plain(r.status).toUpperCase() === "COMPLETED") {
+      a.done.add(lec.n); a.doneRows++;
+      const d = plain(r.d) || null;
+      if (d && (!a.first || d < a.first)) a.first = d;
+      if (d && (!a.last || d > a.last)) a.last = d;
+    }
+    if (plain(r.institute_name)) a.institutes.add(plain(r.institute_name));
+    if (plain(r.course)) a.taughtAs.add(plain(r.course));
+    agg.set(k, a);
+  }
+  return [...agg.values()].map((a) => {
+    const c = LECTURE_COURSES[a.ci];
+    const total = c.lectures.length;
+    return {
+      instructor_user_id: a.uid,
+      course_id: `lecture:${c.key}`,
+      course_title: c.title,
+      course_subject: c.subject,
+      topics_total: 0,
+      topics_taught: 0,
+      taught_topics: [...a.taughtAs],
+      sessions_completed: a.doneRows,
+      first_taught_date: a.first,
+      last_taught_date: a.last,
+      curriculum_sessions: total,
+      completed_sessions: Math.min(a.done.size, total),
+      scheduled_sessions: Math.min(a.sched.size, total),
+      institutes: [...a.institutes],
+      portal_course_key: c.key,
       portal_match_pct: 100,
     };
   });
