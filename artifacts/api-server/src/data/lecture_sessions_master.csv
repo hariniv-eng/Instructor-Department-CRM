@@ -65,7 +65,7 @@ Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,63,Polymorphism,34e
 Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,64,OOP: On-Demand Session,f7a1a09f-0f21-46e2-b93c-fa2d1b50bd20
 Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,65,Python Standard Library,6ae1c51c-fed4-40fb-b52d-4947ea1b8b60
 Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,66,Scope & Namespaces,073e838e-23fc-4447-a716-434b072f43d6
-Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,67,Errors & Exceptions,
+Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,67,Errors & Exceptions,b638632d-2e06-4f26-8dd7-24b7372c5b14
 Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,68,Working with Dates & Times,17332dc3-780f-4f5a-b1bc-abea5d100738
 Build Your Own Static Website,,1,Introduction to GenAI in Frontend Development,7bf8ee08-c794-4a81-96fb-a2225d6157ae
 Build Your Own Static Website,,2,Your first Frontend Project | Getting started,518fdb60-e4f5-4972-9c32-dc2d3c09b355
@@ -149,7 +149,7 @@ Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,2,Number S
 Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,3,Number Systems: Octal & Hexadecimal,4df8747d-2281-4e66-a1ac-d8d6a146a5cc; 36a97e72-683a-4e39-a3c9-5c5da78c9cdd
 Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,4,Basic Arithmetic Operations,28631164-d86c-4fcc-94a4-2ee06a599d77; 9fa4f214-5bb2-40bc-8033-bc71f3e411b7
 Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,5,Bitwise Operators,0da80d31-a2d8-432d-9b46-746e3b5c53c4; d12f1e22-0190-418c-9e63-2002199b7689
-Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,6,Applications of Bitwise Operators,
+Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,6,Applications of Bitwise Operators,b9750096-a943-48ee-9e74-2b282ea724a2
 Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,7,Representation of Signed & Unsigned Integers - I,99b4c829-8f45-4107-9857-c07be3565122; 0f83c4a4-47d4-4eae-8f82-37da1602c4b4
 Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,8,Representation of Signed & Unsigned Integers - II,92742248-8770-4edb-82ac-6dfc8218d8e9
 Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,9,GCD & LCM,484562fd-5390-4dbf-a97a-6fb5264d54ca; 4007257f-070f-4491-82a4-c8c8568dac03
@@ -326,7 +326,7 @@ DSA (C++),e216af3e-bcd0-4dee-9c4f-67e7502ecba3,38,Code for Binary Conversion,1d2
 DSA (C++),e216af3e-bcd0-4dee-9c4f-67e7502ecba3,39,Bitwise Operators,44698907-d655-4437-80c9-6d98490b43ce
 DSA (C++),e216af3e-bcd0-4dee-9c4f-67e7502ecba3,40,Bit Manipulation Techniques 1,23b13df1-c4f2-4ad7-8c73-c19b2be4dd98
 DSA (C++),e216af3e-bcd0-4dee-9c4f-67e7502ecba3,41,Bit Manipulation Techniques 2,ada74c98-13ed-4655-92af-19364469d5e9
-Aptitude & Reasoning (course name not in sheet),3525d39d-b705-45a1-ac24-67291bf35bd6,1,Introduction,
+Aptitude & Reasoning (course name not in sheet),3525d39d-b705-45a1-ac24-67291bf35bd6,1,Introduction,44c29528-8967-455c-8186-659fea24a924
 Aptitude & Reasoning (course name not in sheet),3525d39d-b705-45a1-ac24-67291bf35bd6,2,Time and Work,90da8dbe-3e4f-4d3a-9878-3d9a105f8437
 Aptitude & Reasoning (course name not in sheet),3525d39d-b705-45a1-ac24-67291bf35bd6,3,Pipes and Cisterns,77f508c9-fe13-47ac-983e-99306861d0c7
 Aptitude & Reasoning (course name not in sheet),3525d39d-b705-45a1-ac24-67291bf35bd6,4,Man-chain Rule and Wages,a795ad43-9f04-4001-a2b0-f5f610076cf6
