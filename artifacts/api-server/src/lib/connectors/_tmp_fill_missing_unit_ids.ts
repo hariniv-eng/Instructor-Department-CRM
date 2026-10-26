@@ -46,8 +46,8 @@ async function main() {
   const [sched] = await bq.query({ query: `SELECT resource_id AS unit_id, ANY_VALUE(resource_title) AS unit_title, ANY_VALUE(learning_portal_course_title) AS course_title, COUNT(DISTINCT session_id) AS sessions
     FROM \`${ds}.niat_scheduled_session_wise_resource_details\` WHERE UPPER(session_type) = 'LECTURE' GROUP BY resource_id` });
   type U = { course_id?: string; course_title: string; unit_id: string; unit_title: string; unit_type?: string; topic_title?: string; ord?: number; instructors?: number; sessions?: number };
-  const norm = (id: string) => id.replace(/-/g, "").toLowerCase();
-  const sessionsById = new Map((sched as U[]).map((s) => [norm(s.unit_id), s.sessions ?? 0]));
+  const norm = (id: string | null | undefined) => (id ?? "").replace(/-/g, "").toLowerCase(); // some rows have no resource_id
+  const sessionsById = new Map((sched as U[]).filter((s) => s.unit_id).map((s) => [norm(s.unit_id), s.sessions ?? 0]));
 
   const out = [["Course", "#", "Session name", "Found Unit ID", "BigQuery course", "BigQuery unit title", "Unit type", "Times scheduled as lecture", "How found", "Other candidates"].join(",")];
   const esc = (x: unknown) => `"${String(x ?? "").replace(/"/g, '""')}"`;
@@ -58,7 +58,7 @@ async function main() {
     let cands = hint ? pool.filter((u) => hint.test(u.course_title ?? "")) : pool;
     let how = hint ? "course + title" : "title only";
     if (!cands.length) { cands = pool; how = "title only (course name differs)"; }
-    if (!cands.length) { cands = (sched as U[]).filter((s) => t(s.unit_title) === t(m.name)); how = "scheduled lecture title"; }
+    if (!cands.length) { cands = (sched as U[]).filter((s) => s.unit_id && t(s.unit_title) === t(m.name)); how = "scheduled lecture title"; }
     // Prefer the unit that is actually scheduled most, then the most-used course copy.
     cands.sort((a, b) => (sessionsById.get(norm(b.unit_id)) ?? 0) - (sessionsById.get(norm(a.unit_id)) ?? 0) || (b.instructors ?? 0) - (a.instructors ?? 0));
     const best = cands[0];

@@ -27,25 +27,25 @@ Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,25,Nested Loops,8d5
 Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,26,Problem Solving - Part 5,c0111a17-8697-4fcd-8575-530af3213752
 Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,27,Problem Solving - Part 6,83e061dd-88db-48c9-b088-6587488b907c
 Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,28,Problem Solving - Part 7,5cb3694f-e548-4121-831e-a666cc3825a5
-Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,29,Loop Control Statements,
-Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,30,Comparing Strings & Naming Variables,
-Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,31,Problem Solving and Debugging - 4,
-Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,32,Problem Solving and Debugging - 5,
-Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,33,Lists,
-Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,34,Working with Lists,
-Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,35,Lists and Strings,
-Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,36,Functions,
-Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,37,Function Arguments,
-Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,38,Built-in Functions,
-Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,39,Function Call Stack & Recursion,
-Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,40,Understanding Recursion,
-Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,41,Problem solving using Recursion - 1,
-Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,42,Problem solving using Recursion - 2,
-Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,43,List Methods,
-Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,44,Tuples & Sequences,
-Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,45,Sets,
-Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,46,Set Operations,
-Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,47,Problem Solving and Debugging - Part 6,
+Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,29,Loop Control Statements,b64b1f09-6c9f-436d-b8c2-0a9383cf6695
+Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,30,Comparing Strings & Naming Variables,3bd6dca9-56c1-4f84-aa23-a1d8a7396cf0
+Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,31,Problem Solving and Debugging - 4,f02bb726-97d6-4d13-bb5f-aa5b52baf3c4
+Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,32,Problem Solving and Debugging - 5,0b675d57-650e-4c04-be0f-f50a73e91f58
+Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,33,Lists,a489b3de-43e4-4b6f-825a-44619f8c7df7
+Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,34,Working with Lists,e932ecb8-f08c-44cc-a561-1f153b96786c
+Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,35,Lists and Strings,9c5518b5-d5d2-4b52-a2a6-7c403b68b084
+Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,36,Functions,f32c7dfb-6685-4f54-a744-b41833093370
+Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,37,Function Arguments,3cdc557a-b412-4782-8bfb-2dcf2466334b
+Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,38,Built-in Functions,8721e72a-cb65-45d6-8487-d657f921a230
+Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,39,Function Call Stack & Recursion,fa498f31-e4d7-407e-b437-7971ca833094
+Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,40,Understanding Recursion,26f9ce3c-0c9f-45ba-82cc-ea6e1ae7b86f
+Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,41,Problem solving using Recursion - 1,964c48c7-8e86-4158-b534-98603fdc9838
+Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,42,Problem solving using Recursion - 2,0445bba7-f3e0-4e1f-b904-bb177a1c9e80
+Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,43,List Methods,2318a109-8e32-4c6b-a703-7cb2c57c8f18
+Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,44,Tuples & Sequences,b90fb5d1-aef9-419c-8c35-dccc8c2920ed
+Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,45,Sets,0e50a0ea-32fe-409e-ab0d-77c582e45f45
+Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,46,Set Operations,2877fa6d-132d-4872-8c7c-93ad6ad3de38
+Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,47,Problem Solving and Debugging - Part 6,6aa1e88e-0163-4f68-a272-a8ea867c0fbd
 Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,48,Nested Lists & String Formatting,
 Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,49,Introduction to Matrices,
 Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,50,Introduction to Shorthand expressions,
