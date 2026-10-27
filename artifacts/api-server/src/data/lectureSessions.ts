@@ -1,8 +1,10 @@
-// GENERATED from lecture_sessions_master.csv (2026-10-26) -- the official LECTURE sessions of each course, built from the prod-sequence
+// GENERATED from lecture_sessions_master.csv (2026-10-27) -- the official LECTURE sessions of each course, built from the prod-sequence
 // sheets and checked against the learning portal (_tmp_verify_unit_ids.ts). Used by "Taught in class" (taughtTraining.ts):
 // total = lectures of the course; completed = lectures an instructor has held, matched by Unit ID (resource_id of the scheduled session).
 // To change: edit the CSV and regenerate this file (do not hand-edit the IDs). Unit IDs are lower case without dashes.
 // key: the Training Stats course key (portalKey) when the course is on that list, else an own key; subject: the "Taught in class" column group.
+// LLM (2026-10-27, per request): the Python / Flask backend sessions are part of the GenAI track, taught before the LLM sessions, so they
+// are the first 5 lectures of LLM (32 in all) instead of a course of their own.
 export type LectureCourse = { key: string; portalKey: string | null; title: string; subject: string; lectures: { n: number; name: string; unitIds: string[] }[] };
 export const LECTURE_COURSES: LectureCourse[] = [
  {
@@ -2667,10 +2669,10 @@ export const LECTURE_COURSES: LectureCourse[] = [
   ]
  },
  {
-  "key": "lecture_flask_python_backend",
-  "portalKey": null,
-  "title": "Flask & Python Backend",
-  "subject": "Backend",
+  "key": "llm",
+  "portalKey": "llm",
+  "title": "LLM",
+  "subject": "GenAI",
   "lectures": [
    {
     "n": 1,
@@ -2706,199 +2708,191 @@ export const LECTURE_COURSES: LectureCourse[] = [
     "unitIds": [
      "5b8712b2965449219eabd205b5816095"
     ]
-   }
-  ]
- },
- {
-  "key": "llm",
-  "portalKey": "llm",
-  "title": "LLM",
-  "subject": "GenAI",
-  "lectures": [
+   },
    {
-    "n": 1,
+    "n": 6,
     "name": "Your Learning Journey",
     "unitIds": [
      "43e0c07336e244569b814d6baea1d566"
     ]
    },
    {
-    "n": 2,
+    "n": 7,
     "name": "Building LLM Applications Using Python | Part 1",
     "unitIds": [
      "3331e6f99f854bf39925fef421b64a77"
     ]
    },
    {
-    "n": 3,
+    "n": 8,
     "name": "Building LLM Applications Using Python | Part 2",
     "unitIds": [
      "eb61fdf45b9345b4aeaf217cc7ab88b0"
     ]
    },
    {
-    "n": 4,
+    "n": 9,
     "name": "Building UI for LLM Applications",
     "unitIds": [
      "37f2438472174ff9aa65efa7afefb5cf"
     ]
    },
    {
-    "n": 5,
+    "n": 10,
     "name": "Deploying LLM Applications",
     "unitIds": [
      "f6d7d9a2e4314bca853969f69e69910e"
     ]
    },
    {
-    "n": 6,
+    "n": 11,
     "name": "Understanding How LLMs Work | Part 1",
     "unitIds": [
      "16cd8836fe334162be41b8913ae3a69f"
     ]
    },
    {
-    "n": 7,
+    "n": 12,
     "name": "Understanding How LLMs Work | Part 2",
     "unitIds": [
      "24f646b95d4849b6ba3a1c96cc2e863e"
     ]
    },
    {
-    "n": 8,
+    "n": 13,
     "name": "Enhancing Productivity with AI",
     "unitIds": [
      "ac5136695c3442f0a6d015dda5f235da"
     ]
    },
    {
-    "n": 9,
+    "n": 14,
     "name": "Tool use & Function Calling in LLMs",
     "unitIds": [
      "5a6be15f6b1c4c3e85132d15f9e7607a"
     ]
    },
    {
-    "n": 10,
+    "n": 15,
     "name": "Effective Prompting Techniques",
     "unitIds": [
      "f45177263ef24dea83cdd329a7edcf80"
     ]
    },
    {
-    "n": 11,
+    "n": 16,
     "name": "Introduction to Langchain",
     "unitIds": [
      "e9ef9e04ea0a44d49572d3270460d9ef"
     ]
    },
    {
-    "n": 12,
+    "n": 17,
     "name": "Introduction to Retrieval-Augmented Generation | Part 1",
     "unitIds": [
      "3561231f590e4857ba272aea9d984921"
     ]
    },
    {
-    "n": 13,
+    "n": 18,
     "name": "Introduction to Retrieval-Augmented Generation | Part 2",
     "unitIds": [
      "4a92e788211a43918e510a620df242aa"
     ]
    },
    {
-    "n": 14,
+    "n": 19,
     "name": "Building AI Agents using Langchain",
     "unitIds": [
      "32278073b9b44d7cb8634161c95a417e"
     ]
    },
    {
-    "n": 15,
+    "n": 20,
     "name": "Building Memory Agents",
     "unitIds": [
      "3ea03301ebe14b94b04b2689940cb25d"
     ]
    },
    {
-    "n": 16,
+    "n": 21,
     "name": "AI in the Real World",
     "unitIds": [
      "7a0865e203eb4f1b815a4c52711429d3"
     ]
    },
    {
-    "n": 17,
+    "n": 22,
     "name": "Building an AI-Powered Conversational Interview Assistant | Part 1",
     "unitIds": [
      "0b47342bc36f4287aa1ffcd1ecd5ad10"
     ]
    },
    {
-    "n": 18,
+    "n": 23,
     "name": "Building an AI-Powered Conversational Interview Assistant | Part 2",
     "unitIds": [
      "34b94fe7130a47f19624fb526661becf"
     ]
    },
    {
-    "n": 19,
+    "n": 24,
     "name": "Building RAG Agents Using LangChain",
     "unitIds": [
      "652e24a78661463a9cd4aab446c46af8"
     ]
    },
    {
-    "n": 20,
+    "n": 25,
     "name": "Introduction to Context Engineering",
     "unitIds": [
      "e65b64e88086467db69418eb3aa31e57"
     ]
    },
    {
-    "n": 21,
+    "n": 26,
     "name": "Integrating MCP",
     "unitIds": [
      "80dc2fef7a5243c0abd3a8be632bca18"
     ]
    },
    {
-    "n": 22,
+    "n": 27,
     "name": "Building Multi Agent Systems Using Crew AI",
     "unitIds": [
      "05254f43f7384a15999ca07f8d18fe9d"
     ]
    },
    {
-    "n": 23,
+    "n": 28,
     "name": "Building a Game Development Crew",
     "unitIds": [
      "5433e634492e4acaadc618fd8ff91b95"
     ]
    },
    {
-    "n": 24,
+    "n": 29,
     "name": "Introduction to LLM Evaluation | Part 1",
     "unitIds": [
      "214d4c55a84d4b4d8c4553f58e0ab504"
     ]
    },
    {
-    "n": 25,
+    "n": 30,
     "name": "Introduction to LLM Evaluation | Part 2",
     "unitIds": [
      "a527b20d30684c6488294ff4e2db6858"
     ]
    },
    {
-    "n": 26,
+    "n": 31,
     "name": "Running Models Locally",
     "unitIds": [
      "7786a136c51a475fa3573e98e2f96616"
     ]
    },
    {
-    "n": 27,
+    "n": 32,
     "name": "Fine-Tuning LLMs",
     "unitIds": [
      "48d32faa0ec842eca36d423819bd1f7c"
@@ -4460,188 +4454,188 @@ export const LECTURE_COURSES: LectureCourse[] = [
    }
   ]
  },
-{
- "key": "gen_ai",
- "portalKey": "gen_ai",
- "title": "Introduction to Gen AI",
- "subject": "GenAI",
- "lectures": [
-  {
-   "n": 1,
-   "name": "Your Learning Journey",
-   "unitIds": [
-    "64025833d46d4e7ca7e0a9c230a78b9d"
-   ]
-  },
-  {
-   "n": 2,
-   "name": "Generative AI Foundations",
-   "unitIds": [
-    "55622f8db3584a7abfd7a32ee81a41df"
-   ]
-  },
-  {
-   "n": 3,
-   "name": "Exploring Gen AI Capabilities",
-   "unitIds": [
-    "e96a1a8c564d448e8ffdb45b9de894f4"
-   ]
-  },
-  {
-   "n": 4,
-   "name": "Productivity Power Up with AI Tools",
-   "unitIds": [
-    "e1e7b4a3c28941ea95434562eb1f1b52"
-   ]
-  },
-  {
-   "n": 5,
-   "name": "Prompt Engineering Fundamentals",
-   "unitIds": [
-    "ce7280f1375d416591fcf6d4593435f0"
-   ]
-  },
-  {
-   "n": 6,
-   "name": "Building Social Media Content Automation Workflow | Part - 1",
-   "unitIds": [
-    "8af9ec3bc76840589d04daeda5d0ec8b"
-   ]
-  },
-  {
-   "n": 7,
-   "name": "Building Social Media Content Automation Workflow | Part - 2 (+ Setting Up Google OAuth 2.0 for n8n)",
-   "unitIds": [
-    "f062acff6aea4c698659ba51c4ccbde6",
-    "b6d8e5ed77344324add02edc5accefbb"
-   ]
-  },
-  {
-   "n": 8,
-   "name": "Advanced Prompt Engineering",
-   "unitIds": [
-    "61d3d704b2e54225a2af3d440779a5f6"
-   ]
-  },
-  {
-   "n": 9,
-   "name": "Build Your Own AI News Summarizer | Part - 1",
-   "unitIds": [
-    "7460a29646d24525a03ad7c8278ba82b"
-   ]
-  },
-  {
-   "n": 10,
-   "name": "Build Your Own AI News Summarizer | Part - 2",
-   "unitIds": [
-    "87dd60b06c704fabb5b2a80ef109a96e"
-   ]
-  },
-  {
-   "n": 11,
-   "name": "Build Your Own AI News Summarizer | Part - 3",
-   "unitIds": [
-    "e97d82f0c1d14598ad8c3dae3ebd8442"
-   ]
-  },
-  {
-   "n": 12,
-   "name": "Productivity Power-Up with AI Tools | Part 2",
-   "unitIds": [
-    "21a0cf8e35e94c4990ce3e7de9e83307"
-   ]
-  },
-  {
-   "n": 13,
-   "name": "Mastering Image Generation",
-   "unitIds": [
-    "f08c1eeaa8e24c2fb7a23c3f2a999745"
-   ]
-  },
-  {
-   "n": 14,
-   "name": "Setting Up Your Kaggle Environment",
-   "unitIds": [
-    "309c1c1a87364fce9e2b30a587d16b11"
-   ]
-  },
-  {
-   "n": 15,
-   "name": "Mastering Image Generation with Stable Diffusion",
-   "unitIds": [
-    "51d1574ec0a447dfb26f104fa1538e1d"
-   ]
-  },
-  {
-   "n": 16,
-   "name": "Mastering AI Audio Generation",
-   "unitIds": [
-    "523803bf5bed4d3db7e136458227e403"
-   ]
-  },
-  {
-   "n": 17,
-   "name": "Building No-Code Applications with AI",
-   "unitIds": [
-    "9f24485920884948b3fb95b4125ddd25"
-   ]
-  },
-  {
-   "n": 18,
-   "name": "Mastering AI Audio Generation using F5-TTS",
-   "unitIds": [
-    "09c52e0bdbce4eb7a47642227e06c845"
-   ]
-  },
-  {
-   "n": 19,
-   "name": "Introduction to AI Agents",
-   "unitIds": [
-    "413008847ef74ad38662c7013c09beaf"
-   ]
-  },
-  {
-   "n": 20,
-   "name": "Building a Learning Path Generator",
-   "unitIds": [
-    "c0d61a20d5384d13bdec04b0fbc034db"
-   ]
-  },
-  {
-   "n": 21,
-   "name": "Build Your Own AI Shopping Assistant | Part 1",
-   "unitIds": [
-    "9bc68942c2c745ff98d2917d3b7f1812"
-   ]
-  },
-  {
-   "n": 22,
-   "name": "Build Your Own AI Shopping Assistant | Part 2",
-   "unitIds": [
-    "accd9c83cb4c4be39414abfd4c80c62a"
-   ]
-  },
-  {
-   "n": 23,
-   "name": "Building an Agent with Memory",
-   "unitIds": [
-    "44b27f22901e45b0bc559e0df5ba8b07"
-   ]
-  },
-  {
-   "n": 24,
-   "name": "Introduction to Model Context Protocol | Part - 1",
-   "unitIds": [
-    "234d057ce4824835ba6ccf0d800d22a1"
-   ]
-  },
-  {
-   "n": 25,
-   "name": "Introduction to Model Context Protocol | Part - 2",
-   "unitIds": [
-    "d9b98a5dd733482fbb10b56130b4db71"
-   ]
-  }
- ]
-}
+ {
+  "key": "gen_ai",
+  "portalKey": "gen_ai",
+  "title": "Introduction to Gen AI",
+  "subject": "GenAI",
+  "lectures": [
+   {
+    "n": 1,
+    "name": "Your Learning Journey",
+    "unitIds": [
+     "64025833d46d4e7ca7e0a9c230a78b9d"
+    ]
+   },
+   {
+    "n": 2,
+    "name": "Generative AI Foundations",
+    "unitIds": [
+     "55622f8db3584a7abfd7a32ee81a41df"
+    ]
+   },
+   {
+    "n": 3,
+    "name": "Exploring Gen AI Capabilities",
+    "unitIds": [
+     "e96a1a8c564d448e8ffdb45b9de894f4"
+    ]
+   },
+   {
+    "n": 4,
+    "name": "Productivity Power Up with AI Tools",
+    "unitIds": [
+     "e1e7b4a3c28941ea95434562eb1f1b52"
+    ]
+   },
+   {
+    "n": 5,
+    "name": "Prompt Engineering Fundamentals",
+    "unitIds": [
+     "ce7280f1375d416591fcf6d4593435f0"
+    ]
+   },
+   {
+    "n": 6,
+    "name": "Building Social Media Content Automation Workflow | Part - 1",
+    "unitIds": [
+     "8af9ec3bc76840589d04daeda5d0ec8b"
+    ]
+   },
+   {
+    "n": 7,
+    "name": "Building Social Media Content Automation Workflow | Part - 2 (+ Setting Up Google OAuth 2.0 for n8n)",
+    "unitIds": [
+     "f062acff6aea4c698659ba51c4ccbde6",
+     "b6d8e5ed77344324add02edc5accefbb"
+    ]
+   },
+   {
+    "n": 8,
+    "name": "Advanced Prompt Engineering",
+    "unitIds": [
+     "61d3d704b2e54225a2af3d440779a5f6"
+    ]
+   },
+   {
+    "n": 9,
+    "name": "Build Your Own AI News Summarizer | Part - 1",
+    "unitIds": [
+     "7460a29646d24525a03ad7c8278ba82b"
+    ]
+   },
+   {
+    "n": 10,
+    "name": "Build Your Own AI News Summarizer | Part - 2",
+    "unitIds": [
+     "87dd60b06c704fabb5b2a80ef109a96e"
+    ]
+   },
+   {
+    "n": 11,
+    "name": "Build Your Own AI News Summarizer | Part - 3",
+    "unitIds": [
+     "e97d82f0c1d14598ad8c3dae3ebd8442"
+    ]
+   },
+   {
+    "n": 12,
+    "name": "Productivity Power-Up with AI Tools | Part 2",
+    "unitIds": [
+     "21a0cf8e35e94c4990ce3e7de9e83307"
+    ]
+   },
+   {
+    "n": 13,
+    "name": "Mastering Image Generation",
+    "unitIds": [
+     "f08c1eeaa8e24c2fb7a23c3f2a999745"
+    ]
+   },
+   {
+    "n": 14,
+    "name": "Setting Up Your Kaggle Environment",
+    "unitIds": [
+     "309c1c1a87364fce9e2b30a587d16b11"
+    ]
+   },
+   {
+    "n": 15,
+    "name": "Mastering Image Generation with Stable Diffusion",
+    "unitIds": [
+     "51d1574ec0a447dfb26f104fa1538e1d"
+    ]
+   },
+   {
+    "n": 16,
+    "name": "Mastering AI Audio Generation",
+    "unitIds": [
+     "523803bf5bed4d3db7e136458227e403"
+    ]
+   },
+   {
+    "n": 17,
+    "name": "Building No-Code Applications with AI",
+    "unitIds": [
+     "9f24485920884948b3fb95b4125ddd25"
+    ]
+   },
+   {
+    "n": 18,
+    "name": "Mastering AI Audio Generation using F5-TTS",
+    "unitIds": [
+     "09c52e0bdbce4eb7a47642227e06c845"
+    ]
+   },
+   {
+    "n": 19,
+    "name": "Introduction to AI Agents",
+    "unitIds": [
+     "413008847ef74ad38662c7013c09beaf"
+    ]
+   },
+   {
+    "n": 20,
+    "name": "Building a Learning Path Generator",
+    "unitIds": [
+     "c0d61a20d5384d13bdec04b0fbc034db"
+    ]
+   },
+   {
+    "n": 21,
+    "name": "Build Your Own AI Shopping Assistant | Part 1",
+    "unitIds": [
+     "9bc68942c2c745ff98d2917d3b7f1812"
+    ]
+   },
+   {
+    "n": 22,
+    "name": "Build Your Own AI Shopping Assistant | Part 2",
+    "unitIds": [
+     "accd9c83cb4c4be39414abfd4c80c62a"
+    ]
+   },
+   {
+    "n": 23,
+    "name": "Building an Agent with Memory",
+    "unitIds": [
+     "44b27f22901e45b0bc559e0df5ba8b07"
+    ]
+   },
+   {
+    "n": 24,
+    "name": "Introduction to Model Context Protocol | Part - 1",
+    "unitIds": [
+     "234d057ce4824835ba6ccf0d800d22a1"
+    ]
+   },
+   {
+    "n": 25,
+    "name": "Introduction to Model Context Protocol | Part - 2",
+    "unitIds": [
+     "d9b98a5dd733482fbb10b56130b4db71"
+    ]
+   }
+  ]
+ }
 ];

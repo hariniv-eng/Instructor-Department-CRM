@@ -355,38 +355,38 @@ Aptitude & Reasoning (course name not in sheet),3525d39d-b705-45a1-ac24-67291bf3
 Aptitude & Reasoning (course name not in sheet),3525d39d-b705-45a1-ac24-67291bf35bd6,27,Odd Man Out & Analogies,610a0890-8c17-467b-9512-1b741841ddbc
 Aptitude & Reasoning (course name not in sheet),3525d39d-b705-45a1-ac24-67291bf35bd6,28,Coded Language,dec1510c-1baf-4e25-ba12-ae834da4b00f
 Aptitude & Reasoning (course name not in sheet),3525d39d-b705-45a1-ac24-67291bf35bd6,29,Company Specific Session - Coding & Decoding,0bd20f3a-9893-47a7-995c-00c3b53d3922
-Flask & Python Backend (course name not in sheet),a8f81e0c-22c3-41e6-b98a-ce7552d8e2c7,1,Introduction to Google Colab,3280f0e6-db4c-4123-a3a5-b4670ffc7260
-Flask & Python Backend (course name not in sheet),a8f81e0c-22c3-41e6-b98a-ce7552d8e2c7,2,Introduction to Third-Party Packages,a4e4c0d4-258a-4331-aac7-a2668dc41e33
-Flask & Python Backend (course name not in sheet),a8f81e0c-22c3-41e6-b98a-ce7552d8e2c7,3,Introduction to Flask,6406bff0-8c65-46fe-b812-db97162a8fac
-Flask & Python Backend (course name not in sheet),a8f81e0c-22c3-41e6-b98a-ce7552d8e2c7,4,Building Rest APIs using Flask,f8610c6b-6149-400d-a458-2a81073019aa
-Flask & Python Backend (course name not in sheet),a8f81e0c-22c3-41e6-b98a-ce7552d8e2c7,5,Integrating Flask APIs in Frontend,5b8712b2-9654-4921-9eab-d205b5816095
-LLM,8874b642-82db-4274-8d71-b9940316db8d,1,Your Learning Journey,43e0c073-36e2-4456-9b81-4d6baea1d566
-LLM,8874b642-82db-4274-8d71-b9940316db8d,2,Building LLM Applications Using Python | Part 1,3331e6f9-9f85-4bf3-9925-fef421b64a77
-LLM,8874b642-82db-4274-8d71-b9940316db8d,3,Building LLM Applications Using Python | Part 2,eb61fdf4-5b93-45b4-aeaf-217cc7ab88b0
-LLM,8874b642-82db-4274-8d71-b9940316db8d,4,Building UI for LLM Applications,37f24384-7217-4ff9-aa65-efa7afefb5cf
-LLM,8874b642-82db-4274-8d71-b9940316db8d,5,Deploying LLM Applications,f6d7d9a2-e431-4bca-8539-69f69e69910e
-LLM,8874b642-82db-4274-8d71-b9940316db8d,6,Understanding How LLMs Work | Part 1,16cd8836-fe33-4162-be41-b8913ae3a69f
-LLM,8874b642-82db-4274-8d71-b9940316db8d,7,Understanding How LLMs Work | Part 2,24f646b9-5d48-49b6-ba3a-1c96cc2e863e
-LLM,8874b642-82db-4274-8d71-b9940316db8d,8,Enhancing Productivity with AI,ac513669-5c34-42f0-a6d0-15dda5f235da
-LLM,8874b642-82db-4274-8d71-b9940316db8d,9,Tool use & Function Calling in LLMs,5a6be15f-6b1c-4c3e-8513-2d15f9e7607a
-LLM,8874b642-82db-4274-8d71-b9940316db8d,10,Effective Prompting Techniques,f4517726-3ef2-4dea-83cd-d329a7edcf80
-LLM,8874b642-82db-4274-8d71-b9940316db8d,11,Introduction to Langchain,e9ef9e04-ea0a-44d4-9572-d3270460d9ef
-LLM,8874b642-82db-4274-8d71-b9940316db8d,12,Introduction to Retrieval-Augmented Generation | Part 1,3561231f-590e-4857-ba27-2aea9d984921
-LLM,8874b642-82db-4274-8d71-b9940316db8d,13,Introduction to Retrieval-Augmented Generation | Part 2,4a92e788-211a-4391-8e51-0a620df242aa
-LLM,8874b642-82db-4274-8d71-b9940316db8d,14,Building AI Agents using Langchain,32278073-b9b4-4d7c-b863-4161c95a417e
-LLM,8874b642-82db-4274-8d71-b9940316db8d,15,Building Memory Agents,3ea03301-ebe1-4b94-b04b-2689940cb25d
-LLM,8874b642-82db-4274-8d71-b9940316db8d,16,AI in the Real World,7a0865e2-03eb-4f1b-815a-4c52711429d3
-LLM,8874b642-82db-4274-8d71-b9940316db8d,17,Building an AI-Powered Conversational Interview Assistant | Part 1,0b47342b-c36f-4287-aa1f-fcd1ecd5ad10
-LLM,8874b642-82db-4274-8d71-b9940316db8d,18,Building an AI-Powered Conversational Interview Assistant | Part 2,34b94fe7-130a-47f1-9624-fb526661becf
-LLM,8874b642-82db-4274-8d71-b9940316db8d,19,Building RAG Agents Using LangChain,652e24a7-8661-463a-9cd4-aab446c46af8
-LLM,8874b642-82db-4274-8d71-b9940316db8d,20,Introduction to Context Engineering,e65b64e8-8086-467d-b694-18eb3aa31e57
-LLM,8874b642-82db-4274-8d71-b9940316db8d,21,Integrating MCP,80dc2fef-7a52-43c0-abd3-a8be632bca18
-LLM,8874b642-82db-4274-8d71-b9940316db8d,22,Building Multi Agent Systems Using Crew AI,05254f43-f738-4a15-999c-a07f8d18fe9d
-LLM,8874b642-82db-4274-8d71-b9940316db8d,23,Building a Game Development Crew,5433e634-492e-4aca-adc6-18fd8ff91b95
-LLM,8874b642-82db-4274-8d71-b9940316db8d,24,Introduction to LLM Evaluation | Part 1,214d4c55-a84d-4b4d-8c45-53f58e0ab504
-LLM,8874b642-82db-4274-8d71-b9940316db8d,25,Introduction to LLM Evaluation | Part 2,a527b20d-3068-4c64-8829-4ff4e2db6858
-LLM,8874b642-82db-4274-8d71-b9940316db8d,26,Running Models Locally,7786a136-c51a-475f-a357-3e98e2f96616
-LLM,8874b642-82db-4274-8d71-b9940316db8d,27,Fine-Tuning LLMs,48d32faa-0ec8-42ec-a36d-423819bd1f7c
+LLM,a8f81e0c-22c3-41e6-b98a-ce7552d8e2c7,1,Introduction to Google Colab,3280f0e6-db4c-4123-a3a5-b4670ffc7260
+LLM,a8f81e0c-22c3-41e6-b98a-ce7552d8e2c7,2,Introduction to Third-Party Packages,a4e4c0d4-258a-4331-aac7-a2668dc41e33
+LLM,a8f81e0c-22c3-41e6-b98a-ce7552d8e2c7,3,Introduction to Flask,6406bff0-8c65-46fe-b812-db97162a8fac
+LLM,a8f81e0c-22c3-41e6-b98a-ce7552d8e2c7,4,Building Rest APIs using Flask,f8610c6b-6149-400d-a458-2a81073019aa
+LLM,a8f81e0c-22c3-41e6-b98a-ce7552d8e2c7,5,Integrating Flask APIs in Frontend,5b8712b2-9654-4921-9eab-d205b5816095
+LLM,8874b642-82db-4274-8d71-b9940316db8d,6,Your Learning Journey,43e0c073-36e2-4456-9b81-4d6baea1d566
+LLM,8874b642-82db-4274-8d71-b9940316db8d,7,Building LLM Applications Using Python | Part 1,3331e6f9-9f85-4bf3-9925-fef421b64a77
+LLM,8874b642-82db-4274-8d71-b9940316db8d,8,Building LLM Applications Using Python | Part 2,eb61fdf4-5b93-45b4-aeaf-217cc7ab88b0
+LLM,8874b642-82db-4274-8d71-b9940316db8d,9,Building UI for LLM Applications,37f24384-7217-4ff9-aa65-efa7afefb5cf
+LLM,8874b642-82db-4274-8d71-b9940316db8d,10,Deploying LLM Applications,f6d7d9a2-e431-4bca-8539-69f69e69910e
+LLM,8874b642-82db-4274-8d71-b9940316db8d,11,Understanding How LLMs Work | Part 1,16cd8836-fe33-4162-be41-b8913ae3a69f
+LLM,8874b642-82db-4274-8d71-b9940316db8d,12,Understanding How LLMs Work | Part 2,24f646b9-5d48-49b6-ba3a-1c96cc2e863e
+LLM,8874b642-82db-4274-8d71-b9940316db8d,13,Enhancing Productivity with AI,ac513669-5c34-42f0-a6d0-15dda5f235da
+LLM,8874b642-82db-4274-8d71-b9940316db8d,14,Tool use & Function Calling in LLMs,5a6be15f-6b1c-4c3e-8513-2d15f9e7607a
+LLM,8874b642-82db-4274-8d71-b9940316db8d,15,Effective Prompting Techniques,f4517726-3ef2-4dea-83cd-d329a7edcf80
+LLM,8874b642-82db-4274-8d71-b9940316db8d,16,Introduction to Langchain,e9ef9e04-ea0a-44d4-9572-d3270460d9ef
+LLM,8874b642-82db-4274-8d71-b9940316db8d,17,Introduction to Retrieval-Augmented Generation | Part 1,3561231f-590e-4857-ba27-2aea9d984921
+LLM,8874b642-82db-4274-8d71-b9940316db8d,18,Introduction to Retrieval-Augmented Generation | Part 2,4a92e788-211a-4391-8e51-0a620df242aa
+LLM,8874b642-82db-4274-8d71-b9940316db8d,19,Building AI Agents using Langchain,32278073-b9b4-4d7c-b863-4161c95a417e
+LLM,8874b642-82db-4274-8d71-b9940316db8d,20,Building Memory Agents,3ea03301-ebe1-4b94-b04b-2689940cb25d
+LLM,8874b642-82db-4274-8d71-b9940316db8d,21,AI in the Real World,7a0865e2-03eb-4f1b-815a-4c52711429d3
+LLM,8874b642-82db-4274-8d71-b9940316db8d,22,Building an AI-Powered Conversational Interview Assistant | Part 1,0b47342b-c36f-4287-aa1f-fcd1ecd5ad10
+LLM,8874b642-82db-4274-8d71-b9940316db8d,23,Building an AI-Powered Conversational Interview Assistant | Part 2,34b94fe7-130a-47f1-9624-fb526661becf
+LLM,8874b642-82db-4274-8d71-b9940316db8d,24,Building RAG Agents Using LangChain,652e24a7-8661-463a-9cd4-aab446c46af8
+LLM,8874b642-82db-4274-8d71-b9940316db8d,25,Introduction to Context Engineering,e65b64e8-8086-467d-b694-18eb3aa31e57
+LLM,8874b642-82db-4274-8d71-b9940316db8d,26,Integrating MCP,80dc2fef-7a52-43c0-abd3-a8be632bca18
+LLM,8874b642-82db-4274-8d71-b9940316db8d,27,Building Multi Agent Systems Using Crew AI,05254f43-f738-4a15-999c-a07f8d18fe9d
+LLM,8874b642-82db-4274-8d71-b9940316db8d,28,Building a Game Development Crew,5433e634-492e-4aca-adc6-18fd8ff91b95
+LLM,8874b642-82db-4274-8d71-b9940316db8d,29,Introduction to LLM Evaluation | Part 1,214d4c55-a84d-4b4d-8c45-53f58e0ab504
+LLM,8874b642-82db-4274-8d71-b9940316db8d,30,Introduction to LLM Evaluation | Part 2,a527b20d-3068-4c64-8829-4ff4e2db6858
+LLM,8874b642-82db-4274-8d71-b9940316db8d,31,Running Models Locally,7786a136-c51a-475f-a357-3e98e2f96616
+LLM,8874b642-82db-4274-8d71-b9940316db8d,32,Fine-Tuning LLMs,48d32faa-0ec8-42ec-a36d-423819bd1f7c
 SQL (Introduction to Databases & SQL),25c1a72c-216e-47e1-9bc6-b2f16c66e0ca,1,Introduction to Databases | Part - 1,07ceabfc-4e42-4299-baaa-234c132ca3a9
 SQL (Introduction to Databases & SQL),25c1a72c-216e-47e1-9bc6-b2f16c66e0ca,2,Introduction to Databases | Part - 2,13fa3d91-dc49-4e48-b978-8191f5228864
 SQL (Introduction to Databases & SQL),25c1a72c-216e-47e1-9bc6-b2f16c66e0ca,3,Introduction To SQL | Part - 1,3a7b2d47-3c5a-4a63-81c6-468a360e3e01
@@ -598,3 +598,28 @@ AI for Finance (course name not in sheet),85dac569-85f5-4205-b71a-e86327f39b92,1
 AI for Finance (course name not in sheet),85dac569-85f5-4205-b71a-e86327f39b92,16,Building AI Guardrails | Part 1,632996b1-0ad2-4515-bb17-02f0dba8f46c
 AI for Finance (course name not in sheet),85dac569-85f5-4205-b71a-e86327f39b92,17,Building AI Guardrails | Part 2,73633f4d-0f1d-4516-8f95-f3ad2f0d777f
 AI for Finance (course name not in sheet),85dac569-85f5-4205-b71a-e86327f39b92,18,AI Finance Add-On Session,7f2fa71a-2d6d-4508-b14b-cdcdb9530aa2
+Introduction to Gen AI,,1,Your Learning Journey,64025833-d46d-4e7c-a7e0-a9c230a78b9d
+Introduction to Gen AI,,2,Generative AI Foundations,55622f8d-b358-4a7a-bfd7-a32ee81a41df
+Introduction to Gen AI,,3,Exploring Gen AI Capabilities,e96a1a8c-564d-448e-8ffd-b45b9de894f4
+Introduction to Gen AI,,4,Productivity Power Up with AI Tools,e1e7b4a3-c289-41ea-9543-4562eb1f1b52
+Introduction to Gen AI,,5,Prompt Engineering Fundamentals,ce7280f1-375d-4165-91fc-f6d4593435f0
+Introduction to Gen AI,,6,Building Social Media Content Automation Workflow | Part - 1,8af9ec3b-c768-4058-9d04-daeda5d0ec8b
+Introduction to Gen AI,,7,Building Social Media Content Automation Workflow | Part - 2 (+ Setting Up Google OAuth 2.0 for n8n),f062acff-6aea-4c69-8659-ba51c4ccbde6; b6d8e5ed-7734-4324-add0-2edc5accefbb
+Introduction to Gen AI,,8,Advanced Prompt Engineering,61d3d704-b2e5-4225-a2af-3d440779a5f6
+Introduction to Gen AI,,9,Build Your Own AI News Summarizer | Part - 1,7460a296-46d2-4525-a03a-d7c8278ba82b
+Introduction to Gen AI,,10,Build Your Own AI News Summarizer | Part - 2,87dd60b0-6c70-4fab-b5b2-a80ef109a96e
+Introduction to Gen AI,,11,Build Your Own AI News Summarizer | Part - 3,e97d82f0-c1d1-4598-ad8c-3dae3ebd8442
+Introduction to Gen AI,,12,Productivity Power-Up with AI Tools | Part 2,21a0cf8e-35e9-4c49-90ce-3e7de9e83307
+Introduction to Gen AI,,13,Mastering Image Generation,f08c1eea-a8e2-4c2f-b7a2-3c3f2a999745
+Introduction to Gen AI,,14,Setting Up Your Kaggle Environment,309c1c1a-8736-4fce-9e2b-30a587d16b11
+Introduction to Gen AI,,15,Mastering Image Generation with Stable Diffusion,51d1574e-c0a4-47df-b26f-104fa1538e1d
+Introduction to Gen AI,,16,Mastering AI Audio Generation,523803bf-5bed-4d3d-b7e1-36458227e403
+Introduction to Gen AI,,17,Building No-Code Applications with AI,9f244859-2088-4948-b3fb-95b4125ddd25
+Introduction to Gen AI,,18,Mastering AI Audio Generation using F5-TTS,09c52e0b-dbce-4eb7-a476-42227e06c845
+Introduction to Gen AI,,19,Introduction to AI Agents,41300884-7ef7-4ad3-8662-c7013c09beaf
+Introduction to Gen AI,,20,Building a Learning Path Generator,c0d61a20-d538-4d13-bdec-04b0fbc034db
+Introduction to Gen AI,,21,Build Your Own AI Shopping Assistant | Part 1,9bc68942-c2c7-45ff-98d2-917d3b7f1812
+Introduction to Gen AI,,22,Build Your Own AI Shopping Assistant | Part 2,accd9c83-cb4c-4be3-9414-abfd4c80c62a
+Introduction to Gen AI,,23,Building an Agent with Memory,44b27f22-901e-45b0-bc55-9e0df5ba8b07
+Introduction to Gen AI,,24,Introduction to Model Context Protocol | Part - 1,234d057c-e482-4835-ba6c-cf0d800d22a1
+Introduction to Gen AI,,25,Introduction to Model Context Protocol | Part - 2,d9b98a5d-d733-482f-bb10-b56130b4db71
