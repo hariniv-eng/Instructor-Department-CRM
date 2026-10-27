@@ -264,8 +264,8 @@ export const BATCH_NAME_TO_NIAT_COHORT: Record<string, string> = {
   "Malla Reddy University Batch 1": NIAT_COHORT_2026,
   // Added 2026-10-13, per request: MVR College of Engineering & Technology is a 2026 cohort.
   "MVR College Batch 1": NIAT_COHORT_2026,
-  "Noida International University Batch -1": NIAT_COHORT_2026,
-  "Noida International University Batch 1": NIAT_COHORT_2026,
+  "Noida International University Batch -1": NIAT_COHORT_2025,
+  "Noida International University Batch 1": NIAT_COHORT_2025,
   "P K Das University": NIAT_COHORT_2026,
   "SGSU Batch 1": NIAT_COHORT_2026,
   "SMRU Batch 1": NIAT_COHORT_2026,
@@ -281,6 +281,59 @@ export const BATCH_NAME_TO_NIAT_COHORT: Record<string, string> = {
   "Visakha Institute of Engineering & Technology Batch 1": NIAT_COHORT_2026,
   "YENEPOYA BA Batch-1 CSE AI": NIAT_COHORT_2026,
 
+  // Batch names as BigQuery spells them since the 2026-27 academic year (found 2026-10-27 with _tmp_cohort_check.ts: almost every
+  // batch was renamed, e.g. "CDU Batch-1" -> "CDU Batch -1", "Bharath University" -> "Bharath University Batch -1"), mapped to the
+  // same cohort as the old name of the same university and batch. "KKH Batch -2" is the founding institute's batch (was "Batch 2").
+  "KKH Batch -2": NIAT_COHORT_2024,
+  "Noida International University Batch -2": NIAT_COHORT_2026,
+  "CDU Batch -1": NIAT_COHORT_2025,
+  "CDU Batch -2": NIAT_COHORT_2026,
+  "Malla Reddy University Batch -1": NIAT_COHORT_2026,
+  "SMRU Batch -1": NIAT_COHORT_2026,
+  "SPIHER Bengaluru Batch -1": NIAT_COHORT_2026,
+  "S-VYASA Batch -1": NIAT_COHORT_2025,
+  "S-VYASA Batch -2": NIAT_COHORT_2026,
+  "VGU Batch -1": NIAT_COHORT_2025,
+  "VGU Batch -2": NIAT_COHORT_2026,
+  "NRI Batch -1": NIAT_COHORT_2025,
+  "NRI Batch -2": NIAT_COHORT_2026,
+  "NIAT Chevella Batch -1": NIAT_COHORT_2025,
+  "Yenepoya KA CSE AI Batch -1": NIAT_COHORT_2025,
+  "Yenepoya KA CSE AI Batch -2": NIAT_COHORT_2026,
+  "YENEPOYA BA Batch -1": NIAT_COHORT_2026,
+  "Annamacharya University Batch -1": NIAT_COHORT_2025,
+  "Annamacharya University Batch -2": NIAT_COHORT_2026,
+  "SGU Batch -1": NIAT_COHORT_2025,
+  "SGU Batch -2": NIAT_COHORT_2026,
+  "Takshasila University Batch 1": NIAT_COHORT_2025,
+  "Takshasila University Batch -2": NIAT_COHORT_2026,
+  "Crescent University Batch -1": NIAT_COHORT_2025,
+  "Crescent University Batch -2": NIAT_COHORT_2026,
+  "AMET Batch -2": NIAT_COHORT_2026,
+  "CITY Batch -2": NIAT_COHORT_2026,
+  "NSRIT University Batch -1": NIAT_COHORT_2025,
+  "NSRIT University Batch -2": NIAT_COHORT_2026,
+  "TS Mishra Batch -1": NIAT_COHORT_2026,
+  "SPIHER University Chennai Batch -1": NIAT_COHORT_2026,
+  "BEST University Batch -1": NIAT_COHORT_2026,
+  "Sandip University Batch -1": NIAT_COHORT_2026,
+  "SNS University Batch -1": NIAT_COHORT_2026,
+  "Bharath University Batch -1": NIAT_COHORT_2026,
+  "Lingaya's Vidyapeeth Batch -1": NIAT_COHORT_2026,
+  "GMRIT Batch -1": NIAT_COHORT_2026,
+  "P K Das University Batch -1": NIAT_COHORT_2026,
+  "Malla Reddy Tirupati Batch -1": NIAT_COHORT_2026,
+  "LIMAT Batch -1": NIAT_COHORT_2026,
+  "Subharti University Batch -1": NIAT_COHORT_2026,
+  "SGSU Batch -1": NIAT_COHORT_2026,
+  "Sushanth University Batch -1": NIAT_COHORT_2026,
+  "Geeta Batch -1": NIAT_COHORT_2026,
+  "MVR College Batch -1": NIAT_COHORT_2026,
+  "Visakha Institute of Engineering & Technology Batch -1": NIAT_COHORT_2026,
+  "Sri Sri University Batch -1": NIAT_COHORT_2026,
+  "Sanskriti University Batch -1": NIAT_COHORT_2026,
+  "Joy University Batch -1": NIAT_COHORT_2026,
+
   // Deliberately NOT in this map -- see comment above: "Training_Institute_
   // Batch-1", "Foundations of Generative AI Micro-specialization Batch 1"
   // (IIT Kharagpur), and every Intensive Offline/Training batch_name.
@@ -291,10 +344,13 @@ export const BATCH_NAME_TO_NIAT_COHORT: Record<string, string> = {
  * silently skips any batch_name with no confirmed cohort (see
  * BATCH_NAME_TO_NIAT_COHORT above), rather than guessing.
  */
+// Same map keyed by the name in lower case with only letters/digits (2026-10-27), so a spacing / dash change such as
+// "Batch-1" -> "Batch -1" does not drop people into "No cohort yet" again.
+const COHORT_BY_LOOSE_NAME = new Map(Object.entries(BATCH_NAME_TO_NIAT_COHORT).map(([k, v]) => [k.toLowerCase().replace(/[^a-z0-9]/g, ""), v]));
 export function cohortsForBatches(batchNames: string[]): string[] {
   const cohorts = new Set<string>();
   for (const name of batchNames) {
-    const cohort = BATCH_NAME_TO_NIAT_COHORT[name];
+    const cohort = BATCH_NAME_TO_NIAT_COHORT[name] ?? COHORT_BY_LOOSE_NAME.get(name.toLowerCase().replace(/[^a-z0-9]/g, ""));
     if (cohort) cohorts.add(cohort);
   }
   return [...cohorts].sort();
