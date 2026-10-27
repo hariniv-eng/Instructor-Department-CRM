@@ -6,6 +6,8 @@
 // LLM (2026-10-27, per request): the Python / Flask backend sessions are part of the GenAI track, taught before the LLM sessions, so they
 // are the first 5 lectures of LLM (32 in all) instead of a course of their own.
 export type LectureCourse = { key: string; portalKey: string | null; title: string; subject: string; lectures: { n: number; name: string; unitIds: string[] }[] };
+// Static / Responsive Website (2026-10-27, per request): this year's "HTML & CSS" course teaches the same lectures with new unit IDs,
+// added as extra IDs, so a lecture counts whichever version was taught (HTML & CSS list shared 2026-10-27).
 export const LECTURE_COURSES: LectureCourse[] = [
  {
   "key": "python",
@@ -501,63 +503,72 @@ export const LECTURE_COURSES: LectureCourse[] = [
     "n": 1,
     "name": "Introduction to GenAI in Frontend Development",
     "unitIds": [
-     "7bf8ee08c7944a8196fba2225d6157ae"
+     "7bf8ee08c7944a8196fba2225d6157ae",
+     "13893e7756274b22be3c9142c0ba14e9"
     ]
    },
    {
     "n": 2,
     "name": "Your first Frontend Project | Getting started",
     "unitIds": [
-     "518fdb60e4f549729c32dc2d3c09b355"
+     "518fdb60e4f549729c32dc2d3c09b355",
+     "34890e58e10c4d1ea573d11bf08dbde4"
     ]
    },
    {
     "n": 3,
     "name": "Introduction to HTML",
     "unitIds": [
-     "5d952538058943ea965dddb3aa314862"
+     "5d952538058943ea965dddb3aa314862",
+     "a7c0731fd9904f179d33566b287d6bdc"
     ]
    },
    {
     "n": 4,
     "name": "Leveraging Gen AI for accelerated learning",
     "unitIds": [
-     "beb8932cb4b94a6fa6b0c98777bafb90"
+     "beb8932cb4b94a6fa6b0c98777bafb90",
+     "dc1d2276f33845f7ac4383ad3c21b569"
     ]
    },
    {
     "n": 5,
     "name": "Introduction to CSS | Part 1",
     "unitIds": [
-     "75daf28c5bbc4f3bbf764b07a06c756b"
+     "75daf28c5bbc4f3bbf764b07a06c756b",
+     "33e9b5c19c074eddb3c97d73dab6ecc6"
     ]
    },
    {
     "n": 6,
     "name": "Introduction to CSS | Part 2",
     "unitIds": [
-     "bea4e2e013d646edb456c9b554a742b1"
+     "bea4e2e013d646edb456c9b554a742b1",
+     "4f237b09abda4cfa999fb8e7a2e32c69"
     ]
    },
    {
     "n": 7,
     "name": "Introduction to CSS | Part 3",
     "unitIds": [
-     "8bcfd5c9ff1d4b21857a4f7d6fe37c7d"
+     "8bcfd5c9ff1d4b21857a4f7d6fe37c7d",
+     "a924ec958ac54c0d99c604dffbe1e144"
     ]
    },
    {
     "n": 8,
     "name": "Introduction to CSS Box Model | Part 1",
     "unitIds": [
-     "9c2f2322e97b40d09c6b4f1d714f6946"
+     "9c2f2322e97b40d09c6b4f1d714f6946",
+     "98b48a948ed44514821233f2ec729686"
     ]
    },
    {
     "n": 9,
     "name": "Introduction to CSS Box Model | Part 2",
     "unitIds": [
-     "0043021407f441fc8ccc0905f14b330e"
+     "0043021407f441fc8ccc0905f14b330e",
+     "6d4ed7bd82094de1aab02eedde8a4f9a"
     ]
    },
    {
@@ -613,14 +624,16 @@ export const LECTURE_COURSES: LectureCourse[] = [
     "n": 17,
     "name": "Website: Behind the Scenes",
     "unitIds": [
-     "b7d39617c71847c9be7878bd03df24a2"
+     "b7d39617c71847c9be7878bd03df24a2",
+     "0c25218f68464d35a518510f3ea70ac7"
     ]
    },
    {
     "n": 18,
     "name": "HTML Hyperlinks",
     "unitIds": [
-     "f37f88e8983a483199a99c288878f4b0"
+     "f37f88e8983a483199a99c288878f4b0",
+     "3292103803e74e169e5ee6f9a22f401f"
     ]
    },
    {
@@ -634,14 +647,16 @@ export const LECTURE_COURSES: LectureCourse[] = [
     "n": 20,
     "name": "HTML Semantic Elements",
     "unitIds": [
-     "9627bbafa5094d88a2e7a28580a16ebb"
+     "9627bbafa5094d88a2e7a28580a16ebb",
+     "e452f0d779b94565a36dc8c2f4470c7d"
     ]
    },
    {
     "n": 21,
     "name": "Leveraging Gen AI for Debugging & Building",
     "unitIds": [
-     "e0a4515421414466b28384f3f60f344b"
+     "e0a4515421414466b28384f3f60f344b",
+     "5da6789023c440ec90b5cfcf5e3805a3"
     ]
    },
    {
@@ -691,21 +706,24 @@ export const LECTURE_COURSES: LectureCourse[] = [
     "n": 5,
     "name": "CSS Selectors and Inheritance",
     "unitIds": [
-     "9ebf60e60b9d479bae8c6548d7c2b79a"
+     "9ebf60e60b9d479bae8c6548d7c2b79a",
+     "3ffe2e51042b4ead8ca5fb71b9e4d3bb"
     ]
    },
    {
     "n": 6,
     "name": "More CSS Selectors",
     "unitIds": [
-     "894f85432aea4c51a472c08123209181"
+     "894f85432aea4c51a472c08123209181",
+     "e464a0c4abe74d31b02cc97556c48682"
     ]
    },
    {
     "n": 7,
     "name": "CSS Specificity and Cascade",
     "unitIds": [
-     "f763f2788e3b4912a5bfd9b98319089e"
+     "f763f2788e3b4912a5bfd9b98319089e",
+     "e5dd338102b74209aca4ce280b85f042"
     ]
    },
    {

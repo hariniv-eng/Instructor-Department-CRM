@@ -344,13 +344,23 @@ export const BATCH_NAME_TO_NIAT_COHORT: Record<string, string> = {
  * silently skips any batch_name with no confirmed cohort (see
  * BATCH_NAME_TO_NIAT_COHORT above), rather than guessing.
  */
-// Same map keyed by the name in lower case with only letters/digits (2026-10-27), so a spacing / dash change such as
-// "Batch-1" -> "Batch -1" does not drop people into "No cohort yet" again.
-const COHORT_BY_LOOSE_NAME = new Map(Object.entries(BATCH_NAME_TO_NIAT_COHORT).map(([k, v]) => [k.toLowerCase().replace(/[^a-z0-9]/g, ""), v]));
+// Same map keyed by a loose form of the name (2026-10-27), so a rename of the same batch does not drop people into "No cohort yet"
+// again: lower case, the word "batch" and everything but letters/digits removed, and a name without a batch number counts as batch 1.
+// So "CDU Batch-1" = "CDU Batch -1" = "cdu1", and "Bharath University" = "Bharath University Batch -1" = "bharathuniversity1".
+// (Checked 2026-10-27: no two names in the map share a loose form with different cohorts.)
+const looseBatchKey = (name: string): string => {
+  const k = name.toLowerCase().replace(/batch/g, "").replace(/[^a-z0-9]/g, "");
+  return /\d$/.test(k) ? k : `${k}1`;
+};
+const COHORT_BY_LOOSE_NAME = new Map(Object.entries(BATCH_NAME_TO_NIAT_COHORT).map(([k, v]) => [looseBatchKey(k), v]));
+/** Cohort for one batch_name: exact name first, then the loose form; undefined when not confirmed (never guessed). */
+export function cohortForBatch(name: string): string | undefined {
+  return BATCH_NAME_TO_NIAT_COHORT[name] ?? COHORT_BY_LOOSE_NAME.get(looseBatchKey(name));
+}
 export function cohortsForBatches(batchNames: string[]): string[] {
   const cohorts = new Set<string>();
   for (const name of batchNames) {
-    const cohort = BATCH_NAME_TO_NIAT_COHORT[name] ?? COHORT_BY_LOOSE_NAME.get(name.toLowerCase().replace(/[^a-z0-9]/g, ""));
+    const cohort = cohortForBatch(name);
     if (cohort) cohorts.add(cohort);
   }
   return [...cohorts].sort();
