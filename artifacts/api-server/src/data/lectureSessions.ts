@@ -17,6 +17,9 @@ export type LectureCourse = { key: string; portalKey: string | null; title: stri
 // so 41 in all). Each lecture also carries the unit ID of the same lecture in the old Static / Responsive Website courses, so earlier
 // batches still count. Old-only lectures (Bootstrap, the project sections, CSS Transitions...) are no longer counted. Kept under the
 // key / portalKey "static_web" so the column sits where Static Web was (before Modern Responsive UI); the title shown is "HTML & CSS".
+// IPS (2026-10-27, per request: "this is IPS", the third DSA course after DSA and DSA II): Greedy, Dynamic Programming I & II, Graph I & II
+// prod sequence shared 2026-10-27 -- 48 lectures (the main unit of each topic; Tutorial / Classroom Quiz / MCQ / Coding Practice / Module
+// Quiz are not lectures). Own key (not the Training Stats "ips" key) so the column stays after DSA II.
 export const LECTURE_COURSES: LectureCourse[] = [
  {
   "key": "python",
@@ -4292,6 +4295,350 @@ export const LECTURE_COURSES: LectureCourse[] = [
     "name": "Top K Frequent Elements",
     "unitIds": [
      "e8b032600e68418b9e392264a00c2df8"
+    ]
+   }
+  ]
+ },
+ {
+  "key": "lecture_ips",
+  "portalKey": null,
+  "title": "IPS",
+  "subject": "DSA",
+  "lectures": [
+   {
+    "n": 1,
+    "name": "Intro To Greedy Algorithms",
+    "unitIds": [
+     "3574cac3871e471d931e91338fdd35ce"
+    ]
+   },
+   {
+    "n": 2,
+    "name": "Assign Cookies",
+    "unitIds": [
+     "9d8ca648f92c4a3ab3b21b8a43e83ed5"
+    ]
+   },
+   {
+    "n": 3,
+    "name": "Fractional Knapsack",
+    "unitIds": [
+     "c372c7b099f94ff6aaf89dc5794699c7"
+    ]
+   },
+   {
+    "n": 4,
+    "name": "Minimum Coins",
+    "unitIds": [
+     "1ae4dca5f1aa4851b394bb13babcac42"
+    ]
+   },
+   {
+    "n": 5,
+    "name": "Conference Room Booking",
+    "unitIds": [
+     "ec23d30fec8c419c8abfc68fe2c8b2b7"
+    ]
+   },
+   {
+    "n": 6,
+    "name": "Platform Scheduling",
+    "unitIds": [
+     "3abe555216f546af98bc2e83f3de391f"
+    ]
+   },
+   {
+    "n": 7,
+    "name": "Badge Distribution",
+    "unitIds": [
+     "51378b0592df4744b4e98c011322558d"
+    ]
+   },
+   {
+    "n": 8,
+    "name": "Non Overlapping Intervals",
+    "unitIds": [
+     "a7802e244e704bbba0b27c235b9d0391"
+    ]
+   },
+   {
+    "n": 9,
+    "name": "Introduction to Dynamic Programming",
+    "unitIds": [
+     "809d3ae46e9748088ec021d74388ad7c"
+    ]
+   },
+   {
+    "n": 10,
+    "name": "Climbing Stairs",
+    "unitIds": [
+     "31d733efcd5045249d631af5fb971863"
+    ]
+   },
+   {
+    "n": 11,
+    "name": "Frog Jump I",
+    "unitIds": [
+     "9e89b32a238f4405ba26dcb8fccfeacd"
+    ]
+   },
+   {
+    "n": 12,
+    "name": "House Robber I",
+    "unitIds": [
+     "6ea1a02ab36a42e5bcf5b547f592a1c5"
+    ]
+   },
+   {
+    "n": 13,
+    "name": "Unique Paths I",
+    "unitIds": [
+     "88353f09066e4f13a26c32cdfbfb2f53"
+    ]
+   },
+   {
+    "n": 14,
+    "name": "Maximum Path Sum",
+    "unitIds": [
+     "a2224d978e504555a54cf49321ed62f5"
+    ]
+   },
+   {
+    "n": 15,
+    "name": "Subset Sum",
+    "unitIds": [
+     "1e277f739c964972b00291e9b73012f1"
+    ]
+   },
+   {
+    "n": 16,
+    "name": "Partition Equal Subset Sum",
+    "unitIds": [
+     "08b3b9d6da8949b1884be06a136c79cc"
+    ]
+   },
+   {
+    "n": 17,
+    "name": "Count Subsets with Target Sum",
+    "unitIds": [
+     "78028e90812a457b9163c3068a76c5e6"
+    ]
+   },
+   {
+    "n": 18,
+    "name": "Unbounded Knapsack",
+    "unitIds": [
+     "eb2c57dbe3304f92b286ae2e08e43a3f"
+    ]
+   },
+   {
+    "n": 19,
+    "name": "Longest Common Subsequence Part 1",
+    "unitIds": [
+     "4d9254f86c6e45c68ade580c81587b82"
+    ]
+   },
+   {
+    "n": 20,
+    "name": "Longest Common Subsequence Part 2",
+    "unitIds": [
+     "2d523d743c7f419888edcd2738059c53"
+    ]
+   },
+   {
+    "n": 21,
+    "name": "Longest Palindromic Subsequence",
+    "unitIds": [
+     "cd4b4307ec614ae78427faaf7c5c5947"
+    ]
+   },
+   {
+    "n": 22,
+    "name": "Stock Trading II",
+    "unitIds": [
+     "6a3c595f1e564086940dcdcd2313e1a9"
+    ]
+   },
+   {
+    "n": 23,
+    "name": "Stock Trading III",
+    "unitIds": [
+     "1e6637d1af9b44b4bbf56a14c0a6312c"
+    ]
+   },
+   {
+    "n": 24,
+    "name": "Introduction to Graphs",
+    "unitIds": [
+     "a3e6469717e74e69853842069b91c9fe"
+    ]
+   },
+   {
+    "n": 25,
+    "name": "Graph Representation",
+    "unitIds": [
+     "ac3ed4cd3a06478caa01b6d56ed85cb0"
+    ]
+   },
+   {
+    "n": 26,
+    "name": "Breadth-First Search",
+    "unitIds": [
+     "c8e1c2555d3a45a59bc208a54dacdbc3"
+    ]
+   },
+   {
+    "n": 27,
+    "name": "Depth-First Search",
+    "unitIds": [
+     "aec5702451b4407fa95953510348eaef"
+    ]
+   },
+   {
+    "n": 28,
+    "name": "Number of Provinces",
+    "unitIds": [
+     "62d30339fa33449a8a20887ca65e5757"
+    ]
+   },
+   {
+    "n": 29,
+    "name": "Number of Islands",
+    "unitIds": [
+     "e3d43e2ba9b94dc589de193e48e1c943"
+    ]
+   },
+   {
+    "n": 30,
+    "name": "Cycle Detection in an Undirected Graph Using BFS",
+    "unitIds": [
+     "e13bc9cfaf924ab09c50c2a1af69b09f"
+    ]
+   },
+   {
+    "n": 31,
+    "name": "Cycle Detection in an Undirected Graph Using DFS",
+    "unitIds": [
+     "b57617fd74a24314b5819995fa15ca55"
+    ]
+   },
+   {
+    "n": 32,
+    "name": "Bipartite Graph Using BFS",
+    "unitIds": [
+     "80a5b33892d14ddb9fe2d0acd16b3636"
+    ]
+   },
+   {
+    "n": 33,
+    "name": "Bipartite Graph Using DFS",
+    "unitIds": [
+     "ea298112dcde4795988c8140f6355747"
+    ]
+   },
+   {
+    "n": 34,
+    "name": "Cycle Detection in a Directed Graph",
+    "unitIds": [
+     "758dbd5688814fdaa8c54c97fcfff681"
+    ]
+   },
+   {
+    "n": 35,
+    "name": "Topological Sort",
+    "unitIds": [
+     "74bc03a86d3a407b9e76b962f23ba526"
+    ]
+   },
+   {
+    "n": 36,
+    "name": "Kahn's Algorithm",
+    "unitIds": [
+     "0c35cbcadf8e4fbfa69ec63be7588821"
+    ]
+   },
+   {
+    "n": 37,
+    "name": "Cycle Detection In A Directed Graph Using Kahn's Algorithm",
+    "unitIds": [
+     "61d2f33010984a109b40279866f6ceda"
+    ]
+   },
+   {
+    "n": 38,
+    "name": "Dijkstra's Algorithm",
+    "unitIds": [
+     "bcbd1ac0f81440f38d95db93e6367b52"
+    ]
+   },
+   {
+    "n": 39,
+    "name": "Bellman-Ford Algorithm",
+    "unitIds": [
+     "46c6b344e85a4b85bbcac84d31826aec"
+    ]
+   },
+   {
+    "n": 40,
+    "name": "Floyd Warshall Algorithm",
+    "unitIds": [
+     "4b77f4e8e2ed43fdbdb2ab14159ec150"
+    ]
+   },
+   {
+    "n": 41,
+    "name": "Minimum Spanning Tree",
+    "unitIds": [
+     "f6c1a0c5e8dd4f9884f37fd64b6f88ae"
+    ]
+   },
+   {
+    "n": 42,
+    "name": "Prim's & Kruskal's Algorithm",
+    "unitIds": [
+     "2b1ada29361640e4903c7e382bc90888"
+    ]
+   },
+   {
+    "n": 43,
+    "name": "Prim's Algorithm - Code Implementation",
+    "unitIds": [
+     "caa7880f74cf40d1834f3c9586979db6"
+    ]
+   },
+   {
+    "n": 44,
+    "name": "Disjoint Sets",
+    "unitIds": [
+     "b2b91db24b7c468eb72b9f627a9c4ee7"
+    ]
+   },
+   {
+    "n": 45,
+    "name": "Disjoint Sets - Code Implementation",
+    "unitIds": [
+     "b6473fc1343b45c180bce89e4d1291ef"
+    ]
+   },
+   {
+    "n": 46,
+    "name": "Kruskal's Algorithm - Code Implementation",
+    "unitIds": [
+     "209971f431fa42199a9706c002d8a496"
+    ]
+   },
+   {
+    "n": 47,
+    "name": "Strongly Connected Components",
+    "unitIds": [
+     "869c4c0cfa0241419761c69fdd28133f"
+    ]
+   },
+   {
+    "n": 48,
+    "name": "Articulation Points",
+    "unitIds": [
+     "bedb4fa0343d44ac903d8207268702ad"
     ]
    }
   ]

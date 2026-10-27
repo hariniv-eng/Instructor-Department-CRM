@@ -559,6 +559,54 @@ English B2 - III Semester (course name not in sheet),77b1f18a-a2e4-413a-9515-a91
 "DSA II - Hashing, Linked Lists, Stacks, Trees, Heaps (course name not in sheet)",9e370332-c9dd-4778-9e65-e5d7f75c24f3,59,Kth Largest Element in an Array (Part 1 + Part 2),4c24d406-08de-4b35-a169-fc3005faab33; 29ae2136-e3a3-4c56-8e9d-8a831e22071c
 "DSA II - Hashing, Linked Lists, Stacks, Trees, Heaps (course name not in sheet)",9e370332-c9dd-4778-9e65-e5d7f75c24f3,60,Merge K Sorted Arrays,66501e9f-91ab-4715-bc2c-ae6de0c92464
 "DSA II - Hashing, Linked Lists, Stacks, Trees, Heaps (course name not in sheet)",9e370332-c9dd-4778-9e65-e5d7f75c24f3,61,Top K Frequent Elements,e8b03260-0e68-418b-9e39-2264a00c2df8
+IPS,,1,Intro To Greedy Algorithms,3574cac3-871e-471d-931e-91338fdd35ce
+IPS,,2,Assign Cookies,9d8ca648-f92c-4a3a-b3b2-1b8a43e83ed5
+IPS,,3,Fractional Knapsack,c372c7b0-99f9-4ff6-aaf8-9dc5794699c7
+IPS,,4,Minimum Coins,1ae4dca5-f1aa-4851-b394-bb13babcac42
+IPS,,5,Conference Room Booking,ec23d30f-ec8c-419c-8abf-c68fe2c8b2b7
+IPS,,6,Platform Scheduling,3abe5552-16f5-46af-98bc-2e83f3de391f
+IPS,,7,Badge Distribution,51378b05-92df-4744-b4e9-8c011322558d
+IPS,,8,Non Overlapping Intervals,a7802e24-4e70-4bbb-a0b2-7c235b9d0391
+IPS,,9,Introduction to Dynamic Programming,809d3ae4-6e97-4808-8ec0-21d74388ad7c
+IPS,,10,Climbing Stairs,31d733ef-cd50-4524-9d63-1af5fb971863
+IPS,,11,Frog Jump I,9e89b32a-238f-4405-ba26-dcb8fccfeacd
+IPS,,12,House Robber I,6ea1a02a-b36a-42e5-bcf5-b547f592a1c5
+IPS,,13,Unique Paths I,88353f09-066e-4f13-a26c-32cdfbfb2f53
+IPS,,14,Maximum Path Sum,a2224d97-8e50-4555-a54c-f49321ed62f5
+IPS,,15,Subset Sum,1e277f73-9c96-4972-b002-91e9b73012f1
+IPS,,16,Partition Equal Subset Sum,08b3b9d6-da89-49b1-884b-e06a136c79cc
+IPS,,17,Count Subsets with Target Sum,78028e90-812a-457b-9163-c3068a76c5e6
+IPS,,18,Unbounded Knapsack,eb2c57db-e330-4f92-b286-ae2e08e43a3f
+IPS,,19,Longest Common Subsequence Part 1,4d9254f8-6c6e-45c6-8ade-580c81587b82
+IPS,,20,Longest Common Subsequence Part 2,2d523d74-3c7f-4198-88ed-cd2738059c53
+IPS,,21,Longest Palindromic Subsequence,cd4b4307-ec61-4ae7-8427-faaf7c5c5947
+IPS,,22,Stock Trading II,6a3c595f-1e56-4086-940d-cdcd2313e1a9
+IPS,,23,Stock Trading III,1e6637d1-af9b-44b4-bbf5-6a14c0a6312c
+IPS,,24,Introduction to Graphs,a3e64697-17e7-4e69-8538-42069b91c9fe
+IPS,,25,Graph Representation,ac3ed4cd-3a06-478c-aa01-b6d56ed85cb0
+IPS,,26,Breadth-First Search,c8e1c255-5d3a-45a5-9bc2-08a54dacdbc3
+IPS,,27,Depth-First Search,aec57024-51b4-407f-a959-53510348eaef
+IPS,,28,Number of Provinces,62d30339-fa33-449a-8a20-887ca65e5757
+IPS,,29,Number of Islands,e3d43e2b-a9b9-4dc5-89de-193e48e1c943
+IPS,,30,Cycle Detection in an Undirected Graph Using BFS,e13bc9cf-af92-4ab0-9c50-c2a1af69b09f
+IPS,,31,Cycle Detection in an Undirected Graph Using DFS,b57617fd-74a2-4314-b581-9995fa15ca55
+IPS,,32,Bipartite Graph Using BFS,80a5b338-92d1-4ddb-9fe2-d0acd16b3636
+IPS,,33,Bipartite Graph Using DFS,ea298112-dcde-4795-988c-8140f6355747
+IPS,,34,Cycle Detection in a Directed Graph,758dbd56-8881-4fda-a8c5-4c97fcfff681
+IPS,,35,Topological Sort,74bc03a8-6d3a-407b-9e76-b962f23ba526
+IPS,,36,Kahn's Algorithm,0c35cbca-df8e-4fbf-a69e-c63be7588821
+IPS,,37,Cycle Detection In A Directed Graph Using Kahn's Algorithm,61d2f330-1098-4a10-9b40-279866f6ceda
+IPS,,38,Dijkstra's Algorithm,bcbd1ac0-f814-40f3-8d95-db93e6367b52
+IPS,,39,Bellman-Ford Algorithm,46c6b344-e85a-4b85-bbca-c84d31826aec
+IPS,,40,Floyd Warshall Algorithm,4b77f4e8-e2ed-43fd-bdb2-ab14159ec150
+IPS,,41,Minimum Spanning Tree,f6c1a0c5-e8dd-4f98-84f3-7fd64b6f88ae
+IPS,,42,Prim's & Kruskal's Algorithm,2b1ada29-3616-40e4-903c-7e382bc90888
+IPS,,43,Prim's Algorithm - Code Implementation,caa7880f-74cf-40d1-834f-3c9586979db6
+IPS,,44,Disjoint Sets,b2b91db2-4b7c-468e-b72b-9f627a9c4ee7
+IPS,,45,Disjoint Sets - Code Implementation,b6473fc1-343b-45c1-80bc-e89e4d1291ef
+IPS,,46,Kruskal's Algorithm - Code Implementation,209971f4-31fa-4219-9a97-06c002d8a496
+IPS,,47,Strongly Connected Components,869c4c0c-fa02-4141-9761-c69fdd28133f
+IPS,,48,Articulation Points,bedb4fa0-343d-44ac-903d-8207268702ad
 AI for Finance (course name not in sheet),85dac569-85f5-4205-b71a-e86327f39b92,1,Your Learning Journey,64032f8d-17a3-4af0-b0af-57bcc61db69a
 AI for Finance (course name not in sheet),85dac569-85f5-4205-b71a-e86327f39b92,2,Introduction to AI For Finance,a8416d64-c8f5-4753-aa41-af8bbdae4031
 AI for Finance (course name not in sheet),85dac569-85f5-4205-b71a-e86327f39b92,3,Building Personal Finance Advisor,d6677196-da53-4098-b675-fe20819b4dd6
