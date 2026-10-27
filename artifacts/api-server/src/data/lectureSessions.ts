@@ -8,6 +8,15 @@
 export type LectureCourse = { key: string; portalKey: string | null; title: string; subject: string; lectures: { n: number; name: string; unitIds: string[] }[] };
 // Static / Responsive Website (2026-10-27, per request): this year's "HTML & CSS" course teaches the same lectures with new unit IDs,
 // added as extra IDs, so a lecture counts whichever version was taught (HTML & CSS list shared 2026-10-27).
+// Extra unit IDs (2026-10-27, from _tmp_taught_audit.ts): the same lecture is taught under other course versions with their own unit
+// IDs (e.g. "Modern Responsive Web Design", the campus "Quantitative Aptitude", "Advanced DBMS", "Generative AI", "Programming Foundations").
+// Added only where the session's own unit has exactly the lecture's title AND the course is the same subject; cross-course matches
+// (e.g. Python lectures inside C Programming, Set Operations inside Maths for CS) were left out.
+// HTML & CSS (2026-10-27, per request): replaces the "Static Web" and "Responsive Design" columns. Its 20 lectures are the HTML & CSS
+// prod sequence shared 2026-10-27 (the lectures before Modern Responsive; the rest of that sequence IS Modern Responsive UI, 21 lectures,
+// so 41 in all). Each lecture also carries the unit ID of the same lecture in the old Static / Responsive Website courses, so earlier
+// batches still count. Old-only lectures (Bootstrap, the project sections, CSS Transitions...) are no longer counted. Kept under the
+// key / portalKey "static_web" so the column sits where Static Web was (before Modern Responsive UI); the title shown is "HTML & CSS".
 export const LECTURE_COURSES: LectureCourse[] = [
  {
   "key": "python",
@@ -47,7 +56,8 @@ export const LECTURE_COURSES: LectureCourse[] = [
     "n": 5,
     "name": "Sequence of Instructions",
     "unitIds": [
-     "90eaf23199924c589015c9d5312bb2eb"
+     "90eaf23199924c589015c9d5312bb2eb",
+     "ab40f67ee2e54819bae335570d8a67fe"
     ]
    },
    {
@@ -89,7 +99,8 @@ export const LECTURE_COURSES: LectureCourse[] = [
     "n": 11,
     "name": "Logical Operators",
     "unitIds": [
-     "6ecba024b99d499e8bdd6791519ea5ae"
+     "6ecba024b99d499e8bdd6791519ea5ae",
+     "8726cfe8e09842b5ab38909cda352832"
     ]
    },
    {
@@ -215,7 +226,8 @@ export const LECTURE_COURSES: LectureCourse[] = [
     "n": 29,
     "name": "Loop Control Statements",
     "unitIds": [
-     "b64b1f096c9f436db8c20a9383cf6695"
+     "b64b1f096c9f436db8c20a9383cf6695",
+     "01c62c5ca7694dc28ef6a0c1cc0bd68d"
     ]
    },
    {
@@ -243,7 +255,8 @@ export const LECTURE_COURSES: LectureCourse[] = [
     "n": 33,
     "name": "Lists",
     "unitIds": [
-     "a489b3de43e44b6f825a44619f8c7df7"
+     "a489b3de43e44b6f825a44619f8c7df7",
+     "63c2189dfc55405da866e34691253666"
     ]
    },
    {
@@ -257,7 +270,8 @@ export const LECTURE_COURSES: LectureCourse[] = [
     "n": 35,
     "name": "Lists and Strings",
     "unitIds": [
-     "9c5518b5d5d24b52a2a67c403b68b084"
+     "9c5518b5d5d24b52a2a67c403b68b084",
+     "358b3232dc9a4a8faffc34269b7cfb96"
     ]
    },
    {
@@ -320,7 +334,8 @@ export const LECTURE_COURSES: LectureCourse[] = [
     "n": 44,
     "name": "Tuples & Sequences",
     "unitIds": [
-     "b90fb5d1aef9419c8c35dccc8c2920ed"
+     "b90fb5d1aef9419c8c35dccc8c2920ed",
+     "5382b2d2ed154d209f0361582188ca46"
     ]
    },
    {
@@ -369,7 +384,8 @@ export const LECTURE_COURSES: LectureCourse[] = [
     "n": 51,
     "name": "Introduction to List comprehensions",
     "unitIds": [
-     "fe8b5be258154745ab884ded92afcbbb"
+     "fe8b5be258154745ab884ded92afcbbb",
+     "cbe94e3f2c95412e9f82af8e94c9d5c8"
     ]
    },
    {
@@ -496,319 +512,164 @@ export const LECTURE_COURSES: LectureCourse[] = [
  {
   "key": "static_web",
   "portalKey": "static_web",
-  "title": "Static Web",
+  "title": "HTML & CSS",
   "subject": "Frontend",
   "lectures": [
    {
     "n": 1,
-    "name": "Introduction to GenAI in Frontend Development",
+    "name": "Introduction to GenAI in Web Development",
     "unitIds": [
-     "7bf8ee08c7944a8196fba2225d6157ae",
-     "13893e7756274b22be3c9142c0ba14e9"
+     "13893e7756274b22be3c9142c0ba14e9",
+     "7bf8ee08c7944a8196fba2225d6157ae"
     ]
    },
    {
     "n": 2,
-    "name": "Your first Frontend Project | Getting started",
+    "name": "Getting Started with Web Development",
     "unitIds": [
-     "518fdb60e4f549729c32dc2d3c09b355",
-     "34890e58e10c4d1ea573d11bf08dbde4"
+     "34890e58e10c4d1ea573d11bf08dbde4",
+     "518fdb60e4f549729c32dc2d3c09b355"
     ]
    },
    {
     "n": 3,
     "name": "Introduction to HTML",
     "unitIds": [
-     "5d952538058943ea965dddb3aa314862",
-     "a7c0731fd9904f179d33566b287d6bdc"
+     "a7c0731fd9904f179d33566b287d6bdc",
+     "5d952538058943ea965dddb3aa314862"
     ]
    },
    {
     "n": 4,
-    "name": "Leveraging Gen AI for accelerated learning",
+    "name": "Leveraging GenAI for Accelerated Learning",
     "unitIds": [
-     "beb8932cb4b94a6fa6b0c98777bafb90",
-     "dc1d2276f33845f7ac4383ad3c21b569"
+     "dc1d2276f33845f7ac4383ad3c21b569",
+     "beb8932cb4b94a6fa6b0c98777bafb90"
     ]
    },
    {
     "n": 5,
     "name": "Introduction to CSS | Part 1",
     "unitIds": [
-     "75daf28c5bbc4f3bbf764b07a06c756b",
-     "33e9b5c19c074eddb3c97d73dab6ecc6"
+     "33e9b5c19c074eddb3c97d73dab6ecc6",
+     "75daf28c5bbc4f3bbf764b07a06c756b"
     ]
    },
    {
     "n": 6,
     "name": "Introduction to CSS | Part 2",
     "unitIds": [
-     "bea4e2e013d646edb456c9b554a742b1",
-     "4f237b09abda4cfa999fb8e7a2e32c69"
+     "4f237b09abda4cfa999fb8e7a2e32c69",
+     "bea4e2e013d646edb456c9b554a742b1"
     ]
    },
    {
     "n": 7,
     "name": "Introduction to CSS | Part 3",
     "unitIds": [
-     "8bcfd5c9ff1d4b21857a4f7d6fe37c7d",
-     "a924ec958ac54c0d99c604dffbe1e144"
+     "a924ec958ac54c0d99c604dffbe1e144",
+     "8bcfd5c9ff1d4b21857a4f7d6fe37c7d"
     ]
    },
    {
     "n": 8,
     "name": "Introduction to CSS Box Model | Part 1",
     "unitIds": [
-     "9c2f2322e97b40d09c6b4f1d714f6946",
-     "98b48a948ed44514821233f2ec729686"
+     "98b48a948ed44514821233f2ec729686",
+     "9c2f2322e97b40d09c6b4f1d714f6946"
     ]
    },
    {
     "n": 9,
     "name": "Introduction to CSS Box Model | Part 2",
     "unitIds": [
-     "0043021407f441fc8ccc0905f14b330e",
-     "6d4ed7bd82094de1aab02eedde8a4f9a"
+     "6d4ed7bd82094de1aab02eedde8a4f9a",
+     "0043021407f441fc8ccc0905f14b330e"
     ]
    },
    {
     "n": 10,
-    "name": "Introduction to Bootstrap",
+    "name": "Coding Platform Walkthrough",
     "unitIds": [
-     "c7e31a35613e4fa9b1dc0df2d26c8ce0"
+     "6548dace7d3c4ce896f755f943209fb3"
     ]
    },
    {
     "n": 11,
-    "name": "Introduction to Bootstrap | Part 2",
+    "name": "HTML Void Elements & Lists",
     "unitIds": [
-     "7fea0c37f822494fab97ecbc2b384fc3"
+     "7c8bceadde06433f8ac1533d77720bbb"
     ]
    },
    {
     "n": 12,
-    "name": "Favourite Places Section",
+    "name": "Website: Behind the Scenes",
     "unitIds": [
-     "b2d67fa1c7c348adb55fbc3a6d61fba9"
+     "0c25218f68464d35a518510f3ea70ac7",
+     "b7d39617c71847c9be7878bd03df24a2"
     ]
    },
    {
     "n": 13,
-    "name": "Approach to Develop a Layout",
+    "name": "HTML Hyperlinks",
     "unitIds": [
-     "afb637a2181e42568f0d7a8faa9f4030"
+     "3292103803e74e169e5ee6f9a22f401f",
+     "f37f88e8983a483199a99c288878f4b0"
     ]
    },
    {
     "n": 14,
-    "name": "Favourite Place Detailed View Section",
+    "name": "Introduction to HTML5",
     "unitIds": [
-     "f0922e63539d4ccea8cb5295096e3e81"
+     "9065d05557fb40df882951950964c8f3",
+     "981300031b234f3c9dbd70e3ec1ae75b"
     ]
    },
    {
     "n": 15,
-    "name": "Website Integration",
+    "name": "HTML Semantic Elements",
     "unitIds": [
-     "3fa98e6ff2924744b3edc6b19c0c8ddb"
+     "e452f0d779b94565a36dc8c2f4470c7d",
+     "9627bbafa5094d88a2e7a28580a16ebb"
     ]
    },
    {
     "n": 16,
-    "name": "Website Integration | Part 2",
+    "name": "Leveraging GenAI for Debugging & Building",
     "unitIds": [
-     "8d16d638c610435b8196cfae98d2019c"
+     "5da6789023c440ec90b5cfcf5e3805a3",
+     "e0a4515421414466b28384f3f60f344b"
     ]
    },
    {
     "n": 17,
-    "name": "Website: Behind the Scenes",
+    "name": "More CSS Concepts",
     "unitIds": [
-     "b7d39617c71847c9be7878bd03df24a2",
-     "0c25218f68464d35a518510f3ea70ac7"
+     "c8b3711f893f47d0b5f342ce93944e73"
     ]
    },
    {
     "n": 18,
-    "name": "HTML Hyperlinks",
+    "name": "CSS Selectors & Inheritance",
     "unitIds": [
-     "f37f88e8983a483199a99c288878f4b0",
-     "3292103803e74e169e5ee6f9a22f401f"
+     "3ffe2e51042b4ead8ca5fb71b9e4d3bb",
+     "9ebf60e60b9d479bae8c6548d7c2b79a"
     ]
    },
    {
     "n": 19,
-    "name": "Introduction to HTML5",
+    "name": "More CSS Selectors",
     "unitIds": [
-     "981300031b234f3c9dbd70e3ec1ae75b",
-     "9065d05557fb4f3c882951950964c8f3"
+     "e464a0c4abe74d31b02cc97556c48682",
+     "894f85432aea4c51a472c08123209181"
     ]
    },
    {
     "n": 20,
-    "name": "HTML Semantic Elements",
+    "name": "CSS Specificity & Cascade",
     "unitIds": [
-     "9627bbafa5094d88a2e7a28580a16ebb",
-     "e452f0d779b94565a36dc8c2f4470c7d"
-    ]
-   },
-   {
-    "n": 21,
-    "name": "Leveraging Gen AI for Debugging & Building",
-    "unitIds": [
-     "e0a4515421414466b28384f3f60f344b",
-     "5da6789023c440ec90b5cfcf5e3805a3"
-    ]
-   },
-   {
-    "n": 22,
-    "name": "Introduction to Industry Readiness",
-    "unitIds": [
-     "5f21c4044ea54ba19f6a8e7e15eac164"
-    ]
-   }
-  ]
- },
- {
-  "key": "responsive_design",
-  "portalKey": "responsive_design",
-  "title": "Responsive Design",
-  "subject": "Frontend",
-  "lectures": [
-   {
-    "n": 1,
-    "name": "Introduction to Responsive Web Design",
-    "unitIds": [
-     "67ba0230bcaf46c7918578ae3b95d92d"
-    ]
-   },
-   {
-    "n": 2,
-    "name": "Bootstrap Grid System",
-    "unitIds": [
-     "5a39ea644beb4689ac856ecfd6800878"
-    ]
-   },
-   {
-    "n": 3,
-    "name": "Bootstrap Grid System | Part 2",
-    "unitIds": [
-     "c24d9f560938460688843c98afce27a8"
-    ]
-   },
-   {
-    "n": 4,
-    "name": "Bootstrap Navbar",
-    "unitIds": [
-     "555df4231ab64c7487ea6a962b783e67"
-    ]
-   },
-   {
-    "n": 5,
-    "name": "CSS Selectors and Inheritance",
-    "unitIds": [
-     "9ebf60e60b9d479bae8c6548d7c2b79a",
-     "3ffe2e51042b4ead8ca5fb71b9e4d3bb"
-    ]
-   },
-   {
-    "n": 6,
-    "name": "More CSS Selectors",
-    "unitIds": [
-     "894f85432aea4c51a472c08123209181",
-     "e464a0c4abe74d31b02cc97556c48682"
-    ]
-   },
-   {
-    "n": 7,
-    "name": "CSS Specificity and Cascade",
-    "unitIds": [
-     "f763f2788e3b4912a5bfd9b98319089e",
-     "e5dd338102b74209aca4ce280b85f042"
-    ]
-   },
-   {
-    "n": 8,
-    "name": "Banner Section",
-    "unitIds": [
-     "c33295c38be14b7eac8c829f067e4f9b"
-    ]
-   },
-   {
-    "n": 9,
-    "name": "Why Choose Us? Section",
-    "unitIds": [
-     "f6c08e3794474fb787fac20185594aa1"
-    ]
-   },
-   {
-    "n": 10,
-    "name": "Explore Menu Section",
-    "unitIds": [
-     "a576addbba0e42f69fed1d8d55b9be36"
-    ]
-   },
-   {
-    "n": 11,
-    "name": "Healthy Food, Delivery and Payment, Thanking Customers Sections",
-    "unitIds": [
-     "bab5b27e85ac46bea60568bc21550ea9"
-    ]
-   },
-   {
-    "n": 12,
-    "name": "Follow Us Section and More Styling",
-    "unitIds": [
-     "25320ab164204d189af29b2095ba9f3c"
-    ]
-   },
-   {
-    "n": 13,
-    "name": "CSS Gradients & More Bootstrap Components",
-    "unitIds": [
-     "b4fe5bf7dd2f45abafd60f7a3a0ae793"
-    ]
-   },
-   {
-    "n": 14,
-    "name": "CSS Transitions",
-    "unitIds": [
-     "0d1f6a7ca36c4b148c4aafcf4c1149be"
-    ]
-   },
-   {
-    "n": 15,
-    "name": "CSS Transforms",
-    "unitIds": [
-     "f6aad79d801347de93f0729650c09d47"
-    ]
-   },
-   {
-    "n": 16,
-    "name": "CSS Animations",
-    "unitIds": [
-     "b002d44d6d6e4331957af6df0b620422"
-    ]
-   },
-   {
-    "n": 17,
-    "name": "Building a Responsive Website using Gen AI",
-    "unitIds": [
-     "53965839648c4b529d33ac0417698299"
-    ]
-   },
-   {
-    "n": 18,
-    "name": "Debugging using Chrome Dev Tools - 2",
-    "unitIds": [
-     "38b14c8b9c184ae8b8dd694921dc00d0"
-    ]
-   },
-   {
-    "n": 19,
-    "name": "Framer",
-    "unitIds": [
-     "694c61cd8ef04348852ede4df667d31a"
+     "e5dd338102b74209aca4ce280b85f042",
+     "f763f2788e3b4912a5bfd9b98319089e"
     ]
    }
   ]
@@ -823,49 +684,56 @@ export const LECTURE_COURSES: LectureCourse[] = [
     "n": 1,
     "name": "Sizing Elements and Handling Overflow",
     "unitIds": [
-     "4490aacc70cc45e5a02042fc8b437dfa"
+     "4490aacc70cc45e5a02042fc8b437dfa",
+     "f5563899f8e14cd68037f9cc8ad40d7a"
     ]
    },
    {
     "n": 2,
     "name": "Box Sizing",
     "unitIds": [
-     "8bb1775078c34653b65633dd85193be9"
+     "8bb1775078c34653b65633dd85193be9",
+     "1d30f10ad3254e379f45cf0b6bdc59a9"
     ]
    },
    {
     "n": 3,
     "name": "Introduction to CSS Flexbox",
     "unitIds": [
-     "4ef3a89382fa4e06a2424346037a2c9e"
+     "4ef3a89382fa4e06a2424346037a2c9e",
+     "22a2807fee844fb9b7798ce5de8f0991"
     ]
    },
    {
     "n": 4,
     "name": "Introduction to CSS Flexbox | Part 2",
     "unitIds": [
-     "22a59a92a1ae401f991114eb63e76f8d"
+     "22a59a92a1ae401f991114eb63e76f8d",
+     "8057202cc00a45388eb6a80237c143c2"
     ]
    },
    {
     "n": 5,
     "name": "Introduction to CSS Flexbox | Part 3",
     "unitIds": [
-     "9642cb7fad204d8fab13e7177a4da609"
+     "9642cb7fad204d8fab13e7177a4da609",
+     "8c48ac84362841e58530cd9abc6caef5"
     ]
    },
    {
     "n": 6,
     "name": "CSS Media Queries",
     "unitIds": [
-     "665857e352ed48ffba187048eb2631c4"
+     "665857e352ed48ffba187048eb2631c4",
+     "2699160f3f1d4472a5ba410c43b5c779"
     ]
    },
    {
     "n": 7,
     "name": "Flexbox Sizing",
     "unitIds": [
-     "f5671e6c0bb340da87bbb4c37fd5a66c"
+     "f5671e6c0bb340da87bbb4c37fd5a66c",
+     "3b16b1888ace4bb39da2f3630dbe8b40"
     ]
    },
    {
@@ -930,28 +798,32 @@ export const LECTURE_COURSES: LectureCourse[] = [
     "n": 16,
     "name": "CSS Positioning | Part 1",
     "unitIds": [
-     "5c88d5e1f28844459af654f5470e3f5d"
+     "5c88d5e1f28844459af654f5470e3f5d",
+     "72a4b194cae440628d95534ea00dce21"
     ]
    },
    {
     "n": 17,
     "name": "CSS Positioning | Part 2",
     "unitIds": [
-     "61348839aa7a495e8d7793cd9adc2094"
+     "61348839aa7a495e8d7793cd9adc2094",
+     "2cb8c5db684a4ed2945cd236a829cb77"
     ]
    },
    {
     "n": 18,
     "name": "Introduction to Tailwind CSS",
     "unitIds": [
-     "d4c4dbf0d742496c82771694ffa6cbbd"
+     "d4c4dbf0d742496c82771694ffa6cbbd",
+     "2d9adc903ef244008ecc4aa4a85c3926"
     ]
    },
    {
     "n": 19,
     "name": "Introduction to Tailwind CSS | Part 2",
     "unitIds": [
-     "01b56d48818147b589a5f150d6b68f7f"
+     "01b56d48818147b589a5f150d6b68f7f",
+     "d526c649383943f79a7d46be7eba80fd"
     ]
    },
    {
@@ -1187,7 +1059,8 @@ export const LECTURE_COURSES: LectureCourse[] = [
     "name": "Conditional Probability",
     "unitIds": [
      "498be89e63094135acb2611a2e0d8d7f",
-     "89b720c9aa1b40d182c5ee58eb45c49d"
+     "89b720c9aa1b40d182c5ee58eb45c49d",
+     "a052883d46a54adbb2fc2d82368225a1"
     ]
    },
    {
@@ -1195,14 +1068,16 @@ export const LECTURE_COURSES: LectureCourse[] = [
     "name": "Baye's Theorem & Expected Value",
     "unitIds": [
      "6c02771930104a22afd0c2c0c5d8a43c",
-     "6fb02d6882784a9ca6c0ea6a14006a1d"
+     "6fb02d6882784a9ca6c0ea6a14006a1d",
+     "c5015c85f80e435fa253ecaadbb35514"
     ]
    },
    {
     "n": 15,
     "name": "Matrix Applications",
     "unitIds": [
-     "54c53f1d05eb4191b944b7a914312c7a"
+     "54c53f1d05eb4191b944b7a914312c7a",
+     "c617e846174c465093cc7b4977396c03"
     ]
    },
    {
@@ -1216,21 +1091,24 @@ export const LECTURE_COURSES: LectureCourse[] = [
     "n": 17,
     "name": "AGP Series",
     "unitIds": [
-     "116b1da0c0c24b0eb97e52cb41199f1e"
+     "116b1da0c0c24b0eb97e52cb41199f1e",
+     "41c79015b78c4c96b08b3cbc336211a0"
     ]
    },
    {
     "n": 18,
     "name": "Venn Diagrams and Applications",
     "unitIds": [
-     "04d2a8aa3d0a41cab8f3c6ed1b10bad9"
+     "04d2a8aa3d0a41cab8f3c6ed1b10bad9",
+     "b64d3fd84d314930b7453d1dbf20a70f"
     ]
    },
    {
     "n": 19,
     "name": "Cartesian Products",
     "unitIds": [
-     "b17f618ff2bf49dfa3c14c3b55e7070f"
+     "b17f618ff2bf49dfa3c14c3b55e7070f",
+     "6470f1b6924e4623afa8f268833b693b"
     ]
    },
    {
@@ -1244,7 +1122,8 @@ export const LECTURE_COURSES: LectureCourse[] = [
     "n": 21,
     "name": "Binary Operations",
     "unitIds": [
-     "c2bb512308f54c2d94ba6a9817a120b0"
+     "c2bb512308f54c2d94ba6a9817a120b0",
+     "dea7d613a4004e388b4b08412cbe0d21"
     ]
    }
   ]
@@ -1259,7 +1138,8 @@ export const LECTURE_COURSES: LectureCourse[] = [
     "n": 1,
     "name": "Introduction",
     "unitIds": [
-     "d0d6e6c5075b4450978ed247a4c10944"
+     "d0d6e6c5075b4450978ed247a4c10944",
+     "13ae361032c142e9b6b60e5d8e148b99"
     ]
    },
    {
@@ -1273,7 +1153,9 @@ export const LECTURE_COURSES: LectureCourse[] = [
     "n": 3,
     "name": "Power Cycles",
     "unitIds": [
-     "126be18c23f94d76a92bf43b3f94dc5a"
+     "126be18c23f94d76a92bf43b3f94dc5a",
+     "089145f673f64126a97e2a60c6b028ae",
+     "d078ae56c72749049ab935aba2993d10"
     ]
    },
    {
@@ -1287,21 +1169,27 @@ export const LECTURE_COURSES: LectureCourse[] = [
     "n": 5,
     "name": "Basics and Properties",
     "unitIds": [
-     "d63657ed2221493fadf961434aeef192"
+     "d63657ed2221493fadf961434aeef192",
+     "727bdc72746945a3800a54108d042e85",
+     "ecc44aff703545acb03bf04c7981bda6"
     ]
    },
    {
     "n": 6,
     "name": "Multiples",
     "unitIds": [
-     "12f37206d3fd40349463a3a4eb781c33"
+     "12f37206d3fd40349463a3a4eb781c33",
+     "35c2823cc28c4693abd74e9cbaea7973",
+     "6c83d11edcad4457b18171ca03fe03b4"
     ]
    },
    {
     "n": 7,
     "name": "Factors",
     "unitIds": [
-     "4c6785aa14864ae598527c9d518ed152"
+     "4c6785aa14864ae598527c9d518ed152",
+     "29e3e96c0fcf491e9261aa801e26e344",
+     "5e01a4e4dbcc4becb686584848334e3e"
     ]
    },
    {
@@ -1315,105 +1203,129 @@ export const LECTURE_COURSES: LectureCourse[] = [
     "n": 9,
     "name": "Percentages Basics",
     "unitIds": [
-     "77e79a21197e47d4859177d9c19386dc"
+     "77e79a21197e47d4859177d9c19386dc",
+     "b8e17707f3614376a640ff6067a4e4d1",
+     "ace74921685045b4824751d46777a824"
     ]
    },
    {
     "n": 10,
     "name": "Percentages 1",
     "unitIds": [
-     "cd2069acc3074dbf80302d71dc1a1ba5"
+     "cd2069acc3074dbf80302d71dc1a1ba5",
+     "6bdaf1ca3e644fc5906cd7f672395dc4",
+     "1ab51232072a49a580fd044680d02963"
     ]
    },
    {
     "n": 11,
     "name": "Percentages 2",
     "unitIds": [
-     "bda03ca5234b4096951b4cbe8b3a35b3"
+     "bda03ca5234b4096951b4cbe8b3a35b3",
+     "ec97132cf3464b2e99cf78080c195933",
+     "7718c3acb1c942cbbaffae51e69d1f6e"
     ]
    },
    {
     "n": 12,
     "name": "Profit & Loss",
     "unitIds": [
-     "fc9e9e8b582347108cacf07592fc7d93"
+     "fc9e9e8b582347108cacf07592fc7d93",
+     "1732837a714e421f9f845fc7816db21f",
+     "9f976bbddfe24bd28c799445456b7712"
     ]
    },
    {
     "n": 13,
     "name": "Discount",
     "unitIds": [
-     "364a66c5ecb743af80128a52422c1aba"
+     "364a66c5ecb743af80128a52422c1aba",
+     "9b955b4d98ca434a922b20ad7b6a2f4e",
+     "39bbf0160c8141c1832bcbe31be0786a"
     ]
    },
    {
     "n": 14,
     "name": "Company Specific Session - Percentages and profit & Loss",
     "unitIds": [
-     "6b415c6a2c904f3b909d9eb71b001731"
+     "6b415c6a2c904f3b909d9eb71b001731",
+     "a3e53bbb9ed5436b92e986db7c760049"
     ]
    },
    {
     "n": 15,
     "name": "Simple Interest",
     "unitIds": [
-     "86f123c7c573467b8e96640b4653cb6e"
+     "86f123c7c573467b8e96640b4653cb6e",
+     "7a6185d77cd64232b311a6e1e4c28962"
     ]
    },
    {
     "n": 16,
     "name": "Compound Interest",
     "unitIds": [
-     "b949a74e39574fcabf162164bbd3ac1d"
+     "b949a74e39574fcabf162164bbd3ac1d",
+     "f1526ea48bb4490e8079d8404aedea25"
     ]
    },
    {
     "n": 17,
     "name": "Ratios",
     "unitIds": [
-     "17e339622728478c953aa6f2f5910b2e"
+     "17e339622728478c953aa6f2f5910b2e",
+     "6bd9e586a76c4cc78875acdc857ef923",
+     "3ae3ed454f7747f4b9e3ad33b738ca4f"
     ]
    },
    {
     "n": 18,
     "name": "Proportions",
     "unitIds": [
-     "0b0910a517c046a7bbbc295b99f15ce9"
+     "0b0910a517c046a7bbbc295b99f15ce9",
+     "502c2fe73efa4768bd3a7cc9e27aadb1",
+     "26fd4a22b45e47cfb2a9e4d867297fdd"
     ]
    },
    {
     "n": 19,
     "name": "Company Specific Session - SI & CI and Ratios & Proportions",
     "unitIds": [
-     "bded0ea2a8704b8db3ccda8951d8cd37"
+     "bded0ea2a8704b8db3ccda8951d8cd37",
+     "122a978971dd47c59f68663e9b130f50"
     ]
    },
    {
     "n": 20,
     "name": "Mixtures and Alligations",
     "unitIds": [
-     "fb5e8448f0b6424eab067c8b92c72b74"
+     "fb5e8448f0b6424eab067c8b92c72b74",
+     "e3d61e0ef8d34572842b1f1aaf32147e",
+     "73545bfada0544d9937224786782013c"
     ]
    },
    {
     "n": 21,
     "name": "Partnerships",
     "unitIds": [
-     "1ba163ed0be04a2ca04ebc7a4ee1f28c"
+     "1ba163ed0be04a2ca04ebc7a4ee1f28c",
+     "a5c435e8298b4e38ac9d59ce4f34fa77"
     ]
    },
    {
     "n": 22,
     "name": "Ages",
     "unitIds": [
-     "21ee6f9ca6ee445191a92b5be6ddc703"
+     "21ee6f9ca6ee445191a92b5be6ddc703",
+     "cfc4af4197bc435bae134bdb9de4d3e1",
+     "9454861a63f242d8bda41cde34db2ba7"
     ]
    },
    {
     "n": 23,
     "name": "Averages",
     "unitIds": [
-     "b605c97767fc4b76b4d366e8d0de45d4"
+     "b605c97767fc4b76b4d366e8d0de45d4",
+     "88d212d2804d4922a11c5f97a59fd6f6"
     ]
    },
    {
@@ -2605,14 +2517,16 @@ export const LECTURE_COURSES: LectureCourse[] = [
     "n": 18,
     "name": "DI Tables",
     "unitIds": [
-     "e8d28bd511ed43b29036d9dce5b6b641"
+     "e8d28bd511ed43b29036d9dce5b6b641",
+     "ebdc65487a784d84af53cded9a9f4710"
     ]
    },
    {
     "n": 19,
     "name": "DI Graphs",
     "unitIds": [
-     "768ca3b73ff8456e8fe7d6f961d7eb78"
+     "768ca3b73ff8456e8fe7d6f961d7eb78",
+     "008f141a0e3e4240a77bbb82f365796b"
     ]
    },
    {
@@ -2633,14 +2547,16 @@ export const LECTURE_COURSES: LectureCourse[] = [
     "n": 22,
     "name": "Ranking",
     "unitIds": [
-     "fcf940b067e040a08ab9595b5f3c3fed"
+     "fcf940b067e040a08ab9595b5f3c3fed",
+     "70d105b5fbeb425cab40ece70d1e4686"
     ]
    },
    {
     "n": 23,
     "name": "Directions",
     "unitIds": [
-     "74021209bd17421397d2bb7eee96ef49"
+     "74021209bd17421397d2bb7eee96ef49",
+     "559d411644b448959fe15669f89bf902"
     ]
    },
    {
@@ -2654,14 +2570,16 @@ export const LECTURE_COURSES: LectureCourse[] = [
     "n": 25,
     "name": "Number Series",
     "unitIds": [
-     "f40068e7a3c94c97ab339b181e86b598"
+     "f40068e7a3c94c97ab339b181e86b598",
+     "693f71c7453244a1937253a746d4306c"
     ]
    },
    {
     "n": 26,
     "name": "Alphabet Series",
     "unitIds": [
-     "ad7058cd8bf542ba8fe42126997ddf27"
+     "ad7058cd8bf542ba8fe42126997ddf27",
+     "081e3499bb5847f2821c8d2b8ddefef0"
     ]
    },
    {
@@ -3041,7 +2959,8 @@ export const LECTURE_COURSES: LectureCourse[] = [
     "n": 17,
     "name": "Modelling Database | Part - 2",
     "unitIds": [
-     "0a2ae0561ce6478c960f371c753b57a1"
+     "0a2ae0561ce6478c960f371c753b57a1",
+     "176473757aee4e6398502d264f95266c"
     ]
    },
    {
@@ -3112,21 +3031,24 @@ export const LECTURE_COURSES: LectureCourse[] = [
     "n": 2,
     "name": "Schema Refinement and Database Anomalies",
     "unitIds": [
-     "b0b04c90ced64170afce2209dba59470"
+     "b0b04c90ced64170afce2209dba59470",
+     "a483b052e9a842b0bee66fb567fbd904"
     ]
    },
    {
     "n": 3,
     "name": "Normalization and Functional Dependency",
     "unitIds": [
-     "fdc3cef0a6f8435aaecd60dbf7f72d16"
+     "fdc3cef0a6f8435aaecd60dbf7f72d16",
+     "6119ff18d8354fe387f020a7f86524c6"
     ]
    },
    {
     "n": 4,
     "name": "Normal Forms",
     "unitIds": [
-     "e9a670e8f3f7415cbef8eb7f7715e8bd"
+     "e9a670e8f3f7415cbef8eb7f7715e8bd",
+     "24353b4bd1314fea9bb4181aa62332f8"
     ]
    },
    {
@@ -3155,21 +3077,24 @@ export const LECTURE_COURSES: LectureCourse[] = [
     "n": 1,
     "name": "Introduction to MongoDB",
     "unitIds": [
-     "44ca047c30344ed5b4cff01f47e9e269"
+     "44ca047c30344ed5b4cff01f47e9e269",
+     "49496004c6034a3f87594cc032dd01e2"
     ]
    },
    {
     "n": 2,
     "name": "Getting Started with MongoDB",
     "unitIds": [
-     "85c3087d6e3d4f8ab7d6c5e40a377bb3"
+     "85c3087d6e3d4f8ab7d6c5e40a377bb3",
+     "da21a59a592c481eb0d4134da3aa1c6c"
     ]
    },
    {
     "n": 3,
     "name": "Querying MongoDB - Part 1",
     "unitIds": [
-     "e398793e2e7f4cd4beffa9727aa4fd8a"
+     "e398793e2e7f4cd4beffa9727aa4fd8a",
+     "dede734ad64b47fc9dcd02d012b4bedc"
     ]
    },
    {
@@ -3183,7 +3108,8 @@ export const LECTURE_COURSES: LectureCourse[] = [
     "n": 5,
     "name": "Querying MongoDB - Part 2",
     "unitIds": [
-     "e747902e4e2241a49866ef8d380fbad7"
+     "e747902e4e2241a49866ef8d380fbad7",
+     "a15d697536e54c19abb82947b7a8b063"
     ]
    },
    {
@@ -3197,7 +3123,8 @@ export const LECTURE_COURSES: LectureCourse[] = [
     "n": 7,
     "name": "Grouping & Aggregations",
     "unitIds": [
-     "5743f904500e40a0a3db4e5bc379af93"
+     "5743f904500e40a0a3db4e5bc379af93",
+     "58dc15dab9ee4336bcf53519c6757c42"
     ]
    },
    {
@@ -3211,14 +3138,16 @@ export const LECTURE_COURSES: LectureCourse[] = [
     "n": 9,
     "name": "Complex Field Types - Part 1",
     "unitIds": [
-     "9f0a505f3ca9417387e69c5a9bfb04b0"
+     "9f0a505f3ca9417387e69c5a9bfb04b0",
+     "a61a5856b14e4eb293b9545ec0d218bf"
     ]
    },
    {
     "n": 10,
     "name": "Complex Field Types - Part 2",
     "unitIds": [
-     "7f3803f9f23b47f7bb6bde483c123e42"
+     "7f3803f9f23b47f7bb6bde483c123e42",
+     "1e46aa64a9dc463db9f6751670ac646f"
     ]
    }
   ]
@@ -3268,7 +3197,8 @@ export const LECTURE_COURSES: LectureCourse[] = [
     "n": 6,
     "name": "Measures of Central Tendency",
     "unitIds": [
-     "85a5e120ef2145ca9907be323dfc4ac9"
+     "85a5e120ef2145ca9907be323dfc4ac9",
+     "99e7f7232b9d43c8943d9b9feae10bdd"
     ]
    },
    {
@@ -3282,7 +3212,8 @@ export const LECTURE_COURSES: LectureCourse[] = [
     "n": 8,
     "name": "Measures of Variability",
     "unitIds": [
-     "1bf391f325144adf93972ba7c02277df"
+     "1bf391f325144adf93972ba7c02277df",
+     "41edae5c7c964b9b916db6375b875414"
     ]
    },
    {
@@ -3303,7 +3234,8 @@ export const LECTURE_COURSES: LectureCourse[] = [
     "n": 11,
     "name": "Basics of Probability",
     "unitIds": [
-     "2e520ed5e7ce4418858458c6f61be5f2"
+     "2e520ed5e7ce4418858458c6f61be5f2",
+     "a0c675ce34084e34aae49550e331baa1"
     ]
    },
    {
@@ -3317,7 +3249,8 @@ export const LECTURE_COURSES: LectureCourse[] = [
     "n": 13,
     "name": "Conditional Probability",
     "unitIds": [
-     "a94464fbbfd045d39af894cb170ff6f7"
+     "a94464fbbfd045d39af894cb170ff6f7",
+     "9027bbdb39194f958bfc564cf0510304"
     ]
    },
    {
@@ -3359,7 +3292,8 @@ export const LECTURE_COURSES: LectureCourse[] = [
     "n": 19,
     "name": "Binomial Distribution",
     "unitIds": [
-     "1b033b0cbcc44ff1aa65c96d3bfc7e7c"
+     "1b033b0cbcc44ff1aa65c96d3bfc7e7c",
+     "9392b42c76ca442c98232dc8fe471195"
     ]
    },
    {
@@ -3373,7 +3307,8 @@ export const LECTURE_COURSES: LectureCourse[] = [
     "n": 21,
     "name": "Poisson Distribution",
     "unitIds": [
-     "0eb045569cca43d28cd58b58fa5709fe"
+     "0eb045569cca43d28cd58b58fa5709fe",
+     "41da3364668741c2b2626342c35de49a"
     ]
    },
    {
@@ -3415,14 +3350,16 @@ export const LECTURE_COURSES: LectureCourse[] = [
     "n": 27,
     "name": "Introduction to Sampling",
     "unitIds": [
-     "d4e3ae473b4044888537a1f27b01c4c5"
+     "d4e3ae473b4044888537a1f27b01c4c5",
+     "203668ddcb4b495a9eb34a1730981716"
     ]
    },
    {
     "n": 28,
     "name": "Sampling Distribution",
     "unitIds": [
-     "d47eb0e9f2e6458eaca3afd19e857359"
+     "d47eb0e9f2e6458eaca3afd19e857359",
+     "e4500fc4ea8243e28b3f85e618f22f7d"
     ]
    },
    {
@@ -3513,14 +3450,16 @@ export const LECTURE_COURSES: LectureCourse[] = [
     "n": 41,
     "name": "Multiple Linear Regression",
     "unitIds": [
-     "80411b8308724e9683c469366d981298"
+     "80411b8308724e9683c469366d981298",
+     "2a2885b9785f45eb94ebdbd615330766"
     ]
    },
    {
     "n": 42,
     "name": "Non - Linear Regression",
     "unitIds": [
-     "6edd2373f7844acfa46eecf74e5d2e80"
+     "6edd2373f7844acfa46eecf74e5d2e80",
+     "d49de8ff4e214a618b8b581ea084074d"
     ]
    },
    {
@@ -3741,28 +3680,32 @@ export const LECTURE_COURSES: LectureCourse[] = [
     "n": 7,
     "name": "Venn Diagrams",
     "unitIds": [
-     "c524720da40f407f8de12f20112111c2"
+     "c524720da40f407f8de12f20112111c2",
+     "e3470675bacb43478a001a9f16e1f9d8"
     ]
    },
    {
     "n": 8,
     "name": "Syllogisms 1",
     "unitIds": [
-     "8ea5b9ce397a4aafa9d4a0fe0da7992c"
+     "8ea5b9ce397a4aafa9d4a0fe0da7992c",
+     "86157980f4a44dd19e284c5f3a8c0b86"
     ]
    },
    {
     "n": 9,
     "name": "Syllogisms 2",
     "unitIds": [
-     "8da023e3d1a84745864aa668346eef19"
+     "8da023e3d1a84745864aa668346eef19",
+     "ef85275bd58640528c96250206f37716"
     ]
    },
    {
     "n": 10,
     "name": "Cubes",
     "unitIds": [
-     "31f405622a7a4f2b92cf94e2e6351449"
+     "31f405622a7a4f2b92cf94e2e6351449",
+     "c6d68d9b77ae44548708e24a1168cce6"
     ]
    },
    {
@@ -3826,7 +3769,8 @@ export const LECTURE_COURSES: LectureCourse[] = [
     "n": 2,
     "name": "The Language of Connection (2 slots)",
     "unitIds": [
-     "5b98ba15e9c3483e9eacdafd31cb5dfc"
+     "5b98ba15e9c3483e9eacdafd31cb5dfc",
+     "7916d8c05a22465a93d4e020cd0dc1bb"
     ]
    },
    {
@@ -3840,7 +3784,8 @@ export const LECTURE_COURSES: LectureCourse[] = [
     "n": 4,
     "name": "Designing Clear Prompts",
     "unitIds": [
-     "5b435121ae7840089a11a551ff4f173e"
+     "5b435121ae7840089a11a551ff4f173e",
+     "a0962cbf81b148fe820fb78696eb2c6c"
     ]
    },
    {
@@ -3861,7 +3806,8 @@ export const LECTURE_COURSES: LectureCourse[] = [
     "n": 7,
     "name": "Expressing Possibility and Obligation",
     "unitIds": [
-     "46a48b65c27049adbf46d98aa68d0bc4"
+     "46a48b65c27049adbf46d98aa68d0bc4",
+     "aacb92ab1d6e4529817c0e51378abfbd"
     ]
    },
    {
@@ -3889,14 +3835,16 @@ export const LECTURE_COURSES: LectureCourse[] = [
     "n": 11,
     "name": "Balancing Ideas Clearly (Enhancing Communicative Style)",
     "unitIds": [
-     "92bffb55d46648c9b85071965a0af66f"
+     "92bffb55d46648c9b85071965a0af66f",
+     "838db06169a74fa9888ced0e3de0d986"
     ]
    },
    {
     "n": 12,
     "name": "Managing Hesitation and Emphasizing Key Points",
     "unitIds": [
-     "3cc30236a82547d6a60101938bb657ff"
+     "3cc30236a82547d6a60101938bb657ff",
+     "8be5d43bb15c420582d4f7b5441dff29"
     ]
    }
   ]
@@ -4073,14 +4021,16 @@ export const LECTURE_COURSES: LectureCourse[] = [
     "name": "Introduction to Monotonic Stacks (+ Next Greater Element)",
     "unitIds": [
      "07c8f2bc396b4df197f12a731bd27fe3",
-     "f5938e44316b470b9451f7572ffd9576"
+     "f5938e44316b470b9451f7572ffd9576",
+     "6ba8b6cf522748dcbe82bbaf4dc02386"
     ]
    },
    {
     "n": 25,
     "name": "Infix, Prefix, and Postfix Notations",
     "unitIds": [
-     "5d17cca8e827460fbda41e98fff12755"
+     "5d17cca8e827460fbda41e98fff12755",
+     "4c8d26cec29544a083d15a7da8947a91"
     ]
    },
    {
@@ -4101,14 +4051,16 @@ export const LECTURE_COURSES: LectureCourse[] = [
     "n": 28,
     "name": "Asteroid Collision",
     "unitIds": [
-     "c3231d08d11d44f1a88f87643172ea96"
+     "c3231d08d11d44f1a88f87643172ea96",
+     "56ddecc9f4e14e00bc15f9042941e1ee"
     ]
    },
    {
     "n": 29,
     "name": "Largest Rectangle In Histogram",
     "unitIds": [
-     "ec7d727f323344898145c33ff54e54d5"
+     "ec7d727f323344898145c33ff54e54d5",
+     "10dc091f062c4fd2b31330153de266bc"
     ]
    },
    {
@@ -4144,7 +4096,8 @@ export const LECTURE_COURSES: LectureCourse[] = [
     "n": 34,
     "name": "Introduction to Binary Trees",
     "unitIds": [
-     "a25d2d17216341b685173eb586f60e6e"
+     "a25d2d17216341b685173eb586f60e6e",
+     "6421fce6b3ad48af8d210eb373aae654"
     ]
    },
    {
@@ -4158,7 +4111,8 @@ export const LECTURE_COURSES: LectureCourse[] = [
     "n": 36,
     "name": "Pre-Order Traversal",
     "unitIds": [
-     "a75602b547e84921b4d162d59a25ed93"
+     "a75602b547e84921b4d162d59a25ed93",
+     "208384d7eb47497e8c6ec939308604d7"
     ]
    },
    {
@@ -4179,7 +4133,8 @@ export const LECTURE_COURSES: LectureCourse[] = [
     "n": 39,
     "name": "Level Order Traversal",
     "unitIds": [
-     "64b29ae792884d329f8da10165418c46"
+     "64b29ae792884d329f8da10165418c46",
+     "9a64e3d459504f1db9e79eeb77c4a667"
     ]
    },
    {
@@ -4284,7 +4239,8 @@ export const LECTURE_COURSES: LectureCourse[] = [
     "n": 54,
     "name": "Introduction to Heaps",
     "unitIds": [
-     "6677c40befcc4de88d5b5634dd921d30"
+     "6677c40befcc4de88d5b5634dd921d30",
+     "aa00dc02d98d4ee9b390d6fb8ce6aaf9"
     ]
    },
    {
@@ -4298,7 +4254,8 @@ export const LECTURE_COURSES: LectureCourse[] = [
     "n": 56,
     "name": "Heapsort Algorithm",
     "unitIds": [
-     "ea4fef167357423595229fdf593081fc"
+     "ea4fef167357423595229fdf593081fc",
+     "8b608c2af77f46bc83db7badb03852a1"
     ]
    },
    {
@@ -4504,7 +4461,8 @@ export const LECTURE_COURSES: LectureCourse[] = [
     "n": 4,
     "name": "Productivity Power Up with AI Tools",
     "unitIds": [
-     "e1e7b4a3c28941ea95434562eb1f1b52"
+     "e1e7b4a3c28941ea95434562eb1f1b52",
+     "60226c2726cf4f9dbf19fc434231e781"
     ]
    },
    {
@@ -4540,14 +4498,16 @@ export const LECTURE_COURSES: LectureCourse[] = [
     "n": 9,
     "name": "Build Your Own AI News Summarizer | Part - 1",
     "unitIds": [
-     "7460a29646d24525a03ad7c8278ba82b"
+     "7460a29646d24525a03ad7c8278ba82b",
+     "deb381fe8aa944b6883afd5a0c617e40"
     ]
    },
    {
     "n": 10,
     "name": "Build Your Own AI News Summarizer | Part - 2",
     "unitIds": [
-     "87dd60b06c704fabb5b2a80ef109a96e"
+     "87dd60b06c704fabb5b2a80ef109a96e",
+     "be5189fe272d48af9485cb4535a27401"
     ]
    },
    {
