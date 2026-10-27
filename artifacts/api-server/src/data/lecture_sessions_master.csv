@@ -3,13 +3,13 @@ Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,1,Programming with 
 Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,2,Coding Practice Walkthrough | Part 1,f2a6cdec-7135-4db4-9466-d80aa26999fd
 Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,3,Leveraging Gen AI for Accelerated learning,e89439e9-5e5e-4d4e-8f63-c55e4f81fd01
 Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,4,Variables and Data Types,60a0f780-6133-4e84-9c62-32a99d1ec7a0
-Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,5,Sequence of Instructions,90eaf231-9992-4c58-9015-c9d5312bb2eb
+Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,5,Sequence of Instructions,90eaf231-9992-4c58-9015-c9d5312bb2eb; ab40f67e-e2e5-4819-bae3-35570d8a67fe
 Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,6,Input and Output Basics,c3c48270-5880-4187-bd0c-6716a94cb99d
 Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,7,Coding Practice Walkthrough | Part 2,16505de7-d481-4bf7-b730-79ce47e73503
 Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,8,How to debug your code?,644bef74-d150-4442-ba7b-0e03acfe3544
 Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,9,Type Conversions,dcc9159c-fe50-428b-8cc1-e3211b66d2ef
 Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,10,Relational Operators,4ed1f4cf-692d-404a-b1c3-ba0cd1863197
-Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,11,Logical Operators,6ecba024-b99d-499e-8bdd-6791519ea5ae
+Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,11,Logical Operators,6ecba024-b99d-499e-8bdd-6791519ea5ae; 8726cfe8-e098-42b5-ab38-909cda352832
 Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,12,Conditional Statements,549b2c08-1b9f-4d52-822c-598ab9402494
 Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,13,Problem Solving and Debugging - Part 1,f5626545-9b7a-4799-9306-32ec25700f4c
 Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,14,Problem Solving and Debugging - Part 2,a93a699d-6a17-4972-9736-5566b1446ca2
@@ -27,13 +27,13 @@ Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,25,Nested Loops,8d5
 Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,26,Problem Solving - Part 5,c0111a17-8697-4fcd-8575-530af3213752
 Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,27,Problem Solving - Part 6,83e061dd-88db-48c9-b088-6587488b907c
 Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,28,Problem Solving - Part 7,5cb3694f-e548-4121-831e-a666cc3825a5
-Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,29,Loop Control Statements,b64b1f09-6c9f-436d-b8c2-0a9383cf6695
+Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,29,Loop Control Statements,b64b1f09-6c9f-436d-b8c2-0a9383cf6695; 01c62c5c-a769-4dc2-8ef6-a0c1cc0bd68d
 Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,30,Comparing Strings & Naming Variables,3bd6dca9-56c1-4f84-aa23-a1d8a7396cf0
 Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,31,Problem Solving and Debugging - 4,f02bb726-97d6-4d13-bb5f-aa5b52baf3c4
 Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,32,Problem Solving and Debugging - 5,0b675d57-650e-4c04-be0f-f50a73e91f58
-Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,33,Lists,a489b3de-43e4-4b6f-825a-44619f8c7df7
+Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,33,Lists,a489b3de-43e4-4b6f-825a-44619f8c7df7; 63c2189d-fc55-405d-a866-e34691253666
 Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,34,Working with Lists,e932ecb8-f08c-44cc-a561-1f153b96786c
-Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,35,Lists and Strings,9c5518b5-d5d2-4b52-a2a6-7c403b68b084
+Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,35,Lists and Strings,9c5518b5-d5d2-4b52-a2a6-7c403b68b084; 358b3232-dc9a-4a8f-affc-34269b7cfb96
 Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,36,Functions,f32c7dfb-6685-4f54-a744-b41833093370
 Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,37,Function Arguments,3cdc557a-b412-4782-8bfb-2dcf2466334b
 Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,38,Built-in Functions,8721e72a-cb65-45d6-8487-d657f921a230
@@ -42,14 +42,14 @@ Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,40,Understanding Re
 Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,41,Problem solving using Recursion - 1,964c48c7-8e86-4158-b534-98603fdc9838
 Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,42,Problem solving using Recursion - 2,0445bba7-f3e0-4e1f-b904-bb177a1c9e80
 Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,43,List Methods,2318a109-8e32-4c6b-a703-7cb2c57c8f18
-Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,44,Tuples & Sequences,b90fb5d1-aef9-419c-8c35-dccc8c2920ed
+Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,44,Tuples & Sequences,b90fb5d1-aef9-419c-8c35-dccc8c2920ed; 5382b2d2-ed15-4d20-9f03-61582188ca46
 Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,45,Sets,0e50a0ea-32fe-409e-ab0d-77c582e45f45
 Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,46,Set Operations,2877fa6d-132d-4872-8c7c-93ad6ad3de38
 Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,47,Problem Solving and Debugging - Part 6,ef100c53-d27a-46d1-930f-d3510e296a08
 Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,48,Nested Lists & String Formatting,a7015141-acd5-413b-8137-fe80f1633299
 Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,49,Introduction to Matrices,092fba9c-4a73-46ba-8114-eb3366990c7a
 Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,50,Introduction to Shorthand expressions,6f562082-47fe-45e8-b2c1-e32496b0c706
-Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,51,Introduction to List comprehensions,fe8b5be2-5815-4745-ab88-4ded92afcbbb
+Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,51,Introduction to List comprehensions,fe8b5be2-5815-4745-ab88-4ded92afcbbb; cbe94e3f-2c95-412e-9f82-af8e94c9d5c8
 Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,52,Dictionaries,954c6f8d-557f-43ee-ab13-dd634bedb1d5
 Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,53,Working with Dictionaries,ba84e1b2-13c7-4f53-be9f-911779168bb5
 Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,54,Problem Solving and Debugging - Part 7,d76d66c4-28ef-423f-8b90-c7587472c901
@@ -67,54 +67,33 @@ Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,65,Python Standard 
 Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,66,Scope & Namespaces,073e838e-23fc-4447-a716-434b072f43d6
 Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,67,Errors & Exceptions,b638632d-2e06-4f26-8dd7-24b7372c5b14
 Programming Foundations,c6008f8d-cd91-4843-bb3f-b75d4beca046,68,Working with Dates & Times,17332dc3-780f-4f5a-b1bc-abea5d100738
-Build Your Own Static Website,,1,Introduction to GenAI in Frontend Development,7bf8ee08-c794-4a81-96fb-a2225d6157ae; 13893e77-5627-4b22-be3c-9142c0ba14e9
-Build Your Own Static Website,,2,Your first Frontend Project | Getting started,518fdb60-e4f5-4972-9c32-dc2d3c09b355; 34890e58-e10c-4d1e-a573-d11bf08dbde4
-Build Your Own Static Website,,3,Introduction to HTML,5d952538-0589-43ea-965d-ddb3aa314862; a7c0731f-d990-4f17-9d33-566b287d6bdc
-Build Your Own Static Website,,4,Leveraging Gen AI for accelerated learning,beb8932c-b4b9-4a6f-a6b0-c98777bafb90; dc1d2276-f338-45f7-ac43-83ad3c21b569
-Build Your Own Static Website,,5,Introduction to CSS | Part 1,75daf28c-5bbc-4f3b-bf76-4b07a06c756b; 33e9b5c1-9c07-4edd-b3c9-7d73dab6ecc6
-Build Your Own Static Website,,6,Introduction to CSS | Part 2,bea4e2e0-13d6-46ed-b456-c9b554a742b1; 4f237b09-abda-4cfa-999f-b8e7a2e32c69
-Build Your Own Static Website,,7,Introduction to CSS | Part 3,8bcfd5c9-ff1d-4b21-857a-4f7d6fe37c7d; a924ec95-8ac5-4c0d-99c6-04dffbe1e144
-Build Your Own Static Website,,8,Introduction to CSS Box Model | Part 1,9c2f2322-e97b-40d0-9c6b-4f1d714f6946; 98b48a94-8ed4-4514-8212-33f2ec729686
-Build Your Own Static Website,,9,Introduction to CSS Box Model | Part 2,00430214-07f4-41fc-8ccc-0905f14b330e; 6d4ed7bd-8209-4de1-aab0-2eedde8a4f9a
-Build Your Own Static Website,,10,Introduction to Bootstrap,c7e31a35-613e-4fa9-b1dc-0df2d26c8ce0
-Build Your Own Static Website,,11,Introduction to Bootstrap | Part 2,7fea0c37-f822-494f-ab97-ecbc2b384fc3
-Build Your Own Static Website,,12,Favourite Places Section,b2d67fa1-c7c3-48ad-b55f-bc3a6d61fba9
-Build Your Own Static Website,,13,Approach to Develop a Layout,afb637a2-181e-4256-8f0d-7a8faa9f4030
-Build Your Own Static Website,,14,Favourite Place Detailed View Section,f0922e63-539d-4cce-a8cb-5295096e3e81
-Build Your Own Static Website,,15,Website Integration,3fa98e6f-f292-4744-b3ed-c6b19c0c8ddb
-Build Your Own Static Website,,16,Website Integration | Part 2,8d16d638-c610-435b-8196-cfae98d2019c
-Build Your Own Static Website,,17,Website: Behind the Scenes,b7d39617-c718-47c9-be78-78bd03df24a2; 0c25218f-6846-4d35-a518-510f3ea70ac7
-Build Your Own Static Website,,18,HTML Hyperlinks,f37f88e8-983a-4831-99a9-9c288878f4b0; 32921038-03e7-4e16-9e5e-e6f9a22f401f
-Build Your Own Static Website,,19,Introduction to HTML5,98130003-1b23-4f3c-9dbd-70e3ec1ae75b; 9065d055-57fb-40df-8829-51950964c8f3
-Build Your Own Static Website,,20,HTML Semantic Elements,9627bbaf-a509-4d88-a2e7-a28580a16ebb; e452f0d7-79b9-4565-a36d-c8c2f4470c7d
-Build Your Own Static Website,,21,Leveraging Gen AI for Debugging & Building,e0a45154-2141-4466-b283-84f3f60f344b; 5da67890-23c4-40ec-90b5-cfcf5e3805a3
-Build Your Own Static Website,,22,Introduction to Industry Readiness,5f21c404-4ea5-4ba1-9f6a-8e7e15eac164
-Build Your Own Responsive Website,,1,Introduction to Responsive Web Design,67ba0230-bcaf-46c7-9185-78ae3b95d92d
-Build Your Own Responsive Website,,2,Bootstrap Grid System,5a39ea64-4beb-4689-ac85-6ecfd6800878
-Build Your Own Responsive Website,,3,Bootstrap Grid System | Part 2,c24d9f56-0938-4606-8884-3c98afce27a8
-Build Your Own Responsive Website,,4,Bootstrap Navbar,555df423-1ab6-4c74-87ea-6a962b783e67
-Build Your Own Responsive Website,,5,CSS Selectors and Inheritance,9ebf60e6-0b9d-479b-ae8c-6548d7c2b79a; 3ffe2e51-042b-4ead-8ca5-fb71b9e4d3bb
-Build Your Own Responsive Website,,6,More CSS Selectors,894f8543-2aea-4c51-a472-c08123209181; e464a0c4-abe7-4d31-b02c-c97556c48682
-Build Your Own Responsive Website,,7,CSS Specificity and Cascade,f763f278-8e3b-4912-a5bf-d9b98319089e; e5dd3381-02b7-4209-aca4-ce280b85f042
-Build Your Own Responsive Website,,8,Banner Section,c33295c3-8be1-4b7e-ac8c-829f067e4f9b
-Build Your Own Responsive Website,,9,Why Choose Us? Section,f6c08e37-9447-4fb7-87fa-c20185594aa1
-Build Your Own Responsive Website,,10,Explore Menu Section,a576addb-ba0e-42f6-9fed-1d8d55b9be36
-Build Your Own Responsive Website,,11,"Healthy Food, Delivery and Payment, Thanking Customers Sections",bab5b27e-85ac-46be-a605-68bc21550ea9
-Build Your Own Responsive Website,,12,Follow Us Section and More Styling,25320ab1-6420-4d18-9af2-9b2095ba9f3c
-Build Your Own Responsive Website,,13,CSS Gradients & More Bootstrap Components,b4fe5bf7-dd2f-45ab-afd6-0f7a3a0ae793
-Build Your Own Responsive Website,,14,CSS Transitions,0d1f6a7c-a36c-4b14-8c4a-afcf4c1149be
-Build Your Own Responsive Website,,15,CSS Transforms,f6aad79d-8013-47de-93f0-729650c09d47
-Build Your Own Responsive Website,,16,CSS Animations,b002d44d-6d6e-4331-957a-f6df0b620422
-Build Your Own Responsive Website,,17,Building a Responsive Website using Gen AI,53965839-648c-4b52-9d33-ac0417698299
-Build Your Own Responsive Website,,18,Debugging using Chrome Dev Tools - 2,38b14c8b-9c18-4ae8-b8dd-694921dc00d0
-Build Your Own Responsive Website,,19,Framer,694c61cd-8ef0-4348-852e-de4df667d31a
-Modern Responsive Web Design,,1,Sizing Elements and Handling Overflow,4490aacc-70cc-45e5-a020-42fc8b437dfa
-Modern Responsive Web Design,,2,Box Sizing,8bb17750-78c3-4653-b656-33dd85193be9
-Modern Responsive Web Design,,3,Introduction to CSS Flexbox,4ef3a893-82fa-4e06-a242-4346037a2c9e
-Modern Responsive Web Design,,4,Introduction to CSS Flexbox | Part 2,22a59a92-a1ae-401f-9911-14eb63e76f8d
-Modern Responsive Web Design,,5,Introduction to CSS Flexbox | Part 3,9642cb7f-ad20-4d8f-ab13-e7177a4da609
-Modern Responsive Web Design,,6,CSS Media Queries,665857e3-52ed-48ff-ba18-7048eb2631c4
-Modern Responsive Web Design,,7,Flexbox Sizing,f5671e6c-0bb3-40da-87bb-b4c37fd5a66c
+HTML & CSS,,1,Introduction to GenAI in Web Development,13893e77-5627-4b22-be3c-9142c0ba14e9; 7bf8ee08-c794-4a81-96fb-a2225d6157ae
+HTML & CSS,,2,Getting Started with Web Development,34890e58-e10c-4d1e-a573-d11bf08dbde4; 518fdb60-e4f5-4972-9c32-dc2d3c09b355
+HTML & CSS,,3,Introduction to HTML,a7c0731f-d990-4f17-9d33-566b287d6bdc; 5d952538-0589-43ea-965d-ddb3aa314862
+HTML & CSS,,4,Leveraging GenAI for Accelerated Learning,dc1d2276-f338-45f7-ac43-83ad3c21b569; beb8932c-b4b9-4a6f-a6b0-c98777bafb90
+HTML & CSS,,5,Introduction to CSS | Part 1,33e9b5c1-9c07-4edd-b3c9-7d73dab6ecc6; 75daf28c-5bbc-4f3b-bf76-4b07a06c756b
+HTML & CSS,,6,Introduction to CSS | Part 2,4f237b09-abda-4cfa-999f-b8e7a2e32c69; bea4e2e0-13d6-46ed-b456-c9b554a742b1
+HTML & CSS,,7,Introduction to CSS | Part 3,a924ec95-8ac5-4c0d-99c6-04dffbe1e144; 8bcfd5c9-ff1d-4b21-857a-4f7d6fe37c7d
+HTML & CSS,,8,Introduction to CSS Box Model | Part 1,98b48a94-8ed4-4514-8212-33f2ec729686; 9c2f2322-e97b-40d0-9c6b-4f1d714f6946
+HTML & CSS,,9,Introduction to CSS Box Model | Part 2,6d4ed7bd-8209-4de1-aab0-2eedde8a4f9a; 00430214-07f4-41fc-8ccc-0905f14b330e
+HTML & CSS,,10,Coding Platform Walkthrough,6548dace-7d3c-4ce8-96f7-55f943209fb3
+HTML & CSS,,11,HTML Void Elements & Lists,7c8bcead-de06-433f-8ac1-533d77720bbb
+HTML & CSS,,12,Website: Behind the Scenes,0c25218f-6846-4d35-a518-510f3ea70ac7; b7d39617-c718-47c9-be78-78bd03df24a2
+HTML & CSS,,13,HTML Hyperlinks,32921038-03e7-4e16-9e5e-e6f9a22f401f; f37f88e8-983a-4831-99a9-9c288878f4b0
+HTML & CSS,,14,Introduction to HTML5,9065d055-57fb-40df-8829-51950964c8f3; 98130003-1b23-4f3c-9dbd-70e3ec1ae75b
+HTML & CSS,,15,HTML Semantic Elements,e452f0d7-79b9-4565-a36d-c8c2f4470c7d; 9627bbaf-a509-4d88-a2e7-a28580a16ebb
+HTML & CSS,,16,Leveraging GenAI for Debugging & Building,5da67890-23c4-40ec-90b5-cfcf5e3805a3; e0a45154-2141-4466-b283-84f3f60f344b
+HTML & CSS,,17,More CSS Concepts,c8b3711f-893f-47d0-b5f3-42ce93944e73
+HTML & CSS,,18,CSS Selectors & Inheritance,3ffe2e51-042b-4ead-8ca5-fb71b9e4d3bb; 9ebf60e6-0b9d-479b-ae8c-6548d7c2b79a
+HTML & CSS,,19,More CSS Selectors,e464a0c4-abe7-4d31-b02c-c97556c48682; 894f8543-2aea-4c51-a472-c08123209181
+HTML & CSS,,20,CSS Specificity & Cascade,e5dd3381-02b7-4209-aca4-ce280b85f042; f763f278-8e3b-4912-a5bf-d9b98319089e
+Modern Responsive Web Design,,1,Sizing Elements and Handling Overflow,4490aacc-70cc-45e5-a020-42fc8b437dfa; f5563899-f8e1-4cd6-8037-f9cc8ad40d7a
+Modern Responsive Web Design,,2,Box Sizing,8bb17750-78c3-4653-b656-33dd85193be9; 1d30f10a-d325-4e37-9f45-cf0b6bdc59a9
+Modern Responsive Web Design,,3,Introduction to CSS Flexbox,4ef3a893-82fa-4e06-a242-4346037a2c9e; 22a2807f-ee84-4fb9-b779-8ce5de8f0991
+Modern Responsive Web Design,,4,Introduction to CSS Flexbox | Part 2,22a59a92-a1ae-401f-9911-14eb63e76f8d; 8057202c-c00a-4538-8eb6-a80237c143c2
+Modern Responsive Web Design,,5,Introduction to CSS Flexbox | Part 3,9642cb7f-ad20-4d8f-ab13-e7177a4da609; 8c48ac84-3628-41e5-8530-cd9abc6caef5
+Modern Responsive Web Design,,6,CSS Media Queries,665857e3-52ed-48ff-ba18-7048eb2631c4; 2699160f-3f1d-4472-a5ba-410c43b5c779
+Modern Responsive Web Design,,7,Flexbox Sizing,f5671e6c-0bb3-40da-87bb-b4c37fd5a66c; 3b16b188-8ace-4bb3-9da2-f3630dbe8b40
 Modern Responsive Web Design,,8,Building Responsive Web Page | Part - 1,684b2566-44d7-42a1-92c7-33a8c724ae57
 Modern Responsive Web Design,,9,Building Responsive Web Page | Part - 2,0494f896-82bb-4e71-95c3-3ca1b3a864d5
 Modern Responsive Web Design,,10,Building Responsive Web Page | Part - 3,a20f5368-f0e3-4ab1-90b0-8c593e722a3d
@@ -123,10 +102,10 @@ Modern Responsive Web Design,,12,CSS Grid - 1 (+ CSS Grid - 1 | Properties),d9c3
 Modern Responsive Web Design,,13,CSS Grid - 2,5a556365-1d91-413a-ac4d-ef58945a31f3
 Modern Responsive Web Design,,14,CSS Grid - 3,0e3e1d38-c053-46d0-bad4-fb9086dfda81
 Modern Responsive Web Design,,15,CSS Grid - 4 (+ Flexbox vs Grid),b7ce76dc-81b5-49cd-a329-adcd844e36fe; e8223d96-de34-436e-8115-0a38ef08660e
-Modern Responsive Web Design,,16,CSS Positioning | Part 1,5c88d5e1-f288-4445-9af6-54f5470e3f5d
-Modern Responsive Web Design,,17,CSS Positioning | Part 2,61348839-aa7a-495e-8d77-93cd9adc2094
-Modern Responsive Web Design,,18,Introduction to Tailwind CSS,d4c4dbf0-d742-496c-8277-1694ffa6cbbd
-Modern Responsive Web Design,,19,Introduction to Tailwind CSS | Part 2,01b56d48-8181-47b5-89a5-f150d6b68f7f
+Modern Responsive Web Design,,16,CSS Positioning | Part 1,5c88d5e1-f288-4445-9af6-54f5470e3f5d; 72a4b194-cae4-4062-8d95-534ea00dce21
+Modern Responsive Web Design,,17,CSS Positioning | Part 2,61348839-aa7a-495e-8d77-93cd9adc2094; 2cb8c5db-684a-4ed2-945c-d236a829cb77
+Modern Responsive Web Design,,18,Introduction to Tailwind CSS,d4c4dbf0-d742-496c-8277-1694ffa6cbbd; 2d9adc90-3ef2-4400-8ecc-4aa4a85c3926
+Modern Responsive Web Design,,19,Introduction to Tailwind CSS | Part 2,01b56d48-8181-47b5-89a5-f150d6b68f7f; d526c649-3839-43f7-9a7d-46be7eba80fd
 Modern Responsive Web Design,,20,Building Responsive Website using Tailwind CSS,90e157d1-a561-4503-8f71-768ea60684c9
 Modern Responsive Web Design,,21,Building a Responsive Website using GenAI,f7db93dd-3b49-4d47-966d-c5cbea4e9dda
 Build Your Own Dynamic Web Application,c0d9b357-87a7-41e2-985f-affaef636499,1,Introduction to Dynamic Web Applications,6dc39559-a901-4fb2-a723-0a45875d28b9
@@ -156,38 +135,38 @@ Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,9,GCD & LC
 Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,10,Modulo Arithmetic - I,d18152e9-eacf-43f1-a94d-dc2f060bbe38; 48c07ca7-ccaa-4b2e-a414-484fd2259915
 Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,11,Modulo Arithmetic - II,83f012b8-7eb4-4411-85b7-adf9bbf8a7e0
 Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,12,Error Detection Techniques,78326daf-e803-43b2-b5a6-4b42a2c15567; 6352ad66-e26e-4562-bbc7-2e1a366376b2
-Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,13,Conditional Probability,498be89e-6309-4135-acb2-611a2e0d8d7f; 89b720c9-aa1b-40d1-82c5-ee58eb45c49d
-Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,14,Baye's Theorem & Expected Value,6c027719-3010-4a22-afd0-c2c0c5d8a43c; 6fb02d68-8278-4a9c-a6c0-ea6a14006a1d
-Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,15,Matrix Applications,54c53f1d-05eb-4191-b944-b7a914312c7a
+Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,13,Conditional Probability,498be89e-6309-4135-acb2-611a2e0d8d7f; 89b720c9-aa1b-40d1-82c5-ee58eb45c49d; a052883d-46a5-4adb-b2fc-2d82368225a1
+Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,14,Baye's Theorem & Expected Value,6c027719-3010-4a22-afd0-c2c0c5d8a43c; 6fb02d68-8278-4a9c-a6c0-ea6a14006a1d; c5015c85-f80e-435f-a253-ecaadbb35514
+Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,15,Matrix Applications,54c53f1d-05eb-4191-b944-b7a914312c7a; c617e846-174c-4650-93cc-7b4977396c03
 Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,16,"HP, Relation between AM, GM, & HM",859ff95c-a98a-4a04-b303-811fd0c4bc37
-Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,17,AGP Series,116b1da0-c0c2-4b0e-b97e-52cb41199f1e
-Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,18,Venn Diagrams and Applications,04d2a8aa-3d0a-41ca-b8f3-c6ed1b10bad9
-Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,19,Cartesian Products,b17f618f-f2bf-49df-a3c1-4c3b55e7070f
+Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,17,AGP Series,116b1da0-c0c2-4b0e-b97e-52cb41199f1e; 41c79015-b78c-4c96-b08b-3cbc336211a0
+Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,18,Venn Diagrams and Applications,04d2a8aa-3d0a-41ca-b8f3-c6ed1b10bad9; b64d3fd8-4d31-4930-b745-3d1dbf20a70f
+Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,19,Cartesian Products,b17f618f-f2bf-49df-a3c1-4c3b55e7070f; 6470f1b6-924e-4623-afa8-f268833b693b
 Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,20,Functions and Properties,1e49fd4c-54cb-42d0-a31c-fd689e2f5105
-Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,21,Binary Operations,c2bb5123-08f5-4c2d-94ba-6a9817a120b0
-Quantitative Aptitude,97671af2-f44f-4eed-978c-d65d5c0c55c9,1,Introduction,d0d6e6c5-075b-4450-978e-d247a4c10944
+Mathematics for Computer Science,70850c6b-459c-4134-a16c-3e42d46eb794,21,Binary Operations,c2bb5123-08f5-4c2d-94ba-6a9817a120b0; dea7d613-a400-4e38-8b4b-08412cbe0d21
+Quantitative Aptitude,97671af2-f44f-4eed-978c-d65d5c0c55c9,1,Introduction,d0d6e6c5-075b-4450-978e-d247a4c10944; 13ae3610-32c1-42e9-b6b6-0e5d8e148b99
 Quantitative Aptitude,97671af2-f44f-4eed-978c-d65d5c0c55c9,2,Numbers 1,879557a3-518c-4dd3-9da2-effaac444fea
-Quantitative Aptitude,97671af2-f44f-4eed-978c-d65d5c0c55c9,3,Power Cycles,126be18c-23f9-4d76-a92b-f43b3f94dc5a
+Quantitative Aptitude,97671af2-f44f-4eed-978c-d65d5c0c55c9,3,Power Cycles,126be18c-23f9-4d76-a92b-f43b3f94dc5a; 089145f6-73f6-4126-a97e-2a60c6b028ae; d078ae56-c727-4904-9ab9-35aba2993d10
 Quantitative Aptitude,97671af2-f44f-4eed-978c-d65d5c0c55c9,4,Numbers- CSMCQ PPT,2f93f6bd-09e7-4509-8c79-0bd82fe3a41e
-Quantitative Aptitude,97671af2-f44f-4eed-978c-d65d5c0c55c9,5,Basics and Properties,d63657ed-2221-493f-adf9-61434aeef192
-Quantitative Aptitude,97671af2-f44f-4eed-978c-d65d5c0c55c9,6,Multiples,12f37206-d3fd-4034-9463-a3a4eb781c33
-Quantitative Aptitude,97671af2-f44f-4eed-978c-d65d5c0c55c9,7,Factors,4c6785aa-1486-4ae5-9852-7c9d518ed152
+Quantitative Aptitude,97671af2-f44f-4eed-978c-d65d5c0c55c9,5,Basics and Properties,d63657ed-2221-493f-adf9-61434aeef192; 727bdc72-7469-45a3-800a-54108d042e85; ecc44aff-7035-45ac-b03b-f04c7981bda6
+Quantitative Aptitude,97671af2-f44f-4eed-978c-d65d5c0c55c9,6,Multiples,12f37206-d3fd-4034-9463-a3a4eb781c33; 35c2823c-c28c-4693-abd7-4e9cbaea7973; 6c83d11e-dcad-4457-b181-71ca03fe03b4
+Quantitative Aptitude,97671af2-f44f-4eed-978c-d65d5c0c55c9,7,Factors,4c6785aa-1486-4ae5-9852-7c9d518ed152; 29e3e96c-0fcf-491e-9261-aa801e26e344; 5e01a4e4-dbcc-4bec-b686-584848334e3e
 Quantitative Aptitude,97671af2-f44f-4eed-978c-d65d5c0c55c9,8,LCM & HCF - CSMCQ PPT,e02cf525-2024-4e4b-bcf8-8df2ad1ad2e5
-Quantitative Aptitude,97671af2-f44f-4eed-978c-d65d5c0c55c9,9,Percentages Basics,77e79a21-197e-47d4-8591-77d9c19386dc
-Quantitative Aptitude,97671af2-f44f-4eed-978c-d65d5c0c55c9,10,Percentages 1,cd2069ac-c307-4dbf-8030-2d71dc1a1ba5
-Quantitative Aptitude,97671af2-f44f-4eed-978c-d65d5c0c55c9,11,Percentages 2,bda03ca5-234b-4096-951b-4cbe8b3a35b3
-Quantitative Aptitude,97671af2-f44f-4eed-978c-d65d5c0c55c9,12,Profit & Loss,fc9e9e8b-5823-4710-8cac-f07592fc7d93
-Quantitative Aptitude,97671af2-f44f-4eed-978c-d65d5c0c55c9,13,Discount,364a66c5-ecb7-43af-8012-8a52422c1aba
-Quantitative Aptitude,97671af2-f44f-4eed-978c-d65d5c0c55c9,14,Company Specific Session - Percentages and profit & Loss,6b415c6a-2c90-4f3b-909d-9eb71b001731
-Quantitative Aptitude,97671af2-f44f-4eed-978c-d65d5c0c55c9,15,Simple Interest,86f123c7-c573-467b-8e96-640b4653cb6e
-Quantitative Aptitude,97671af2-f44f-4eed-978c-d65d5c0c55c9,16,Compound Interest,b949a74e-3957-4fca-bf16-2164bbd3ac1d
-Quantitative Aptitude,97671af2-f44f-4eed-978c-d65d5c0c55c9,17,Ratios,17e33962-2728-478c-953a-a6f2f5910b2e
-Quantitative Aptitude,97671af2-f44f-4eed-978c-d65d5c0c55c9,18,Proportions,0b0910a5-17c0-46a7-bbbc-295b99f15ce9
-Quantitative Aptitude,97671af2-f44f-4eed-978c-d65d5c0c55c9,19,Company Specific Session - SI & CI and Ratios & Proportions,bded0ea2-a870-4b8d-b3cc-da8951d8cd37
-Quantitative Aptitude,97671af2-f44f-4eed-978c-d65d5c0c55c9,20,Mixtures and Alligations,fb5e8448-f0b6-424e-ab06-7c8b92c72b74
-Quantitative Aptitude,97671af2-f44f-4eed-978c-d65d5c0c55c9,21,Partnerships,1ba163ed-0be0-4a2c-a04e-bc7a4ee1f28c
-Quantitative Aptitude,97671af2-f44f-4eed-978c-d65d5c0c55c9,22,Ages,21ee6f9c-a6ee-4451-91a9-2b5be6ddc703
-Quantitative Aptitude,97671af2-f44f-4eed-978c-d65d5c0c55c9,23,Averages,b605c977-67fc-4b76-b4d3-66e8d0de45d4
+Quantitative Aptitude,97671af2-f44f-4eed-978c-d65d5c0c55c9,9,Percentages Basics,77e79a21-197e-47d4-8591-77d9c19386dc; b8e17707-f361-4376-a640-ff6067a4e4d1; ace74921-6850-45b4-8247-51d46777a824
+Quantitative Aptitude,97671af2-f44f-4eed-978c-d65d5c0c55c9,10,Percentages 1,cd2069ac-c307-4dbf-8030-2d71dc1a1ba5; 6bdaf1ca-3e64-4fc5-906c-d7f672395dc4; 1ab51232-072a-49a5-80fd-044680d02963
+Quantitative Aptitude,97671af2-f44f-4eed-978c-d65d5c0c55c9,11,Percentages 2,bda03ca5-234b-4096-951b-4cbe8b3a35b3; ec97132c-f346-4b2e-99cf-78080c195933; 7718c3ac-b1c9-42cb-baff-ae51e69d1f6e
+Quantitative Aptitude,97671af2-f44f-4eed-978c-d65d5c0c55c9,12,Profit & Loss,fc9e9e8b-5823-4710-8cac-f07592fc7d93; 1732837a-714e-421f-9f84-5fc7816db21f; 9f976bbd-dfe2-4bd2-8c79-9445456b7712
+Quantitative Aptitude,97671af2-f44f-4eed-978c-d65d5c0c55c9,13,Discount,364a66c5-ecb7-43af-8012-8a52422c1aba; 9b955b4d-98ca-434a-922b-20ad7b6a2f4e; 39bbf016-0c81-41c1-832b-cbe31be0786a
+Quantitative Aptitude,97671af2-f44f-4eed-978c-d65d5c0c55c9,14,Company Specific Session - Percentages and profit & Loss,6b415c6a-2c90-4f3b-909d-9eb71b001731; a3e53bbb-9ed5-436b-92e9-86db7c760049
+Quantitative Aptitude,97671af2-f44f-4eed-978c-d65d5c0c55c9,15,Simple Interest,86f123c7-c573-467b-8e96-640b4653cb6e; 7a6185d7-7cd6-4232-b311-a6e1e4c28962
+Quantitative Aptitude,97671af2-f44f-4eed-978c-d65d5c0c55c9,16,Compound Interest,b949a74e-3957-4fca-bf16-2164bbd3ac1d; f1526ea4-8bb4-490e-8079-d8404aedea25
+Quantitative Aptitude,97671af2-f44f-4eed-978c-d65d5c0c55c9,17,Ratios,17e33962-2728-478c-953a-a6f2f5910b2e; 6bd9e586-a76c-4cc7-8875-acdc857ef923; 3ae3ed45-4f77-47f4-b9e3-ad33b738ca4f
+Quantitative Aptitude,97671af2-f44f-4eed-978c-d65d5c0c55c9,18,Proportions,0b0910a5-17c0-46a7-bbbc-295b99f15ce9; 502c2fe7-3efa-4768-bd3a-7cc9e27aadb1; 26fd4a22-b45e-47cf-b2a9-e4d867297fdd
+Quantitative Aptitude,97671af2-f44f-4eed-978c-d65d5c0c55c9,19,Company Specific Session - SI & CI and Ratios & Proportions,bded0ea2-a870-4b8d-b3cc-da8951d8cd37; 122a9789-71dd-47c5-9f68-663e9b130f50
+Quantitative Aptitude,97671af2-f44f-4eed-978c-d65d5c0c55c9,20,Mixtures and Alligations,fb5e8448-f0b6-424e-ab06-7c8b92c72b74; e3d61e0e-f8d3-4572-842b-1f1aaf32147e; 73545bfa-da05-44d9-9372-24786782013c
+Quantitative Aptitude,97671af2-f44f-4eed-978c-d65d5c0c55c9,21,Partnerships,1ba163ed-0be0-4a2c-a04e-bc7a4ee1f28c; a5c435e8-298b-4e38-ac9d-59ce4f34fa77
+Quantitative Aptitude,97671af2-f44f-4eed-978c-d65d5c0c55c9,22,Ages,21ee6f9c-a6ee-4451-91a9-2b5be6ddc703; cfc4af41-97bc-435b-ae13-4bdb9de4d3e1; 9454861a-63f2-42d8-bda4-1cde34db2ba7
+Quantitative Aptitude,97671af2-f44f-4eed-978c-d65d5c0c55c9,23,Averages,b605c977-67fc-4b76-b4d3-66e8d0de45d4; 88d212d2-804d-4922-a11c-5f97a59fd6f6
 Quantitative Aptitude,97671af2-f44f-4eed-978c-d65d5c0c55c9,24,"Company Specific Session - Mixtures & Allegations, Partnerships, Ages, Averages",32496df9-c677-4cc3-aa35-a0fd03725df6
 Quantitative Aptitude,97671af2-f44f-4eed-978c-d65d5c0c55c9,25,Basics & Average Speed,76174288-ce5a-4786-979b-a1b6da5779f0
 Quantitative Aptitude,97671af2-f44f-4eed-978c-d65d5c0c55c9,26,Relative Speed,d01ac7c6-13f2-494d-9c18-486a77b02ff9
@@ -343,15 +322,15 @@ Aptitude & Reasoning (course name not in sheet),3525d39d-b705-45a1-ac24-67291bf3
 Aptitude & Reasoning (course name not in sheet),3525d39d-b705-45a1-ac24-67291bf35bd6,15,Calendars 1,112fc93b-2fa1-404b-8404-21060b600549
 Aptitude & Reasoning (course name not in sheet),3525d39d-b705-45a1-ac24-67291bf35bd6,16,Calendars 2,1849f46a-eea7-4a7a-bb05-a2550173aeb4
 Aptitude & Reasoning (course name not in sheet),3525d39d-b705-45a1-ac24-67291bf35bd6,17,Company Specific Session - Clocks & Calendars,d7101f63-26a3-4d54-b996-a31e85f1979d
-Aptitude & Reasoning (course name not in sheet),3525d39d-b705-45a1-ac24-67291bf35bd6,18,DI Tables,e8d28bd5-11ed-43b2-9036-d9dce5b6b641
-Aptitude & Reasoning (course name not in sheet),3525d39d-b705-45a1-ac24-67291bf35bd6,19,DI Graphs,768ca3b7-3ff8-456e-8fe7-d6f961d7eb78
+Aptitude & Reasoning (course name not in sheet),3525d39d-b705-45a1-ac24-67291bf35bd6,18,DI Tables,e8d28bd5-11ed-43b2-9036-d9dce5b6b641; ebdc6548-7a78-4d84-af53-cded9a9f4710
+Aptitude & Reasoning (course name not in sheet),3525d39d-b705-45a1-ac24-67291bf35bd6,19,DI Graphs,768ca3b7-3ff8-456e-8fe7-d6f961d7eb78; 008f141a-0e3e-4240-a77b-bb82f365796b
 Aptitude & Reasoning (course name not in sheet),3525d39d-b705-45a1-ac24-67291bf35bd6,20,DI Pie Charts,15cd00c2-cc94-47f6-ae97-c3f8ee436ca3
 Aptitude & Reasoning (course name not in sheet),3525d39d-b705-45a1-ac24-67291bf35bd6,21,Company Specific Session - DI,a7a61f9f-369c-4a7b-b82d-ba8684af2021
-Aptitude & Reasoning (course name not in sheet),3525d39d-b705-45a1-ac24-67291bf35bd6,22,Ranking,fcf940b0-67e0-40a0-8ab9-595b5f3c3fed
-Aptitude & Reasoning (course name not in sheet),3525d39d-b705-45a1-ac24-67291bf35bd6,23,Directions,74021209-bd17-4213-97d2-bb7eee96ef49
+Aptitude & Reasoning (course name not in sheet),3525d39d-b705-45a1-ac24-67291bf35bd6,22,Ranking,fcf940b0-67e0-40a0-8ab9-595b5f3c3fed; 70d105b5-fbeb-425c-ab40-ece70d1e4686
+Aptitude & Reasoning (course name not in sheet),3525d39d-b705-45a1-ac24-67291bf35bd6,23,Directions,74021209-bd17-4213-97d2-bb7eee96ef49; 559d4116-44b4-4895-9fe1-5669f89bf902
 Aptitude & Reasoning (course name not in sheet),3525d39d-b705-45a1-ac24-67291bf35bd6,24,Company Specific Session - Ranking & Directions,a7e663f6-2f5b-4844-b02b-c55e79339da0
-Aptitude & Reasoning (course name not in sheet),3525d39d-b705-45a1-ac24-67291bf35bd6,25,Number Series,f40068e7-a3c9-4c97-ab33-9b181e86b598
-Aptitude & Reasoning (course name not in sheet),3525d39d-b705-45a1-ac24-67291bf35bd6,26,Alphabet Series,ad7058cd-8bf5-42ba-8fe4-2126997ddf27
+Aptitude & Reasoning (course name not in sheet),3525d39d-b705-45a1-ac24-67291bf35bd6,25,Number Series,f40068e7-a3c9-4c97-ab33-9b181e86b598; 693f71c7-4532-44a1-9372-53a746d4306c
+Aptitude & Reasoning (course name not in sheet),3525d39d-b705-45a1-ac24-67291bf35bd6,26,Alphabet Series,ad7058cd-8bf5-42ba-8fe4-2126997ddf27; 081e3499-bb58-47f2-821c-8d2b8ddefef0
 Aptitude & Reasoning (course name not in sheet),3525d39d-b705-45a1-ac24-67291bf35bd6,27,Odd Man Out & Analogies,610a0890-8c17-467b-9512-1b741841ddbc
 Aptitude & Reasoning (course name not in sheet),3525d39d-b705-45a1-ac24-67291bf35bd6,28,Coded Language,dec1510c-1baf-4e25-ba12-ae834da4b00f
 Aptitude & Reasoning (course name not in sheet),3525d39d-b705-45a1-ac24-67291bf35bd6,29,Company Specific Session - Coding & Decoding,0bd20f3a-9893-47a7-995c-00c3b53d3922
@@ -403,7 +382,7 @@ SQL (Introduction to Databases & SQL),25c1a72c-216e-47e1-9bc6-b2f16c66e0ca,13,SQ
 SQL (Introduction to Databases & SQL),25c1a72c-216e-47e1-9bc6-b2f16c66e0ca,14,SQL Case Clause and Set Operations,4cad287f-9250-425e-b14f-c65b9f48f5aa
 SQL (Introduction to Databases & SQL),25c1a72c-216e-47e1-9bc6-b2f16c66e0ca,15,Modelling Database | Part - 1,567a8e01-9978-4172-b7a8-5519ebfbd57f
 SQL (Introduction to Databases & SQL),25c1a72c-216e-47e1-9bc6-b2f16c66e0ca,16,Modeling Databases | Part 1 | Relationship,e293edc1-e185-4a0c-a85c-32521a7be1dc
-SQL (Introduction to Databases & SQL),25c1a72c-216e-47e1-9bc6-b2f16c66e0ca,17,Modelling Database | Part - 2,0a2ae056-1ce6-478c-960f-371c753b57a1
+SQL (Introduction to Databases & SQL),25c1a72c-216e-47e1-9bc6-b2f16c66e0ca,17,Modelling Database | Part - 2,0a2ae056-1ce6-478c-960f-371c753b57a1; 17647375-7aee-4e63-9850-2d264f95266c
 SQL (Introduction to Databases & SQL),25c1a72c-216e-47e1-9bc6-b2f16c66e0ca,18,Modelling Database | Part - 2 | Querying On Multiple Tables,48deab43-591e-4ef0-aabf-0398bbcb720f
 SQL (Introduction to Databases & SQL),25c1a72c-216e-47e1-9bc6-b2f16c66e0ca,19,Joins | Part - 1,45e7e6a3-16bf-47b8-bc1b-f6a5eb2467e9
 SQL (Introduction to Databases & SQL),25c1a72c-216e-47e1-9bc6-b2f16c66e0ca,20,Querying with Joins | Part - 2,a3796e06-1e98-4973-8a89-b013f44616ce
@@ -412,49 +391,49 @@ SQL (Introduction to Databases & SQL),25c1a72c-216e-47e1-9bc6-b2f16c66e0ca,22,Vi
 SQL (Introduction to Databases & SQL),25c1a72c-216e-47e1-9bc6-b2f16c66e0ca,23,Subqueries,fdba8007-d15c-42c9-b4c6-76b8fdabfffb
 SQL (Introduction to Databases & SQL),25c1a72c-216e-47e1-9bc6-b2f16c66e0ca,24,Transaction and Indexes,841b8569-2038-4197-8556-4271e832de1e
 "DBMS (Keys, Normalization, Transactions)",a3aa84c2-ac32-4ed5-81a9-f050566521e9,1,Keys in DBMS,70daba1c-a8e2-4af5-9246-5299be9b236e
-"DBMS (Keys, Normalization, Transactions)",a3aa84c2-ac32-4ed5-81a9-f050566521e9,2,Schema Refinement and Database Anomalies,b0b04c90-ced6-4170-afce-2209dba59470
-"DBMS (Keys, Normalization, Transactions)",a3aa84c2-ac32-4ed5-81a9-f050566521e9,3,Normalization and Functional Dependency,fdc3cef0-a6f8-435a-aecd-60dbf7f72d16
-"DBMS (Keys, Normalization, Transactions)",a3aa84c2-ac32-4ed5-81a9-f050566521e9,4,Normal Forms,e9a670e8-f3f7-415c-bef8-eb7f7715e8bd
+"DBMS (Keys, Normalization, Transactions)",a3aa84c2-ac32-4ed5-81a9-f050566521e9,2,Schema Refinement and Database Anomalies,b0b04c90-ced6-4170-afce-2209dba59470; a483b052-e9a8-42b0-bee6-6fb567fbd904
+"DBMS (Keys, Normalization, Transactions)",a3aa84c2-ac32-4ed5-81a9-f050566521e9,3,Normalization and Functional Dependency,fdc3cef0-a6f8-435a-aecd-60dbf7f72d16; 6119ff18-d835-4fe3-87f0-20a7f86524c6
+"DBMS (Keys, Normalization, Transactions)",a3aa84c2-ac32-4ed5-81a9-f050566521e9,4,Normal Forms,e9a670e8-f3f7-415c-bef8-eb7f7715e8bd; 24353b4b-d131-4fea-9bb4-181aa62332f8
 "DBMS (Keys, Normalization, Transactions)",a3aa84c2-ac32-4ed5-81a9-f050566521e9,5,Denormalization,7160e8c2-c898-4251-8ca6-02306aed21a3
 "DBMS (Keys, Normalization, Transactions)",a3aa84c2-ac32-4ed5-81a9-f050566521e9,6,Transaction and Concurrency Control,3f19d828-0b81-4123-9db9-2e8f7bd30458
-MongoDB,dd6794ae-5206-4bb4-af26-efdacd3668fd,1,Introduction to MongoDB,44ca047c-3034-4ed5-b4cf-f01f47e9e269
-MongoDB,dd6794ae-5206-4bb4-af26-efdacd3668fd,2,Getting Started with MongoDB,85c3087d-6e3d-4f8a-b7d6-c5e40a377bb3
-MongoDB,dd6794ae-5206-4bb4-af26-efdacd3668fd,3,Querying MongoDB - Part 1,e398793e-2e7f-4cd4-beff-a9727aa4fd8a
+MongoDB,dd6794ae-5206-4bb4-af26-efdacd3668fd,1,Introduction to MongoDB,44ca047c-3034-4ed5-b4cf-f01f47e9e269; 49496004-c603-4a3f-8759-4cc032dd01e2
+MongoDB,dd6794ae-5206-4bb4-af26-efdacd3668fd,2,Getting Started with MongoDB,85c3087d-6e3d-4f8a-b7d6-c5e40a377bb3; da21a59a-592c-481e-b0d4-134da3aa1c6c
+MongoDB,dd6794ae-5206-4bb4-af26-efdacd3668fd,3,Querying MongoDB - Part 1,e398793e-2e7f-4cd4-beff-a9727aa4fd8a; dede734a-d64b-47fc-9dcd-02d012b4bedc
 MongoDB,dd6794ae-5206-4bb4-af26-efdacd3668fd,4,Querying MongoDB - Part 1 | Projection,299cc79b-cb2d-4349-abd8-2d24816d9b03
-MongoDB,dd6794ae-5206-4bb4-af26-efdacd3668fd,5,Querying MongoDB - Part 2,e747902e-4e22-41a4-9866-ef8d380fbad7
+MongoDB,dd6794ae-5206-4bb4-af26-efdacd3668fd,5,Querying MongoDB - Part 2,e747902e-4e22-41a4-9866-ef8d380fbad7; a15d6975-36e5-4c19-abb8-2947b7a8b063
 MongoDB,dd6794ae-5206-4bb4-af26-efdacd3668fd,6,Querying MongoDB - Part 2 | Pagination,f3aa5232-fab8-4266-b48a-6ab7bcdf34a3
-MongoDB,dd6794ae-5206-4bb4-af26-efdacd3668fd,7,Grouping & Aggregations,5743f904-500e-40a0-a3db-4e5bc379af93
+MongoDB,dd6794ae-5206-4bb4-af26-efdacd3668fd,7,Grouping & Aggregations,5743f904-500e-40a0-a3db-4e5bc379af93; 58dc15da-b9ee-4336-bcf5-3519c6757c42
 MongoDB,dd6794ae-5206-4bb4-af26-efdacd3668fd,8,Grouping & Aggregations | Part 2,983ea66f-3f22-434d-8d94-ec476f4be3dd
-MongoDB,dd6794ae-5206-4bb4-af26-efdacd3668fd,9,Complex Field Types - Part 1,9f0a505f-3ca9-4173-87e6-9c5a9bfb04b0
-MongoDB,dd6794ae-5206-4bb4-af26-efdacd3668fd,10,Complex Field Types - Part 2,7f3803f9-f23b-47f7-bb6b-de483c123e42
+MongoDB,dd6794ae-5206-4bb4-af26-efdacd3668fd,9,Complex Field Types - Part 1,9f0a505f-3ca9-4173-87e6-9c5a9bfb04b0; a61a5856-b14e-4eb2-93b9-545ec0d218bf
+MongoDB,dd6794ae-5206-4bb4-af26-efdacd3668fd,10,Complex Field Types - Part 2,7f3803f9-f23b-47f7-bb6b-de483c123e42; 1e46aa64-a9dc-463d-b9f6-751670ac646f
 Probability & Statistics for ML (course name not in sheet),39ddb075-b7e8-448a-bac2-b89baa4fb3f4,1,Introduction to Probability & Statistics in ML,4bae337e-df6d-4a6e-9d63-875563343238
 Probability & Statistics for ML (course name not in sheet),39ddb075-b7e8-448a-bac2-b89baa4fb3f4,2,Introduction to Statistics & Datasets,419072ad-5a67-4cce-b15c-c6ad788ed10a
 Probability & Statistics for ML (course name not in sheet),39ddb075-b7e8-448a-bac2-b89baa4fb3f4,3,Data Visualization - I,afbbebe6-324c-4c39-b4e5-74b6102269af
 Probability & Statistics for ML (course name not in sheet),39ddb075-b7e8-448a-bac2-b89baa4fb3f4,4,Data Visualization - II,ee98a978-e592-47b0-99a5-dee02195a052
 Probability & Statistics for ML (course name not in sheet),39ddb075-b7e8-448a-bac2-b89baa4fb3f4,5,Data Visualization Implementation,c7bc7729-d4a8-4692-b398-a57d71ff0e1d
-Probability & Statistics for ML (course name not in sheet),39ddb075-b7e8-448a-bac2-b89baa4fb3f4,6,Measures of Central Tendency,85a5e120-ef21-45ca-9907-be323dfc4ac9
+Probability & Statistics for ML (course name not in sheet),39ddb075-b7e8-448a-bac2-b89baa4fb3f4,6,Measures of Central Tendency,85a5e120-ef21-45ca-9907-be323dfc4ac9; 99e7f723-2b9d-43c8-943d-9b9feae10bdd
 Probability & Statistics for ML (course name not in sheet),39ddb075-b7e8-448a-bac2-b89baa4fb3f4,7,Measures of Central Tendency Implementation,0a03c279-b3e7-4b81-900a-ebe73b99d9ea
-Probability & Statistics for ML (course name not in sheet),39ddb075-b7e8-448a-bac2-b89baa4fb3f4,8,Measures of Variability,1bf391f3-2514-4adf-9397-2ba7c02277df
+Probability & Statistics for ML (course name not in sheet),39ddb075-b7e8-448a-bac2-b89baa4fb3f4,8,Measures of Variability,1bf391f3-2514-4adf-9397-2ba7c02277df; 41edae5c-7c96-4b9b-916d-b6375b875414
 Probability & Statistics for ML (course name not in sheet),39ddb075-b7e8-448a-bac2-b89baa4fb3f4,9,Skewness and Outliers,975ecf7a-f669-489a-b619-cabe1af14fae
 Probability & Statistics for ML (course name not in sheet),39ddb075-b7e8-448a-bac2-b89baa4fb3f4,10,Measures of Variability Implementation,de6d97fe-1d8a-406e-866a-35511b04e15f
-Probability & Statistics for ML (course name not in sheet),39ddb075-b7e8-448a-bac2-b89baa4fb3f4,11,Basics of Probability,2e520ed5-e7ce-4418-8584-58c6f61be5f2
+Probability & Statistics for ML (course name not in sheet),39ddb075-b7e8-448a-bac2-b89baa4fb3f4,11,Basics of Probability,2e520ed5-e7ce-4418-8584-58c6f61be5f2; a0c675ce-3408-4e34-aae4-9550e331baa1
 Probability & Statistics for ML (course name not in sheet),39ddb075-b7e8-448a-bac2-b89baa4fb3f4,12,Probability Rules & Theorems,a9c334dd-d2ae-4e9a-aecd-995dcd8b239b
-Probability & Statistics for ML (course name not in sheet),39ddb075-b7e8-448a-bac2-b89baa4fb3f4,13,Conditional Probability,a94464fb-bfd0-45d3-9af8-94cb170ff6f7
+Probability & Statistics for ML (course name not in sheet),39ddb075-b7e8-448a-bac2-b89baa4fb3f4,13,Conditional Probability,a94464fb-bfd0-45d3-9af8-94cb170ff6f7; 9027bbdb-3919-4f95-8bfc-564cf0510304
 Probability & Statistics for ML (course name not in sheet),39ddb075-b7e8-448a-bac2-b89baa4fb3f4,14,Law of Partition and Total Probability,62bcd4c9-33a0-4a5d-8cb4-47cba3d30ce2
 Probability & Statistics for ML (course name not in sheet),39ddb075-b7e8-448a-bac2-b89baa4fb3f4,15,Skewness & Outliers Implementation,35480814-33d0-4b72-a17c-2681ca9d6d1d
 Probability & Statistics for ML (course name not in sheet),39ddb075-b7e8-448a-bac2-b89baa4fb3f4,16,Baye's Theorem and counting principles,0e93171a-f242-4f74-a587-34dceae3638a
 Probability & Statistics for ML (course name not in sheet),39ddb075-b7e8-448a-bac2-b89baa4fb3f4,17,Discrete Random Variables,93281bc2-f83e-4bc2-840d-6364c625afa0
 Probability & Statistics for ML (course name not in sheet),39ddb075-b7e8-448a-bac2-b89baa4fb3f4,18,Continuous Random Variables,dcbb9b55-2490-4bec-b7b2-cd5397d25833
-Probability & Statistics for ML (course name not in sheet),39ddb075-b7e8-448a-bac2-b89baa4fb3f4,19,Binomial Distribution,1b033b0c-bcc4-4ff1-aa65-c96d3bfc7e7c
+Probability & Statistics for ML (course name not in sheet),39ddb075-b7e8-448a-bac2-b89baa4fb3f4,19,Binomial Distribution,1b033b0c-bcc4-4ff1-aa65-c96d3bfc7e7c; 9392b42c-76ca-442c-9823-2dc8fe471195
 Probability & Statistics for ML (course name not in sheet),39ddb075-b7e8-448a-bac2-b89baa4fb3f4,20,Fundamentals of Probability Implementation,a0c30afb-ae3a-41e9-a3cd-ca6dee254cf5
-Probability & Statistics for ML (course name not in sheet),39ddb075-b7e8-448a-bac2-b89baa4fb3f4,21,Poisson Distribution,0eb04556-9cca-43d2-8cd5-8b58fa5709fe
+Probability & Statistics for ML (course name not in sheet),39ddb075-b7e8-448a-bac2-b89baa4fb3f4,21,Poisson Distribution,0eb04556-9cca-43d2-8cd5-8b58fa5709fe; 41da3364-6687-41c2-b262-6342c35de49a
 Probability & Statistics for ML (course name not in sheet),39ddb075-b7e8-448a-bac2-b89baa4fb3f4,22,Normal Distribution - I,ddf6abff-7815-46aa-bf20-0b071bc65c6b
 Probability & Statistics for ML (course name not in sheet),39ddb075-b7e8-448a-bac2-b89baa4fb3f4,23,Normal Distribution - II,16dcf874-eebe-4f0a-a3b3-905d47deab83
 Probability & Statistics for ML (course name not in sheet),39ddb075-b7e8-448a-bac2-b89baa4fb3f4,24,Other Continuous Probability Distributions,b03833b8-fc09-45ec-89b6-fde7c3f13e1f
 Probability & Statistics for ML (course name not in sheet),39ddb075-b7e8-448a-bac2-b89baa4fb3f4,25,Probability Distributions Implementation,102b1a11-349c-4b6a-8f4a-67a1822f653a
 Probability & Statistics for ML (course name not in sheet),39ddb075-b7e8-448a-bac2-b89baa4fb3f4,26,Introduction to Inferential Statistics,98c7bfe5-49d6-4cf2-889c-2c2a80600335
-Probability & Statistics for ML (course name not in sheet),39ddb075-b7e8-448a-bac2-b89baa4fb3f4,27,Introduction to Sampling,d4e3ae47-3b40-4488-8537-a1f27b01c4c5
-Probability & Statistics for ML (course name not in sheet),39ddb075-b7e8-448a-bac2-b89baa4fb3f4,28,Sampling Distribution,d47eb0e9-f2e6-458e-aca3-afd19e857359
+Probability & Statistics for ML (course name not in sheet),39ddb075-b7e8-448a-bac2-b89baa4fb3f4,27,Introduction to Sampling,d4e3ae47-3b40-4488-8537-a1f27b01c4c5; 203668dd-cb4b-495a-9eb3-4a1730981716
+Probability & Statistics for ML (course name not in sheet),39ddb075-b7e8-448a-bac2-b89baa4fb3f4,28,Sampling Distribution,d47eb0e9-f2e6-458e-aca3-afd19e857359; e4500fc4-ea82-43e2-8b3f-85e618f22f7d
 Probability & Statistics for ML (course name not in sheet),39ddb075-b7e8-448a-bac2-b89baa4fb3f4,29,Sampling Distribution - Central limit theorem Implementation,1d5aaacf-8eb2-4b9b-bc48-9d589aeb6e0a
 Probability & Statistics for ML (course name not in sheet),39ddb075-b7e8-448a-bac2-b89baa4fb3f4,30,Confidence Intervals & Confidence Levels,a9e7dc2d-5a31-4bd8-a6b6-9c8e84a8e23b
 Probability & Statistics for ML (course name not in sheet),39ddb075-b7e8-448a-bac2-b89baa4fb3f4,31,Testing of Hypothesis - Mean,51d8671e-64e2-4a30-94b6-7e2f0d82b6a3
@@ -467,8 +446,8 @@ Probability & Statistics for ML (course name not in sheet),39ddb075-b7e8-448a-ba
 Probability & Statistics for ML (course name not in sheet),39ddb075-b7e8-448a-bac2-b89baa4fb3f4,38,Covarience and Correlation,ff63f9ac-a256-49e9-b0a8-cbcb1559e7ab
 Probability & Statistics for ML (course name not in sheet),39ddb075-b7e8-448a-bac2-b89baa4fb3f4,39,Linear Regression,a22a60f0-662f-4065-8c57-74dc9a6b6cf4
 Probability & Statistics for ML (course name not in sheet),39ddb075-b7e8-448a-bac2-b89baa4fb3f4,40,Chi - Squared Test Implementation,ffc60461-3176-48b8-b15b-86b717c221e4
-Probability & Statistics for ML (course name not in sheet),39ddb075-b7e8-448a-bac2-b89baa4fb3f4,41,Multiple Linear Regression,80411b83-0872-4e96-83c4-69366d981298
-Probability & Statistics for ML (course name not in sheet),39ddb075-b7e8-448a-bac2-b89baa4fb3f4,42,Non - Linear Regression,6edd2373-f784-4acf-a46e-ecf74e5d2e80
+Probability & Statistics for ML (course name not in sheet),39ddb075-b7e8-448a-bac2-b89baa4fb3f4,41,Multiple Linear Regression,80411b83-0872-4e96-83c4-69366d981298; 2a2885b9-785f-45eb-94eb-dbd615330766
+Probability & Statistics for ML (course name not in sheet),39ddb075-b7e8-448a-bac2-b89baa4fb3f4,42,Non - Linear Regression,6edd2373-f784-4acf-a46e-ecf74e5d2e80; d49de8ff-4e21-4a61-8b8b-581ea084074d
 Probability & Statistics for ML (course name not in sheet),39ddb075-b7e8-448a-bac2-b89baa4fb3f4,43,Anova & F - Test Implementation,759dbae5-7f41-4544-9176-aae9bf33a4a5
 Probability & Statistics for ML (course name not in sheet),39ddb075-b7e8-448a-bac2-b89baa4fb3f4,44,Covariance and Correlation Implementation,46f38994-9c3b-46fc-86aa-41b54bf83197
 Node JS Backend Development (course name not in sheet),128b8668-816b-44eb-9f04-86a571b0b495,1,Introduction to Backend Development (+ Cloud IDE Walkthrough),f96ff5f5-ce13-46a4-a497-62adba933a57; 6a3d1968-448a-4d16-a4ff-fdfad1780390
@@ -497,10 +476,10 @@ Logical Reasoning (course name not in sheet),cd8b2378-67b5-4440-a0fe-915e5586aa9
 Logical Reasoning (course name not in sheet),cd8b2378-67b5-4440-a0fe-915e5586aa96,4,Blood Relations 1,518a02b2-c5b6-498d-99be-925ab4fbb683
 Logical Reasoning (course name not in sheet),cd8b2378-67b5-4440-a0fe-915e5586aa96,5,Blood Relations 2,76613305-b776-4871-8829-d012e1620200
 Logical Reasoning (course name not in sheet),cd8b2378-67b5-4440-a0fe-915e5586aa96,6,Company Specific Session - Arrangements & Blood relations,16beb9ea-81de-41ce-8e7e-02941fec3051
-Logical Reasoning (course name not in sheet),cd8b2378-67b5-4440-a0fe-915e5586aa96,7,Venn Diagrams,c524720d-a40f-407f-8de1-2f20112111c2
-Logical Reasoning (course name not in sheet),cd8b2378-67b5-4440-a0fe-915e5586aa96,8,Syllogisms 1,8ea5b9ce-397a-4aaf-a9d4-a0fe0da7992c
-Logical Reasoning (course name not in sheet),cd8b2378-67b5-4440-a0fe-915e5586aa96,9,Syllogisms 2,8da023e3-d1a8-4745-864a-a668346eef19
-Logical Reasoning (course name not in sheet),cd8b2378-67b5-4440-a0fe-915e5586aa96,10,Cubes,31f40562-2a7a-4f2b-92cf-94e2e6351449
+Logical Reasoning (course name not in sheet),cd8b2378-67b5-4440-a0fe-915e5586aa96,7,Venn Diagrams,c524720d-a40f-407f-8de1-2f20112111c2; e3470675-bacb-4347-8a00-1a9f16e1f9d8
+Logical Reasoning (course name not in sheet),cd8b2378-67b5-4440-a0fe-915e5586aa96,8,Syllogisms 1,8ea5b9ce-397a-4aaf-a9d4-a0fe0da7992c; 86157980-f4a4-4dd1-9e28-4c5f3a8c0b86
+Logical Reasoning (course name not in sheet),cd8b2378-67b5-4440-a0fe-915e5586aa96,9,Syllogisms 2,8da023e3-d1a8-4745-864a-a668346eef19; ef85275b-d586-4052-8c96-250206f37716
+Logical Reasoning (course name not in sheet),cd8b2378-67b5-4440-a0fe-915e5586aa96,10,Cubes,31f40562-2a7a-4f2b-92cf-94e2e6351449; c6d68d9b-77ae-4454-8708-e24a1168cce6
 Logical Reasoning (course name not in sheet),cd8b2378-67b5-4440-a0fe-915e5586aa96,11,"Company Specific Session - Venn Diagrams, Syllogisms, Cubes",5db32318-168e-4851-9c7d-bf799930e623
 Logical Reasoning (course name not in sheet),cd8b2378-67b5-4440-a0fe-915e5586aa96,12,Puzzles,8eb2f44b-0b13-49f1-9165-59b717866775
 Logical Reasoning (course name not in sheet),cd8b2378-67b5-4440-a0fe-915e5586aa96,13,Data Sufficiency,e58078fd-622b-4b6e-a927-5ade68fc03d0
@@ -508,17 +487,17 @@ Logical Reasoning (course name not in sheet),cd8b2378-67b5-4440-a0fe-915e5586aa9
 Logical Reasoning (course name not in sheet),cd8b2378-67b5-4440-a0fe-915e5586aa96,15,Counting Figures,a9b8a3c4-09ff-4537-b76f-fb7fb2a7bbdd
 Logical Reasoning (course name not in sheet),cd8b2378-67b5-4440-a0fe-915e5586aa96,16,Visual Reasoning,50fb32f5-9547-4857-84a6-01ac5a20d5f5
 English B2 - III Semester (course name not in sheet),77b1f18a-a2e4-413a-9515-a91c399e4831,1,Accuracy in Sentence Structure,d99f29b3-cd2b-48f0-a890-4295b61c22cb
-English B2 - III Semester (course name not in sheet),77b1f18a-a2e4-413a-9515-a91c399e4831,2,The Language of Connection (2 slots),5b98ba15-e9c3-483e-9eac-dafd31cb5dfc
+English B2 - III Semester (course name not in sheet),77b1f18a-a2e4-413a-9515-a91c399e4831,2,The Language of Connection (2 slots),5b98ba15-e9c3-483e-9eac-dafd31cb5dfc; 7916d8c0-5a22-465a-93d4-e020cd0dc1bb
 English B2 - III Semester (course name not in sheet),77b1f18a-a2e4-413a-9515-a91c399e4831,3,Mastering the Art of Discussion,2333f825-b8df-49c8-b1a1-1c34ffd8a129
-English B2 - III Semester (course name not in sheet),77b1f18a-a2e4-413a-9515-a91c399e4831,4,Designing Clear Prompts,5b435121-ae78-4008-9a11-a551ff4f173e
+English B2 - III Semester (course name not in sheet),77b1f18a-a2e4-413a-9515-a91c399e4831,4,Designing Clear Prompts,5b435121-ae78-4008-9a11-a551ff4f173e; a0962cbf-81b1-48fe-820f-b78696eb2c6c
 English B2 - III Semester (course name not in sheet),77b1f18a-a2e4-413a-9515-a91c399e4831,5,Framing Effective Questions,d4ef5369-a2e0-417d-83f9-bc6cf6c9f3e8
 English B2 - III Semester (course name not in sheet),77b1f18a-a2e4-413a-9515-a91c399e4831,6,Emphasizing Self-Expression,fa58517c-a91d-4a6e-97ae-cc2d38bdb593
-English B2 - III Semester (course name not in sheet),77b1f18a-a2e4-413a-9515-a91c399e4831,7,Expressing Possibility and Obligation,46a48b65-c270-49ad-bf46-d98aa68d0bc4
+English B2 - III Semester (course name not in sheet),77b1f18a-a2e4-413a-9515-a91c399e4831,7,Expressing Possibility and Obligation,46a48b65-c270-49ad-bf46-d98aa68d0bc4; aacb92ab-1d6e-4529-817c-0e51378abfbd
 English B2 - III Semester (course name not in sheet),77b1f18a-a2e4-413a-9515-a91c399e4831,8,Rephrasing Speech Accurately,59f3bcb1-fd4f-4c6f-94c1-9af0eb4d7325
 English B2 - III Semester (course name not in sheet),77b1f18a-a2e4-413a-9515-a91c399e4831,9,Shifting Focus in Communication,f90dc415-3eab-43a6-a155-218709279f1e
 English B2 - III Semester (course name not in sheet),77b1f18a-a2e4-413a-9515-a91c399e4831,10,Improving Natural Fluency,aadb5854-3547-40b8-b8e4-394355e2ff47
-English B2 - III Semester (course name not in sheet),77b1f18a-a2e4-413a-9515-a91c399e4831,11,Balancing Ideas Clearly (Enhancing Communicative Style),92bffb55-d466-48c9-b850-71965a0af66f
-English B2 - III Semester (course name not in sheet),77b1f18a-a2e4-413a-9515-a91c399e4831,12,Managing Hesitation and Emphasizing Key Points,3cc30236-a825-47d6-a601-01938bb657ff
+English B2 - III Semester (course name not in sheet),77b1f18a-a2e4-413a-9515-a91c399e4831,11,Balancing Ideas Clearly (Enhancing Communicative Style),92bffb55-d466-48c9-b850-71965a0af66f; 838db061-69a7-4fa9-888c-ed0e3de0d986
+English B2 - III Semester (course name not in sheet),77b1f18a-a2e4-413a-9515-a91c399e4831,12,Managing Hesitation and Emphasizing Key Points,3cc30236-a825-47d6-a601-01938bb657ff; 8be5d43b-b15c-4205-82d4-f7b5441dff29
 "DSA II - Hashing, Linked Lists, Stacks, Trees, Heaps (course name not in sheet)",9e370332-c9dd-4778-9e65-e5d7f75c24f3,1,Hashing,30982e6a-375b-45a4-97b1-0e3b447a7d2a
 "DSA II - Hashing, Linked Lists, Stacks, Trees, Heaps (course name not in sheet)",9e370332-c9dd-4778-9e65-e5d7f75c24f3,2,Prefix Sum,a7b2fb3a-e3aa-4723-a241-8f47574197f9
 "DSA II - Hashing, Linked Lists, Stacks, Trees, Heaps (course name not in sheet)",9e370332-c9dd-4778-9e65-e5d7f75c24f3,3,"Sliding Window, Two-Pointer Technique",bc9f4ac1-9b60-43b9-9da3-b864a8ae993a
@@ -542,22 +521,22 @@ English B2 - III Semester (course name not in sheet),77b1f18a-a2e4-413a-9515-a91
 "DSA II - Hashing, Linked Lists, Stacks, Trees, Heaps (course name not in sheet)",9e370332-c9dd-4778-9e65-e5d7f75c24f3,21,Introduction of Stack,ffd5e1f6-ac64-427e-b3e0-8825de0494da
 "DSA II - Hashing, Linked Lists, Stacks, Trees, Heaps (course name not in sheet)",9e370332-c9dd-4778-9e65-e5d7f75c24f3,22,Stack Implementation Using Array,4aa9d6fa-3857-47ed-9f21-2df397cee883
 "DSA II - Hashing, Linked Lists, Stacks, Trees, Heaps (course name not in sheet)",9e370332-c9dd-4778-9e65-e5d7f75c24f3,23,Stack Implementation Using Linked List,4b50cc7c-0254-4be8-ba6d-af806d9434ee
-"DSA II - Hashing, Linked Lists, Stacks, Trees, Heaps (course name not in sheet)",9e370332-c9dd-4778-9e65-e5d7f75c24f3,24,Introduction to Monotonic Stacks (+ Next Greater Element),07c8f2bc-396b-4df1-97f1-2a731bd27fe3; f5938e44-316b-470b-9451-f7572ffd9576
-"DSA II - Hashing, Linked Lists, Stacks, Trees, Heaps (course name not in sheet)",9e370332-c9dd-4778-9e65-e5d7f75c24f3,25,"Infix, Prefix, and Postfix Notations",5d17cca8-e827-460f-bda4-1e98fff12755
+"DSA II - Hashing, Linked Lists, Stacks, Trees, Heaps (course name not in sheet)",9e370332-c9dd-4778-9e65-e5d7f75c24f3,24,Introduction to Monotonic Stacks (+ Next Greater Element),07c8f2bc-396b-4df1-97f1-2a731bd27fe3; f5938e44-316b-470b-9451-f7572ffd9576; 6ba8b6cf-5227-48dc-be82-bbaf4dc02386
+"DSA II - Hashing, Linked Lists, Stacks, Trees, Heaps (course name not in sheet)",9e370332-c9dd-4778-9e65-e5d7f75c24f3,25,"Infix, Prefix, and Postfix Notations",5d17cca8-e827-460f-bda4-1e98fff12755; 4c8d26ce-c295-44a0-83d1-5a7da8947a91
 "DSA II - Hashing, Linked Lists, Stacks, Trees, Heaps (course name not in sheet)",9e370332-c9dd-4778-9e65-e5d7f75c24f3,26,Implement Min Stack,94135436-b8d5-44b3-acc6-e0a1bc6e3523
 "DSA II - Hashing, Linked Lists, Stacks, Trees, Heaps (course name not in sheet)",9e370332-c9dd-4778-9e65-e5d7f75c24f3,27,Balanced Parenthesis,62e7b259-70f8-407d-861f-2086d0053dcd
-"DSA II - Hashing, Linked Lists, Stacks, Trees, Heaps (course name not in sheet)",9e370332-c9dd-4778-9e65-e5d7f75c24f3,28,Asteroid Collision,c3231d08-d11d-44f1-a88f-87643172ea96
-"DSA II - Hashing, Linked Lists, Stacks, Trees, Heaps (course name not in sheet)",9e370332-c9dd-4778-9e65-e5d7f75c24f3,29,Largest Rectangle In Histogram,ec7d727f-3233-4489-8145-c33ff54e54d5
+"DSA II - Hashing, Linked Lists, Stacks, Trees, Heaps (course name not in sheet)",9e370332-c9dd-4778-9e65-e5d7f75c24f3,28,Asteroid Collision,c3231d08-d11d-44f1-a88f-87643172ea96; 56ddecc9-f4e1-4e00-bc15-f9042941e1ee
+"DSA II - Hashing, Linked Lists, Stacks, Trees, Heaps (course name not in sheet)",9e370332-c9dd-4778-9e65-e5d7f75c24f3,29,Largest Rectangle In Histogram,ec7d727f-3233-4489-8145-c33ff54e54d5; 10dc091f-062c-4fd2-b313-30153de266bc
 "DSA II - Hashing, Linked Lists, Stacks, Trees, Heaps (course name not in sheet)",9e370332-c9dd-4778-9e65-e5d7f75c24f3,30,Queue - Introduction & Implementation Using Arrays,3386ad2f-071a-47ca-ab74-d5a73d31c5b0
 "DSA II - Hashing, Linked Lists, Stacks, Trees, Heaps (course name not in sheet)",9e370332-c9dd-4778-9e65-e5d7f75c24f3,31,Queue Implementation Using Linked List,83d071ae-5456-484c-a65b-7a264d7909f8
 "DSA II - Hashing, Linked Lists, Stacks, Trees, Heaps (course name not in sheet)",9e370332-c9dd-4778-9e65-e5d7f75c24f3,32,Implement Stack Using Queue,186fd8d0-4b98-4643-afb0-5d8962bce01d
 "DSA II - Hashing, Linked Lists, Stacks, Trees, Heaps (course name not in sheet)",9e370332-c9dd-4778-9e65-e5d7f75c24f3,33,Implement Queue Using Stack (Part 1 + Part 2),a6fda753-2ee8-4263-894a-699f9db5971a; bb0389c2-2af9-437b-819e-9e3d165b29de
-"DSA II - Hashing, Linked Lists, Stacks, Trees, Heaps (course name not in sheet)",9e370332-c9dd-4778-9e65-e5d7f75c24f3,34,Introduction to Binary Trees,a25d2d17-2163-41b6-8517-3eb586f60e6e
+"DSA II - Hashing, Linked Lists, Stacks, Trees, Heaps (course name not in sheet)",9e370332-c9dd-4778-9e65-e5d7f75c24f3,34,Introduction to Binary Trees,a25d2d17-2163-41b6-8517-3eb586f60e6e; 6421fce6-b3ad-48af-8d21-0eb373aae654
 "DSA II - Hashing, Linked Lists, Stacks, Trees, Heaps (course name not in sheet)",9e370332-c9dd-4778-9e65-e5d7f75c24f3,35,Binary Tree Traversals,26262c62-0f31-4a88-ae9f-db0f6f46af15
-"DSA II - Hashing, Linked Lists, Stacks, Trees, Heaps (course name not in sheet)",9e370332-c9dd-4778-9e65-e5d7f75c24f3,36,Pre-Order Traversal,a75602b5-47e8-4921-b4d1-62d59a25ed93
+"DSA II - Hashing, Linked Lists, Stacks, Trees, Heaps (course name not in sheet)",9e370332-c9dd-4778-9e65-e5d7f75c24f3,36,Pre-Order Traversal,a75602b5-47e8-4921-b4d1-62d59a25ed93; 208384d7-eb47-497e-8c6e-c939308604d7
 "DSA II - Hashing, Linked Lists, Stacks, Trees, Heaps (course name not in sheet)",9e370332-c9dd-4778-9e65-e5d7f75c24f3,37,In-Order Traversal,ec6e71a9-d5dd-4d58-9e5a-3612f7e65b19
 "DSA II - Hashing, Linked Lists, Stacks, Trees, Heaps (course name not in sheet)",9e370332-c9dd-4778-9e65-e5d7f75c24f3,38,Post-Order Traversal,99e859a9-98ed-41a2-a1e3-b664daef3c12
-"DSA II - Hashing, Linked Lists, Stacks, Trees, Heaps (course name not in sheet)",9e370332-c9dd-4778-9e65-e5d7f75c24f3,39,Level Order Traversal,64b29ae7-9288-4d32-9f8d-a10165418c46
+"DSA II - Hashing, Linked Lists, Stacks, Trees, Heaps (course name not in sheet)",9e370332-c9dd-4778-9e65-e5d7f75c24f3,39,Level Order Traversal,64b29ae7-9288-4d32-9f8d-a10165418c46; 9a64e3d4-5950-4f1d-b9e7-9eeb77c4a667
 "DSA II - Hashing, Linked Lists, Stacks, Trees, Heaps (course name not in sheet)",9e370332-c9dd-4778-9e65-e5d7f75c24f3,40,Height of a Binary Tree,ae241876-99cf-4c34-95d6-bd20986ed9e4
 "DSA II - Hashing, Linked Lists, Stacks, Trees, Heaps (course name not in sheet)",9e370332-c9dd-4778-9e65-e5d7f75c24f3,41,Balanced Binary Tree,f15b86c0-770a-4e04-a188-00ea0d87ff99
 "DSA II - Hashing, Linked Lists, Stacks, Trees, Heaps (course name not in sheet)",9e370332-c9dd-4778-9e65-e5d7f75c24f3,42,Diameter Of Binary Tree,07ecaacc-dc2e-4b38-8a7a-e2989d07289f
@@ -572,9 +551,9 @@ English B2 - III Semester (course name not in sheet),77b1f18a-a2e4-413a-9515-a91
 "DSA II - Hashing, Linked Lists, Stacks, Trees, Heaps (course name not in sheet)",9e370332-c9dd-4778-9e65-e5d7f75c24f3,51,Validate a Binary Search Tree,040714f2-1dd8-4a12-9c8c-84c6d5e20f76
 "DSA II - Hashing, Linked Lists, Stacks, Trees, Heaps (course name not in sheet)",9e370332-c9dd-4778-9e65-e5d7f75c24f3,52,Predecessor and Successor in BST,82e8c910-9fd0-45ce-9480-7ff66b0ea535
 "DSA II - Hashing, Linked Lists, Stacks, Trees, Heaps (course name not in sheet)",9e370332-c9dd-4778-9e65-e5d7f75c24f3,53,Merge Two BSTs,bdfe95bc-328d-42bd-a037-8d4e8388ecd0
-"DSA II - Hashing, Linked Lists, Stacks, Trees, Heaps (course name not in sheet)",9e370332-c9dd-4778-9e65-e5d7f75c24f3,54,Introduction to Heaps,6677c40b-efcc-4de8-8d5b-5634dd921d30
+"DSA II - Hashing, Linked Lists, Stacks, Trees, Heaps (course name not in sheet)",9e370332-c9dd-4778-9e65-e5d7f75c24f3,54,Introduction to Heaps,6677c40b-efcc-4de8-8d5b-5634dd921d30; aa00dc02-d98d-4ee9-b390-d6fb8ce6aaf9
 "DSA II - Hashing, Linked Lists, Stacks, Trees, Heaps (course name not in sheet)",9e370332-c9dd-4778-9e65-e5d7f75c24f3,55,Implementation of Binary Heap,6062b6a3-274b-40a9-bb77-22efad6d0c42
-"DSA II - Hashing, Linked Lists, Stacks, Trees, Heaps (course name not in sheet)",9e370332-c9dd-4778-9e65-e5d7f75c24f3,56,Heapsort Algorithm,ea4fef16-7357-4235-9522-9fdf593081fc
+"DSA II - Hashing, Linked Lists, Stacks, Trees, Heaps (course name not in sheet)",9e370332-c9dd-4778-9e65-e5d7f75c24f3,56,Heapsort Algorithm,ea4fef16-7357-4235-9522-9fdf593081fc; 8b608c2a-f77f-46bc-83db-7badb03852a1
 "DSA II - Hashing, Linked Lists, Stacks, Trees, Heaps (course name not in sheet)",9e370332-c9dd-4778-9e65-e5d7f75c24f3,57,Max Heap Validation,bd02361e-7f01-43db-88ba-ce22323b0e30
 "DSA II - Hashing, Linked Lists, Stacks, Trees, Heaps (course name not in sheet)",9e370332-c9dd-4778-9e65-e5d7f75c24f3,58,Convert Min Heap to Max Heap,8895872b-bd19-41d6-b3af-ff41bd733074
 "DSA II - Hashing, Linked Lists, Stacks, Trees, Heaps (course name not in sheet)",9e370332-c9dd-4778-9e65-e5d7f75c24f3,59,Kth Largest Element in an Array (Part 1 + Part 2),4c24d406-08de-4b35-a169-fc3005faab33; 29ae2136-e3a3-4c56-8e9d-8a831e22071c
@@ -601,13 +580,13 @@ AI for Finance (course name not in sheet),85dac569-85f5-4205-b71a-e86327f39b92,1
 Introduction to Gen AI,,1,Your Learning Journey,64025833-d46d-4e7c-a7e0-a9c230a78b9d
 Introduction to Gen AI,,2,Generative AI Foundations,55622f8d-b358-4a7a-bfd7-a32ee81a41df
 Introduction to Gen AI,,3,Exploring Gen AI Capabilities,e96a1a8c-564d-448e-8ffd-b45b9de894f4
-Introduction to Gen AI,,4,Productivity Power Up with AI Tools,e1e7b4a3-c289-41ea-9543-4562eb1f1b52
+Introduction to Gen AI,,4,Productivity Power Up with AI Tools,e1e7b4a3-c289-41ea-9543-4562eb1f1b52; 60226c27-26cf-4f9d-bf19-fc434231e781
 Introduction to Gen AI,,5,Prompt Engineering Fundamentals,ce7280f1-375d-4165-91fc-f6d4593435f0
 Introduction to Gen AI,,6,Building Social Media Content Automation Workflow | Part - 1,8af9ec3b-c768-4058-9d04-daeda5d0ec8b
 Introduction to Gen AI,,7,Building Social Media Content Automation Workflow | Part - 2 (+ Setting Up Google OAuth 2.0 for n8n),f062acff-6aea-4c69-8659-ba51c4ccbde6; b6d8e5ed-7734-4324-add0-2edc5accefbb
 Introduction to Gen AI,,8,Advanced Prompt Engineering,61d3d704-b2e5-4225-a2af-3d440779a5f6
-Introduction to Gen AI,,9,Build Your Own AI News Summarizer | Part - 1,7460a296-46d2-4525-a03a-d7c8278ba82b
-Introduction to Gen AI,,10,Build Your Own AI News Summarizer | Part - 2,87dd60b0-6c70-4fab-b5b2-a80ef109a96e
+Introduction to Gen AI,,9,Build Your Own AI News Summarizer | Part - 1,7460a296-46d2-4525-a03a-d7c8278ba82b; deb381fe-8aa9-44b6-883a-fd5a0c617e40
+Introduction to Gen AI,,10,Build Your Own AI News Summarizer | Part - 2,87dd60b0-6c70-4fab-b5b2-a80ef109a96e; be5189fe-272d-48af-9485-cb4535a27401
 Introduction to Gen AI,,11,Build Your Own AI News Summarizer | Part - 3,e97d82f0-c1d1-4598-ad8c-3dae3ebd8442
 Introduction to Gen AI,,12,Productivity Power-Up with AI Tools | Part 2,21a0cf8e-35e9-4c49-90ce-3e7de9e83307
 Introduction to Gen AI,,13,Mastering Image Generation,f08c1eea-a8e2-4c2f-b7a2-3c3f2a999745
