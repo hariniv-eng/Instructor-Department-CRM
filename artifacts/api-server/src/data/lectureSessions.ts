@@ -640,7 +640,8 @@ export const LECTURE_COURSES: LectureCourse[] = [
     "n": 19,
     "name": "Introduction to HTML5",
     "unitIds": [
-     "981300031b234f3c9dbd70e3ec1ae75b"
+     "981300031b234f3c9dbd70e3ec1ae75b",
+     "9065d05557fb4f3c882951950964c8f3"
     ]
    },
    {
