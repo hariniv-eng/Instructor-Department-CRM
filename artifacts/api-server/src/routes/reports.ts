@@ -9,6 +9,7 @@ import { TECH_AREAS, normalizeSubjectArea } from "../lib/departmentTaxonomy";
 import { isPinnedConfirmedInstructor } from "../data/classificationOverrides";
 import { productOf } from "../lib/product";
 import { taughtSubjectColumn, courseColumnOf, portalColumnOf, TAUGHT_SUBJECT_COLUMNS } from "../lib/connectors/taughtTraining";
+import { LECTURE_COURSES } from "../data/lectureSessions";
 
 // Pinned edge-case instructors (NW0005068): see isPinnedConfirmedInstructor() in
 // data/classificationOverrides.ts. Kept counted on every sync until their Darwin
@@ -1510,6 +1511,7 @@ router.get("/reports/training-stats", requireAuth, requireRole("admin"), async (
 // its courses as columns and one row per instructor. Course -> subject is worked out here (taughtSubjectColumn: by id, else by title;
 // orientation/intro courses left out), so changing it needs no re-sync. Completed = 80%+. Admin-only. Reads defensively.
 const TAUGHT_COMPLETED_PCT = 80;
+const NON_TECH_TAUGHT_SUBJECTS = new Set(["English", "Aptitude", "Maths"]);
 const isNiatInstructor = (p: typeof instructorsTable.$inferSelect) =>
   productOf(p) === "NIAT (Deployed)" && (!p.enrolledPlans || /niat/i.test(p.enrolledPlans));
 router.get("/reports/taught-training", requireAuth, requireRole("admin"), async (_req, res) => {
@@ -1538,6 +1540,11 @@ router.get("/reports/taught-training", requireAuth, requireRole("admin"), async 
     const key = portal?.key ?? named.key;
     // Courses of the lecture list that are not on the Training Stats list carry their own subject (2026-10-26).
     const subject = portal?.subject ?? t.courseSubject ?? taughtSubjectColumn(t.courseId, t.courseTitle)!;
+    // Tech / non-tech split (2026-10-26, per request): an instructor whose subject is English, Aptitude or Maths is shown only under
+    // the non-tech subjects, and a tech instructor (Frontend / Backend / DSA / GenAI) only under the tech ones. Someone with no subject
+    // on file is shown everywhere they taught.
+    const area = normalizeSubjectArea(byUid.get(t.instructorUserId)!.deptArea || byUid.get(t.instructorUserId)!.manualDeptArea || null);
+    if (area && NON_TECH_TAUGHT_SUBJECTS.has(area) !== NON_TECH_TAUGHT_SUBJECTS.has(subject)) continue;
     if (!cellsByUid.has(t.instructorUserId)) cellsByUid.set(t.instructorUserId, {});
     const cells = cellsByUid.get(t.instructorUserId)!;
     const prev = cells[key];
@@ -1545,13 +1552,23 @@ router.get("/reports/taught-training", requireAuth, requireRole("admin"), async 
     const lastDate = [prev?.last_taught_date, t.lastTaughtDate].filter((d): d is string => !!d).sort().pop() ?? null;
     cells[key] = { completed, curriculum, scheduled: (prev?.scheduled ?? 0) + t.scheduledSessions, pct: pct(completed, curriculum), last_taught_date: lastDate,
       institutes: [...new Set([...(prev?.institutes ?? []), ...t.institutes])], taught_as: [...new Set([...(prev?.taught_as ?? []), ...(t.taughtTopics ?? [])])] };
-    const order = portal ? TRAINING_COURSE_TAXONOMY.findIndex((d) => `portal:${d.key}` === key) : 10000;
-    const c = courses.get(key) ?? { course_id: key, title: portal?.title ?? named.title, subject, instructors: 0, curriculum_max: 0, portal: !!portal, order, taught_as: [] };
+    // Courses of the lecture list that are not on the Training Stats list follow the lecture list's order (2026-10-26, per request:
+    // in DSA, "DSA (C++)" first, then "DSA II").
+    const lectureIdx = t.courseId.startsWith("lecture:") ? LECTURE_COURSES.findIndex((c) => c.key === t.courseId.slice("lecture:".length)) : -1;
+    const order = portal ? TRAINING_COURSE_TAXONOMY.findIndex((d) => `portal:${d.key}` === key) : 10000 + (lectureIdx >= 0 ? lectureIdx : 999);
+    const c = courses.get(key) ?? { course_id: key, title: (t.courseId.startsWith("lecture:") ? t.courseTitle : portal?.title) ?? named.title, subject, instructors: 0, curriculum_max: 0, portal: !!portal, order, taught_as: [] };
     if (!prev) c.instructors += 1;
     c.curriculum_max = Math.max(c.curriculum_max, curriculum);
     for (const name of t.taughtTopics ?? []) if (!c.taught_as.includes(name)) c.taught_as.push(name);
     courses.set(key, c);
   }
+  // Hide instructors with nothing taught (2026-10-26, per request): someone whose every course is at 0% (no completed lecture) is not
+  // shown. If they have completed lectures in at least one course they are shown, with all their courses. Course head counts and
+  // columns are recounted from the people who remain.
+  for (const [uid, cells] of [...cellsByUid]) if (!Object.values(cells).some((c) => c.completed > 0)) cellsByUid.delete(uid);
+  for (const c of courses.values()) c.instructors = 0;
+  for (const cells of cellsByUid.values()) for (const key of Object.keys(cells)) { const c = courses.get(key); if (c) c.instructors += 1; }
+  for (const [key, c] of [...courses]) if (!c.instructors) courses.delete(key);
   const rows = [...cellsByUid].map(([uid, cells]) => {
     const p = byUid.get(uid)!;
     return {
