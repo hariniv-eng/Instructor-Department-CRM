@@ -27,7 +27,7 @@ async function main() {
               STRING_AGG(DISTINCT CAST(session_status AS STRING), '/') AS status, ANY_VALUE(session_type) AS type,
               ${batch ? "ANY_VALUE(CAST(batch_name AS STRING))" : "NULL"} AS batch, ANY_VALUE(learning_portal_course_title) AS course,
               ANY_VALUE(session_title) AS title,
-              ARRAY_AGG(DISTINCT STRUCT(REPLACE(LOWER(IFNULL(resource_id, '')), '-', '') AS id, IFNULL(resource_title, '') AS rt)) AS res
+              STRING_AGG(DISTINCT CONCAT(REPLACE(LOWER(IFNULL(resource_id, '')), '-', ''), '^^', IFNULL(resource_title, '')), '~~') AS res
             FROM ${t}
             WHERE instructor_user_id = @id AND session_start_datetime <= CURRENT_DATETIME()
             GROUP BY session_id ORDER BY start`,
@@ -37,8 +37,8 @@ async function main() {
   console.log(`${employeeId} · ${rows.length} sessions\n`);
   console.log("# | date time | status | type | batch | portal course | session title | unit(s) used");
   (rows as Record<string, unknown>[]).forEach((r, i) => {
-    const res = ((r.res as { id: string; rt: string }[]) ?? []).filter((x) => x.id || x.rt)
-      .map((x) => lectureName.get(x.id) ?? x.rt ?? x.id).join(" ; ");
+    const res = plain(r.res).split("~~").map((x) => { const [id = "", rt = ""] = x.split("^^"); return { id, rt }; }).filter((x) => x.id || x.rt)
+      .map((x) => lectureName.get(x.id) ?? (x.rt || x.id)).join(" ; ");
     console.log(`${i + 1} | ${plain(r.start).slice(0, 16)} | ${plain(r.status)} | ${plain(r.type)} | ${plain(r.batch) || "-"} | ${plain(r.course) || "-"} | ${plain(r.title) || "-"} | ${res || "-"}`);
   });
   process.exit(0);
