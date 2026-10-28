@@ -7,7 +7,7 @@
 //
 // Matching a demo to a lecture: by TOPIC NAME. The demo's session_id is the QA tool's own topic ID -- it matches no learning-portal unit
 // or topic (checked 2026-10-28), so unit IDs cannot be used here. The topic name is compared to the lecture names of
-// data/lectureSessions.ts (lower case, letters/digits only; "&" = "and"; both halves of a combined name like "CSS Grid - 4 (+ Flexbox vs
+// data/lectureSessions.ts with demoNameKey() below (lower case, letters/digits only; "&" = "and"; both halves of a combined name like "CSS Grid - 4 (+ Flexbox vs
 // Grid)" count). A name found in several courses (e.g. "Introduction" in three Aptitude courses, "Bitwise Operators" in Maths and DSA) goes
 // to the course(s) of the instructor's own subject; if none fits, to the course(s) on the same tech / non-tech side; else to all of them.
 import { BigQuery } from "@google-cloud/bigquery";
@@ -35,16 +35,41 @@ export type DemoCourseRow = {
 };
 
 const plain = (v: unknown): string => (v && typeof v === "object" && "value" in (v as object) ? String((v as { value: unknown }).value) : v == null ? "" : String(v));
-export const demoNameKey = (s: string) => s.toLowerCase().replace(/&/g, "and").replace(/[^a-z0-9]/g, "");
+// Topic-name key (2026-10-28, after the preview: 30% of demos did not match on the exact name). Both the demo topic and the lecture name go
+// through it: lower case; a trailing subject tag dropped ("Factors Quant", "Linear arrangements logical reasoning", "... adv aptitude");
+// a trailing "CSMCQ PPT" dropped ("LCM & HCF - CSMCQ PPT"); "&" = "and"; the word "part" dropped ("CSS Grid | Part 1" = "CSS Grid - 1");
+// a plural "s" dropped ("Introduction to Database" = "Introduction to Databases"); two common misspellings fixed (Mutiples, Allegations).
+const SUBJECT_TAG = /\s+(quant|logical reasoning|adv(anced)? aptitude|numerical ability)\s*$/i;
+const CSMCQ = /\s*-?\s*csmcq ppt\s*$/i;
+export const demoNameKey = (s: string) => s.toLowerCase().replace(SUBJECT_TAG, "").replace(CSMCQ, "").replace(/&/g, " and ")
+  .replace(/mutiple/g, "multiple").replace(/allegation/g, "alligation")
+  .split(/[^a-z0-9]+/).filter((w) => w && w !== "part").map((w) => (w.length > 3 && w.endsWith("s") && !w.endsWith("ss") ? w.slice(0, -1) : w)).join("");
+// Older names of the same lecture (2026-10-28): the old "Build Your Own Static Website" names of HTML & CSS lectures, and a reworded
+// Modern Responsive title. [course key, lecture number, other name]
+const NAME_ALIASES: [string, number, string][] = [
+  ["static_web", 1, "Introduction to GenAI in Frontend Development"],
+  ["static_web", 2, "Your first Frontend Project | Getting started"],
+  ["modern_responsive_ui", 20, "Building a Responsive Website with Tailwind CSS"],
+];
 
 // lecture name key -> every (course index, lecture number) with that name
-function lectureNameIndex(): Map<string, { ci: number; n: number }[]> {
+export function lectureNameIndex(): Map<string, { ci: number; n: number }[]> {
   const idx = new Map<string, { ci: number; n: number }[]>();
-  LECTURE_COURSES.forEach((c, ci) => c.lectures.forEach((l) => {
-    const parts = [l.name, ...l.name.split(/\s*\(\+\s*/).map((p) => p.replace(/\)\s*$/, ""))];
-    for (const k of new Set(parts.map(demoNameKey).filter(Boolean))) idx.set(k, [...(idx.get(k) ?? []), { ci, n: l.n }]);
-  }));
+  const add = (name: string, ci: number, n: number) => {
+    const parts = [name, ...name.split(/\s*\(\+\s*/).map((p) => p.replace(/\)\s*$/, ""))];
+    for (const k of new Set(parts.map(demoNameKey).filter(Boolean))) {
+      const list = idx.get(k) ?? [];
+      if (!list.some((h) => h.ci === ci && h.n === n)) idx.set(k, [...list, { ci, n }]);
+    }
+  };
+  LECTURE_COURSES.forEach((c, ci) => c.lectures.forEach((l) => add(l.name, ci, l.n)));
+  for (const [key, n, alias] of NAME_ALIASES) { const ci = LECTURE_COURSES.findIndex((c) => c.key === key); if (ci >= 0) add(alias, ci, n); }
   return idx;
+}
+/** Lectures a demo topic name matches; a name without a number also matches the lecture's "Part 1" ("Building Social Media ... Workflow"). */
+export function matchDemoTopic(idx: Map<string, { ci: number; n: number }[]>, title: string): { ci: number; n: number }[] | undefined {
+  const k = demoNameKey(title);
+  return k ? idx.get(k) ?? (/\d$/.test(k) ? undefined : idx.get(`${k}1`)) : undefined;
 }
 
 /** subjectByUid: TeachOS user id -> the instructor's subject (normalized, e.g. "Frontend", "English"), used only for names in several courses. */
@@ -65,7 +90,7 @@ export async function fetchDemoCourseRows(subjectByUid: Map<string, string | nul
   const agg = new Map<string, Agg>();
   for (const r of rows as Record<string, unknown>[]) {
     const uid = plain(r.uid);
-    let hits = idx.get(demoNameKey(plain(r.t)));
+    let hits = matchDemoTopic(idx, plain(r.t));
     if (!uid || !hits) continue;
     if (new Set(hits.map((h) => h.ci)).size > 1) {
       const area = subjectByUid.get(uid) ?? null;
