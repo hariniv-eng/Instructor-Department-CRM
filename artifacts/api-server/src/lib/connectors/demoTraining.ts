@@ -1,7 +1,7 @@
 // "Demos" view of Training Stats (2026-10-28, per request: "like Taught in class, another tab Demos -- out of a course's classes, how
 // many each instructor has done a demo on, and below it the average QA score of those demos"). Source: the BigQuery view
-// niat_session_wise_qa_rating, evaluation_type = 'DEMO' only (per request -- TRAINING_DEMO, MOCK, SCHEDULE, AI assessments are not
-// counted), status Completed (any letter case). One row per (instructor, lecture-list course): lectures of the course they have a
+// niat_session_wise_qa_rating, evaluation_type DEMO and TRAINING_DEMO (2026-10-28, per request: training demos -- started 6 Oct 2026 --
+// count together with the regular demos; training AI assessments, AI assessments, MOCK and SCHEDULE are not counted), status Completed (any letter case). One row per (instructor, lecture-list course): lectures of the course they have a
 // completed demo on, total lectures, number of demos, sum / count of final_score (0-10) for the average QA score (average of ALL their
 // demos in the course, per request -- e.g. 8 demos across the 20 HTML & CSS lectures -> the average of those 8 scores), first / last date.
 //
@@ -82,7 +82,7 @@ export async function fetchDemoCourseRows(subjectByUid: Map<string, string | nul
   const [rows] = await runWithHardTimeout(() => bq.query({
     query: `SELECT instructor_user_id AS uid, session_title AS t, final_score AS s, CAST(session_date AS STRING) AS d
             FROM \`${config.BIGQUERY_PROJECT_ID}.${config.BIGQUERY_DATASET}.${QA_RATING_VIEW}\`
-            WHERE evaluation_type = 'DEMO' AND LOWER(status) = 'completed' AND instructor_user_id IS NOT NULL AND session_title IS NOT NULL`,
+            WHERE evaluation_type IN ('DEMO', 'TRAINING_DEMO') AND LOWER(status) = 'completed' AND instructor_user_id IS NOT NULL AND session_title IS NOT NULL`,
   }), QUERY_TIMEOUT_MS);
 
   const idx = lectureNameIndex();

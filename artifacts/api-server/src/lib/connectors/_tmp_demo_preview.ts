@@ -25,12 +25,12 @@ async function main() {
   const idx = lectureNameIndex();
   const bq = new BigQuery({ projectId: config.BIGQUERY_PROJECT_ID, ...(config.BIGQUERY_CREDENTIALS_JSON ? { credentials: JSON.parse(config.BIGQUERY_CREDENTIALS_JSON) } : {}) });
   const [t] = await bq.query({ query: `SELECT session_title AS t, COUNT(*) AS n, COUNT(DISTINCT instructor_user_id) AS p FROM \`${config.BIGQUERY_PROJECT_ID}.${config.BIGQUERY_DATASET}.${QA_RATING_VIEW}\`
-    WHERE evaluation_type = 'DEMO' AND LOWER(status) = 'completed' GROUP BY 1` });
+    WHERE evaluation_type IN ('DEMO', 'TRAINING_DEMO') AND LOWER(status) = 'completed' GROUP BY 1` });
   const T = t as Record<string, unknown>[];
   const total = T.reduce((a, r) => a + Number(plain(r.n)), 0);
   const un = T.filter((r) => !matchDemoTopic(idx, plain(r.t))).sort((a, b) => Number(plain(b.n)) - Number(plain(a.n)));
   const unN = un.reduce((a, r) => a + Number(plain(r.n)), 0);
-  console.log(`\nCompleted DEMO rows: ${total}; matched to a lecture: ${total - unN} (${Math.round(((total - unN) / total) * 100)}%); not matched: ${unN} in ${un.length} topic names.`);
+  console.log(`\nCompleted DEMO + TRAINING_DEMO rows: ${total}; matched to a lecture: ${total - unN} (${Math.round(((total - unN) / total) * 100)}%); not matched: ${unN} in ${un.length} topic names.`);
   console.log("Top topic names not matched (demos | instructors):");
   for (const r of un.slice(0, 40)) console.log(`  ${plain(r.t)} | ${plain(r.n)} | ${plain(r.p)}`);
   process.exit(0);
