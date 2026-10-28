@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, instructorsTable, instructorArchiveTable, darwinboxActiveTable, darwinboxFullRosterTable, darwinboxExitsTable, instructorTrainingStatusTable, instructorTaughtCourseTable, exitCardSnapshotTable, instructorContributionTable, instructorContributionDailyTable, instructorManualJoiningTable, instructorEvaluationDailyTable, instructorTimeSpentDailyTable } from "@workspace/db";
+import { db, instructorsTable, instructorArchiveTable, darwinboxActiveTable, darwinboxFullRosterTable, darwinboxExitsTable, instructorTrainingStatusTable, instructorTaughtCourseTable, instructorDemoCourseTable, exitCardSnapshotTable, instructorContributionTable, instructorContributionDailyTable, instructorManualJoiningTable, instructorEvaluationDailyTable, instructorTimeSpentDailyTable } from "@workspace/db";
 import { and, desc, eq, gte, lt, lte } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/auth";
 import { cell, parseLooseDate, toISODate } from "../lib/reconcile";
@@ -1587,6 +1587,58 @@ router.get("/reports/taught-training", requireAuth, requireRole("admin"), async 
     subject_columns: TAUGHT_SUBJECT_COLUMNS,
     completed_pct: TAUGHT_COMPLETED_PCT,
     synced_at: taughtRows[0]?.syncedAt ?? null,
+  });
+});
+
+// "Demos" view of Training Stats (2026-10-28, per request): next to "Taught in class", per instructor and lecture-list course -- how many
+// of the course's lectures they have recorded a completed DEMO on (e.g. 8 of HTML & CSS's 20), and the average QA score (0-10) of all
+// those demos. Built by the Training Status sync (connectors/demoTraining.ts). People: NIAT Deployed AND NIAT Training instructors (per
+// request -- about 40% of demos are by instructors in training), each row says which. Same tech / non-tech rule as Taught in class.
+const DEMO_PRODUCTS = new Set(["NIAT (Deployed)", "NIAT (Training)"]);
+router.get("/reports/demo-training", requireAuth, requireRole("admin"), async (_req, res) => {
+  const allRows = await db.select().from(instructorsTable);
+  const people = allRows.filter((r) => r.inTeachos && r.teachosUserId && !TRAINING_STATS_EXCLUDED_CLASSIFICATIONS.has(r.classification ?? "") && DEMO_PRODUCTS.has(productOf(r)));
+  const byUid = new Map(people.map((p) => [p.teachosUserId!, p]));
+  let demoRows: (typeof instructorDemoCourseTable.$inferSelect)[] = [];
+  try {
+    demoRows = await db.select().from(instructorDemoCourseTable);
+  } catch (err) {
+    console.warn("[demo-training] instructor_demo_course is not readable yet (run the database push):", (err as Error).message);
+  }
+  type Cell = { demoed: number; total: number; demos: number; avg_score: number | null; scored: number; score_sum: number; last_demo_date: string | null };
+  const courses = new Map<string, { course_id: string; title: string; subject: string; instructors: number; total: number; order: number }>();
+  const cellsByUid = new Map<string, Record<string, Cell>>();
+  for (const t of demoRows) {
+    const person = byUid.get(t.instructorUserId);
+    if (!person || t.lecturesDemoed <= 0) continue;
+    const area = normalizeSubjectArea(person.deptArea || person.manualDeptArea || null);
+    if (area && NON_TECH_TAUGHT_SUBJECTS.has(area) !== NON_TECH_TAUGHT_SUBJECTS.has(t.courseSubject)) continue;
+    const key = `demo:${t.courseKey}`;
+    const cells = cellsByUid.get(t.instructorUserId) ?? {};
+    cells[key] = { demoed: t.lecturesDemoed, total: t.lecturesTotal, demos: t.demos, scored: t.scored, score_sum: t.scoreSum,
+      avg_score: t.scored > 0 ? Math.round((t.scoreSum / t.scored) * 10) / 10 : null, last_demo_date: t.lastDemoDate };
+    cellsByUid.set(t.instructorUserId, cells);
+    const c = courses.get(key) ?? { course_id: key, title: t.courseTitle, subject: t.courseSubject, instructors: 0, total: t.lecturesTotal,
+      order: LECTURE_COURSES.findIndex((x) => x.key === t.courseKey) };
+    c.instructors += 1;
+    courses.set(key, c);
+  }
+  const rows = [...cellsByUid].map(([uid, cells]) => {
+    const p = byUid.get(uid)!;
+    return {
+      employee_id: p.employeeId,
+      full_name: p.fullName,
+      product: productOf(p),
+      subject_area: normalizeSubjectArea(p.deptArea || p.manualDeptArea || null),
+      capability_manager: p.teachosManager || p.manualCapabilityManager || null,
+      courses: cells,
+    };
+  }).sort((a, b) => a.full_name.localeCompare(b.full_name));
+  res.json({
+    rows,
+    courses: [...courses.values()].sort((a, b) => TAUGHT_SUBJECT_COLUMNS.indexOf(a.subject as (typeof TAUGHT_SUBJECT_COLUMNS)[number]) - TAUGHT_SUBJECT_COLUMNS.indexOf(b.subject as (typeof TAUGHT_SUBJECT_COLUMNS)[number]) || a.order - b.order),
+    subject_columns: TAUGHT_SUBJECT_COLUMNS,
+    synced_at: demoRows[0]?.syncedAt ?? null,
   });
 });
 

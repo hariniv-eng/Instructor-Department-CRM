@@ -6,6 +6,7 @@ import {
   darwinboxExitsTable,
   darwinboxFullRosterTable,
   teachosDeploymentTable,
+  instructorsTable,
 } from "@workspace/db";
 import { desc } from "drizzle-orm";
 import { fetchDarwinRowsBoth, DarwinboxError } from "../lib/connectors/darwinbox";
@@ -17,9 +18,11 @@ import { fetchContributionRows, fetchContributionDailyRows, InstructorContributi
 import { fetchEvaluationDailyRows } from "../lib/connectors/instructorEvaluations";
 import { fetchTimeSpentDailyRows } from "../lib/connectors/instructorTimeSpent";
 import { fetchTaughtCourseRows } from "../lib/connectors/taughtTraining";
+import { fetchDemoCourseRows } from "../lib/connectors/demoTraining";
+import { normalizeSubjectArea } from "../lib/departmentTaxonomy";
 import { snapshotTeachosDataIntoArchive } from "../lib/archiveInstructors";
 import { resolvedCourseDefs } from "../data/trainingCourseTaxonomy";
-import { storeDarwinboxActive, storeDarwinboxExits, storeDarwinboxFullRoster, storeTeachosDeployment, storeTrainingStatus, storeTaughtCourses, storeContribution, storeContributionDaily, storeEvaluationDaily, storeTimeSpentDaily } from "../lib/storeRaw";
+import { storeDarwinboxActive, storeDarwinboxExits, storeDarwinboxFullRoster, storeTeachosDeployment, storeTrainingStatus, storeTaughtCourses, storeDemoCourses, storeContribution, storeContributionDaily, storeEvaluationDaily, storeTimeSpentDaily } from "../lib/storeRaw";
 import { reconcileDarwin, reconcileDarwinFullRosterFallback, reconcileTeachos, reconcileTeachosEmployeeIdReference, reconcileCapabilityManager, recomputeStatuses } from "../lib/reconcile";
 import { sdb, inSyncTransaction, inSavepoint, withSyncLock } from "../lib/syncContext";
 import { LAST_SYNC, LAST_CAPABILITY_MANAGER_SYNC, setLastCapabilityManagerSync, DAILY_AUTO_SYNC_INTERVAL_HOURS, type SyncResult } from "../lib/syncState";
@@ -244,6 +247,16 @@ async function runTrainingStatusSync(): Promise<SyncResult> {
       console.error("[taught-training] sync failed:", e);
       // Record the failure where it can be seen (2026-10-23): the uploads log, so _tmp_taught_totals.ts / Sync health show the reason.
       await db.insert(uploadsTable).values({ source: "Instructor Taught Training FAILED", filename: `taught-in-class step failed: ${String((e as Error)?.message ?? e).slice(0, 900)}`, rowCount: 0 }).catch(() => {});
+    }
+    // "Demos" view (2026-10-28): DEMO evaluations per instructor + lecture-list course, built right after. Its own try as well.
+    try {
+      const people = await db.select().from(instructorsTable);
+      const subjectByUid = new Map(people.filter((p) => p.teachosUserId).map((p) => [p.teachosUserId!, (normalizeSubjectArea(p.deptArea || p.manualDeptArea || null) as string | null) ?? null]));
+      const demos = await storeDemoCourses(await fetchDemoCourseRows(subjectByUid));
+      await db.insert(uploadsTable).values({ source: "Instructor Demo Training", filename: "BigQuery sync (niat_session_wise_qa_rating DEMO, per instructor + lecture-list course)", rowCount: demos });
+    } catch (e) {
+      console.error("[demo-training] sync failed:", e);
+      await db.insert(uploadsTable).values({ source: "Instructor Demo Training FAILED", filename: `demos step failed: ${String((e as Error)?.message ?? e).slice(0, 900)}`, rowCount: 0 }).catch(() => {});
     }
     return { ok: true, source: "training_status_live", stored, synced_at: new Date().toISOString() };
   } catch (e) {

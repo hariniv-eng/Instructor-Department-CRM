@@ -17,6 +17,7 @@ import {
   teachosDeploymentTable,
   instructorTrainingStatusTable,
   instructorTaughtCourseTable,
+  instructorDemoCourseTable,
   instructorContributionTable,
   instructorContributionDailyTable,
   instructorEvaluationDailyTable,
@@ -26,6 +27,7 @@ import { sdb as db } from "./syncContext";
 import { cell, type SheetRow } from "./reconcile";
 import type { CourseStatusRow } from "./connectors/instructorLearningStatus";
 import type { TaughtCourseRow } from "./connectors/taughtTraining";
+import type { DemoCourseRow } from "./connectors/demoTraining";
 import type { ContributionRow, ContributionDailyRow } from "./connectors/instructorContribution";
 import type { EvaluationDailyRow } from "./connectors/instructorEvaluations";
 import type { TimeSpentDailyRow } from "./connectors/instructorTimeSpent";
@@ -138,6 +140,30 @@ export async function storeTaughtCourses(rows: TaughtCourseRow[]): Promise<numbe
         portalMatchPct: row.portal_match_pct,
       }));
       if (batch.length) await tx.insert(instructorTaughtCourseTable).values(batch);
+    }
+  });
+  return rows.length;
+}
+
+// "Demos" view of Training Stats (2026-10-28): fully replaced on every Training Status sync, like storeTaughtCourses() above.
+export async function storeDemoCourses(rows: DemoCourseRow[]): Promise<number> {
+  await db.transaction(async (tx) => {
+    await tx.delete(instructorDemoCourseTable);
+    for (let i = 0; i < rows.length; i += CHUNK) {
+      const batch = rows.slice(i, i + CHUNK).map((row) => ({
+        instructorUserId: row.instructor_user_id,
+        courseKey: row.course_key,
+        courseTitle: row.course_title,
+        courseSubject: row.course_subject,
+        lecturesTotal: row.lectures_total,
+        lecturesDemoed: row.lectures_demoed,
+        demos: row.demos,
+        scoreSum: row.score_sum,
+        scored: row.scored,
+        firstDemoDate: row.first_demo_date,
+        lastDemoDate: row.last_demo_date,
+      }));
+      if (batch.length) await tx.insert(instructorDemoCourseTable).values(batch);
     }
   });
   return rows.length;

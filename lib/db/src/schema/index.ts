@@ -510,6 +510,27 @@ export const instructorTaughtCourseTable = pgTable("instructor_taught_course", {
 });
 export type InstructorTaughtCourse = typeof instructorTaughtCourseTable.$inferSelect;
 
+// "Demos" view of Training Stats (2026-10-28, per request): for each instructor and lecture-list course, how many of the course's
+// lectures they have recorded a DEMO on (niat_session_wise_qa_rating, evaluation_type DEMO, status Completed -- matched to the lecture by
+// topic name, since the demo's topic ID is the QA tool's own ID), and the average QA score (final_score, 0-10) of all those demos.
+// Fully replaced on every Training Status sync (connectors/demoTraining.ts).
+export const instructorDemoCourseTable = pgTable("instructor_demo_course", {
+  id: serial("id").primaryKey(),
+  instructorUserId: text("instructor_user_id").notNull(),
+  courseKey: text("course_key").notNull(),
+  courseTitle: text("course_title").notNull(),
+  courseSubject: text("course_subject").notNull(),
+  lecturesTotal: integer("lectures_total").notNull().default(0),
+  lecturesDemoed: integer("lectures_demoed").notNull().default(0),
+  demos: integer("demos").notNull().default(0),
+  scoreSum: doublePrecision("score_sum").notNull().default(0),
+  scored: integer("scored").notNull().default(0),
+  firstDemoDate: date("first_demo_date"),
+  lastDemoDate: date("last_demo_date"),
+  syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
+});
+export type InstructorDemoCourse = typeof instructorDemoCourseTable.$inferSelect;
+
 // Daily copy of the Overview's "Exit data" list (2026-10-23, per request: "from now keep yesterday's list" -- the count went 21 -> 20 and
 // there was no way to see who dropped off). One set of rows per IST day: today's set is refreshed every time the list is read (and after
 // the daily sync), earlier days stay as they were last seen, so the Overview can show who was added / removed since the previous day.
