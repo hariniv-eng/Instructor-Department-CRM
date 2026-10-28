@@ -110,9 +110,9 @@ export function DemoTrainingView() {
 
   return <div>
     <PageIntro
-      eyebrow="BigQuery / niat_session_wise_qa_rating, DEMO"
+      eyebrow="BigQuery / niat_session_wise_qa_rating, DEMO + TRAINING_DEMO"
       title="Training Stats -- Demos"
-      description="NIAT Deployed and Training instructors. Columns are the courses of the lecture list. Each cell = how many of the course's lectures the instructor has recorded a completed demo on (e.g. 8/20), and below it the average QA score (out of 10) of all those demos. Demos are matched to lectures by topic name. Hover a cell for details."
+      description="NIAT Deployed and Training instructors. Columns are the courses of the lecture list. Each cell = how many of the course's lectures the instructor has recorded a completed demo on (e.g. 8/20) -- regular demos and training demos together -- and below it the average QA score (out of 10) of all those demos. Demos are matched to lectures by topic name. Hover a cell for details."
       action={<div className="flex items-center gap-2">
         <button type="button" data-testid="button-refresh-demo-training" onClick={refresh} className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3.5 py-2.5 text-[12px] font-bold text-foreground transition-colors hover:bg-secondary"><RefreshCw size={14} /> Refresh</button>
         <button type="button" data-testid="button-sync-demo-training" onClick={syncNow} disabled={syncing} className="inline-flex items-center gap-2 rounded-lg bg-primary px-3.5 py-2.5 text-[12px] font-bold text-primary-foreground shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-45">{syncing ? 'Syncing…' : 'Sync Now'}</button>
