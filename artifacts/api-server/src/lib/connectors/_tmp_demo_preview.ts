@@ -5,7 +5,7 @@
 import { BigQuery } from "@google-cloud/bigquery";
 import { db, instructorsTable } from "@workspace/db";
 import { config } from "./config";
-import { fetchDemoCourseRows, demoNameKey, QA_RATING_VIEW } from "./demoTraining";
+import { fetchDemoCourseRows, lectureNameIndex, matchDemoTopic, QA_RATING_VIEW } from "./demoTraining";
 import { normalizeSubjectArea } from "../departmentTaxonomy";
 import { LECTURE_COURSES } from "../../data/lectureSessions";
 
@@ -22,14 +22,13 @@ async function main() {
     const sc = rs.reduce((a, r) => a + r.scored, 0), sum = rs.reduce((a, r) => a + r.score_sum, 0);
     console.log(`  ${c.title} | ${c.subject} | ${rs.length} | ${(rs.reduce((a, r) => a + r.lectures_demoed, 0) / rs.length).toFixed(1)} / ${c.lectures.length} | ${sc ? (sum / sc).toFixed(2) : "-"}`);
   }
-  const names = new Set<string>();
-  for (const c of LECTURE_COURSES) for (const l of c.lectures) for (const p of [l.name, ...l.name.split(/\s*\(\+\s*/).map((x) => x.replace(/\)\s*$/, ""))]) names.add(demoNameKey(p));
+  const idx = lectureNameIndex();
   const bq = new BigQuery({ projectId: config.BIGQUERY_PROJECT_ID, ...(config.BIGQUERY_CREDENTIALS_JSON ? { credentials: JSON.parse(config.BIGQUERY_CREDENTIALS_JSON) } : {}) });
   const [t] = await bq.query({ query: `SELECT session_title AS t, COUNT(*) AS n, COUNT(DISTINCT instructor_user_id) AS p FROM \`${config.BIGQUERY_PROJECT_ID}.${config.BIGQUERY_DATASET}.${QA_RATING_VIEW}\`
     WHERE evaluation_type = 'DEMO' AND LOWER(status) = 'completed' GROUP BY 1` });
   const T = t as Record<string, unknown>[];
   const total = T.reduce((a, r) => a + Number(plain(r.n)), 0);
-  const un = T.filter((r) => !names.has(demoNameKey(plain(r.t)))).sort((a, b) => Number(plain(b.n)) - Number(plain(a.n)));
+  const un = T.filter((r) => !matchDemoTopic(idx, plain(r.t))).sort((a, b) => Number(plain(b.n)) - Number(plain(a.n)));
   const unN = un.reduce((a, r) => a + Number(plain(r.n)), 0);
   console.log(`\nCompleted DEMO rows: ${total}; matched to a lecture: ${total - unN} (${Math.round(((total - unN) / total) * 100)}%); not matched: ${unN} in ${un.length} topic names.`);
   console.log("Top topic names not matched (demos | instructors):");
