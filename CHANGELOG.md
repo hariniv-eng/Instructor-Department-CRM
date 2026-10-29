@@ -19,6 +19,9 @@ Commit messages stay short (title + 2-3 lines); this file is the detailed record
 
 ## 2026-10-29
 
+- **Training - Demos: scores shown out of 10** -- QA and AI averages read e.g. "QA 6.8/10", "AI 6.5/10" (final_score is 0-10 for both), in cells, overall column and headers.
+  File: `artifacts/instructor-crm/src/pages/demo-training.tsx`. After pull: Publish.
+
 - **Training - Demos cells: unique lectures + average only** -- each Demos / AI cell shows different lectures covered of the course total (a repeat counts once) and the average score over ALL demos / assessments, repeats included. The total-with-repeats line is removed (hover only).
   File: `artifacts/instructor-crm/src/pages/demo-training.tsx`. After pull: Publish.
 
