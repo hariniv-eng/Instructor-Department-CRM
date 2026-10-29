@@ -19,6 +19,9 @@ Commit messages stay short (title + 2-3 lines); this file is the detailed record
 
 ## 2026-10-29
 
+- **One-person demo check (read-only)** -- lists one instructor's DEMO / TRAINING_DEMO / AI evaluations with status, score, matched course and links, plus how many completed demos company-wide are scored 0. Used for NW0005240 (Demos tab shows QA 0).
+  File: `artifacts/api-server/src/lib/connectors/_tmp_person_demos.ts`.
+
 - **GenAI column order** -- Intro to Gen AI, then LLM, then AI for Finance (Demos + Taught in Class).
   File: `artifacts/api-server/src/data/lectureSessions.ts` (course moved in `LECTURE_COURSES`). After pull: Publish + Sync Now (Training Status). Commit `b703af5`.
 - **Training Stats tab names and order** -- Training - LP, Training - Demos, Taught in Class; page headings match.
