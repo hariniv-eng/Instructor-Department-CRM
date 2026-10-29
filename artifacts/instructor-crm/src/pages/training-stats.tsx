@@ -333,11 +333,12 @@ function CompletionBreakdown({ title, firstColumn, rows, testId, note }: { title
 
 // Two views (2026-10-19, per request): the learning-portal Training Stats below (unchanged) and "Taught in class" (taught-training.tsx),
 // built from the topics each instructor has actually taught in completed sessions.
+// Names and order (2026-10-29, per request): "Training - LP" (learning portal), "Training - Demos", then "Taught in Class" last.
 const TRAINING_VIEWS = [
-  { key: 'portal', label: 'Learning portal' },
-  { key: 'taught', label: 'Taught in class' },
+  { key: 'portal', label: 'Training - LP' },
   // Demos (2026-10-28, per request): lectures each instructor has recorded a demo on, with the average QA score (demo-training.tsx).
-  { key: 'demos', label: 'Demos' },
+  { key: 'demos', label: 'Training - Demos' },
+  { key: 'taught', label: 'Taught in Class' },
 ] as const;
 export default function TrainingStatsPage() {
   const [view, setView] = useState<'portal' | 'taught' | 'demos'>('portal');

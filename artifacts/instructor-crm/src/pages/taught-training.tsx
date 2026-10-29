@@ -104,7 +104,7 @@ export function TaughtTrainingView() {
   return <div>
     <PageIntro
       eyebrow="BigQuery / NIAT session schedule, by session id"
-      title="Training Stats -- Taught in class"
+      title="Taught in Class"
       description="NIAT instructors only. Columns are the learning-portal courses. Each cell = the course's CLASS SESSIONS in the learning portal (its lessons, e.g. 'Introduction to CSS | Part 2' -- not reading material, quizzes or practice; the same total for every instructor) that this instructor has taught in a completed LECTURE session (practice sessions are not counted). Hover a cell for details. 80% or more = Completed."
       action={<div className="flex items-center gap-2">
         <button type="button" data-testid="button-refresh-taught-training" onClick={refresh} className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3.5 py-2.5 text-[12px] font-bold text-foreground transition-colors hover:bg-secondary"><RefreshCw size={14} /> Refresh</button>
