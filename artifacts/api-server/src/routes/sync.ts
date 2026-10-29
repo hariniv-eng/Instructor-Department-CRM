@@ -253,7 +253,7 @@ async function runTrainingStatusSync(): Promise<SyncResult> {
       const people = await db.select().from(instructorsTable);
       const subjectByUid = new Map(people.filter((p) => p.teachosUserId).map((p) => [p.teachosUserId!, (normalizeSubjectArea(p.deptArea || p.manualDeptArea || null) as string | null) ?? null]));
       const demos = await storeDemoCourses(await fetchDemoCourseRows(subjectByUid));
-      await db.insert(uploadsTable).values({ source: "Instructor Demo Training", filename: "BigQuery sync (niat_session_wise_qa_rating DEMO + TRAINING_DEMO, per instructor + lecture-list course)", rowCount: demos });
+      await db.insert(uploadsTable).values({ source: "Instructor Demo Training", filename: "BigQuery sync (niat_session_wise_qa_rating DEMO + TRAINING_DEMO and AI assessments, per instructor + lecture-list course)", rowCount: demos });
     } catch (e) {
       console.error("[demo-training] sync failed:", e);
       await db.insert(uploadsTable).values({ source: "Instructor Demo Training FAILED", filename: `demos step failed: ${String((e as Error)?.message ?? e).slice(0, 900)}`, rowCount: 0 }).catch(() => {});

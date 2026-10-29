@@ -155,6 +155,7 @@ export async function storeDemoCourses(rows: DemoCourseRow[]): Promise<number> {
         courseKey: row.course_key,
         courseTitle: row.course_title,
         courseSubject: row.course_subject,
+        evaluationKind: row.evaluation_kind,
         lecturesTotal: row.lectures_total,
         lecturesDemoed: row.lectures_demoed,
         demos: row.demos,
