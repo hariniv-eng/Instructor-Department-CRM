@@ -5,6 +5,10 @@
 // completed demo on, total lectures, number of demos, sum / count of final_score (0-10) for the average QA score (average of ALL their
 // demos in the course, per request -- e.g. 8 demos across the 20 HTML & CSS lectures -> the average of those 8 scores), first / last date.
 //
+// AI assessments (2026-10-29, per request: "beside each course's demo column, an AI assessment column -- number of assessments and the
+// average score"): AI_ASSESSMENT and TRAINING_AI_ASSESSMENT are aggregated the same way, as separate rows with evaluation_kind = 'ai'
+// (demo rows: 'demo'). Training AI assessments count with AI assessments, as training demos do with demos.
+//
 // Matching a demo to a lecture: by TOPIC NAME. The demo's session_id is the QA tool's own topic ID -- it matches no learning-portal unit
 // or topic (checked 2026-10-28), so unit IDs cannot be used here. The topic name is compared to the lecture names of
 // data/lectureSessions.ts with demoNameKey() below (lower case, letters/digits only; "&" = "and"; both halves of a combined name like "CSS Grid - 4 (+ Flexbox vs
@@ -25,6 +29,7 @@ export type DemoCourseRow = {
   course_key: string;
   course_title: string;
   course_subject: string;
+  evaluation_kind: "demo" | "ai";
   lectures_total: number;
   lectures_demoed: number;
   demos: number;
@@ -80,13 +85,14 @@ export async function fetchDemoCourseRows(subjectByUid: Map<string, string | nul
     ? new BigQuery({ projectId: config.BIGQUERY_PROJECT_ID, credentials: JSON.parse(config.BIGQUERY_CREDENTIALS_JSON) })
     : new BigQuery({ projectId: config.BIGQUERY_PROJECT_ID });
   const [rows] = await runWithHardTimeout(() => bq.query({
-    query: `SELECT instructor_user_id AS uid, session_title AS t, final_score AS s, CAST(session_date AS STRING) AS d
+    query: `SELECT instructor_user_id AS uid, session_title AS t, final_score AS s, CAST(session_date AS STRING) AS d,
+                   IF(evaluation_type LIKE '%AI_ASSESSMENT', 'ai', 'demo') AS kind
             FROM \`${config.BIGQUERY_PROJECT_ID}.${config.BIGQUERY_DATASET}.${QA_RATING_VIEW}\`
-            WHERE evaluation_type IN ('DEMO', 'TRAINING_DEMO') AND LOWER(status) = 'completed' AND instructor_user_id IS NOT NULL AND session_title IS NOT NULL`,
+            WHERE evaluation_type IN ('DEMO', 'TRAINING_DEMO', 'AI_ASSESSMENT', 'TRAINING_AI_ASSESSMENT') AND LOWER(status) = 'completed' AND instructor_user_id IS NOT NULL AND session_title IS NOT NULL`,
   }), QUERY_TIMEOUT_MS);
 
   const idx = lectureNameIndex();
-  type Agg = { uid: string; ci: number; lectures: Set<number>; demos: number; sum: number; scored: number; first: string | null; last: string | null };
+  type Agg = { uid: string; ci: number; kind: "demo" | "ai"; lectures: Set<number>; demos: number; sum: number; scored: number; first: string | null; last: string | null };
   const agg = new Map<string, Agg>();
   for (const r of rows as Record<string, unknown>[]) {
     const uid = plain(r.uid);
@@ -101,8 +107,9 @@ export async function fetchDemoCourseRows(subjectByUid: Map<string, string | nul
     const score = r.s === null || r.s === undefined || plain(r.s) === "" ? null : Number(plain(r.s));
     const d = plain(r.d) || null;
     for (const ci of new Set(hits.map((h) => h.ci))) {
-      const k = `${uid}|${ci}`;
-      const a = agg.get(k) ?? { uid, ci, lectures: new Set<number>(), demos: 0, sum: 0, scored: 0, first: null, last: null };
+      const kind = plain(r.kind) === "ai" ? "ai" : "demo";
+      const k = `${uid}|${ci}|${kind}`;
+      const a = agg.get(k) ?? { uid, ci, kind, lectures: new Set<number>(), demos: 0, sum: 0, scored: 0, first: null, last: null };
       for (const h of hits) if (h.ci === ci) a.lectures.add(h.n);
       a.demos++;
       if (score !== null && Number.isFinite(score)) { a.sum += score; a.scored++; }
@@ -118,6 +125,7 @@ export async function fetchDemoCourseRows(subjectByUid: Map<string, string | nul
       course_key: c.key,
       course_title: c.title,
       course_subject: c.subject,
+      evaluation_kind: a.kind,
       lectures_total: c.lectures.length,
       lectures_demoed: Math.min(a.lectures.size, c.lectures.length),
       demos: a.demos,

@@ -11,13 +11,19 @@ Commit messages stay short (title + 2-3 lines); this file is the detailed record
 | Training Stats tab names / order (Training - LP, Training - Demos, Taught in Class) | `artifacts/instructor-crm/src/pages/training-stats.tsx` (`TRAINING_VIEWS`) |
 | Taught in Class page (columns, cells, filters) | `artifacts/instructor-crm/src/pages/taught-training.tsx`; data: `artifacts/api-server/src/lib/connectors/taughtTraining.ts`; API: `artifacts/api-server/src/routes/reports.ts` (`/reports/taught-training`) |
 | Training - Demos page | `artifacts/instructor-crm/src/pages/demo-training.tsx`; data: `artifacts/api-server/src/lib/connectors/demoTraining.ts`; API: `routes/reports.ts` (`/reports/demo-training`) |
-| Which demo types count, demo-to-lecture name matching | `artifacts/api-server/src/lib/connectors/demoTraining.ts` |
+| Which demo / AI assessment types count, topic-to-lecture name matching | `artifacts/api-server/src/lib/connectors/demoTraining.ts` |
 | What the Training Status Sync Now builds | `artifacts/api-server/src/routes/sync.ts` (`runTrainingStatusSync`) |
 | Database tables | `lib/db/src/schema/index.ts` (then `pnpm --filter @workspace/db run push`) |
 | Overview NIAT cohort card: batch name -> cohort | `artifacts/api-server/src/lib/connectors/instructorContribution.ts` (`BATCH_NAME_TO_NIAT_COHORT`) |
 | One-off read-only checks | `artifacts/api-server/src/lib/connectors/_tmp_*.ts` |
 
 ## 2026-10-29
+
+- **Training - Demos cells: unique lectures + average only** -- each Demos / AI cell shows different lectures covered of the course total (a repeat counts once) and the average score over ALL demos / assessments, repeats included. The total-with-repeats line is removed (hover only).
+  File: `artifacts/instructor-crm/src/pages/demo-training.tsx`. After pull: Publish.
+
+- **Training - Demos: AI assessment column beside each course's demo column** -- per instructor and course: lectures covered, number of AI assessments (regular + training) and average AI score; same for the subject's overall column. CSV download includes both.
+  Files: `lib/db/src/schema/index.ts` (new column `evaluation_kind` on `instructor_demo_course`), `connectors/demoTraining.ts` (reads AI_ASSESSMENT + TRAINING_AI_ASSESSMENT too), `lib/storeRaw.ts`, `routes/reports.ts` (`/reports/demo-training` cell = demo + ai), `routes/sync.ts` (log label), `pages/demo-training.tsx` (two sub-columns per course). After pull: DB push + Publish + Sync Now (Training Status).
 
 - **One-person demo check (read-only)** -- lists one instructor's DEMO / TRAINING_DEMO / AI evaluations with status, score, matched course and links, plus how many completed demos company-wide are scored 0. Used for NW0005240 (Demos tab shows QA 0).
   File: `artifacts/api-server/src/lib/connectors/_tmp_person_demos.ts`.

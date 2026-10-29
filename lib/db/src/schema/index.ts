@@ -520,6 +520,8 @@ export const instructorDemoCourseTable = pgTable("instructor_demo_course", {
   courseKey: text("course_key").notNull(),
   courseTitle: text("course_title").notNull(),
   courseSubject: text("course_subject").notNull(),
+  // "demo" (DEMO + TRAINING_DEMO) or "ai" (AI_ASSESSMENT + TRAINING_AI_ASSESSMENT), 2026-10-29.
+  evaluationKind: text("evaluation_kind").notNull().default("demo"),
   lecturesTotal: integer("lectures_total").notNull().default(0),
   lecturesDemoed: integer("lectures_demoed").notNull().default(0),
   demos: integer("demos").notNull().default(0),
