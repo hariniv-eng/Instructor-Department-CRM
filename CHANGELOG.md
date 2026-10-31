@@ -20,6 +20,9 @@ Commit messages stay short (title + 2-3 lines); this file is the detailed record
 
 ## 2026-10-31
 
+- **New BigQuery tables check (read-only)** -- whether `z_niat_users_live_classess_attendance_and_time_spent_details` and `z_niat_live_session_student_feedback_details` exist in any dataset we can see, their columns, row count, date range, and whether we have read access.
+  File: `artifacts/api-server/src/lib/connectors/_tmp_new_tables_check.ts`.
+
 - **Archive total check (read-only)** -- why Instructor Department (695) + exits (26) differs from the Archive total (717): lists people in the department but not archived, archived Active/SNP but no longer in the department, Exited but still in the department, Exited but not on the exit card.
   File: `artifacts/api-server/src/lib/connectors/_tmp_archive_total_check.ts`. Counts come from: department = `computeDepartmentAndExceptionRows` and archive = `loadArchivePeople`, both in `artifacts/api-server/src/routes/reports.ts`.
 
