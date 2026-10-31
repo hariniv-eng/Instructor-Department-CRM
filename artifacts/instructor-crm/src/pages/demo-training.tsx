@@ -10,6 +10,7 @@ import { MultiSelectFilter } from './instructors';
 // score (0-10) of all those demos. Beside it (2026-10-29), the same for AI assessments. NIAT Deployed and NIAT Training instructors. Server: connectors/demoTraining.ts and
 // GET /reports/demo-training (built by the Training Status sync).
 
+// Scores are out of 10 (final_score 0-10 for demos and AI assessments alike; shown as e.g. 6.5/10, 2026-10-29).
 // One kind of evaluation in one course: DIFFERENT lectures covered of the course's total (a repeat counts once -- shown), number of
 // evaluations incl. repeats (hover only), average score (0-10) over ALL of them, repeats included (2026-10-29, per request).
 type Stat = { covered: number; total: number; count: number; avg_score: number | null; scored: number; score_sum: number; last_date: string | null };
@@ -178,7 +179,7 @@ export function DemoTrainingView() {
                 <tr className="border-b border-border bg-[#f4f7f9]">
                   {[...columns.map((c) => c.course_id), 'overall'].flatMap((id) => KINDS.map(({ kind, label }) => <th key={`${id}|${kind}`} className={`${th} text-center ${kind === 'demo' ? 'border-l-2' : ''} ${id === 'overall' ? 'bg-[#eef4ee]' : ''}`}>
                     <div className="normal-case tracking-normal font-sans text-[10px] font-bold text-foreground">{label}</div>
-                    {id !== 'overall' && <div className="mt-0.5 font-sans text-[10px] normal-case tracking-normal text-muted-foreground/80">{formatKpi(colTotals[`${id}|${kind}`]?.people ?? 0)} · avg {fmtScore(colTotals[`${id}|${kind}`]?.avg ?? null)}</div>}
+                    {id !== 'overall' && <div className="mt-0.5 font-sans text-[10px] normal-case tracking-normal text-muted-foreground/80">{formatKpi(colTotals[`${id}|${kind}`]?.people ?? 0)} · avg {fmtScore(colTotals[`${id}|${kind}`]?.avg ?? null)}{colTotals[`${id}|${kind}`]?.avg == null ? '' : '/10'}</div>}
                   </th>))}
                 </tr>
               </thead>
@@ -195,7 +196,7 @@ export function DemoTrainingView() {
                       title={x ? `${label} on ${x.covered} different lectures of the course's ${x.total} · average score ${fmtScore(x.avg_score)} / 10 over all ${x.count} (repeats of the same lecture included) · last ${fmtDate(x.last_date)}` : `No ${label.toLowerCase()}`}>
                       {x ? <div className="flex flex-col items-center gap-0.5">
                         <span className="text-[12px] font-bold tabular-nums text-foreground">{x.covered}/{x.total}</span>
-                        <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-bold tabular-nums ${scoreTone(x.avg_score)}`}>{short} {fmtScore(x.avg_score)}</span>
+                        <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-bold tabular-nums ${scoreTone(x.avg_score)}`}>{short} {fmtScore(x.avg_score)}{x.avg_score === null ? '' : '/10'}</span>
                       </div> : <span className="text-[11px] text-muted-foreground">{NONE}</span>}
                     </td>;
                   }))}
@@ -204,7 +205,7 @@ export function DemoTrainingView() {
                     return <td key={`overall|${kind}`} className={`${td} bg-[#f6faf6] text-center ${kind === 'demo' ? 'border-l-2' : ''}`}>
                       {o.count ? <div className="flex flex-col items-center gap-0.5">
                         <span className="text-[12px] font-bold tabular-nums text-foreground">{o.covered}/{o.total}</span>
-                        <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-bold tabular-nums ${scoreTone(o.avg)}`}>{short} {fmtScore(o.avg)}</span>
+                        <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-bold tabular-nums ${scoreTone(o.avg)}`}>{short} {fmtScore(o.avg)}{o.avg === null ? '' : '/10'}</span>
                       </div> : <span className="text-[11px] text-muted-foreground">{NONE}</span>}
                     </td>;
                   })}

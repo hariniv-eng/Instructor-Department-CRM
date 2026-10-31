@@ -15,9 +15,23 @@ Commit messages stay short (title + 2-3 lines); this file is the detailed record
 | What the Training Status Sync Now builds | `artifacts/api-server/src/routes/sync.ts` (`runTrainingStatusSync`) |
 | Database tables | `lib/db/src/schema/index.ts` (then `pnpm --filter @workspace/db run push`) |
 | Overview NIAT cohort card: batch name -> cohort | `artifacts/api-server/src/lib/connectors/instructorContribution.ts` (`BATCH_NAME_TO_NIAT_COHORT`) |
+| Instructors tab fallbacks for people not in Darwin (gender, subject, joining date, email...) | `artifacts/api-server/src/routes/reports.ts` (`toApiInstructorSummary`); what the archive keeps: `artifacts/api-server/src/lib/archiveInstructors.ts` |
 | One-off read-only checks | `artifacts/api-server/src/lib/connectors/_tmp_*.ts` |
 
+## 2026-10-31
+
+- **Archive total check (read-only)** -- why Instructor Department (695) + exits (26) differs from the Archive total (717): lists people in the department but not archived, archived Active/SNP but no longer in the department, Exited but still in the department, Exited but not on the exit card.
+  File: `artifacts/api-server/src/lib/connectors/_tmp_archive_total_check.ts`. Counts come from: department = `computeDepartmentAndExceptionRows` and archive = `loadArchivePeople`, both in `artifacts/api-server/src/routes/reports.ts`.
+
+## 2026-10-30
+
+- **Payroll gender check (read-only)** -- for payroll-converted people: gender shown on the Instructors tab vs where it is stored (live row, archive, Darwin full roster, Darwin exit records).
+  File: `artifacts/api-server/src/lib/connectors/_tmp_payroll_gender_check.ts`. Gender fallback order itself: `artifacts/api-server/src/routes/reports.ts` (`toApiInstructorSummary`, `gender:`); archive copy: `artifacts/api-server/src/lib/archiveInstructors.ts` (`keepFromDarwin`).
+
 ## 2026-10-29
+
+- **Training - Demos: scores shown out of 10** -- QA and AI averages read e.g. "QA 6.8/10", "AI 6.5/10" (final_score is 0-10 for both), in cells, overall column and headers.
+  File: `artifacts/instructor-crm/src/pages/demo-training.tsx`. After pull: Publish.
 
 - **Training - Demos cells: unique lectures + average only** -- each Demos / AI cell shows different lectures covered of the course total (a repeat counts once) and the average score over ALL demos / assessments, repeats included. The total-with-repeats line is removed (hover only).
   File: `artifacts/instructor-crm/src/pages/demo-training.tsx`. After pull: Publish.
