@@ -18,10 +18,15 @@ Commit messages stay short (title + 2-3 lines); this file is the detailed record
 | Instructors tab fallbacks for people not in Darwin (gender, subject, joining date, email...) | `artifacts/api-server/src/routes/reports.ts` (`toApiInstructorSummary`); what the archive keeps: `artifacts/api-server/src/lib/archiveInstructors.ts` |
 | Product (NIAT Deployed / Training / Academy / Intensive / IIT X DSA / Support) | `artifacts/api-server/src/lib/product.ts` (`productOf`) + `artifacts/instructor-crm/src/pages/instructors.tsx` (`productLabel`) |
 | Instructors tab table (columns, frozen header / name column) | `artifacts/instructor-crm/src/pages/instructors.tsx` (`CategoryTable`, `PersonRow`, `STICKY_NAME_CELL`) |
+| Overview card explanations (the (i) icon texts) | `artifacts/instructor-crm/src/components/info-tip.tsx` (`OVERVIEW_INFO`) |
 | One-off read-only checks | `artifacts/api-server/src/lib/connectors/_tmp_*.ts` |
 
 ## 2026-11-05
 
+- **TeachOS inactive instructors export (read-only)** -- everyone INACTIVE in BigQuery `niat_instructor_details`, with FCC status (in Darwin, exit record, CM review, archive status, last session) and a best-guess reason. Writes `teachos_inactive.csv` (staff names -- delete after download).
+  File: `artifacts/api-server/src/lib/connectors/_tmp_teachos_inactive.ts`.
+- **Overview: (i) "how is this counted" icon on every card** (per Capability Managers' request) -- hover or tap the icon at the top right of each card / next to its title to see how the number is worked out and its source: the 3 Exceptions cards, Instructor Department, Instructors + Mentors, Operations team, Exit data, Product mix, NIAT contribution, Top campuses, Manager workload, NIAT map. Instructor Department / Instructors + Mentors / Operations team notes written source-first (Darwin Instructors department + payroll-converted from TeachOS).
+  Files: `artifacts/instructor-crm/src/components/info-tip.tsx` (new: the icon + ALL the texts in `OVERVIEW_INFO` -- edit texts here), `artifacts/instructor-crm/src/pages/dashboard.tsx`, `artifacts/instructor-crm/src/components/niat-map.tsx`. After pull: Publish.
 - **Instructors tab table: frozen header row** -- the column-name row stays at the top while scrolling down (the table now scrolls inside its own box, up to the window height); the name column already stays on the left while scrolling sideways, and the top-left "Name" cell stays in both. Also applies to the Custom filter page (same table).
   File: `artifacts/instructor-crm/src/pages/instructors.tsx` (`CategoryTable`). After pull: Publish.
 - **Product rules: DSA campus -> IIT X DSA (fixed); new product "IIT KGP"** -- the DSA-campus check missed TeachOS's spelling "...Technologies - DSA", so 4 DSA instructors (NW0007902, NW0006942, NW0007347, NW0006899) counted as NIAT (Deployed); now IIT X DSA. Any campus mentioning IIT KGP / Kharagpur (e.g. "Nxtwave & IIT KGP OCN", 2 people) is its own product "IIT KGP", not NIAT (Deployed). Intensive Kukatpally stays Intensive (decided, no change). NIAT (Deployed) expected 498 -> 492.

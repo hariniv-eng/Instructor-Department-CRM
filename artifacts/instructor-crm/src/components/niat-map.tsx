@@ -7,6 +7,7 @@ import { useMemo, useState } from 'react';
 import { MapPin as MapPinIcon, X } from 'lucide-react';
 import { niatMapPins } from '@/lib/campusLocations';
 import { INDIA_STATES, MAP_HEIGHT, MAP_LAT1, MAP_LON0, MAP_WIDTH } from '@/lib/indiaMapData';
+import { InfoTip, OVERVIEW_INFO } from '@/components/info-tip';
 
 const LON_SPAN = 31; // degrees of longitude across MAP_WIDTH (67.5 -> 98.5), as used by the generator
 const PX_PER_DEG = MAP_WIDTH / LON_SPAN;
@@ -23,7 +24,7 @@ export function NiatMapCard({ instructorInstitutes, mentorInstitutes }: { instru
     <div className="mb-2 flex items-center gap-3">
       <span className="grid h-7 w-7 place-items-center rounded-lg bg-secondary text-muted-foreground"><MapPinIcon size={14} /></span>
       <div>
-        <h2 className="text-[12px] font-extrabold tracking-[-0.03em]">NIAT university locations</h2>
+        <h2 className="flex items-center gap-1 text-[12px] font-extrabold tracking-[-0.03em]">NIAT university locations <InfoTip title={OVERVIEW_INFO.niatMap.title} lines={OVERVIEW_INFO.niatMap.lines} testId="info-niat-map" /></h2>
         <p className="text-[10px] text-muted-foreground">{universityCount} universities across {pins.length} locations — click a pin</p>
       </div>
     </div>
