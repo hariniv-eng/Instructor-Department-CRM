@@ -1049,10 +1049,14 @@ export function CategoryTable({ category, people, backQuery, linkMode = 'row', b
   const columns = gridColsClass(category);
   const pager = usePagedRows(people, 50);
   const movementsByInstructor = useMovementsByInstructor();
+  // Frozen header row (2026-11-05, per request: "fix the column-name row so it stays while scrolling, and keep the name visible when
+  // scrolling sideways"): the table scrolls inside its own box (up to the window height), so the header row can stick to the top of
+  // that box (sticky top-0, above the rows) while the name column keeps sticking to the left (STICKY_NAME_CELL). Both directions
+  // scroll in the same box, so the top-left "Name" header cell stays put in both.
   return <div className="overflow-hidden rounded-xl border border-border bg-card shadow-xs">
-    <div className="overflow-x-auto">
+    <div data-testid="instructor-table-scroll" className="max-h-[calc(100vh-160px)] overflow-auto">
       <div className="w-max min-w-full">
-        <div className={`grid gap-4 border-b border-border bg-[#f4f7f9] px-5 py-3.5 text-left font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground ${columns}`}>
+        <div className={`sticky top-0 z-20 grid gap-4 border-b border-border bg-[#f4f7f9] px-5 py-3.5 text-left font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground ${columns}`}>
           <span className={`${STICKY_NAME_CELL} bg-[#f4f7f9]`}>{nameColumnLabel(category)}</span>
           <span>Designation</span>
           <span>Employee ID</span>

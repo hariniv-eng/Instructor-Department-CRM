@@ -17,10 +17,13 @@ Commit messages stay short (title + 2-3 lines); this file is the detailed record
 | Overview NIAT cohort card: batch name -> cohort | `artifacts/api-server/src/lib/connectors/instructorContribution.ts` (`BATCH_NAME_TO_NIAT_COHORT`) |
 | Instructors tab fallbacks for people not in Darwin (gender, subject, joining date, email...) | `artifacts/api-server/src/routes/reports.ts` (`toApiInstructorSummary`); what the archive keeps: `artifacts/api-server/src/lib/archiveInstructors.ts` |
 | Product (NIAT Deployed / Training / Academy / Intensive / IIT X DSA / Support) | `artifacts/api-server/src/lib/product.ts` (`productOf`) + `artifacts/instructor-crm/src/pages/instructors.tsx` (`productLabel`) |
+| Instructors tab table (columns, frozen header / name column) | `artifacts/instructor-crm/src/pages/instructors.tsx` (`CategoryTable`, `PersonRow`, `STICKY_NAME_CELL`) |
 | One-off read-only checks | `artifacts/api-server/src/lib/connectors/_tmp_*.ts` |
 
 ## 2026-11-05
 
+- **Instructors tab table: frozen header row** -- the column-name row stays at the top while scrolling down (the table now scrolls inside its own box, up to the window height); the name column already stays on the left while scrolling sideways, and the top-left "Name" cell stays in both. Also applies to the Custom filter page (same table).
+  File: `artifacts/instructor-crm/src/pages/instructors.tsx` (`CategoryTable`). After pull: Publish.
 - **Product rules: DSA campus -> IIT X DSA (fixed); new product "IIT KGP"** -- the DSA-campus check missed TeachOS's spelling "...Technologies - DSA", so 4 DSA instructors (NW0007902, NW0006942, NW0007347, NW0006899) counted as NIAT (Deployed); now IIT X DSA. Any campus mentioning IIT KGP / Kharagpur (e.g. "Nxtwave & IIT KGP OCN", 2 people) is its own product "IIT KGP", not NIAT (Deployed). Intensive Kukatpally stays Intensive (decided, no change). NIAT (Deployed) expected 498 -> 492.
   Files: `artifacts/api-server/src/lib/product.ts` (`isIitxDsaCampus`, new `isIitKgpCampus`, `productOf`), `artifacts/instructor-crm/src/pages/instructors.tsx` (`productLabel`, `ALL_PRODUCTS`), `artifacts/instructor-crm/src/pages/dashboard.tsx` (product colour). After pull: Publish. Also affects Taught in Class / Demos / Overview cohort card, which use NIAT (Deployed).
 - **Manual deployed sheet vs FCC (read-only)** -- compares the manual NIAT deployed list (490 employee IDs + location, shared 5 Nov; names not stored) with FCC's NIAT (Deployed) 498: who is only in FCC, who is only in the sheet and where FCC has them instead, and location vs TeachOS campus differences.
