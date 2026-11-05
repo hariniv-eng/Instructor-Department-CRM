@@ -21,7 +21,7 @@ Commit messages stay short (title + 2-3 lines); this file is the detailed record
 
 ## 2026-11-05
 
-- **NIAT (Deployed) session activity (read-only)** -- for the 498: completed sessions in the last 7 / 30 / 60 days, last session, upcoming sessions; buckets by instructors / mentors; lists who taught nothing in 60 days. Writes `niat_deployed_activity.csv` (staff names -- delete after download).
+- **NIAT (Deployed) session activity (read-only)** -- for the 498: completed sessions in the last 7 / 30 / 60 days, last session, upcoming sessions; buckets by instructors / mentors; lists who taught nothing in 60 days, with their university (TeachOS campus) and Darwin workspace (added same day). Writes `niat_deployed_activity.csv` (staff names -- delete after download).
   File: `artifacts/api-server/src/lib/connectors/_tmp_niat_deployed_activity.ts`. Source table: session schedule (`SESSION_SCHEDULE_TABLE` in `connectors/instructorContribution.ts`).
 - **NIAT (Deployed) count check (read-only)** -- recounts NIAT (Deployed) instructors + mentors with the app's rules (department -> productOf), split by role / subject / payroll, joiners and exits in the last 14 days, approved exits still counted, vs BigQuery niat_instructor_details.
   File: `artifacts/api-server/src/lib/connectors/_tmp_niat_deployed_count.ts`. Product rule: `artifacts/api-server/src/lib/product.ts` (`productOf`); Overview card: `artifacts/instructor-crm/src/pages/dashboard.tsx` (`NiatContributionCard`).

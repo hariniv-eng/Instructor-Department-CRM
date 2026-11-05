@@ -46,14 +46,15 @@ async function main() {
   console.log("Activity (completed sessions in the schedule) | instructors | mentors | total");
   for (const [b, m] of [...out].sort()) console.log(`  ${b.slice(2)} | ${m.get("Instructor") ?? 0} | ${m.get("Mentor") ?? 0} | ${(m.get("Instructor") ?? 0) + (m.get("Mentor") ?? 0)}`);
   const quiet = niat.filter(({ r }) => { const b = bucket(S.get(r.teachosUserId ?? "")); return b.startsWith("4") || b.startsWith("5"); });
-  console.log(`\nNo completed session in the last 60 days (${quiet.length}) -- employee ID | role | subject | last session | upcoming sessions (next):`);
-  for (const { r, kind } of quiet) { const s = S.get(r.teachosUserId ?? ""); console.log(`  ${r.employeeId ?? "-"} | ${kind} | ${normalizeSubjectArea(r.deptArea || r.manualDeptArea || null) ?? "-"} | ${plain(s?.last_done) || "never"} | ${n(s, "upcoming")}${plain(s?.next_up) ? ` (${plain(s?.next_up)})` : ""}`); }
+  // University / campus (2026-11-05, per request): the TeachOS deployment campus(es) and Darwin's workspace.
+  console.log(`\nNo completed session in the last 60 days (${quiet.length}) -- employee ID | role | subject | university (TeachOS campus) | Darwin workspace | last session | upcoming sessions (next):`);
+  for (const { r, kind } of quiet) { const s = S.get(r.teachosUserId ?? ""); console.log(`  ${r.employeeId ?? "-"} | ${kind} | ${normalizeSubjectArea(r.deptArea || r.manualDeptArea || null) ?? "-"} | ${(r.institutes ?? []).join(" + ") || "-"} | ${r.workspace || "-"} | ${plain(s?.last_done) || "never"} | ${n(s, "upcoming")}${plain(s?.next_up) ? ` (${plain(s?.next_up)})` : ""}`); }
   const scheduledOnly = niat.filter(({ r }) => { const s = S.get(r.teachosUserId ?? ""); return !n(s, "d7") && n(s, "upcoming") > 0; }).length;
   console.log(`\nNot in the last 7 days but with upcoming sessions scheduled: ${scheduledOnly}`);
 
   const esc = (x: unknown) => `"${String(x ?? "").replace(/"/g, '""')}"`;
-  const csv = [["Name", "Employee ID", "Role", "Subject", "Capability Manager", "Payroll", "Activity", "Sessions last 7 days", "Last 30 days", "Last 60 days", "Last completed session", "Upcoming sessions", "Next upcoming"].map(esc).join(",")];
-  for (const { r, kind } of niat) { const s = S.get(r.teachosUserId ?? ""); csv.push([r.fullName, r.employeeId, kind, normalizeSubjectArea(r.deptArea || r.manualDeptArea || null), r.teachosManager || r.manualCapabilityManager, isPayrollPerson(r) ? "yes" : "no", bucket(s).slice(2), n(s, "d7"), n(s, "d30"), n(s, "d60"), plain(s?.last_done), n(s, "upcoming"), plain(s?.next_up)].map(esc).join(",")); }
+  const csv = [["Name", "Employee ID", "Role", "Subject", "University (TeachOS campus)", "Darwin workspace", "Capability Manager", "Payroll", "Activity", "Sessions last 7 days", "Last 30 days", "Last 60 days", "Last completed session", "Upcoming sessions", "Next upcoming"].map(esc).join(",")];
+  for (const { r, kind } of niat) { const s = S.get(r.teachosUserId ?? ""); csv.push([r.fullName, r.employeeId, kind, normalizeSubjectArea(r.deptArea || r.manualDeptArea || null), (r.institutes ?? []).join(" + "), r.workspace, r.teachosManager || r.manualCapabilityManager, isPayrollPerson(r) ? "yes" : "no", bucket(s).slice(2), n(s, "d7"), n(s, "d30"), n(s, "d60"), plain(s?.last_done), n(s, "upcoming"), plain(s?.next_up)].map(esc).join(",")); }
   fs.writeFileSync("niat_deployed_activity.csv", csv.join("\n"));
   console.log(`Full list with names: niat_deployed_activity.csv (delete after download).`);
   process.exit(0);
