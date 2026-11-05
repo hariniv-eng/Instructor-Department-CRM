@@ -7,6 +7,7 @@ import { PageIntro, QueryError, SkeletonBlock, DownloadCsvButton, TableSearchInp
 import { downloadCsv, slugify, toCsv } from '@/lib/csv';
 import { ALL_PRODUCTS, productLabel } from './instructors';
 import { NiatMapCard } from '@/components/niat-map';
+import { InfoTip, OVERVIEW_INFO } from '@/components/info-tip';
 import { SopNote, SopNoteList } from '@/components/sop-note';
 import { ActionTakenCell, MOVEMENT_TYPES, currentMovements, movementLabel, useMovementsByInstructor, type Movement } from '@/components/movement-tracker';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -152,9 +153,9 @@ export default function DashboardPage() {
     />
 
     {report && <section aria-label="Exceptions" data-testid="banner-exceptions" className="mb-4 grid grid-cols-1 gap-3 animate-rise sm:grid-cols-3">
-      <ExceptionSegment label="CM actions" title="Needs review" meta="Exit record not reviewed yet — Capability Managers" count={reviewPeople.length} icon={<AlertTriangle size={16} />} href="/instructors?category=exception" testId="exception-1" />
-      <ExceptionSegment label="Admin team actions" title="TeachOS access actions" meta={`${removeCount} remove · ${giveCount} give · ${movementCount} movement changes`} count={exception2Total} icon={<Trash2 size={16} />} active={activeException === 'remove'} onClick={() => setException2Open(true)} testId="exception-2" />
-      <ExceptionSegment label="HRBP actions" title="Approval pending" meta="Exit approval pending — HRBP action" count={pendingPeople.length} icon={<Clock size={16} />} active={activeException === 'pending'} onClick={() => setActiveException(activeException === 'pending' ? null : 'pending')} testId="exception-3" />
+      <ExceptionSegment label="CM actions" title="Needs review" meta="Exit record not reviewed yet — Capability Managers" count={reviewPeople.length} icon={<AlertTriangle size={16} />} href="/instructors?category=exception" testId="exception-1" info={OVERVIEW_INFO.needsReview} />
+      <ExceptionSegment label="Admin team actions" title="TeachOS access actions" meta={`${removeCount} remove · ${giveCount} give · ${movementCount} movement changes`} count={exception2Total} icon={<Trash2 size={16} />} active={activeException === 'remove'} onClick={() => setException2Open(true)} testId="exception-2" info={OVERVIEW_INFO.teachosActions} />
+      <ExceptionSegment label="HRBP actions" title="Approval pending" meta="Exit approval pending — HRBP action" count={pendingPeople.length} icon={<Clock size={16} />} active={activeException === 'pending'} onClick={() => setActiveException(activeException === 'pending' ? null : 'pending')} testId="exception-3" info={OVERVIEW_INFO.approvalPending} />
     </section>}
     {report && activeException === 'pending' && <ExceptionPendingPanel people={pendingPeople} onClose={() => setActiveException(null)} />}
     <Dialog open={exception2Open} onOpenChange={setException2Open}>
@@ -187,9 +188,9 @@ export default function DashboardPage() {
     {reportQuery.isLoading && <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">{[1, 2, 3, 4].map((item) => <SkeletonBlock key={item} className="h-[126px]" />)}</div>}
     {reportQuery.isError && <QueryError message="Dashboard data is unavailable right now." />}
     {report && <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 animate-rise">
-      <KpiCard label="Instructor Department" value={formatKpi(report.kpis.department_total_count)} meta="Instructors + Mentors + Ops team" icon={<Building2 size={12} />} tone="saffron" />
-      <KpiCard label="Instructors + Mentors" value={formatKpi(instructorMentorTotal)} meta={`${instructorPeople.length.toLocaleString('en-IN')} Instructors · ${mentorPeople.length.toLocaleString('en-IN')} Mentors`} icon={<UsersRound size={12} />} tone="navy" />
-      <KpiCard label="Operations team" value={formatKpi(report.kpis.ops_team_count)} meta="Darwin — Delivery Support (Ops)" icon={<Briefcase size={12} />} tone="coral" />
+      <KpiCard label="Instructor Department" value={formatKpi(report.kpis.department_total_count)} meta="Instructors + Mentors + Ops team" icon={<Building2 size={12} />} tone="saffron" info={OVERVIEW_INFO.department} />
+      <KpiCard label="Instructors + Mentors" value={formatKpi(instructorMentorTotal)} meta={`${instructorPeople.length.toLocaleString('en-IN')} Instructors · ${mentorPeople.length.toLocaleString('en-IN')} Mentors`} icon={<UsersRound size={12} />} tone="navy" info={OVERVIEW_INFO.instructorsMentors} />
+      <KpiCard label="Operations team" value={formatKpi(report.kpis.ops_team_count)} meta="Darwin — Delivery Support (Ops)" icon={<Briefcase size={12} />} tone="coral" info={OVERVIEW_INFO.ops} />
       <ExitKpiCard exitCandidates={exitCandidates} />
     </section>}
 
@@ -211,7 +212,8 @@ export default function DashboardPage() {
 
 // One third of the red Exceptions bar at the top of the Overview (2026-10-08, per request). Exception 1
 // jumps straight to the Instructors tab's Exception list; 2 and 3 open their list below the bar.
-function ExceptionSegment({ label, title, meta, count, icon, href, active = false, onClick, testId }: {
+function ExceptionSegment({ label, title, meta, count, icon, href, active = false, onClick, testId, info }: {
+  info?: { title: string; lines: string[] };
   label: string;
   title: string;
   meta: string;
@@ -241,8 +243,12 @@ function ExceptionSegment({ label, title, meta, count, icon, href, active = fals
   const cls = `flex w-full items-center gap-3 rounded-xl border px-4 py-3.5 text-left shadow-sm transition-colors ${clear
     ? `border-[#c3e0d7] text-[#256e65] hover:bg-[#d2e8e1] ${active ? 'bg-[#d2e8e1]' : 'bg-[#dff0eb]'}`
     : `border-[#ebc9bd] text-[#9b4434] hover:bg-[#f0d6cd] ${active ? 'bg-[#f0d6cd]' : 'bg-[#f6e4de]'}`}`;
-  if (href) return <Link href={href} data-testid={`link-${testId}`} className={cls}>{body}</Link>;
-  return <button type="button" data-testid={`button-${testId}`} onClick={onClick} aria-pressed={active} className={cls}>{body}</button>;
+  const card = href
+    ? <Link href={href} data-testid={`link-${testId}`} className={cls}>{body}</Link>
+    : <button type="button" data-testid={`button-${testId}`} onClick={onClick} aria-pressed={active} className={cls}>{body}</button>;
+  // (i) "how is this counted" icon (2026-11-05) sits on top of the card, outside the link / button, so hovering or tapping it never opens the card.
+  if (!info) return card;
+  return <div className="relative">{card}<InfoTip title={info.title} lines={info.lines} className="absolute right-2 top-2" testId={`info-${testId}`} /></div>;
 }
 
 // Employee Status as set by the Capability Manager on the Instructors tab (2026-10-12, per request: shown to the HRBP too).
@@ -376,7 +382,7 @@ function ProductMixCard({ people, instructors, mentors }: { people: InstructorSu
       <div className="flex items-center gap-3">
         <span className="grid h-7 w-7 place-items-center rounded-lg bg-secondary text-muted-foreground"><PieChart size={14} /></span>
         <div>
-          <h2 className="text-[12px] font-extrabold tracking-[-0.03em]">Product mix</h2>
+          <h2 className="flex items-center gap-1 text-[12px] font-extrabold tracking-[-0.03em]">Product mix <InfoTip title={OVERVIEW_INFO.productMix.title} lines={OVERVIEW_INFO.productMix.lines} testId="info-product-mix" /></h2>
           <p className="text-[10px] text-muted-foreground">{subject ? `${subject} · share of each Product` : 'Instructor Department by Product · pick a subject to narrow it'}</p>
         </div>
       </div>
@@ -466,7 +472,7 @@ function NiatContributionCard({ people }: { people: InstructorSummary[] }) {
     <div className="mb-3 flex items-center gap-3">
       <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-secondary text-muted-foreground"><GraduationCap size={14} /></span>
       <div>
-        <h2 className="text-[12px] font-extrabold tracking-[-0.03em]">Contribution of NIAT instructors &amp; mentors</h2>
+        <h2 className="flex items-center gap-1 text-[12px] font-extrabold tracking-[-0.03em]">Contribution of NIAT instructors &amp; mentors <InfoTip title={OVERVIEW_INFO.niatContribution.title} lines={OVERVIEW_INFO.niatContribution.lines} testId="info-niat-contribution" /></h2>
         <p className="text-[10px] text-muted-foreground">Instructors and mentors teaching each NIAT cohort · last 30 days (last 2 months if none)</p>
       </div>
     </div>
@@ -547,7 +553,7 @@ function TopCampusesCard({ instructors, mentors }: { instructors: InstructorSumm
   const max = Math.max(1, ...campuses.map((campus) => campus.total));
   return <div data-testid="card-top-campuses" className="min-w-0 overflow-hidden rounded-xl border border-border bg-card p-4 shadow-sm">
     <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-      <h2 className="text-[12px] font-extrabold tracking-[-0.02em]">Top campuses by instructors + mentors</h2>
+      <h2 className="flex items-center gap-1 text-[12px] font-extrabold tracking-[-0.02em]">Top campuses by instructors + mentors <InfoTip title={OVERVIEW_INFO.topCampuses.title} lines={OVERVIEW_INFO.topCampuses.lines} testId="info-top-campuses" /></h2>
       <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
         <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-sm bg-[#4f86b8]" />Instructors</span>
         <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-sm bg-[#2e8b7a]" />Mentors</span>
@@ -587,7 +593,7 @@ function CapabilityManagersCard({ people }: { people: InstructorSummary[] }) {
     <div className="mb-3 flex items-center gap-3">
       <span className="grid h-7 w-7 place-items-center rounded-lg bg-secondary text-muted-foreground"><UsersRound size={14} /></span>
       <div>
-        <h2 className="text-[12px] font-extrabold tracking-[-0.03em]">Manager workload</h2>
+        <h2 className="flex items-center gap-1 text-[12px] font-extrabold tracking-[-0.03em]">Manager workload <InfoTip title={OVERVIEW_INFO.managerWorkload.title} lines={OVERVIEW_INFO.managerWorkload.lines} testId="info-manager-workload" /></h2>
         <p className="text-[10px] text-muted-foreground">Everyone reporting to each Capability Manager · Instructors + Mentors + Ops</p>
       </div>
     </div>
@@ -639,6 +645,8 @@ function ExitKpiCard({ exitCandidates }: { exitCandidates: InstructorSummary[] }
   const chip = (text: string, tone: 'amber' | 'blue') => <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${tone === 'amber' ? 'bg-[#fbeed3] text-[#8a5a0b]' : 'bg-[#e1eaf1] text-primary'}`}>{text}</span>;
   return <>
     {/* Deliberately unlike the four live-headcount tiles: a filled card, two counts side by side, and a clear call to open the names (2026-10-09, per request). */}
+    <div className="relative flex">
+    <InfoTip title={OVERVIEW_INFO.exits.title} lines={OVERVIEW_INFO.exits.lines} tone="light" className="absolute right-2 top-2 z-10" testId="info-exit-data" />
     <button type="button" data-testid="button-kpi-card-exit-data" onClick={() => setOpen(true)} className="group relative flex w-full flex-col justify-between overflow-hidden rounded-xl border border-primary bg-primary p-4 text-left text-primary-foreground shadow-md transition-transform hover:-translate-y-0.5">
       <span aria-hidden className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full bg-primary-foreground/10" />
       <span aria-hidden className="pointer-events-none absolute -bottom-8 right-8 h-16 w-16 rounded-full bg-primary-foreground/5" />
@@ -655,6 +663,7 @@ function ExitKpiCard({ exitCandidates }: { exitCandidates: InstructorSummary[] }
       </div>
       <p className="relative mt-3 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.08em] text-primary-foreground/90">{archiveQuery.isError ? 'Archive unavailable right now' : 'View exit details'} <ArrowRight size={11} className="transition-transform group-hover:translate-x-0.5" /></p>
     </button>
+    </div>
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="max-w-3xl" data-testid="dialog-exit-data">
         <DialogHeader>
@@ -710,7 +719,8 @@ function ExitKpiCard({ exitCandidates }: { exitCandidates: InstructorSummary[] }
   </>;
 }
 
-function KpiCard({ label, value, meta, icon, tone, alert = false }: {
+function KpiCard({ label, value, meta, icon, tone, alert = false, info }: {
+  info?: { title: string; lines: string[] };
   label: string;
   value: string;
   meta: string;
@@ -727,6 +737,7 @@ function KpiCard({ label, value, meta, icon, tone, alert = false }: {
     className="relative w-full overflow-hidden rounded-xl border border-border bg-card py-5 pl-5 pr-4 text-center shadow-sm"
   >
     <span aria-hidden className="absolute bottom-3 left-0 top-3 w-1.5 rounded-r-full" style={{ backgroundColor: edges[tone] }} />
+    {info && <InfoTip title={info.title} lines={info.lines} className="absolute right-2 top-2" testId={`info-kpi-${label.toLowerCase().replace(/\s+/g, '-')}`} />}
     <p className="flex items-center justify-center gap-1.5 text-[11px] font-bold text-muted-foreground"><span className={`grid h-5 w-5 place-items-center rounded-md ${tones[tone]}`}>{icon}</span>{label}</p>
     <p className="mt-2 text-[28px] font-extrabold leading-none tracking-[-0.04em]">{value}</p>
     <p className={`mt-1.5 text-[10px] ${alert ? 'text-[#a36b00]' : 'text-muted-foreground'}`}>{meta}</p>
