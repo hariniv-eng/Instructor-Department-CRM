@@ -21,6 +21,8 @@ Commit messages stay short (title + 2-3 lines); this file is the detailed record
 
 ## 2026-11-05
 
+- **Manual deployed sheet vs FCC (read-only)** -- compares the manual NIAT deployed list (490 employee IDs + location, shared 5 Nov; names not stored) with FCC's NIAT (Deployed) 498: who is only in FCC, who is only in the sheet and where FCC has them instead, and location vs TeachOS campus differences.
+  File: `artifacts/api-server/src/lib/connectors/_tmp_manual_deployed_compare.ts` (the sheet's IDs are inside it as `MANUAL`).
 - **NIAT (Deployed) session activity (read-only)** -- for the 498: completed sessions in the last 7 / 30 / 60 days, last session, upcoming sessions; buckets by instructors / mentors; lists who taught nothing in 60 days, with their university (TeachOS campus) and Darwin workspace (added same day). Writes `niat_deployed_activity.csv` (staff names -- delete after download).
   File: `artifacts/api-server/src/lib/connectors/_tmp_niat_deployed_activity.ts`. Source table: session schedule (`SESSION_SCHEDULE_TABLE` in `connectors/instructorContribution.ts`).
 - **NIAT (Deployed) count check (read-only)** -- recounts NIAT (Deployed) instructors + mentors with the app's rules (department -> productOf), split by role / subject / payroll, joiners and exits in the last 14 days, approved exits still counted, vs BigQuery niat_instructor_details.
