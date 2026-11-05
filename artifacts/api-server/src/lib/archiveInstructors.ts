@@ -29,9 +29,9 @@
 // No code path here (or anywhere else in the app) ever deletes a row from
 // this table -- its row count can only grow.
 import { eq } from "drizzle-orm";
-import { instructorArchiveTable, instructorsTable, instructorContributionTable, instructorTrainingStatusTable } from "@workspace/db";
+import { instructorArchiveTable, instructorsTable, instructorContributionTable, instructorTrainingStatusTable, darwinboxExitsTable, instructorManualJoiningTable } from "@workspace/db";
 import { sdb as db } from "./syncContext";
-import { normalize } from "./reconcile";
+import { normalize, toISODate } from "./reconcile";
 import { isPinnedConfirmedInstructor } from "../data/classificationOverrides";
 
 type LiveRow = typeof instructorsTable.$inferSelect;
@@ -129,12 +129,49 @@ function findArchiveMatch(archived: ArchiveRow[], row: LiveRow): { match: Archiv
   return { match, matchedBy: match ? "name" : null };
 }
 
+// Date of joining in the archive (2026-11-05, per request: "in the Instructor Archive also store the joining date of instructors").
+// Darwin's date is archived as before. For people Darwin never gave a date to (payroll-converted instructors) or who left before the
+// archive kept it, the date is filled from -- in this order -- their Darwin exit record's "Date Of Joining" (newest record with a usable
+// date), then the date typed in by hand on the Contribution tab (instructor_manual_joining). Once stored it stays, like every archived
+// field. Same header matching as joiningDateOfExitRecord() in routes/reports.ts (lib cannot import routes) -- keep the two in step.
+const JOINING_HEADERS = new Set(["dateofjoining", "doj", "joiningdate", "dateofjoin", "dateofjoiningdoj"]);
+function joiningDateOf(rawData: Record<string, unknown>): string | null {
+  for (const [key, value] of Object.entries(rawData ?? {})) {
+    if (value === null || value === undefined) continue;
+    if (!JOINING_HEADERS.has(key.toLowerCase().replace(/[^a-z]/g, ""))) continue;
+    const iso = toISODate(String(value).trim());
+    if (iso && iso >= "1990-01-01" && iso <= new Date().toISOString().slice(0, 10)) return iso;
+  }
+  return null;
+}
+async function loadJoiningFallback(): Promise<Map<string, string>> {
+  const byEmployee = new Map<string, string>();
+  try {
+    const newest = new Map<string, number>();
+    for (const x of await db.select({ id: darwinboxExitsTable.id, employeeId: darwinboxExitsTable.employeeId, rawData: darwinboxExitsTable.rawData }).from(darwinboxExitsTable)) {
+      if (!x.employeeId) continue;
+      const iso = joiningDateOf(x.rawData as Record<string, unknown>);
+      if (iso && x.id > (newest.get(x.employeeId) ?? -1)) { newest.set(x.employeeId, x.id); byEmployee.set(x.employeeId, iso); }
+    }
+  } catch (err) {
+    console.warn("[archive] could not read exit records for joining dates:", (err as Error).message);
+  }
+  try {
+    for (const m of await db.select().from(instructorManualJoiningTable)) if (!byEmployee.has(m.employeeId)) byEmployee.set(m.employeeId, m.dateOfJoining);
+  } catch (err) {
+    console.warn("[archive] instructor_manual_joining not readable (run the database push):", (err as Error).message);
+  }
+  return byEmployee;
+}
+
 export async function archiveInstructors(options: { grantTeachosOnlyScope?: boolean } = {}): Promise<{ created: number; updated: number }> {
   const grantTeachosOnlyScope = options.grantTeachosOnlyScope ?? true;
   const liveRows = await db.select().from(instructorsTable);
   const archivedRows = await db.select().from(instructorArchiveTable);
   let created = 0;
   let updated = 0;
+  const joiningFallback = await loadJoiningFallback();
+  const joiningOf = (employeeId: string | null) => (employeeId ? joiningFallback.get(employeeId) ?? null : null);
 
   for (const row of liveRows) {
     const { match, matchedBy } = findArchiveMatch(archivedRows, row);
@@ -159,7 +196,7 @@ export async function archiveInstructors(options: { grantTeachosOnlyScope?: bool
         fullName: row.fullName,
         orgEmail: row.orgEmail,
         mobile: row.mobile,
-        dateOfJoining: row.dateOfJoining,
+        dateOfJoining: row.dateOfJoining ?? joiningOf(row.employeeId),
         department: row.department,
         subDepartment: row.subDepartment,
         designation: row.designation,
@@ -212,7 +249,7 @@ export async function archiveInstructors(options: { grantTeachosOnlyScope?: bool
       teachosUserId: keep(row.teachosUserId, match.teachosUserId),
       orgEmail: keep(row.orgEmail, match.orgEmail),
       mobile: keep(row.mobile, match.mobile),
-      dateOfJoining: keep(row.dateOfJoining, match.dateOfJoining),
+      dateOfJoining: keep(row.dateOfJoining, match.dateOfJoining) ?? joiningOf(row.employeeId ?? match.employeeId),
       department: keep(row.department, match.department),
       subDepartment: keep(row.subDepartment, match.subDepartment),
       designation: keep(row.designation, match.designation),
@@ -277,6 +314,11 @@ export async function archiveInstructors(options: { grantTeachosOnlyScope?: bool
   // TeachOS-side data (contribution, cohorts, training) -- see the function below.
   await snapshotTeachosDataIntoArchive();
 
+  // Archived people with no live row any more (left long ago) and still no joining date: fill it from the exit record / manual date.
+  for (const a of await db.select({ id: instructorArchiveTable.id, employeeId: instructorArchiveTable.employeeId, dateOfJoining: instructorArchiveTable.dateOfJoining }).from(instructorArchiveTable)) {
+    const fill = !a.dateOfJoining ? joiningOf(a.employeeId) : null;
+    if (fill) { await db.update(instructorArchiveTable).set({ dateOfJoining: fill }).where(eq(instructorArchiveTable.id, a.id)); updated++; }
+  }
   return { created, updated };
 }
 

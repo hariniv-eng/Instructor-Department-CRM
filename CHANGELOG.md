@@ -19,10 +19,15 @@ Commit messages stay short (title + 2-3 lines); this file is the detailed record
 | Product (NIAT Deployed / Training / Academy / Intensive / IIT X DSA / Support) | `artifacts/api-server/src/lib/product.ts` (`productOf`) + `artifacts/instructor-crm/src/pages/instructors.tsx` (`productLabel`) |
 | Instructors tab table (columns, frozen header / name column) | `artifacts/instructor-crm/src/pages/instructors.tsx` (`CategoryTable`, `PersonRow`, `STICKY_NAME_CELL`) |
 | Overview card explanations (the (i) icon texts) | `artifacts/instructor-crm/src/components/info-tip.tsx` (`OVERVIEW_INFO`) |
+| What the Instructor Archive stores (joining date, gender, subject ...) | `artifacts/api-server/src/lib/archiveInstructors.ts` |
 | One-off read-only checks | `artifacts/api-server/src/lib/connectors/_tmp_*.ts` |
 
 ## 2026-11-05
 
+- **Instructor Archive keeps a joining date for everyone** -- Darwin's date as before; for people Darwin never gave one to (payroll-converted) or who left before it was kept, filled from their Darwin exit record's "Date Of Joining", else the date typed in on the Contribution tab. Also fills archived people who have already left. Once stored it stays. Shown in the Archive's "Date of joining" column and CSV.
+  File: `artifacts/api-server/src/lib/archiveInstructors.ts` (`loadJoiningFallback`, `archiveInstructors`). After pull: Publish + Sync Now (Darwin) -- the archive is filled during the sync.
+- **Overview (i) notes shortened** -- each card's note is now one line saying where the number comes from (e.g. Instructor Department: "Darwin's Instructors department + TeachOS's payroll-converted instructors.").
+  File: `artifacts/instructor-crm/src/components/info-tip.tsx` (`OVERVIEW_INFO`). After pull: Publish.
 - **TeachOS inactive instructors export (read-only)** -- everyone INACTIVE in BigQuery `niat_instructor_details`, with FCC status (in Darwin, exit record, CM review, archive status, last session) and a best-guess reason. Writes `teachos_inactive.csv` (staff names -- delete after download).
   File: `artifacts/api-server/src/lib/connectors/_tmp_teachos_inactive.ts`.
 - **Overview: (i) "how is this counted" icon on every card** (per Capability Managers' request) -- hover or tap the icon at the top right of each card / next to its title to see how the number is worked out and its source: the 3 Exceptions cards, Instructor Department, Instructors + Mentors, Operations team, Exit data, Product mix, NIAT contribution, Top campuses, Manager workload, NIAT map. Instructor Department / Instructors + Mentors / Operations team notes written source-first (Darwin Instructors department + payroll-converted from TeachOS).
