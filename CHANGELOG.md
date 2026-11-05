@@ -16,7 +16,13 @@ Commit messages stay short (title + 2-3 lines); this file is the detailed record
 | Database tables | `lib/db/src/schema/index.ts` (then `pnpm --filter @workspace/db run push`) |
 | Overview NIAT cohort card: batch name -> cohort | `artifacts/api-server/src/lib/connectors/instructorContribution.ts` (`BATCH_NAME_TO_NIAT_COHORT`) |
 | Instructors tab fallbacks for people not in Darwin (gender, subject, joining date, email...) | `artifacts/api-server/src/routes/reports.ts` (`toApiInstructorSummary`); what the archive keeps: `artifacts/api-server/src/lib/archiveInstructors.ts` |
+| Product (NIAT Deployed / Training / Academy / Intensive / IIT X DSA / Support) | `artifacts/api-server/src/lib/product.ts` (`productOf`) + `artifacts/instructor-crm/src/pages/instructors.tsx` (`productLabel`) |
 | One-off read-only checks | `artifacts/api-server/src/lib/connectors/_tmp_*.ts` |
+
+## 2026-11-05
+
+- **NIAT (Deployed) count check (read-only)** -- recounts NIAT (Deployed) instructors + mentors with the app's rules (department -> productOf), split by role / subject / payroll, joiners and exits in the last 14 days, approved exits still counted, vs BigQuery niat_instructor_details.
+  File: `artifacts/api-server/src/lib/connectors/_tmp_niat_deployed_count.ts`. Product rule: `artifacts/api-server/src/lib/product.ts` (`productOf`); Overview card: `artifacts/instructor-crm/src/pages/dashboard.tsx` (`NiatContributionCard`).
 
 ## 2026-10-31
 
