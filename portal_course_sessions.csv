@@ -1,0 +1,62 @@
+﻿Track,Course,Course key,Course version,No.,Class session
+Backend Development,Python,python,b76ff0b83180494fa9a80e89c56421b1|v0,1,Programming with Python
+Backend Development,Python,python,b76ff0b83180494fa9a80e89c56421b1|v0,2,Leveraging GenAI for Accelerated Learning
+Backend Development,Python,python,b76ff0b83180494fa9a80e89c56421b1|v0,3,Variables and Data Types
+Backend Development,Python,python,b76ff0b83180494fa9a80e89c56421b1|v0,4,Sequence of Instructions
+Backend Development,Python,python,b76ff0b83180494fa9a80e89c56421b1|v0,5,Input and Output Basics
+Backend Development,Python,python,b76ff0b83180494fa9a80e89c56421b1|v0,6,How to Debug Your Code?
+Backend Development,Python,python,b76ff0b83180494fa9a80e89c56421b1|v0,7,Type Conversions
+Backend Development,Python,python,b76ff0b83180494fa9a80e89c56421b1|v0,8,Relational Operators
+Backend Development,Python,python,b76ff0b83180494fa9a80e89c56421b1|v0,9,Logical Operators
+Backend Development,Python,python,b76ff0b83180494fa9a80e89c56421b1|v0,10,Conditional Statements
+Backend Development,Python,python,b76ff0b83180494fa9a80e89c56421b1|v0,11,Problem Solving and Debugging - Part 1
+Backend Development,Python,python,b76ff0b83180494fa9a80e89c56421b1|v0,12,Problem Solving and Debugging - Part 2
+Backend Development,Python,python,b76ff0b83180494fa9a80e89c56421b1|v0,13,Nested Conditional Statements
+Backend Development,Python,python,b76ff0b83180494fa9a80e89c56421b1|v0,14,Problem Solving - Part 1
+Backend Development,Python,python,b76ff0b83180494fa9a80e89c56421b1|v0,15,Loops
+Backend Development,Python,python,b76ff0b83180494fa9a80e89c56421b1|v0,16,Understanding Coding Question Formats
+Backend Development,Python,python,b76ff0b83180494fa9a80e89c56421b1|v0,17,For Loop
+Backend Development,Python,python,b76ff0b83180494fa9a80e89c56421b1|v0,18,Nested Loops
+Backend Development,Python,python,b76ff0b83180494fa9a80e89c56421b1|v0,19,Loop Control Statements
+Backend Development,Python,python,b76ff0b83180494fa9a80e89c56421b1|v0,20,String Methods
+Backend Development,Python,python,b76ff0b83180494fa9a80e89c56421b1|v0,21,Comparing Strings & Naming Variables
+Backend Development,Python,python,b76ff0b83180494fa9a80e89c56421b1|v0,22,Lists
+Backend Development,Python,python,b76ff0b83180494fa9a80e89c56421b1|v0,23,Working with Lists
+Backend Development,Python,python,b76ff0b83180494fa9a80e89c56421b1|v0,24,Lists and Strings
+Backend Development,Python,python,b76ff0b83180494fa9a80e89c56421b1|v0,25,List Methods
+Backend Development,Python,python,b76ff0b83180494fa9a80e89c56421b1|v0,26,Nested Lists
+Backend Development,Python,python,b76ff0b83180494fa9a80e89c56421b1|v0,27,Tuples & Sequences
+Backend Development,Python,python,b76ff0b83180494fa9a80e89c56421b1|v0,28,Functions
+Backend Development,Python,python,b76ff0b83180494fa9a80e89c56421b1|v0,29,Function Arguments
+Backend Development,Python,python,b76ff0b83180494fa9a80e89c56421b1|v0,30,Built-in Functions
+Backend Development,Python,python,b76ff0b83180494fa9a80e89c56421b1|v0,31,Lambda Functions
+Backend Development,Python,python,b76ff0b83180494fa9a80e89c56421b1|v0,32,Function Call Stack & Recursion
+Backend Development,Python,python,b76ff0b83180494fa9a80e89c56421b1|v0,33,Understanding Recursion
+Backend Development,Python,python,b76ff0b83180494fa9a80e89c56421b1|v0,34,Problem-Solving using Recursion - 1
+Backend Development,Python,python,b76ff0b83180494fa9a80e89c56421b1|v0,35,Problem-Solving using Recursion - 2
+Backend Development,Python,python,b76ff0b83180494fa9a80e89c56421b1|v0,36,Python Standard Library
+Backend Development,Python,python,b76ff0b83180494fa9a80e89c56421b1|v0,37,Introduction to Third Party Packages
+Backend Development,Python,python,b76ff0b83180494fa9a80e89c56421b1|v0,38,To-Do List Application using Tkinter
+Backend Development,SQL,sql,d3cb79d46f31424cb0f8cddbdf68659f|v0,1,Keys in DBMS
+Backend Development,SQL,sql,d3cb79d46f31424cb0f8cddbdf68659f|v0,2,Schema Refinement & Database Anomalies
+Backend Development,SQL,sql,d3cb79d46f31424cb0f8cddbdf68659f|v0,3,Normalization and Functional Dependency
+Backend Development,SQL,sql,d3cb79d46f31424cb0f8cddbdf68659f|v0,4,Normal Forms
+Backend Development,SQL,sql,d3cb79d46f31424cb0f8cddbdf68659f|v0,5,Denormalization
+Backend Development,Node JS,node_js,d82d6905669442c48c0cbd2c887c1b53|v1,1,Introduction to Backend Development
+Backend Development,Node JS,node_js,d82d6905669442c48c0cbd2c887c1b53|v1,2,Hypertext Transfer Protocol (HTTP)
+Backend Development,Node JS,node_js,d82d6905669442c48c0cbd2c887c1b53|v1,3,Introduction to Express JS
+Backend Development,Node JS,node_js,d82d6905669442c48c0cbd2c887c1b53|v1,4,Introduction to Express JS | Part 2
+Backend Development,Node JS,node_js,d82d6905669442c48c0cbd2c887c1b53|v1,5,Introduction to Express JS | Part 3
+Backend Development,Node JS,node_js,d82d6905669442c48c0cbd2c887c1b53|v1,6,REST APIs
+Backend Development,Node JS,node_js,d82d6905669442c48c0cbd2c887c1b53|v1,7,Debugging Common Errors
+Backend Development,Node JS,node_js,d82d6905669442c48c0cbd2c887c1b53|v1,8,Debugging Common Errors | Part 2
+Backend Development,Node JS,node_js,d82d6905669442c48c0cbd2c887c1b53|v1,9,Authentication
+Backend Development,Node JS,node_js,d82d6905669442c48c0cbd2c887c1b53|v1,10,Authentication | Part 2
+Backend Development,Node JS,node_js,d82d6905669442c48c0cbd2c887c1b53|v1,11,Authentication | Part 3
+Backend Development,MongoDB,mongodb,def2b9d80f7d4b5691d6af44b0df0b05|v0,1,Introduction to MongoDB
+Backend Development,MongoDB,mongodb,def2b9d80f7d4b5691d6af44b0df0b05|v0,2,Querying MongoDB - Part 1
+Backend Development,MongoDB,mongodb,def2b9d80f7d4b5691d6af44b0df0b05|v0,3,Querying MongoDB - Part 2
+Backend Development,MongoDB,mongodb,def2b9d80f7d4b5691d6af44b0df0b05|v0,4,Grouping & Aggregations
+Backend Development,Developer Foundation,developer_foundation,33a457452b2a4d60bc1683ca731081f3|v1,1,Working with File System
+Backend Development,Developer Foundation,developer_foundation,33a457452b2a4d60bc1683ca731081f3|v1,2,Working with Files
+Backend Development,Developer Foundation,developer_foundation,33a457452b2a4d60bc1683ca731081f3|v1,3,Staging Area and Commits
