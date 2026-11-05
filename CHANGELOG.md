@@ -21,6 +21,8 @@ Commit messages stay short (title + 2-3 lines); this file is the detailed record
 
 ## 2026-11-05
 
+- **Product rules: DSA campus -> IIT X DSA (fixed); new product "IIT KGP"** -- the DSA-campus check missed TeachOS's spelling "...Technologies - DSA", so 4 DSA instructors (NW0007902, NW0006942, NW0007347, NW0006899) counted as NIAT (Deployed); now IIT X DSA. Any campus mentioning IIT KGP / Kharagpur (e.g. "Nxtwave & IIT KGP OCN", 2 people) is its own product "IIT KGP", not NIAT (Deployed). Intensive Kukatpally stays Intensive (decided, no change). NIAT (Deployed) expected 498 -> 492.
+  Files: `artifacts/api-server/src/lib/product.ts` (`isIitxDsaCampus`, new `isIitKgpCampus`, `productOf`), `artifacts/instructor-crm/src/pages/instructors.tsx` (`productLabel`, `ALL_PRODUCTS`), `artifacts/instructor-crm/src/pages/dashboard.tsx` (product colour). After pull: Publish. Also affects Taught in Class / Demos / Overview cohort card, which use NIAT (Deployed).
 - **Manual deployed sheet vs FCC (read-only)** -- compares the manual NIAT deployed list (490 employee IDs + location, shared 5 Nov; names not stored) with FCC's NIAT (Deployed) 498: who is only in FCC, who is only in the sheet and where FCC has them instead, and location vs TeachOS campus differences.
   File: `artifacts/api-server/src/lib/connectors/_tmp_manual_deployed_compare.ts` (the sheet's IDs are inside it as `MANUAL`).
 - **NIAT (Deployed) session activity (read-only)** -- for the 498: completed sessions in the last 7 / 30 / 60 days, last session, upcoming sessions; buckets by instructors / mentors; lists who taught nothing in 60 days, with their university (TeachOS campus) and Darwin workspace (added same day). Writes `niat_deployed_activity.csv` (staff names -- delete after download).

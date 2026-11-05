@@ -11,10 +11,18 @@
 type ProductInput = { classification: string | null; institutes: string[] | null; directManager: string | null };
 
 // IIT X DSA campus (2026-10-24): "NxtWave Institute of Advanced Technology - DSA", ignoring case, spaces and punctuation ("Next Wave",
-// "-DSA" / " - DSA" all match).
+// "-DSA" / " - DSA" all match). 2026-11-05 fix: TeachOS spells it "...Technologies - DSA" (plural), which the old pattern missed, so
+// 4 DSA-campus instructors were counted as NIAT (Deployed); "Technology" and "Technologies" both match now.
 export function isIitxDsaCampus(campus: string): boolean {
   const k = campus.toLowerCase().replace(/[^a-z0-9]+/g, "");
-  return /^n(e)?xtwaveinstituteofadvancedtechnology/.test(k) && k.endsWith("dsa");
+  return /^n(e)?xtwaveinstituteofadvancedtechnolog(y|ies)/.test(k) && k.endsWith("dsa");
+}
+
+// IIT KGP campus (2026-11-05, per request: "leave the IIT KGP campus out of NIAT Deployed"): e.g. "Nxtwave & IIT KGP OCN" -- any campus
+// mentioning IIT KGP / Kharagpur. Its own product, "IIT KGP".
+export function isIitKgpCampus(campus: string): boolean {
+  const k = campus.toLowerCase().replace(/[^a-z0-9]+/g, "");
+  return k.includes("iitkgp") || k.includes("kharagpur");
 }
 
 export function productOf(person: ProductInput): string {
@@ -24,6 +32,7 @@ export function productOf(person: ProductInput): string {
   const manager = (person.directManager ?? "").toLowerCase();
   // IIT X DSA: the Darwin-manager rule as before, OR (2026-10-24, per request) the DSA campus -- either one is enough.
   if (manager.includes("nw0005864") || manager.includes("jashwanth dandu") || institutes.some(isIitxDsaCampus)) return "IIT X DSA";
+  if (institutes.some(isIitKgpCampus)) return "IIT KGP";
   if (institutes.some((i) => i.toLowerCase().includes("intensive"))) return "Intensive";
   if (institutes.includes("Training Institute")) return "NIAT (Training)";
   if (institutes.length === 0) return "NIAT (Training)";

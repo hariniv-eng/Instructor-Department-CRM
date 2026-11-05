@@ -309,6 +309,7 @@ const PRODUCT_COLORS: Record<string, string> = {
   Academy: '#e0a030',
   Intensive: '#2e8b7a',
   'IIT X DSA': '#c75b3f',
+  'IIT KGP': '#7a5ea8',
   Support: '#8a93a6',
 };
 function ProductMixCard({ people, instructors, mentors }: { people: InstructorSummary[]; instructors: InstructorSummary[]; mentors: InstructorSummary[] }) {

@@ -911,7 +911,7 @@ export function bifurcationLabel(classification: string | null): string {
 // 140px, added to both grid templates below and every list below, as the
 // new last column (matching how Enrolled Plan was added as the last column
 // on 2026-09-27).
-export const ALL_PRODUCTS = ['NIAT (Deployed)', 'NIAT (Training)', 'Academy', 'Intensive', 'IIT X DSA', 'Support'];
+export const ALL_PRODUCTS = ['NIAT (Deployed)', 'NIAT (Training)', 'Academy', 'Intensive', 'IIT X DSA', 'IIT KGP', 'Support'];
 
 export function productLabel(person: InstructorSummary): string {
   // Every Operations team row is the "Support" product (2026-10-08, per request) -- checked
@@ -929,8 +929,11 @@ export function productLabel(person: InstructorSummary): string {
   const reportsToJashwanth = darwinManager.includes('nw0005864') || darwinManager.includes('jashwanth dandu');
   // OR (2026-10-24, per request) any Campus is "NxtWave Institute of Advanced Technology - DSA" (case / spaces / punctuation ignored).
   // Same rule as isIitxDsaCampus() in api-server/src/lib/product.ts -- keep the two in step.
-  const dsaCampus = (person.institutes ?? []).some((i) => { const k = i.toLowerCase().replace(/[^a-z0-9]+/g, ''); return /^n(e)?xtwaveinstituteofadvancedtechnology/.test(k) && k.endsWith('dsa'); });
+  // 2026-11-05: "Technology" or "Technologies" (TeachOS uses the plural).
+  const dsaCampus = (person.institutes ?? []).some((i) => { const k = i.toLowerCase().replace(/[^a-z0-9]+/g, ''); return /^n(e)?xtwaveinstituteofadvancedtechnolog(y|ies)/.test(k) && k.endsWith('dsa'); });
   if (reportsToJashwanth || dsaCampus) return 'IIT X DSA';
+  // IIT KGP campus (2026-11-05, per request): its own product, not NIAT (Deployed). Same rule as isIitKgpCampus() in product.ts.
+  if ((person.institutes ?? []).some((i) => { const k = i.toLowerCase().replace(/[^a-z0-9]+/g, ''); return k.includes('iitkgp') || k.includes('kharagpur'); })) return 'IIT KGP';
   if ((person.institutes ?? []).some((i) => i.toLowerCase().includes('intensive'))) return 'Intensive';
   if ((person.institutes ?? []).includes('Training Institute')) return 'NIAT (Training)';
   // Blank campus = NIAT training instructor (2026-10-08, per request: "if the campus
