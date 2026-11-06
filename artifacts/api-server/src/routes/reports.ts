@@ -304,7 +304,9 @@ const toApiInstructorSummary = (row: InstructorRow, contributionByTeachosId: Map
   // exit record exists. Payroll instructors always have
   // an exit record without having left, so theirs is the manual date their
   // Capability Manager enters instead.
-  date_of_exit: row.classification === "payroll_converted" ? row.manualExitDate ?? null : row.exitLastWorkingDate ?? null,
+  // 2026-11-06 fix: the same "payroll" test as the Instructors tab's editable box (is_payroll / isPayrollPerson), so a CM-marked Payroll
+  // Converted person who is still in Darwin also gets their typed-in date back (before, the box saved it but showed Darwin's date).
+  date_of_exit: isPayrollPerson(row) ? row.manualExitDate ?? null : row.exitLastWorkingDate ?? null,
   // Capability Manager's manual read on an exit-flagged record -- "exited" |
   // "serving_notice_period" | "payroll_converted" | null. Purely a tracking
   // label; see exitVerification's comment in the schema for why it never
