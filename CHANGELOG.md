@@ -22,6 +22,13 @@ Commit messages stay short (title + 2-3 lines); this file is the detailed record
 | What the Instructor Archive stores (joining date, gender, subject ...) | `artifacts/api-server/src/lib/archiveInstructors.ts` |
 | One-off read-only checks | `artifacts/api-server/src/lib/connectors/_tmp_*.ts` |
 
+## 2026-11-06
+
+- **Payroll date of exit: calendar pop-up** -- clicking the box opens a calendar next to it with Month and Year dropdowns; clicking a day saves it at once; "Clear" removes it. Replaces the typed date box.
+  File: `artifacts/instructor-crm/src/pages/instructors.tsx` (`DateOfExitCell`, uses `components/ui/popover` + `components/ui/calendar`). After pull: Publish.
+- **Fix: payroll instructors' manual date of exit (Instructors tab)** -- (1) the date picker did not open: the row is a link and the click-stop that keeps it from opening the profile also blocked the browser's picker; clicking the box now opens the picker itself. (2) For a CM-marked Payroll Converted person still in Darwin, the typed date was saved but the column kept showing Darwin's date; it now shows the typed date for every payroll person (same test as the editable box).
+  Files: `artifacts/instructor-crm/src/pages/instructors.tsx` (`DateOfExitCell`), `artifacts/api-server/src/routes/reports.ts` (`date_of_exit` in `toApiInstructorSummary`). After pull: Publish.
+
 ## 2026-11-05
 
 - **Instructor Archive keeps a joining date for everyone** -- Darwin's date as before; for people Darwin never gave one to (payroll-converted) or who left before it was kept, filled from their Darwin exit record's "Date Of Joining", else the date typed in on the Contribution tab. Also fills archived people who have already left. Once stored it stays. Shown in the Archive's "Date of joining" column and CSV.

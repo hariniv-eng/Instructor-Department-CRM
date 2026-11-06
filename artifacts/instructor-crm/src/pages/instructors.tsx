@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, Briefcase, BookOpen, Building2, ChevronDown, GraduationCap, Layers, MapPin, Search, SlidersHorizontal, UserCheck, Users, UsersRound, Wallet, X } from 'lucide-react';
+import { AlertTriangle, Briefcase, BookOpen, Building2, CalendarDays, ChevronDown, GraduationCap, Layers, MapPin, Search, SlidersHorizontal, UserCheck, Users, UsersRound, Wallet, X } from 'lucide-react';
 import { useGetReportsInstructors, useUpdateInstructorGender, useUpdateInstructorSubject, useUpdateInstructorExitVerification, useUpdateInstructorExitDate, getGetReportsInstructorsQueryKey, ApiError } from '@workspace/api-client-react';
 import type { AccessSplit, InstructorSummary } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -8,6 +8,8 @@ import { campusCityAndState } from '@/lib/campusRegions';
 import { PageIntro, EmptyState, QueryError, SkeletonBlock, DownloadCsvButton, MiniStat, pct, usePagedRows, TablePager } from '@/components/ui-pieces';
 import { downloadCsv, slugify, toCsv } from '@/lib/csv';
 import { toast } from '@/hooks/use-toast';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 import { ActionTakenCell, MovementCell, actionLabel, currentMovements, getKnownMovements, movementLabel, useMovementsByInstructor, type Movement } from '@/components/movement-tracker';
 
 // Manual-entry saves (Gender/Exit Verification/Subject below) used to fail
@@ -1307,20 +1309,14 @@ function ExitCell({ person }: { person: InstructorSummary }) {
 // stopPropagation wrapper as GenderCell/ExitCell (the whole row is a link).
 function DateOfExitCell({ person }: { person: InstructorSummary }) {
   const queryClient = useQueryClient();
-  const [value, setValue] = useState(person.date_of_exit ?? '');
-  const editingRef = useRef(false);
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Follow the saved value only while the box is NOT being edited. Before (2026-10-15) every refetch after a save overwrote the box
-  // mid-typing, which scrambled or cleared a date that was still being keyed in.
-  useEffect(() => { if (!editingRef.current) setValue(person.date_of_exit ?? ''); }, [person.date_of_exit]);
-  useEffect(() => () => { if (saveTimer.current) clearTimeout(saveTimer.current); }, []);
+  const [open, setOpen] = useState(false);
+  const saved = person.date_of_exit ?? '';
   const updateExitDate = useUpdateInstructorExitDate({
     mutation: {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getGetReportsInstructorsQueryKey() });
       },
       onError: (error) => {
-        setValue(person.date_of_exit ?? '');
         toast({ variant: 'destructive', title: "Couldn't save date of exit", description: describeSaveError(error) });
       },
     },
@@ -1330,33 +1326,50 @@ function DateOfExitCell({ person }: { person: InstructorSummary }) {
   if (!person.is_payroll) {
     return <div className="truncate font-mono-ui text-[11px] text-muted-foreground">{person.date_of_exit || ''}</div>;
   }
-  // A complete, believable date only: typing a year digit by digit passes through values like 0002-10-15 and 0020-10-15, which must
-  // never be saved. Clearing the box is saved when the box loses focus, not while it is half-edited.
-  const isCompleteDate = (next: string) => /^\d{4}-\d{2}-\d{2}$/.test(next) && Number(next.slice(0, 4)) >= 2000 && Number(next.slice(0, 4)) <= new Date().getFullYear() + 1;
-  const save = (next: string) => {
-    if (saveTimer.current) { clearTimeout(saveTimer.current); saveTimer.current = null; }
-    if (next === (person.date_of_exit ?? '')) return;
-    if (next !== '' && !isCompleteDate(next)) return;
-    updateExitDate.mutate({ id: person.id, data: { exit_date: next === '' ? null : next } });
+  // Calendar pop-up (2026-11-06, per request: "when we click on it, open a calendar beside it, with year, month and date to pick"):
+  // click the box -> a calendar opens next to it with Month and Year dropdowns; clicking a day saves it at once. "Clear" removes it.
+  // Replaces the typed date box, whose browser picker did not open inside the row link. The row is a link to the profile, so every
+  // click here is stopped from reaching it (the pop-up is rendered outside the row, but React still passes its clicks up the tree).
+  const stop = (event: React.SyntheticEvent) => { event.stopPropagation(); };
+  const toIso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const selected = saved ? new Date(`${saved}T00:00:00`) : undefined;
+  const save = (next: string | null) => {
+    setOpen(false);
+    if ((next ?? '') === saved) return;
+    updateExitDate.mutate({ id: person.id, data: { exit_date: next } });
   };
+  const thisYear = new Date().getFullYear();
   return <div onClick={(event) => { event.preventDefault(); event.stopPropagation(); }} className="text-[12px]">
-    <input
-      type="date"
-      value={value}
-      min="2000-01-01"
-      onFocus={() => { editingRef.current = true; }}
-      onChange={(event) => {
-        const next = event.target.value;
-        setValue(next);
-        if (saveTimer.current) clearTimeout(saveTimer.current);
-        if (next !== '' && isCompleteDate(next)) saveTimer.current = setTimeout(() => save(next), 700);
-      }}
-      onBlur={(event) => { editingRef.current = false; save(event.target.value); }}
-      onKeyDown={(event) => { if (event.key === 'Enter') save((event.target as HTMLInputElement).value); }}
-      data-testid={`input-exit-date-${person.id}`}
-      title="Payroll instructor -- the Capability Manager enters the date of exit here when they actually exit. Saved when the date is complete (or when you click away)."
-      className="h-8 w-full rounded-md border border-border bg-background px-1.5 text-[11px] font-semibold text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-ring/25 disabled:opacity-60"
-    />
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          onClick={(event) => { event.preventDefault(); event.stopPropagation(); setOpen((value) => !value); }}
+          data-testid={`input-exit-date-${person.id}`}
+          title="Payroll instructor -- the Capability Manager picks the date of exit here when they actually exit."
+          className="inline-flex h-8 w-full items-center justify-between gap-1.5 rounded-md border border-border bg-background px-2 text-left text-[11px] font-semibold text-foreground transition-colors hover:border-primary disabled:opacity-60"
+          disabled={updateExitDate.isPending}
+        >
+          <span className={saved ? '' : 'font-normal text-muted-foreground'}>{saved ? new Date(`${saved}T00:00:00`).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Pick date'}</span>
+          <CalendarDays size={13} className="shrink-0 text-muted-foreground" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent side="right" align="start" className="w-auto p-0" onClick={stop} onPointerDown={stop} data-testid={`calendar-exit-date-${person.id}`}>
+        <Calendar
+          mode="single"
+          captionLayout="dropdown"
+          startMonth={new Date(2020, 0)}
+          endMonth={new Date(thisYear + 1, 11)}
+          defaultMonth={selected ?? new Date()}
+          selected={selected}
+          onSelect={(day) => { if (day) save(toIso(day)); }}
+        />
+        <div className="flex items-center justify-between gap-2 border-t border-border px-3 py-2">
+          <span className="text-[10px] text-muted-foreground">Click a day to save</span>
+          {saved && <button type="button" onClick={() => save(null)} className="rounded-md px-2 py-1 text-[11px] font-bold text-[#9b4434] hover:bg-[#f6e4de]">Clear</button>}
+        </div>
+      </PopoverContent>
+    </Popover>
   </div>;
 }
 
