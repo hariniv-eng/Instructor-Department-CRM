@@ -24,6 +24,19 @@ async function main() {
     params: { uid: p.teachosUserId } });
   const idx = lectureNameIndex();
   console.log(`${emp} · ${(rows as unknown[]).length} demo / AI evaluations\n`);
+  // Count per type and status (2026-11-07, per request: "how many demos ... demos, training demos or AI assessments -- total count").
+  const counts = new Map<string, Map<string, number>>();
+  for (const r of rows as Record<string, unknown>[]) {
+    const ty = plain(r.ty), st = plain(r.st).toLowerCase() || "(blank)";
+    const m = counts.get(ty) ?? new Map<string, number>(); m.set(st, (m.get(st) ?? 0) + 1); counts.set(ty, m);
+  }
+  console.log("COUNTS (type: total -- by status)");
+  for (const ty of ["DEMO", "TRAINING_DEMO", "AI_ASSESSMENT", "TRAINING_AI_ASSESSMENT"]) {
+    const m = counts.get(ty) ?? new Map<string, number>();
+    const total = [...m.values()].reduce((x, y) => x + y, 0);
+    console.log(`  ${ty}: ${total}${total ? ` -- ${[...m].map(([k, v]) => `${k} ${v}`).join(", ")}` : ""}`);
+  }
+  console.log(`  ALL: ${(rows as unknown[]).length}\n`);
   console.log("date | type | status | score | mins | report | transcript | topic | matched course #lecture");
   const byCourse = new Map<string, { n: number; sum: number; scored: number; zero: number }>();
   for (const r of rows as Record<string, unknown>[]) {
