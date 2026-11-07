@@ -23,6 +23,8 @@ Commit messages stay short (title + 2-3 lines); this file is the detailed record
 | One-off read-only checks | `artifacts/api-server/src/lib/connectors/_tmp_*.ts` |
 
 ## 2026-11-07
+- **Training - Demos: old-course topics now counted** -- 11 demo topic names from the old Static / Responsive Website courses (Bootstrap, Bootstrap Grid / Navbar, Favourite Places, Website Integration, CSS Transforms, Intro to Responsive Web Design) and "Introduction to Generative AI" were matched to no course, so those demos were dropped. They now count for HTML & CSS / Modern Responsive UI / Introduction to Gen AI in the number of demos and the average score, but not in "lectures covered" (that stays out of the new course's 20 / 21 lectures). Found on NW2000396 (12 of 36 completed demos were not counted).
+  Files: `artifacts/api-server/src/lib/connectors/demoTraining.ts` (`EXTRA_TOPICS`), `_tmp_person_demos.ts` (prints "old-course topic", plus per-type counts). After pull: Publish, then Sync Now.
 - **Overview: instructors per semester** -- the "Contribution of NIAT instructors & mentors" card now shows two boxes: Semester 1 (teaching NIAT 2026) and Semester 3 (teaching NIAT 2025). Someone teaching both cohorts counts in both; the footnote says how many. Same population as the card (NIAT Deployed instructors + mentors, cohort from the last 30 days / 2 months).
   File: `artifacts/instructor-crm/src/pages/dashboard.tsx` (`NiatContributionCard`). After pull: Publish.
 - Added read-only `_tmp_semester_courses.ts` (each cohort's semester courses with dates; not needed now that the semester list was shared).

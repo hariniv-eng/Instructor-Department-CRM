@@ -41,7 +41,7 @@ async function main() {
   const byCourse = new Map<string, { n: number; sum: number; scored: number; zero: number }>();
   for (const r of rows as Record<string, unknown>[]) {
     const hits = matchDemoTopic(idx, plain(r.t));
-    const where = hits ? [...new Set(hits.map((h) => `${LECTURE_COURSES[h.ci].title} #${h.n}`))].join(" / ") : "not in lecture list";
+    const where = hits ? [...new Set(hits.map((h) => `${LECTURE_COURSES[h.ci].title} ${h.n > 0 ? `#${h.n}` : "(old-course topic)"}`))].join(" / ") : "not in lecture list";
     console.log(`  ${plain(r.d)} | ${plain(r.ty)} | ${plain(r.st)} | ${plain(r.s) || "-"} | ${plain(r.mins) || "-"} | ${r.rep ? "yes" : "no"} | ${r.tr ? "yes" : "no"} | ${plain(r.t)} | ${where}`);
     if (["DEMO", "TRAINING_DEMO"].includes(plain(r.ty)) && plain(r.st).toLowerCase() === "completed" && hits) {
       for (const ci of new Set(hits.map((h) => h.ci))) {
