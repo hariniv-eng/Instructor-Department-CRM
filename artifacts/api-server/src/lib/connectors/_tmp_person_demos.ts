@@ -51,6 +51,29 @@ async function main() {
       }
     }
   }
+  // Per course, all demos vs only recordings of 10 minutes or more (2026-11-07, per request: "how many above 10 minutes, how many unique
+  // sessions"). Completed DEMO / TRAINING_DEMO only; AI assessments separately below.
+  for (const kind of ["demo", "ai"] as const) {
+    const sum = new Map<string, { all: number; allL: Set<string>; allS: number[]; long: number; longL: Set<string>; longS: number[] }>();
+    for (const r of rows as Record<string, unknown>[]) {
+      const isAi = plain(r.ty).endsWith("AI_ASSESSMENT");
+      if ((kind === "ai") !== isAi || plain(r.st).toLowerCase() !== "completed") continue;
+      const hits = matchDemoTopic(idx, plain(r.t));
+      const courses = hits ? [...new Set(hits.map((h) => LECTURE_COURSES[h.ci].title))] : ["(not in lecture list)"];
+      for (const c of courses) {
+        const e = sum.get(c) ?? { all: 0, allL: new Set(), allS: [], long: 0, longL: new Set(), longS: [] };
+        const lec = hits ? hits.filter((h) => LECTURE_COURSES[h.ci].title === c).map((h) => (h.n > 0 ? `#${h.n}` : plain(r.t))).join("/") : plain(r.t);
+        const sc = plain(r.s) === "" ? null : Number(plain(r.s));
+        e.all++; e.allL.add(lec); if (sc !== null) e.allS.push(sc);
+        if (Number(plain(r.mins)) >= 10) { e.long++; e.longL.add(lec); if (sc !== null) e.longS.push(sc); }
+        sum.set(c, e);
+      }
+    }
+    const avg = (a: number[]) => (a.length ? (a.reduce((x, y) => x + y, 0) / a.length).toFixed(2) : "-");
+    console.log(`\n${kind === "demo" ? "DEMOS" : "AI ASSESSMENTS"} per course (completed): all -> demos / different lectures / avg  ||  10 min or more -> demos / different lectures / avg`);
+    for (const [c, e] of sum) console.log(`  ${c}: ${e.all} / ${e.allL.size} / ${avg(e.allS)}  ||  ${e.long} / ${e.longL.size} / ${avg(e.longS)}`);
+    if (!sum.size) console.log("  (none)");
+  }
   console.log("\nWhat the Demos tab works out (course: completed demos, of which score 0, average):");
   for (const [k, e] of byCourse) console.log(`  ${k}: ${e.n}, ${e.zero} at 0, avg ${e.scored ? (e.sum / e.scored).toFixed(2) : "-"}`);
   const stored = await db.select().from(instructorDemoCourseTable).where(eq(instructorDemoCourseTable.instructorUserId, p.teachosUserId)).catch(() => []);
