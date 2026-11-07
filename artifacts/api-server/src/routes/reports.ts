@@ -1609,7 +1609,10 @@ router.get("/reports/demo-training", requireAuth, requireRole("admin"), async (_
     console.warn("[demo-training] instructor_demo_course is not readable yet (run the database push):", (err as Error).message);
   }
   type Stat = { covered: number; total: number; count: number; avg_score: number | null; scored: number; score_sum: number; last_date: string | null };
-  type Cell = { demo: Stat | null; ai: Stat | null };
+  // Four kinds per course (2026-11-07): demos / AI assessments, each split into in training (up to the deployment date, plus every
+  // TRAINING_ evaluation) and after deployment -- see demoKindOf() in connectors/demoTraining.ts.
+  type Kind = "demo_training" | "demo_deployed" | "ai_training" | "ai_deployed";
+  type Cell = Record<Kind, Stat | null>;
   const courses = new Map<string, { course_id: string; title: string; subject: string; demo_instructors: number; ai_instructors: number; total: number; order: number }>();
   const cellsByUid = new Map<string, Record<string, Cell>>();
   for (const t of demoRows) {
@@ -1617,17 +1620,18 @@ router.get("/reports/demo-training", requireAuth, requireRole("admin"), async (_
     if (!person || t.lecturesDemoed <= 0) continue;
     const area = normalizeSubjectArea(person.deptArea || person.manualDeptArea || null);
     if (area && NON_TECH_TAUGHT_SUBJECTS.has(area) !== NON_TECH_TAUGHT_SUBJECTS.has(t.courseSubject)) continue;
-    const kind: "demo" | "ai" = t.evaluationKind === "ai" ? "ai" : "demo";
+    // Rows from before the split ('demo' / 'ai', until the next Sync Now) are shown as after deployment.
+    const kind: Kind = t.evaluationKind === "ai" ? "ai_deployed" : t.evaluationKind === "demo" ? "demo_deployed" : t.evaluationKind as Kind;
     const key = `demo:${t.courseKey}`;
     const cells = cellsByUid.get(t.instructorUserId) ?? {};
-    const cell = cells[key] ?? { demo: null, ai: null };
+    const cell = cells[key] ?? { demo_training: null, demo_deployed: null, ai_training: null, ai_deployed: null };
     cell[kind] = { covered: t.lecturesDemoed, total: t.lecturesTotal, count: t.demos, scored: t.scored, score_sum: t.scoreSum,
       avg_score: t.scored > 0 ? Math.round((t.scoreSum / t.scored) * 10) / 10 : null, last_date: t.lastDemoDate };
     cells[key] = cell;
     cellsByUid.set(t.instructorUserId, cells);
     const c = courses.get(key) ?? { course_id: key, title: t.courseTitle, subject: t.courseSubject, demo_instructors: 0, ai_instructors: 0, total: t.lecturesTotal,
       order: LECTURE_COURSES.findIndex((x) => x.key === t.courseKey) };
-    if (kind === "demo") c.demo_instructors += 1; else c.ai_instructors += 1;
+    if (kind.startsWith("demo")) c.demo_instructors += 1; else c.ai_instructors += 1;
     courses.set(key, c);
   }
   const rows = [...cellsByUid].map(([uid, cells]) => {
