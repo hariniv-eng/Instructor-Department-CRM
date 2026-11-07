@@ -1608,7 +1608,9 @@ router.get("/reports/demo-training", requireAuth, requireRole("admin"), async (_
   } catch (err) {
     console.warn("[demo-training] instructor_demo_course is not readable yet (run the database push):", (err as Error).message);
   }
-  type Stat = { covered: number; total: number; count: number; avg_score: number | null; scored: number; score_sum: number; last_date: string | null };
+  // 10-minute rule fields (2026-11-07): short = under 10 min; *_long = the 10+ minute ones; repeats = evaluations on an already-covered lecture.
+  type Stat = { covered: number; total: number; count: number; avg_score: number | null; scored: number; score_sum: number; last_date: string | null;
+    short: number; covered_long: number; scored_long: number; score_sum_long: number; avg_long: number | null; repeats: number; repeats_long: number };
   // Four kinds per course (2026-11-07): demos / AI assessments, each split into in training (up to the deployment date, plus every
   // TRAINING_ evaluation) and after deployment -- see demoKindOf() in connectors/demoTraining.ts.
   type Kind = "demo_training" | "demo_deployed" | "ai_training" | "ai_deployed";
@@ -1626,7 +1628,9 @@ router.get("/reports/demo-training", requireAuth, requireRole("admin"), async (_
     const cells = cellsByUid.get(t.instructorUserId) ?? {};
     const cell = cells[key] ?? { demo_training: null, demo_deployed: null, ai_training: null, ai_deployed: null };
     cell[kind] = { covered: t.lecturesDemoed, total: t.lecturesTotal, count: t.demos, scored: t.scored, score_sum: t.scoreSum,
-      avg_score: t.scored > 0 ? Math.round((t.scoreSum / t.scored) * 10) / 10 : null, last_date: t.lastDemoDate };
+      avg_score: t.scored > 0 ? Math.round((t.scoreSum / t.scored) * 10) / 10 : null, last_date: t.lastDemoDate,
+      short: t.demosShort, covered_long: t.lecturesLong, scored_long: t.scoredLong, score_sum_long: t.scoreSumLong,
+      avg_long: t.scoredLong > 0 ? Math.round((t.scoreSumLong / t.scoredLong) * 10) / 10 : null, repeats: t.repeats, repeats_long: t.repeatsLong };
     cells[key] = cell;
     cellsByUid.set(t.instructorUserId, cells);
     const c = courses.get(key) ?? { course_id: key, title: t.courseTitle, subject: t.courseSubject, demo_instructors: 0, ai_instructors: 0, total: t.lecturesTotal,
