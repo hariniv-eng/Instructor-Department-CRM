@@ -5,9 +5,9 @@
 //   pnpm exec tsx src/lib/connectors/_tmp_person_demos.ts NW0005240
 import { BigQuery } from "@google-cloud/bigquery";
 import { eq } from "drizzle-orm";
-import { db, instructorsTable, instructorDemoCourseTable } from "@workspace/db";
+import { db, instructorsTable, instructorDemoCourseTable, instructorContributionTable, instructorManualJoiningTable } from "@workspace/db";
 import { config } from "./config";
-import { QA_RATING_VIEW, lectureNameIndex, matchDemoTopic } from "./demoTraining";
+import { QA_RATING_VIEW, lectureNameIndex, matchDemoTopic, demoKindOf, type DemoKind } from "./demoTraining";
 import { LECTURE_COURSES } from "../../data/lectureSessions";
 
 const plain = (v: unknown): string => (v && typeof v === "object" && "value" in (v as object) ? String((v as { value: unknown }).value) : v == null ? "" : String(v));
@@ -23,7 +23,12 @@ async function main() {
     FROM ${V} WHERE instructor_user_id = @uid AND evaluation_type IN ('DEMO', 'TRAINING_DEMO', 'AI_ASSESSMENT', 'TRAINING_AI_ASSESSMENT') ORDER BY d, created`,
     params: { uid: p.teachosUserId } });
   const idx = lectureNameIndex();
-  console.log(`${emp} · ${(rows as unknown[]).length} demo / AI evaluations\n`);
+  // In training vs after deployment (2026-11-07): same dates the sync uses.
+  const [manual] = await db.select().from(instructorManualJoiningTable).where(eq(instructorManualJoiningTable.employeeId, emp));
+  const [contrib] = await db.select({ d: instructorContributionTable.deploymentDate }).from(instructorContributionTable).where(eq(instructorContributionTable.instructorUserId, p.teachosUserId));
+  const win = { joining: p.dateOfJoining ?? manual?.dateOfJoining ?? null, deployed: contrib?.d ?? null };
+  const kindOf = (r: Record<string, unknown>): DemoKind => demoKindOf(plain(r.ty), plain(r.d) || null, win);
+  console.log(`${emp} · ${(rows as unknown[]).length} demo / AI evaluations · joining ${win.joining ?? "unknown"} · deployment (first session) ${win.deployed ?? "not deployed"}\n`);
   // Count per type and status (2026-11-07, per request: "how many demos ... demos, training demos or AI assessments -- total count").
   const counts = new Map<string, Map<string, number>>();
   for (const r of rows as Record<string, unknown>[]) {
@@ -37,12 +42,12 @@ async function main() {
     console.log(`  ${ty}: ${total}${total ? ` -- ${[...m].map(([k, v]) => `${k} ${v}`).join(", ")}` : ""}`);
   }
   console.log(`  ALL: ${(rows as unknown[]).length}\n`);
-  console.log("date | type | status | score | mins | report | transcript | topic | matched course #lecture");
+  console.log("date | type | status | score | mins | report | transcript | topic | matched course #lecture | counted as");
   const byCourse = new Map<string, { n: number; sum: number; scored: number; zero: number }>();
   for (const r of rows as Record<string, unknown>[]) {
     const hits = matchDemoTopic(idx, plain(r.t));
     const where = hits ? [...new Set(hits.map((h) => `${LECTURE_COURSES[h.ci].title} ${h.n > 0 ? `#${h.n}` : "(old-course topic)"}`))].join(" / ") : "not in lecture list";
-    console.log(`  ${plain(r.d)} | ${plain(r.ty)} | ${plain(r.st)} | ${plain(r.s) || "-"} | ${plain(r.mins) || "-"} | ${r.rep ? "yes" : "no"} | ${r.tr ? "yes" : "no"} | ${plain(r.t)} | ${where}`);
+    console.log(`  ${plain(r.d)} | ${plain(r.ty)} | ${plain(r.st)} | ${plain(r.s) || "-"} | ${plain(r.mins) || "-"} | ${r.rep ? "yes" : "no"} | ${r.tr ? "yes" : "no"} | ${plain(r.t)} | ${where} | ${kindOf(r)}`);
     if (["DEMO", "TRAINING_DEMO"].includes(plain(r.ty)) && plain(r.st).toLowerCase() === "completed" && hits) {
       for (const ci of new Set(hits.map((h) => h.ci))) {
         const k = LECTURE_COURSES[ci].title, e = byCourse.get(k) ?? { n: 0, sum: 0, scored: 0, zero: 0 };
@@ -53,11 +58,10 @@ async function main() {
   }
   // Per course, all demos vs only recordings of 10 minutes or more (2026-11-07, per request: "how many above 10 minutes, how many unique
   // sessions"). Completed DEMO / TRAINING_DEMO only; AI assessments separately below.
-  for (const kind of ["demo", "ai"] as const) {
+  for (const kind of ["demo_training", "demo_deployed", "ai_training", "ai_deployed"] as const) {
     const sum = new Map<string, { all: number; allL: Set<string>; allS: number[]; long: number; longL: Set<string>; longS: number[] }>();
     for (const r of rows as Record<string, unknown>[]) {
-      const isAi = plain(r.ty).endsWith("AI_ASSESSMENT");
-      if ((kind === "ai") !== isAi || plain(r.st).toLowerCase() !== "completed") continue;
+      if (kindOf(r) !== kind || plain(r.st).toLowerCase() !== "completed") continue;
       const hits = matchDemoTopic(idx, plain(r.t));
       const courses = hits ? [...new Set(hits.map((h) => LECTURE_COURSES[h.ci].title))] : ["(not in lecture list)"];
       for (const c of courses) {
@@ -70,7 +74,7 @@ async function main() {
       }
     }
     const avg = (a: number[]) => (a.length ? (a.reduce((x, y) => x + y, 0) / a.length).toFixed(2) : "-");
-    console.log(`\n${kind === "demo" ? "DEMOS" : "AI ASSESSMENTS"} per course (completed): all -> demos / different lectures / avg  ||  10 min or more -> demos / different lectures / avg`);
+    console.log(`\n${{ demo_training: "IN-TRAINING DEMOS", demo_deployed: "DEMOS AFTER DEPLOYMENT", ai_training: "IN-TRAINING AI ASSESSMENTS", ai_deployed: "AI ASSESSMENTS AFTER DEPLOYMENT" }[kind]} per course (completed): all -> demos / different lectures / avg  ||  10 min or more -> demos / different lectures / avg`);
     for (const [c, e] of sum) console.log(`  ${c}: ${e.all} / ${e.allL.size} / ${avg(e.allS)}  ||  ${e.long} / ${e.longL.size} / ${avg(e.longS)}`);
     if (!sum.size) console.log("  (none)");
   }

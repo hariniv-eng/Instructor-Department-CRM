@@ -7,6 +7,8 @@ import {
   darwinboxFullRosterTable,
   teachosDeploymentTable,
   instructorsTable,
+  instructorContributionTable,
+  instructorManualJoiningTable,
 } from "@workspace/db";
 import { desc } from "drizzle-orm";
 import { fetchDarwinRowsBoth, DarwinboxError } from "../lib/connectors/darwinbox";
@@ -252,7 +254,14 @@ async function runTrainingStatusSync(): Promise<SyncResult> {
     try {
       const people = await db.select().from(instructorsTable);
       const subjectByUid = new Map(people.filter((p) => p.teachosUserId).map((p) => [p.teachosUserId!, (normalizeSubjectArea(p.deptArea || p.manualDeptArea || null) as string | null) ?? null]));
-      const demos = await storeDemoCourses(await fetchDemoCourseRows(subjectByUid));
+      // In training vs after deployment (2026-11-07): joining date (Darwin, else the typed-in manual one) and Contribution's deployment date.
+      const manualJoining = new Map((await db.select().from(instructorManualJoiningTable)).map((m) => [m.employeeId, m.dateOfJoining]));
+      const deployedByUid = new Map((await db.select({ uid: instructorContributionTable.instructorUserId, d: instructorContributionTable.deploymentDate }).from(instructorContributionTable)).map((c) => [c.uid, c.d]));
+      const windowByUid = new Map(people.filter((p) => p.teachosUserId).map((p) => [p.teachosUserId!, {
+        joining: p.dateOfJoining ?? (p.employeeId ? manualJoining.get(p.employeeId) ?? null : null),
+        deployed: deployedByUid.get(p.teachosUserId!) ?? null,
+      }]));
+      const demos = await storeDemoCourses(await fetchDemoCourseRows(subjectByUid, windowByUid));
       await db.insert(uploadsTable).values({ source: "Instructor Demo Training", filename: "BigQuery sync (niat_session_wise_qa_rating DEMO + TRAINING_DEMO and AI assessments, per instructor + lecture-list course)", rowCount: demos });
     } catch (e) {
       console.error("[demo-training] sync failed:", e);

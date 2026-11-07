@@ -14,6 +14,17 @@
 // data/lectureSessions.ts with demoNameKey() below (lower case, letters/digits only; "&" = "and"; both halves of a combined name like "CSS Grid - 4 (+ Flexbox vs
 // Grid)" count). A name found in several courses (e.g. "Introduction" in three Aptitude courses, "Bitwise Operators" in Maths and DSA) goes
 // to the course(s) of the instructor's own subject; if none fits, to the course(s) on the same tech / non-tech side; else to all of them.
+//
+// In training vs after deployment (2026-11-07, per request: "we only need the demos instructors gave before they started teaching ... a
+// column In-training demos and a column Demos after deployment; the same for AI assessments"). Each evaluation now goes to one of four
+// kinds:
+//   demo_training -- every TRAINING_DEMO, plus every DEMO dated on or before the instructor's deployment date (Contribution's
+//                    deployment_date = first session ever scheduled). Not deployed yet (no deployment date) -> all their DEMOs.
+//   demo_deployed -- DEMO dated after the deployment date.
+//   ai_training / ai_deployed -- the same for TRAINING_AI_ASSESSMENT / AI_ASSESSMENT.
+// The joining date is the start of the training period; a DEMO dated BEFORE the joining date (rare -- rehires, test uploads) is kept in
+// "in training" rather than dropped (so the joining date only marks the start; nothing is cut by it). A DEMO with no date: after
+// deployment if the person is deployed, else in training.
 import { BigQuery } from "@google-cloud/bigquery";
 import { config, missing } from "./config";
 import { runWithHardTimeout } from "./timeout";
@@ -24,12 +35,20 @@ export const QA_RATING_VIEW = process.env.QA_RATING_VIEW || "niat_session_wise_q
 const QUERY_TIMEOUT_MS = 120000;
 const NON_TECH = new Set(["English", "Aptitude", "Maths"]);
 
+export type DemoKind = "demo_training" | "demo_deployed" | "ai_training" | "ai_deployed";
+/** TeachOS user id -> joining date and deployment date (YYYY-MM-DD; null when unknown / not deployed yet). */
+export type DemoWindow = { joining: string | null; deployed: string | null };
+export function demoKindOf(evaluationType: string, date: string | null, w: DemoWindow | undefined): DemoKind {
+  const ai = evaluationType.endsWith("AI_ASSESSMENT");
+  const training = evaluationType.startsWith("TRAINING_") || !w?.deployed || (date !== null && date <= w.deployed);
+  return `${ai ? "ai" : "demo"}_${training ? "training" : "deployed"}`;
+}
 export type DemoCourseRow = {
   instructor_user_id: string;
   course_key: string;
   course_title: string;
   course_subject: string;
-  evaluation_kind: "demo" | "ai";
+  evaluation_kind: DemoKind;
   lectures_total: number;
   lectures_demoed: number;
   demos: number;
@@ -97,7 +116,7 @@ export function matchDemoTopic(idx: Map<string, { ci: number; n: number }[]>, ti
 }
 
 /** subjectByUid: TeachOS user id -> the instructor's subject (normalized, e.g. "Frontend", "English"), used only for names in several courses. */
-export async function fetchDemoCourseRows(subjectByUid: Map<string, string | null> = new Map()): Promise<DemoCourseRow[]> {
+export async function fetchDemoCourseRows(subjectByUid: Map<string, string | null> = new Map(), windowByUid: Map<string, DemoWindow> = new Map()): Promise<DemoCourseRow[]> {
   const missingKeys = missing(["BIGQUERY_PROJECT_ID", "BIGQUERY_DATASET"] as const);
   if (missingKeys.length) throw new DemoTrainingError(`BigQuery settings are not fully configured — missing: ${missingKeys.join(", ")} (check .env).`);
   const bq = config.BIGQUERY_CREDENTIALS_JSON
@@ -105,13 +124,13 @@ export async function fetchDemoCourseRows(subjectByUid: Map<string, string | nul
     : new BigQuery({ projectId: config.BIGQUERY_PROJECT_ID });
   const [rows] = await runWithHardTimeout(() => bq.query({
     query: `SELECT instructor_user_id AS uid, session_title AS t, final_score AS s, CAST(session_date AS STRING) AS d,
-                   IF(evaluation_type LIKE '%AI_ASSESSMENT', 'ai', 'demo') AS kind
+                   evaluation_type AS ty
             FROM \`${config.BIGQUERY_PROJECT_ID}.${config.BIGQUERY_DATASET}.${QA_RATING_VIEW}\`
             WHERE evaluation_type IN ('DEMO', 'TRAINING_DEMO', 'AI_ASSESSMENT', 'TRAINING_AI_ASSESSMENT') AND LOWER(status) = 'completed' AND instructor_user_id IS NOT NULL AND session_title IS NOT NULL`,
   }), QUERY_TIMEOUT_MS);
 
   const idx = lectureNameIndex();
-  type Agg = { uid: string; ci: number; kind: "demo" | "ai"; lectures: Set<number>; demos: number; sum: number; scored: number; first: string | null; last: string | null };
+  type Agg = { uid: string; ci: number; kind: DemoKind; lectures: Set<number>; demos: number; sum: number; scored: number; first: string | null; last: string | null };
   const agg = new Map<string, Agg>();
   for (const r of rows as Record<string, unknown>[]) {
     const uid = plain(r.uid);
@@ -126,7 +145,7 @@ export async function fetchDemoCourseRows(subjectByUid: Map<string, string | nul
     const score = r.s === null || r.s === undefined || plain(r.s) === "" ? null : Number(plain(r.s));
     const d = plain(r.d) || null;
     for (const ci of new Set(hits.map((h) => h.ci))) {
-      const kind = plain(r.kind) === "ai" ? "ai" : "demo";
+      const kind = demoKindOf(plain(r.ty), d, windowByUid.get(uid));
       const k = `${uid}|${ci}|${kind}`;
       const a = agg.get(k) ?? { uid, ci, kind, lectures: new Set<number>(), demos: 0, sum: 0, scored: 0, first: null, last: null };
       for (const h of hits) if (h.ci === ci && h.n > 0) a.lectures.add(h.n); // n = 0: old-course extra topic, not a lecture

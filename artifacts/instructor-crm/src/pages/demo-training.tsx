@@ -14,10 +14,18 @@ import { MultiSelectFilter } from './instructors';
 // One kind of evaluation in one course: DIFFERENT lectures covered of the course's total (a repeat counts once -- shown), number of
 // evaluations incl. repeats (hover only), average score (0-10) over ALL of them, repeats included (2026-10-29, per request).
 type Stat = { covered: number; total: number; count: number; avg_score: number | null; scored: number; score_sum: number; last_date: string | null };
-// Per course (2026-10-29): demos and, beside them, AI assessments.
-type Cell = { demo: Stat | null; ai: Stat | null };
-type Kind = 'demo' | 'ai';
-const KINDS: { kind: Kind; label: string; short: string }[] = [{ kind: 'demo', label: 'Demos', short: 'QA' }, { kind: 'ai', label: 'AI assessments', short: 'AI' }];
+// Per course: four columns (2026-11-07, per request) -- demos in training (every training demo + demos up to the deployment date) and
+// demos after deployment, then the same for AI assessments. Server: demoKindOf() in connectors/demoTraining.ts.
+type Kind = 'demo_training' | 'demo_deployed' | 'ai_training' | 'ai_deployed';
+type Cell = Record<Kind, Stat | null>;
+const KINDS: { kind: Kind; label: string; short: string; noun: string }[] = [
+  { kind: 'demo_training', label: 'In-training demos', short: 'QA', noun: 'demos' },
+  { kind: 'demo_deployed', label: 'Demos after deployment', short: 'QA', noun: 'demos' },
+  { kind: 'ai_training', label: 'In-training AI assessments', short: 'AI', noun: 'AI assessments' },
+  { kind: 'ai_deployed', label: 'AI assessments after deployment', short: 'AI', noun: 'AI assessments' },
+];
+// A thick line before each course's first column, a thin one before its AI columns.
+const kindBorder = (kind: Kind) => (kind === 'demo_training' ? 'border-l-2' : kind === 'ai_training' ? 'border-l border-l-border' : '');
 type DemoRow = { employee_id: string | null; full_name: string; product: string; subject_area: string | null; capability_manager: string | null; courses: Record<string, Cell> };
 type CourseCol = { course_id: string; title: string; subject: string; demo_instructors: number; ai_instructors: number; total: number };
 type DemoResponse = { rows: DemoRow[]; courses: CourseCol[]; subject_columns: string[]; synced_at: string | null };
@@ -82,7 +90,7 @@ export function DemoTrainingView() {
       const scored = st.reduce((a, x) => a + x.scored, 0), sum = st.reduce((a, x) => a + x.score_sum, 0);
       return { covered: st.reduce((a, x) => a + x.covered, 0), total, count: st.reduce((a, x) => a + x.count, 0), avg: scored > 0 ? Math.round((sum / scored) * 10) / 10 : null };
     };
-    return [{ ...r, overall: { demo: sumUp('demo'), ai: sumUp('ai') } }];
+    return [{ ...r, overall: Object.fromEntries(KINDS.map(({ kind }) => [kind, sumUp(kind)])) as Record<Kind, ReturnType<typeof sumUp>> }];
   }), [all, columns]);
   type SubjectRow = (typeof subjectRows)[number];
   const pass = (r: SubjectRow, skip: string) =>
@@ -122,7 +130,7 @@ export function DemoTrainingView() {
     <PageIntro
       eyebrow="BigQuery / niat_session_wise_qa_rating, demos + AI assessments"
       title="Training - Demos"
-      description="NIAT Deployed and Training instructors. Columns are the courses of the lecture list. Each course has two columns. Demos: how many different lectures of the course the instructor has a completed demo on (e.g. 8/20 -- a lecture done twice counts once; regular and training demos together) and the average QA score (out of 10) over ALL their demos in the course, repeats included. AI assessments: the same for AI assessments (regular and training), with the average AI score. Matched to lectures by topic name. Hover a cell for the total including repeats."
+      description="NIAT Deployed and Training instructors. Columns are the courses of the lecture list. Each course has four columns. In-training demos: every training demo, plus regular demos up to the instructor's deployment date (first session in Contribution; everything, if not deployed yet). Demos after deployment: regular demos after that date. Then the same two for AI assessments. Each cell: different lectures covered (e.g. 8/20 -- a lecture done twice counts once), the number of demos including repeats, and the average score out of 10 over all of them. Matched to lectures by topic name."
       action={<div className="flex items-center gap-2">
         <button type="button" data-testid="button-refresh-demo-training" onClick={refresh} className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3.5 py-2.5 text-[12px] font-bold text-foreground transition-colors hover:bg-secondary"><RefreshCw size={14} /> Refresh</button>
         <button type="button" data-testid="button-sync-demo-training" onClick={syncNow} disabled={syncing} className="inline-flex items-center gap-2 rounded-lg bg-primary px-3.5 py-2.5 text-[12px] font-bold text-primary-foreground shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-45">{syncing ? 'Syncing…' : 'Sync Now'}</button>
@@ -171,13 +179,13 @@ export function DemoTrainingView() {
                   <th rowSpan={2} className={th}>Deployed / Training</th>
                   <th rowSpan={2} className={th}>Instructor subject</th>
                   <th rowSpan={2} className={th}>Capability Manager</th>
-                  {columns.map((c) => <th key={c.course_id} colSpan={2} className={`${th} border-l-2 text-center`} title={`${c.total} lectures; demos by ${c.demo_instructors} instructors, AI assessments by ${c.ai_instructors}`}>
+                  {columns.map((c) => <th key={c.course_id} colSpan={KINDS.length} className={`${th} border-l-2 text-center`} title={`${c.total} lectures; demos by ${c.demo_instructors} instructors, AI assessments by ${c.ai_instructors}`}>
                     <div className="normal-case tracking-normal font-sans text-[11px] font-bold text-foreground">{c.title}</div>
                   </th>)}
-                  <th colSpan={2} className={`${th} border-l-2 bg-[#eef4ee] text-center`}>{SHORT[activeSubject] ?? activeSubject} overall</th>
+                  <th colSpan={KINDS.length} className={`${th} border-l-2 bg-[#eef4ee] text-center`}>{SHORT[activeSubject] ?? activeSubject} overall</th>
                 </tr>
                 <tr className="border-b border-border bg-[#f4f7f9]">
-                  {[...columns.map((c) => c.course_id), 'overall'].flatMap((id) => KINDS.map(({ kind, label }) => <th key={`${id}|${kind}`} className={`${th} text-center ${kind === 'demo' ? 'border-l-2' : ''} ${id === 'overall' ? 'bg-[#eef4ee]' : ''}`}>
+                  {[...columns.map((c) => c.course_id), 'overall'].flatMap((id) => KINDS.map(({ kind, label }) => <th key={`${id}|${kind}`} className={`${th} text-center ${kindBorder(kind)} ${id === 'overall' ? 'bg-[#eef4ee]' : ''}`}>
                     <div className="normal-case tracking-normal font-sans text-[10px] font-bold text-foreground">{label}</div>
                     {id !== 'overall' && <div className="mt-0.5 font-sans text-[10px] normal-case tracking-normal text-muted-foreground/80">{formatKpi(colTotals[`${id}|${kind}`]?.people ?? 0)} · avg {fmtScore(colTotals[`${id}|${kind}`]?.avg ?? null)}{colTotals[`${id}|${kind}`]?.avg == null ? '' : '/10'}</div>}
                   </th>))}
@@ -192,19 +200,21 @@ export function DemoTrainingView() {
                   <td className={`${td} text-muted-foreground`}>{r.capability_manager || NONE}</td>
                   {columns.flatMap((c) => KINDS.map(({ kind, label, short }) => {
                     const x = r.courses[c.course_id]?.[kind];
-                    return <td key={`${c.course_id}|${kind}`} className={`${td} text-center ${kind === 'demo' ? 'border-l-2' : ''}`}
+                    return <td key={`${c.course_id}|${kind}`} className={`${td} text-center ${kindBorder(kind)}`}
                       title={x ? `${label} on ${x.covered} different lectures of the course's ${x.total} · average score ${fmtScore(x.avg_score)} / 10 over all ${x.count} (repeats of the same lecture included) · last ${fmtDate(x.last_date)}` : `No ${label.toLowerCase()}`}>
                       {x ? <div className="flex flex-col items-center gap-0.5">
                         <span className="text-[12px] font-bold tabular-nums text-foreground">{x.covered}/{x.total}</span>
+                        <span className="text-[10px] tabular-nums text-muted-foreground">{x.count} {KINDS.find((k) => k.kind === kind)!.noun}</span>
                         <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-bold tabular-nums ${scoreTone(x.avg_score)}`}>{short} {fmtScore(x.avg_score)}{x.avg_score === null ? '' : '/10'}</span>
                       </div> : <span className="text-[11px] text-muted-foreground">{NONE}</span>}
                     </td>;
                   }))}
                   {KINDS.map(({ kind, short }) => {
                     const o = r.overall[kind];
-                    return <td key={`overall|${kind}`} className={`${td} bg-[#f6faf6] text-center ${kind === 'demo' ? 'border-l-2' : ''}`}>
+                    return <td key={`overall|${kind}`} className={`${td} bg-[#f6faf6] text-center ${kindBorder(kind)}`}>
                       {o.count ? <div className="flex flex-col items-center gap-0.5">
                         <span className="text-[12px] font-bold tabular-nums text-foreground">{o.covered}/{o.total}</span>
+                        <span className="text-[10px] tabular-nums text-muted-foreground">{o.count} {KINDS.find((k) => k.kind === kind)!.noun}</span>
                         <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-bold tabular-nums ${scoreTone(o.avg)}`}>{short} {fmtScore(o.avg)}{o.avg === null ? '' : '/10'}</span>
                       </div> : <span className="text-[11px] text-muted-foreground">{NONE}</span>}
                     </td>;
