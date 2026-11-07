@@ -642,6 +642,13 @@ function ExitKpiCard({ exitCandidates }: { exitCandidates: InstructorSummary[] }
   const pendingExitRows = useMemo<ExitRowView[]>(() => upcoming.filter((person) => person.exit_verification !== 'serving_notice_period').map(fromPerson).sort(byDateDesc), [upcoming]);
   const noticeRows = useMemo<ExitRowView[]>(() => upcoming.filter((person) => person.exit_verification === 'serving_notice_period').map(fromPerson).sort(byDateDesc), [upcoming]);
   const value = archiveQuery.isLoading ? '…' : archiveQuery.isError ? '—' : approved.length.toLocaleString('en-IN');
+  const downloadExitLists = () => {
+    const lists: [string, ExitRowView[]][] = [['Exit (approved)', exitRows], ['Upcoming -- Exited / Absconded, pending approval', pendingExitRows], ['Upcoming -- serving notice period', noticeRows]];
+    downloadCsv(`exit-data-${new Date().toISOString().slice(0, 10)}.csv`, toCsv(
+      ['List', 'Name', 'Employee ID', 'Subject', 'Capability Manager', 'Marked as', 'Approval', 'Date of exit', 'Date type'],
+      lists.flatMap(([list, rows]) => rows.map((row) => [list, row.name, row.employeeId ?? '', row.subject ?? '', row.manager ?? '', row.markedAs, row.approval, row.date ?? '', row.date ? (row.dateIsRaised ? 'Date the exit was raised' : 'Last working day') : ''])),
+    ));
+  };
   const chip = (text: string, tone: 'amber' | 'blue') => <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${tone === 'amber' ? 'bg-[#fbeed3] text-[#8a5a0b]' : 'bg-[#e1eaf1] text-primary'}`}>{text}</span>;
   return <>
     {/* Deliberately unlike the four live-headcount tiles: a filled card, two counts side by side, and a clear call to open the names (2026-10-09, per request). */}
@@ -672,6 +679,10 @@ function ExitKpiCard({ exitCandidates }: { exitCandidates: InstructorSummary[] }
             {exitRows.length} exits · {pendingExitRows.length} upcoming (Exited / Absconded, pending approval) · {noticeRows.length} serving notice period. Payroll candidates are not included.
           </DialogDescription>
         </DialogHeader>
+        {/* Download (2026-11-06, per request): all three lists in one CSV, with a "List" column saying which one each person is in. */}
+        <div className="flex justify-end">
+          <DownloadCsvButton onClick={downloadExitLists} disabled={exitRows.length + pendingExitRows.length + noticeRows.length === 0} label={`Download CSV (${exitRows.length + pendingExitRows.length + noticeRows.length})`} testId="button-download-exit-data" />
+        </div>
         <div className="max-h-[65vh] space-y-5 overflow-auto pr-1" data-testid="exit-dialog-combined">
           {archiveQuery.data?.change && <section data-testid="exit-section-change" className="rounded-lg border border-border bg-[#f8fafb] px-3 py-2.5">
             <h3 className="text-[13px] font-extrabold">Since {fmtDay(archiveQuery.data.change.previous_date)}: {archiveQuery.data.change.previous_total} → {exitRows.length}</h3>
