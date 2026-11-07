@@ -24,6 +24,8 @@ Commit messages stay short (title + 2-3 lines); this file is the detailed record
 
 ## 2026-11-06
 
+- **Exit data list: Download CSV** -- the Overview Exit data card's pop-up has a "Download CSV (n)" button. One file (`exit-data-YYYY-MM-DD.csv`) with all three lists and a "List" column (Exits / Upcoming -- Exited or Absconded / Upcoming -- serving notice). Columns: Name, Employee ID, Subject, Capability Manager, Marked as, Approval, Date of exit, Date type. The file has staff names.
+  File: `artifacts/instructor-crm/src/pages/dashboard.tsx` (`ExitKpiCard`). After pull: Publish.
 - **Payroll date of exit: calendar pop-up** -- clicking the box opens a calendar next to it with Month and Year dropdowns; clicking a day saves it at once; "Clear" removes it. Replaces the typed date box.
   File: `artifacts/instructor-crm/src/pages/instructors.tsx` (`DateOfExitCell`, uses `components/ui/popover` + `components/ui/calendar`). After pull: Publish.
 - **Fix: payroll instructors' manual date of exit (Instructors tab)** -- (1) the date picker did not open: the row is a link and the click-stop that keeps it from opening the profile also blocked the browser's picker; clicking the box now opens the picker itself. (2) For a CM-marked Payroll Converted person still in Darwin, the typed date was saved but the column kept showing Darwin's date; it now shows the typed date for every payroll person (same test as the editable box).
