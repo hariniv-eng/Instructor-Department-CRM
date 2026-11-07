@@ -527,6 +527,15 @@ export const instructorDemoCourseTable = pgTable("instructor_demo_course", {
   demos: integer("demos").notNull().default(0),
   scoreSum: doublePrecision("score_sum").notNull().default(0),
   scored: integer("scored").notNull().default(0),
+  // 10-minute rule (2026-11-07, per request): recordings under 10 minutes (audio_duration) are counted but kept apart -- the cell shows
+  // lectures covered and the average score of the 10+ minute ones; the hover note shows total / under 10 min / repeats.
+  demosShort: integer("demos_short").notNull().default(0),
+  lecturesLong: integer("lectures_long").notNull().default(0),
+  scoreSumLong: doublePrecision("score_sum_long").notNull().default(0),
+  scoredLong: integer("scored_long").notNull().default(0),
+  // Repeats: evaluations on a lecture already covered (all / 10+ minutes only).
+  repeats: integer("repeats").notNull().default(0),
+  repeatsLong: integer("repeats_long").notNull().default(0),
   firstDemoDate: date("first_demo_date"),
   lastDemoDate: date("last_demo_date"),
   syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),

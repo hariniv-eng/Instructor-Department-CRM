@@ -54,6 +54,13 @@ export type DemoCourseRow = {
   demos: number;
   score_sum: number;
   scored: number;
+  // 10-minute rule (2026-11-07): under 10 min = audio_duration below 10 minutes (no duration = counted as 10+).
+  demos_short: number;
+  lectures_long: number;
+  score_sum_long: number;
+  scored_long: number;
+  repeats: number;
+  repeats_long: number;
   first_demo_date: string | null;
   last_demo_date: string | null;
 };
@@ -124,13 +131,14 @@ export async function fetchDemoCourseRows(subjectByUid: Map<string, string | nul
     : new BigQuery({ projectId: config.BIGQUERY_PROJECT_ID });
   const [rows] = await runWithHardTimeout(() => bq.query({
     query: `SELECT instructor_user_id AS uid, session_title AS t, final_score AS s, CAST(session_date AS STRING) AS d,
-                   evaluation_type AS ty
+                   evaluation_type AS ty, SAFE_CAST(audio_duration AS FLOAT64) / 60 AS mins
             FROM \`${config.BIGQUERY_PROJECT_ID}.${config.BIGQUERY_DATASET}.${QA_RATING_VIEW}\`
             WHERE evaluation_type IN ('DEMO', 'TRAINING_DEMO', 'AI_ASSESSMENT', 'TRAINING_AI_ASSESSMENT') AND LOWER(status) = 'completed' AND instructor_user_id IS NOT NULL AND session_title IS NOT NULL`,
   }), QUERY_TIMEOUT_MS);
 
   const idx = lectureNameIndex();
-  type Agg = { uid: string; ci: number; kind: DemoKind; lectures: Set<number>; demos: number; sum: number; scored: number; first: string | null; last: string | null };
+  type Agg = { uid: string; ci: number; kind: DemoKind; lectures: Set<number>; demos: number; sum: number; scored: number; first: string | null; last: string | null;
+    short: number; lecHits: Map<number, number>; longHits: Map<number, number>; longSum: number; longScored: number };
   const agg = new Map<string, Agg>();
   // ONE course per evaluation (2026-11-07, per request: NW2000396's single "Your Learning Journey" demo showed as 1 demo in each of Intro
   // to Gen AI, LLM and AI for Finance -- "3 of 75"). A topic name found in several courses used to count in ALL of them after the subject
@@ -166,10 +174,15 @@ export async function fetchDemoCourseRows(subjectByUid: Map<string, string | nul
     for (const ci of new Set(hits.map((h) => h.ci))) {
       const kind = demoKindOf(plain(r.ty), d, windowByUid.get(uid));
       const k = `${uid}|${ci}|${kind}`;
-      const a = agg.get(k) ?? { uid, ci, kind, lectures: new Set<number>(), demos: 0, sum: 0, scored: 0, first: null, last: null };
-      for (const h of hits) if (h.ci === ci && h.n > 0) a.lectures.add(h.n); // n = 0: old-course extra topic, not a lecture
+      const a = agg.get(k) ?? { uid, ci, kind, lectures: new Set<number>(), demos: 0, sum: 0, scored: 0, first: null, last: null,
+        short: 0, lecHits: new Map<number, number>(), longHits: new Map<number, number>(), longSum: 0, longScored: 0 };
+      const mins = r.mins === null || r.mins === undefined || plain(r.mins) === "" ? null : Number(plain(r.mins));
+      const isShort = mins !== null && Number.isFinite(mins) && mins < 10;
+      const lecs = [...new Set(hits.filter((h) => h.ci === ci && h.n > 0).map((h) => h.n))]; // n = 0: old-course extra topic, not a lecture
+      for (const n of lecs) { a.lectures.add(n); a.lecHits.set(n, (a.lecHits.get(n) ?? 0) + 1); if (!isShort) a.longHits.set(n, (a.longHits.get(n) ?? 0) + 1); }
       a.demos++;
-      if (score !== null && Number.isFinite(score)) { a.sum += score; a.scored++; }
+      if (isShort) a.short++;
+      if (score !== null && Number.isFinite(score)) { a.sum += score; a.scored++; if (!isShort) { a.longSum += score; a.longScored++; } }
       if (d && (!a.first || d < a.first)) a.first = d;
       if (d && (!a.last || d > a.last)) a.last = d;
       agg.set(k, a);
@@ -188,6 +201,12 @@ export async function fetchDemoCourseRows(subjectByUid: Map<string, string | nul
       demos: a.demos,
       score_sum: Math.round(a.sum * 100) / 100,
       scored: a.scored,
+      demos_short: a.short,
+      lectures_long: Math.min(a.longHits.size, c.lectures.length),
+      score_sum_long: Math.round(a.longSum * 100) / 100,
+      scored_long: a.longScored,
+      repeats: [...a.lecHits.values()].reduce((x, v) => x + v - 1, 0),
+      repeats_long: [...a.longHits.values()].reduce((x, v) => x + v - 1, 0),
       first_demo_date: a.first,
       last_demo_date: a.last,
     };

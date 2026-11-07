@@ -161,6 +161,12 @@ export async function storeDemoCourses(rows: DemoCourseRow[]): Promise<number> {
         demos: row.demos,
         scoreSum: row.score_sum,
         scored: row.scored,
+        demosShort: row.demos_short,
+        lecturesLong: row.lectures_long,
+        scoreSumLong: row.score_sum_long,
+        scoredLong: row.scored_long,
+        repeats: row.repeats,
+        repeatsLong: row.repeats_long,
         firstDemoDate: row.first_demo_date,
         lastDemoDate: row.last_demo_date,
       }));
