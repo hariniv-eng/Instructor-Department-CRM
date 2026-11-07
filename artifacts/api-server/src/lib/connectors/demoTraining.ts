@@ -132,6 +132,12 @@ export async function fetchDemoCourseRows(subjectByUid: Map<string, string | nul
   const idx = lectureNameIndex();
   type Agg = { uid: string; ci: number; kind: DemoKind; lectures: Set<number>; demos: number; sum: number; scored: number; first: string | null; last: string | null };
   const agg = new Map<string, Agg>();
+  // ONE course per evaluation (2026-11-07, per request: NW2000396's single "Your Learning Journey" demo showed as 1 demo in each of Intro
+  // to Gen AI, LLM and AI for Finance -- "3 of 75"). A topic name found in several courses used to count in ALL of them after the subject
+  // filter. Now, if it is still in several: the course where this instructor has other demos / AI assessments that match only one course;
+  // else the first of them in course order (the earliest course, e.g. Introduction to Gen AI).
+  const matched: { r: Record<string, unknown>; uid: string; hits: { ci: number; n: number }[] }[] = [];
+  const singleCourses = new Map<string, Set<number>>();
   for (const r of rows as Record<string, unknown>[]) {
     const uid = plain(r.uid);
     let hits = matchDemoTopic(idx, plain(r.t));
@@ -142,6 +148,19 @@ export async function fetchDemoCourseRows(subjectByUid: Map<string, string | nul
       const side = area ? hits.filter((h) => NON_TECH.has(LECTURE_COURSES[h.ci].subject) === NON_TECH.has(area)) : [];
       hits = own.length ? own : side.length ? side : hits;
     }
+    const cis = new Set(hits.map((h) => h.ci));
+    if (cis.size === 1) singleCourses.set(uid, new Set([...(singleCourses.get(uid) ?? []), ...cis]));
+    matched.push({ r, uid, hits });
+  }
+  for (const m of matched) {
+    const cis = [...new Set(m.hits.map((h) => h.ci))].sort((x, y) => x - y);
+    if (cis.length > 1) {
+      const mine = cis.filter((ci) => singleCourses.get(m.uid)?.has(ci));
+      const pick = mine.length ? mine[0] : cis[0];
+      m.hits = m.hits.filter((h) => h.ci === pick);
+    }
+  }
+  for (const { r, uid, hits } of matched) {
     const score = r.s === null || r.s === undefined || plain(r.s) === "" ? null : Number(plain(r.s));
     const d = plain(r.d) || null;
     for (const ci of new Set(hits.map((h) => h.ci))) {
