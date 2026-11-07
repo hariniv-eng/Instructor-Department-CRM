@@ -203,8 +203,8 @@ export function DemoTrainingView() {
                     return <td key={`${c.course_id}|${kind}`} className={`${td} text-center ${kindBorder(kind)}`}
                       title={x ? `${label} on ${x.covered} different lectures of the course's ${x.total} · average score ${fmtScore(x.avg_score)} / 10 over all ${x.count} (repeats of the same lecture included) · last ${fmtDate(x.last_date)}` : `No ${label.toLowerCase()}`}>
                       {x ? <div className="flex flex-col items-center gap-0.5">
-                        <span className="text-[12px] font-bold tabular-nums text-foreground">{x.covered}/{x.total}</span>
-                        <span className="text-[10px] tabular-nums text-muted-foreground">{x.count} {KINDS.find((k) => k.kind === kind)!.noun}</span>
+                        <span className="text-[12px] font-bold tabular-nums text-foreground">{x.covered}/{x.total} <span className="text-[10px] font-semibold text-muted-foreground">lectures</span></span>
+                        <span className="text-[10px] tabular-nums text-muted-foreground">{x.count} {KINDS.find((k) => k.kind === kind)!.noun} in total</span>
                         <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-bold tabular-nums ${scoreTone(x.avg_score)}`}>{short} {fmtScore(x.avg_score)}{x.avg_score === null ? '' : '/10'}</span>
                       </div> : <span className="text-[11px] text-muted-foreground">{NONE}</span>}
                     </td>;
@@ -213,8 +213,8 @@ export function DemoTrainingView() {
                     const o = r.overall[kind];
                     return <td key={`overall|${kind}`} className={`${td} bg-[#f6faf6] text-center ${kindBorder(kind)}`}>
                       {o.count ? <div className="flex flex-col items-center gap-0.5">
-                        <span className="text-[12px] font-bold tabular-nums text-foreground">{o.covered}/{o.total}</span>
-                        <span className="text-[10px] tabular-nums text-muted-foreground">{o.count} {KINDS.find((k) => k.kind === kind)!.noun}</span>
+                        <span className="text-[12px] font-bold tabular-nums text-foreground">{o.covered}/{o.total} <span className="text-[10px] font-semibold text-muted-foreground">lectures</span></span>
+                        <span className="text-[10px] tabular-nums text-muted-foreground">{o.count} {KINDS.find((k) => k.kind === kind)!.noun} in total</span>
                         <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-bold tabular-nums ${scoreTone(o.avg)}`}>{short} {fmtScore(o.avg)}{o.avg === null ? '' : '/10'}</span>
                       </div> : <span className="text-[11px] text-muted-foreground">{NONE}</span>}
                     </td>;
