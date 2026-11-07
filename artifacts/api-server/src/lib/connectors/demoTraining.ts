@@ -56,6 +56,23 @@ const NAME_ALIASES: [string, number, string][] = [
   ["static_web", 2, "Your first Frontend Project | Getting started"],
   ["modern_responsive_ui", 20, "Building a Responsive Website with Tailwind CSS"],
 ];
+// Old-course topics (2026-11-07, per request: "these 12 topics that are not counted" -- found on NW2000396). Demos on lectures of the old
+// "Static Website" / "Responsive Website" courses that have no lecture in the new HTML & CSS / Modern Responsive UI lists. They now count
+// for the course (number of demos + average score), but NOT in "lectures covered" -- the course total (20 / 21) stays the new course's.
+// Lecture number 0 = "extra topic, no lecture". [course key, other name]
+const EXTRA_TOPICS: [string, string][] = [
+  ["static_web", "Introduction to Bootstrap"],
+  ["static_web", "Introduction to Bootstrap | Part 2"],
+  ["static_web", "A Note on Bootstrap Versions"],
+  ["static_web", "Favourite Places Section"],
+  ["static_web", "Website Integration"],
+  ["modern_responsive_ui", "Introduction to Responsive Web Design"],
+  ["modern_responsive_ui", "Bootstrap Grid System"],
+  ["modern_responsive_ui", "Bootstrap Grid System | Part 2"],
+  ["modern_responsive_ui", "Bootstrap Navbar"],
+  ["modern_responsive_ui", "CSS Transforms"],
+  ["gen_ai", "Introduction to Generative AI"],
+];
 
 // lecture name key -> every (course index, lecture number) with that name
 export function lectureNameIndex(): Map<string, { ci: number; n: number }[]> {
@@ -69,6 +86,8 @@ export function lectureNameIndex(): Map<string, { ci: number; n: number }[]> {
   };
   LECTURE_COURSES.forEach((c, ci) => c.lectures.forEach((l) => add(l.name, ci, l.n)));
   for (const [key, n, alias] of NAME_ALIASES) { const ci = LECTURE_COURSES.findIndex((c) => c.key === key); if (ci >= 0) add(alias, ci, n); }
+  // Extra topics only where the name is not already a lecture of some course (a real lecture always wins).
+  for (const [key, name] of EXTRA_TOPICS) { const ci = LECTURE_COURSES.findIndex((c) => c.key === key); if (ci >= 0 && !idx.has(demoNameKey(name))) add(name, ci, 0); }
   return idx;
 }
 /** Lectures a demo topic name matches; a name without a number also matches the lecture's "Part 1" ("Building Social Media ... Workflow"). */
@@ -110,7 +129,7 @@ export async function fetchDemoCourseRows(subjectByUid: Map<string, string | nul
       const kind = plain(r.kind) === "ai" ? "ai" : "demo";
       const k = `${uid}|${ci}|${kind}`;
       const a = agg.get(k) ?? { uid, ci, kind, lectures: new Set<number>(), demos: 0, sum: 0, scored: 0, first: null, last: null };
-      for (const h of hits) if (h.ci === ci) a.lectures.add(h.n);
+      for (const h of hits) if (h.ci === ci && h.n > 0) a.lectures.add(h.n); // n = 0: old-course extra topic, not a lecture
       a.demos++;
       if (score !== null && Number.isFinite(score)) { a.sum += score; a.scored++; }
       if (d && (!a.first || d < a.first)) a.first = d;
