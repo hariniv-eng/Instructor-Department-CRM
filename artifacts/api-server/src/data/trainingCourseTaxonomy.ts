@@ -99,13 +99,15 @@ export const TRAINING_COURSE_TAXONOMY: TrainingCourseDef[] = [
     key: "dsa",
     label: "DSA",
     trackGroup: "DSA",
-    // Found by course_id (the title below is a backup if the id column is ever missing).
-    courseIds: ["bb04e38a723e4bbfbf99ec43992bb31c"],
+    // 2026-11-07, per request: DSA = the semester 2 DSA course, course id e216af3e-bcd0-4dee-9c4f-67e7502ecba3 (the same course as
+    // "DSA (C++)" in data/lectureSessions.ts, used by Demos / Taught in class). Replaces DSA Foundation (bb04e38a...), the Faculty-ops
+    // course used since 2026-10-14. Matched by course id only -- no title backup, so DSA Foundation rows are no longer counted here.
+    courseIds: ["e216af3ebcd04dee9c4f67e7502ecba3"],
     // 2026-10-14, per request ("do the same" as the Faculty-ops app): DSA is the "DSA Foundation" course -- the course whose id
     // bb04e38a... Faculty-ops uses, confirmed live (15 topics, 671 instructors, ~199k unit rows). The earlier mapping
     // (Phase 1-3 courses, filtered to a topic list, ~290 rows company-wide) was the wrong source, so DSA instructors showed
     // "no data". DIA and IPS below keep their Phase topic lists; Faculty-ops has no course id for them.
-    courseTitles: ["DSA Foundation"],
+    courseTitles: [],
   },
   {
     key: "dia",
