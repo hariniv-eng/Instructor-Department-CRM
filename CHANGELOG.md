@@ -22,6 +22,11 @@ Commit messages stay short (title + 2-3 lines); this file is the detailed record
 | What the Instructor Archive stores (joining date, gender, subject ...) | `artifacts/api-server/src/lib/archiveInstructors.ts` |
 | One-off read-only checks | `artifacts/api-server/src/lib/connectors/_tmp_*.ts` |
 
+## 2026-11-07
+- **Overview: instructors per semester** -- the "Contribution of NIAT instructors & mentors" card now shows two boxes: Semester 1 (teaching NIAT 2026) and Semester 3 (teaching NIAT 2025). Someone teaching both cohorts counts in both; the footnote says how many. Same population as the card (NIAT Deployed instructors + mentors, cohort from the last 30 days / 2 months).
+  File: `artifacts/instructor-crm/src/pages/dashboard.tsx` (`NiatContributionCard`). After pull: Publish.
+- Added read-only `_tmp_semester_courses.ts` (each cohort's semester courses with dates; not needed now that the semester list was shared).
+
 ## 2026-11-06
 
 - **Exit data list: Download CSV** -- the Overview Exit data card's pop-up has a "Download CSV (n)" button. One file (`exit-data-YYYY-MM-DD.csv`) with all three lists and a "List" column (Exits / Upcoming -- Exited or Absconded / Upcoming -- serving notice). Columns: Name, Employee ID, Subject, Capability Manager, Marked as, Approval, Date of exit, Date type. The file has staff names.

@@ -439,7 +439,7 @@ function NiatContributionCard({ people }: { people: InstructorSummary[] }) {
   // One flat list (2026-10-09, per request): every row is the exact cohort(s) an instructor teaches, in the order
   // 2024, 2024 + 2025, 2025, 2025 + 2026, 2026 -- no separate "only one cohort" / "combination" sections. Each
   // instructor is counted once, under exactly the cohort(s) they teach, so the rows add up to the NIAT total.
-  const { rows, total } = useMemo(() => {
+  const { rows, total, semesters } = useMemo(() => {
     // Deployed only (2026-10-13, per request: "this data should only consist of the deployed instructor data") --
     // NIAT (Training) people are not counted here. Mentors are included with the instructors (same day, per request:
     // "your list should consist of instructors plus mentors"); each person once, whichever list they came from.
@@ -450,8 +450,15 @@ function NiatContributionCard({ people }: { people: InstructorSummary[] }) {
     const groups = new Map<string, { cohorts: string[]; count: number }>();
     for (const name of NIAT_COHORT_ORDER) groups.set(name, { cohorts: [name], count: 0 });
     let noCohort = 0;
+    // Per semester (2026-11-07, per request: "separate values of number of instructors in semester one and semester three"):
+    // NIAT 2026 = semester 1, NIAT 2025 = semester 3. Someone teaching both cohorts is counted in both semesters.
+    const semesters = { sem1: 0, sem3: 0, both: 0 };
     for (const person of niat) {
       const cohorts = [...new Set(person.niat_cohorts ?? [])].sort((x, y) => rank(x) - rank(y) || x.localeCompare(y));
+      const s1 = cohorts.includes('NIAT 2026'), s3 = cohorts.includes('NIAT 2025');
+      if (s1) semesters.sem1 += 1;
+      if (s3) semesters.sem3 += 1;
+      if (s1 && s3) semesters.both += 1;
       if (cohorts.length === 0) { noCohort += 1; continue; }
       const key = cohorts.join(' + ');
       const entry = groups.get(key) ?? { cohorts, count: 0 };
@@ -464,7 +471,7 @@ function NiatContributionCard({ people }: { people: InstructorSummary[] }) {
     // People with no cohort (2026-10-13): no completed session in the last 2 months, or a batch that maps to no NIAT cohort,
     // or no TeachOS match. Shown as their own row so the rows always add up to the total above.
     if (noCohort > 0) ordered.push({ label: 'No cohort yet', count: noCohort });
-    return { rows: ordered, total: niat.length };
+    return { rows: ordered, total: niat.length, semesters };
   }, [people]);
   const max = Math.max(1, ...rows.map((row) => row.count));
   const bar = (count: number) => <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-secondary"><div className="h-full rounded-full" style={{ width: `${Math.max(count > 0 ? 2 : 0, (count / max) * 100)}%`, backgroundColor: '#4f86b8' }} /></div>;
@@ -480,6 +487,10 @@ function NiatContributionCard({ people }: { people: InstructorSummary[] }) {
       <span className="text-[18px] font-extrabold leading-none tracking-[-0.03em] tabular-nums" data-testid="text-niat-instructor-total">{total.toLocaleString('en-IN')}</span>
       <span className="text-[12px] text-muted-foreground">NIAT instructors + mentors (Deployed)</span>
     </div>
+    <div className="mb-3 grid grid-cols-2 gap-2" data-testid="niat-semester-counts">
+      <div className="rounded-lg border border-border bg-secondary/60 px-3 py-1.5" data-testid="text-niat-sem1"><div className="text-[10px] text-muted-foreground">Semester 1 (NIAT 2026)</div><div className="text-[15px] font-extrabold tabular-nums">{semesters.sem1.toLocaleString('en-IN')}</div></div>
+      <div className="rounded-lg border border-border bg-secondary/60 px-3 py-1.5" data-testid="text-niat-sem3"><div className="text-[10px] text-muted-foreground">Semester 3 (NIAT 2025)</div><div className="text-[15px] font-extrabold tabular-nums">{semesters.sem3.toLocaleString('en-IN')}</div></div>
+    </div>
     <ul className="flex flex-1 flex-col justify-between gap-2">
       {rows.map((row) => <li key={row.label} data-testid={`row-niat-cohort-${slugify(row.label)}`}>
         <div className="flex items-baseline justify-between gap-3">
@@ -489,7 +500,7 @@ function NiatContributionCard({ people }: { people: InstructorSummary[] }) {
         {bar(row.count)}
       </li>)}
     </ul>
-    <p className="mt-3 text-[10px] text-muted-foreground">Each instructor or mentor is counted once, under the exact cohort(s) they teach. "No cohort yet" = deployed, but no completed session in the last 2 months.</p>
+    <p className="mt-3 text-[10px] text-muted-foreground">Semester boxes: someone teaching both cohorts counts in both ({semesters.both.toLocaleString('en-IN')} people). List: each instructor or mentor is counted once, under the exact cohort(s) they teach. "No cohort yet" = deployed, but no completed session in the last 2 months.</p>
   </div>;
 }
 
