@@ -394,9 +394,9 @@ export const recomputeStatuses = async (options: { grantTeachosOnlyScope?: boole
       // people with an exit record get the manual Employee Status, and the Capability Manager marks them Payroll Converted if they are").
       // The sync never fills Employee Status in. It only still clears an old automatic mark when an exit record newly appears, so that
       // person lands in the CM actions queue for review.
-      ...((!!exit && !row.exitFlag && row.exitVerification === "payroll_converted")
-          ? { exitVerification: null }
-          : {}),
+      // MANUAL ENTRIES ARE NEVER CHANGED BY THE SYNC (2026-11-09, per request: "whenever changes are done by Capability Managers or
+      // anyone in the application, make sure they stay forever"). The rule that cleared a Payroll Converted mark when an exit record
+      // newly appeared is removed -- Employee Status is only ever written by PATCH /instructors/:id/exit-verification.
       exitDepartment: isTeachosOnlyLeftover ? (exit?.department ?? null) : null,
       exitDesignation: isTeachosOnlyLeftover ? (exit?.designation ?? null) : null,
       exitGender: isTeachosOnlyLeftover ? (exit?.gender ?? null) : null,

@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { and, arrayContains, asc, eq, ilike, or } from "drizzle-orm";
-import { db, instructorsTable, instructorArchiveTable } from "@workspace/db";
+import { db, instructorsTable, instructorArchiveTable, uploadsTable } from "@workspace/db";
 import { requireAuth, requireRole } from "../middlewares/auth";
 import { VALID_CAPABILITY_MANAGERS } from "../data/validCapabilityManagers";
 import { SUBJECT_AREAS, normalizeSubjectArea } from "../lib/departmentTaxonomy";
@@ -273,7 +273,7 @@ router.patch("/instructors/:id/exit-verification", async (req, res): Promise<voi
     return;
   }
   // Employee Status can only be SET for someone with an exit record, or a TeachOS-only (payroll) person (2026-10-24, per request); clearing it (null) is always allowed.
-  const [current] = await db.select({ exitFlag: instructorsTable.exitFlag, classification: instructorsTable.classification }).from(instructorsTable).where(eq(instructorsTable.id, Number(req.params.id)));
+  const [current] = await db.select({ exitFlag: instructorsTable.exitFlag, classification: instructorsTable.classification, exitVerification: instructorsTable.exitVerification }).from(instructorsTable).where(eq(instructorsTable.id, Number(req.params.id)));
   if (!current) {
     res.status(404).json({ error: "Instructor not found" });
     return;
@@ -294,6 +294,8 @@ router.patch("/instructors/:id/exit-verification", async (req, res): Promise<voi
     ? eq(instructorArchiveTable.employeeId, row.employeeId)
     : row.teachosUserId ? eq(instructorArchiveTable.teachosUserId, row.teachosUserId) : null;
   if (archiveKey) await db.update(instructorArchiveTable).set({ exitVerification: raw }).where(archiveKey);
+  // Change log (2026-11-09): every Employee Status saved from the page, old -> new, in the uploads log (see recomputeStatuses for the sync side).
+  await db.insert(uploadsTable).values({ source: "Employee Status change", filename: `${row.employeeId ?? `row ${row.id}`}: ${current.exitVerification ?? "(empty)"} -> ${raw ?? "(empty)"} on the page`, rowCount: 0 }).catch(() => {});
   res.json(toApiInstructor(row));
 });
 
