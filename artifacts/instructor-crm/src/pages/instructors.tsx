@@ -738,7 +738,8 @@ export function MultiSelectFilter({ label, options, selected, onChange, testId, 
         <span className="truncate">{summary}</span>
         <ChevronDown size={14} className={`shrink-0 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
-      {open && <div role="listbox" className="absolute left-0 top-full z-20 mt-1 max-h-[280px] w-max min-w-[220px] overflow-y-auto rounded-lg border border-border bg-card p-1 shadow-lg">
+      {/* z-50 (2026-11-09): above the table's frozen header (sticky, z-20), which was covering the open list. */}
+      {open && <div role="listbox" className="absolute left-0 top-full z-50 mt-1 max-h-[280px] w-max min-w-[220px] overflow-y-auto rounded-lg border border-border bg-card p-1 shadow-lg">
         {options.length === 0 && <p className="px-2 py-1.5 text-[11px] text-muted-foreground">No options for this category</p>}
         {options.map((option) => <label key={option.key} data-testid={`${testId}-option-${option.key}`} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-[12px] transition-colors hover:bg-secondary">
           <input type="checkbox" checked={selected.includes(option.key)} onChange={() => toggle(option.key)} className="h-3.5 w-3.5 shrink-0 accent-primary" />
