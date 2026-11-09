@@ -22,6 +22,12 @@ Commit messages stay short (title + 2-3 lines); this file is the detailed record
 | What the Instructor Archive stores (joining date, gender, subject ...) | `artifacts/api-server/src/lib/archiveInstructors.ts` |
 | One-off read-only checks | `artifacts/api-server/src/lib/connectors/_tmp_*.ts` |
 
+## 2026-11-09
+- **Manual entries are never changed by the sync** -- removed the rule in `recomputeStatuses` that cleared a Payroll Converted Employee Status when an exit record newly appeared. Employee Status is now only ever written from the page. (Other manual fields -- subject, gender, Capability Manager, exit date, joining date -- are separate manual columns the sync does not write.)
+  File: `artifacts/api-server/src/lib/reconcile.ts`. After pull: Publish.
+- **Employee Status change log** -- every Employee Status (CM mark) saved on the page, is written to the uploads log (source "Employee Status change", e.g. `NW2000452: (empty) -> payroll_converted on the page`). Added because NW2000452's Payroll Converted mark kept disappearing; his exit record and exit flag were stable, so the sync's clear rule should not have fired -- the log will show what clears it.
+  Files: `artifacts/api-server/src/routes/instructors.ts` (PATCH exit-verification), `_tmp_cm_mark_check.ts` (section 5 shows the log for one ID). After pull: Publish.
+
 ## 2026-11-07
 - **Training - Demos: 10-minute rule + hover note** -- for demos, each cell now shows the different lectures covered by demos of 10 minutes or more (audio length) and their average QA. Hovering (or tapping) a cell shows a note: total demos, how many were under 10 minutes, how many of the 10+ minute ones were repeats, the average of the 10+ minute ones and of all, and the last date. AI assessments are not cut at 10 minutes (they are 5-12 min by nature); their note shows total, repeats and average. CSV: per course and kind -- lectures, total, under 10 min, repeats, avg score, avg score (all).
   Files: `lib/db/src/schema/index.ts` (`instructor_demo_course`: demos_short, lectures_long, score_sum_long, scored_long, repeats, repeats_long), `artifacts/api-server/src/lib/connectors/demoTraining.ts`, `lib/storeRaw.ts` (`storeDemoCourses`), `routes/reports.ts` (`/reports/demo-training`), `instructor-crm/src/pages/demo-training.tsx` (`StatCell`). **After pull: `pnpm --filter @workspace/db run push`, then Publish, then Sync Now.**

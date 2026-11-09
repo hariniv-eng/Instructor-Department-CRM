@@ -36,6 +36,9 @@ async function main() {
   const ups = await db.select().from(uploadsTable).where(eq(uploadsTable.source, "Exit List")).orderBy(desc(uploadsTable.uploadedAt)).limit(12);
   console.log(`\n4. last exit-list syncs (time | rows stored | detail):`);
   for (const u of ups) console.log(`   ${u.uploadedAt.toISOString()} | ${u.rowCount} | ${u.filename.replace(/^Darwinbox reports-API sync \(raw, flagged only\)\s*/, "")}`);
+  const changes = await db.select().from(uploadsTable).where(sql`${uploadsTable.source} = 'Employee Status change' AND UPPER(${uploadsTable.filename}) LIKE ${emp + ":%"}`).orderBy(desc(uploadsTable.uploadedAt)).limit(30);
+  console.log(`\n5. Employee Status changes logged for ${emp} (logging starts 2026-11-09; newest first): ${changes.length}`);
+  for (const c of changes) console.log(`   ${c.uploadedAt.toISOString()} | ${c.filename}`);
   process.exit(0);
 }
 main().catch((e) => { console.error(e); process.exit(1); });
