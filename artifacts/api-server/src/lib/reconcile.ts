@@ -5,7 +5,7 @@
 // behavior stays identical regardless of where the rows came from.
 
 import { and, eq } from "drizzle-orm";
-import { instructorsTable, darwinboxExitsTable, teachosIdReferenceTable } from "@workspace/db";
+import { instructorsTable, darwinboxExitsTable, teachosIdReferenceTable, uploadsTable } from "@workspace/db";
 import { sdb as db, inSavepoint } from "./syncContext";
 import { hasConfirmedInstructorDesignation, EXCLUDED_EMPLOYEES, type ExcludedOverride, OTHER_DEPARTMENT_EMPLOYEES, type OtherDepartmentOverride } from "../data/classificationOverrides";
 import { VALID_CAPABILITY_MANAGERS, CAPABILITY_MANAGER_ALIASES, CAPABILITY_MANAGER_BY_USER_ID } from "../data/validCapabilityManagers";
@@ -238,6 +238,9 @@ function findExit(row: InstructorRow, exits: { byEmployeeId: Map<string, ExitInf
 export const recomputeStatuses = async (options: { grantTeachosOnlyScope?: boolean } = {}) => {
   const rows = await db.select().from(instructorsTable);
   const exits = await loadLatestExitsByPerson();
+  // Serving notice period -> Exited (2026-11-09, per request): see snpEnded below. Logged after the loop.
+  const todayIst = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  const autoExited: string[] = [];
   await Promise.all(rows.map((row) => {
     // Priority: an individual, human-reviewed override (classificationOverrides.ts)
     // always wins first — EXCLUDED_EMPLOYEES, then OTHER_DEPARTMENT_EMPLOYEES
@@ -369,7 +372,15 @@ export const recomputeStatuses = async (options: { grantTeachosOnlyScope?: boole
           : "needs_review";
     }
 
+    // THE ONE AUTOMATIC CHANGE TO EMPLOYEE STATUS (2026-11-09, per request: "only if it is first marked Serving Notice Period, and the
+    // date of exit has passed the present date, then it should be marked Exited automatically and moved to remove access in TeachOS").
+    // Date of exit = the Darwin exit record's "Date Of Exit" (last working day); for a payroll-converted person, the date typed in by
+    // hand. Passed = before today (IST), so the person moves the day after their last working day. Nothing else is ever changed.
+    const dateOfExit = classification === "payroll_converted" ? (row.manualExitDate ?? null) : toISODate(exit?.lastWorkingDate ?? null);
+    const snpEnded = row.exitVerification === "serving_notice_period" && !!dateOfExit && dateOfExit < todayIst;
+    if (snpEnded) autoExited.push(`${row.employeeId ?? `row ${row.id}`}: serving_notice_period -> exited by the SYNC (date of exit ${dateOfExit} has passed)`);
     return db.update(instructorsTable).set({
+      ...(snpEnded ? { exitVerification: "exited" } : {}),
       computedStatus,
       classification,
       classificationReason,
@@ -411,6 +422,7 @@ export const recomputeStatuses = async (options: { grantTeachosOnlyScope?: boole
       deploymentStatus,
     }).where(eq(instructorsTable.id, row.id));
   }));
+  if (autoExited.length) await db.insert(uploadsTable).values(autoExited.map((filename) => ({ source: "Employee Status change", filename, rowCount: 0 })));
   // Permanent archive (2026-09-28, per request) -- see archiveInstructors.ts.
   // Runs after every row above is fully updated, so it archives this
   // reconcile pass's final state, not a stale pre-update snapshot.

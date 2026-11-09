@@ -37,7 +37,7 @@ export const OVERVIEW_INFO: Record<string, { title: string; lines: string[] }> =
   instructorsMentors: { title: 'Instructors + Mentors', lines: ['Instructor Department without the Operations team.'] },
   ops: { title: 'Operations team', lines: ['Darwin department "Instructors – Delivery Support (Ops and Central Managers)".'] },
   exits: { title: 'Exit data', lines: ['Approved Darwin exits from the Instructor Archive (payroll-converted left out).'] },
-  productMix: { title: 'Product mix', lines: ['Instructor Department split by Product, based on each person\'s TeachOS campus.'] },
+  productMix: { title: 'Product mix', lines: ['Instructors + mentors split by Product, based on each person\'s TeachOS campus. The Operations team (Support) is not included.'] },
   niatContribution: { title: 'NIAT contribution', lines: ['NIAT (Deployed) instructors + mentors by the cohort of the batches they taught in the last 30 days (60 if none).'] },
   topCampuses: { title: 'Top campuses', lines: ['Instructors + mentors per TeachOS campus, top 10.'] },
   managerWorkload: { title: 'Manager workload', lines: ['Instructor Department grouped by Capability Manager.'] },
