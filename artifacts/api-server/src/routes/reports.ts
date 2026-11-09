@@ -100,7 +100,12 @@ const toApiArchiveSummary = (row: ArchiveRow, approvedExit?: ApprovedExitFallbac
   const manualPayroll = row.exitVerification === "payroll_converted";
   const manualSnp = row.exitVerification === "serving_notice_period";
   const exitDate = manualPayroll ? null : (approvedExit?.date ?? row.exitDate ?? null);
-  const status: "Active" | "Exited" | "SNP" = manualPayroll ? "Active" : manualSnp ? "SNP" : exitDate ? "Exited" : "Active";
+  // Serving notice period ENDED (2026-11-09, per request: NW0005061 -- SNP, exit Approved, Date Of Exit already passed, but still not in
+  // the Exit data): an SNP person whose exit is Approved and whose Date Of Exit (last working day) is before today (IST) is Exited.
+  // Same day boundary as the Overview's Exception 2, where such people already move from Serving notice to the remove-access list.
+  const todayIst = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  const snpEnded = manualSnp && (approvedExit?.status ?? "").trim().toLowerCase() === "approved" && !!approvedExit?.lastWorkingDate && approvedExit.lastWorkingDate < todayIst;
+  const status: "Active" | "Exited" | "SNP" = manualPayroll ? "Active" : manualSnp && !snpEnded ? "SNP" : exitDate ? "Exited" : "Active";
   return {
     id: row.id,
     employee_id: row.employeeId,

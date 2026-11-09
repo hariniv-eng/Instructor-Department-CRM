@@ -318,7 +318,10 @@ const PRODUCT_COLORS: Record<string, string> = {
   'IIT KGP': '#7a5ea8',
   Support: '#8a93a6',
 };
-function ProductMixCard({ people, instructors, mentors }: { people: InstructorSummary[]; instructors: InstructorSummary[]; mentors: InstructorSummary[] }) {
+function ProductMixCard({ people: departmentPeople, instructors, mentors }: { people: InstructorSummary[]; instructors: InstructorSummary[]; mentors: InstructorSummary[] }) {
+  // Instructors + mentors only (2026-11-09, per request: "don't add Support in the product mix"). The Operations team (product Support)
+  // used to be counted in the donut and listed as a Support row; it is left out entirely now, so the card matches the Instructors +
+  // Mentors KPI card.
   // Interactive version (2026-10-10, per request): nothing is counted until a subject is picked. Picking a subject fills
   // the donut with that subject's instructors + mentors, shows the instructor and mentor counts at the top, and lists
   // every product (zeros included) with its instructor / mentor split. The instructor and mentor lists never overlap, so nobody is counted twice;
@@ -339,13 +342,14 @@ function ProductMixCard({ people, instructors, mentors }: { people: InstructorSu
   }, [subject]);
   const instructorIds = useMemo(() => new Set(instructors.map((person) => person.id)), [instructors]);
   const mentorIds = useMemo(() => new Set(mentors.map((person) => person.id)), [mentors]);
+  const people = useMemo(() => departmentPeople.filter((person) => (instructorIds.has(person.id) || mentorIds.has(person.id)) && productLabel(person) !== 'Support'), [departmentPeople, instructorIds, mentorIds]);
   const subjects = useMemo(() => {
     const counts = new Map<string, number>();
     for (const person of people) if (person.dept_area) counts.set(person.dept_area, (counts.get(person.dept_area) ?? 0) + 1);
     return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([name]) => name);
   }, [people]);
   const stats = useMemo(() => {
-    const rows = new Map<string, { instructors: number; mentors: number; ops: number }>(ALL_PRODUCTS.map((name) => [name, { instructors: 0, mentors: 0, ops: 0 }]));
+    const rows = new Map<string, { instructors: number; mentors: number; ops: number }>(ALL_PRODUCTS.filter((name) => name !== 'Support').map((name) => [name, { instructors: 0, mentors: 0, ops: 0 }]));
     let instructorTotal = 0;
     let mentorTotal = 0;
     for (const person of people) {
