@@ -31,7 +31,7 @@
 import { eq } from "drizzle-orm";
 import { instructorArchiveTable, instructorsTable, instructorContributionTable, instructorTrainingStatusTable, darwinboxExitsTable, instructorManualJoiningTable } from "@workspace/db";
 import { sdb as db } from "./syncContext";
-import { normalize, toISODate } from "./reconcile";
+import { toISODate } from "./reconcile";
 import { isPinnedConfirmedInstructor } from "../data/classificationOverrides";
 
 type LiveRow = typeof instructorsTable.$inferSelect;
@@ -124,9 +124,8 @@ function findArchiveMatch(archived: ArchiveRow[], row: LiveRow): { match: Archiv
     const match = archived.find((item) => item.teachosUserId === row.teachosUserId);
     if (match) return { match, matchedBy: "teachos_user_id" };
   }
-  const normalized = normalize(row.fullName);
-  const match = archived.find((item) => normalize(item.fullName) === normalized);
-  return { match, matchedBy: match ? "name" : null };
+  // No name match (2026-11-09, per request: employee ID only) -- a person with neither ID is not linked to an archive entry.
+  return { match: undefined, matchedBy: null };
 }
 
 // Date of joining in the archive (2026-11-05, per request: "in the Instructor Archive also store the joining date of instructors").
