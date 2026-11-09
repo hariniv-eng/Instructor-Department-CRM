@@ -21,14 +21,13 @@ export const cell = (row: SheetRow, ...keys: string[]) => {
 
 export const normalize = (value: string) => value.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^\p{L}\p{N}\s]/gu, "").replace(/\s+/g, " ").trim();
 
-export const findMatch = (rows: Array<typeof instructorsTable.$inferSelect>, name: string | null, employeeId?: string | null) => {
-  if (employeeId) {
-    const employee = rows.find((item) => item.employeeId === employeeId);
-    if (employee) return employee;
-  }
-  if (!name) return undefined;
-  const normalized = normalize(name);
-  return rows.find((item) => normalize(item.fullName) === normalized) ?? rows.find((item) => normalize(item.fullName).replaceAll(" ", "") === normalized.replaceAll(" ", ""));
+// EMPLOYEE ID ONLY (2026-11-09, per request: "whenever we map any instructor or get data, map it using employee ID only"). The
+// full-name fallback is removed: it linked a TeachOS instructor to a different Darwin employee with the same name (NW2000452 got a
+// Business Development Associate's Darwin details and exit record). No ID -> no match; `name` is kept only so callers don't change.
+export const findMatch = (rows: Array<typeof instructorsTable.$inferSelect>, _name: string | null, employeeId?: string | null) => {
+  if (!employeeId) return undefined;
+  const id = employeeId.trim().toUpperCase();
+  return rows.find((item) => (item.employeeId ?? "").trim().toUpperCase() === id);
 };
 
 // --- TeachOS instructor-count classification -------------------------------
@@ -530,7 +529,8 @@ export async function reconcileTeachos(rows: SheetRow[]) {
     // employee_id inline.
     const rowEmployeeId = cell(item, "Employee Id", "employee_id");
     const bridgedEmployeeId = teachosUserId ? bridgeByTeachosId.get(teachosUserId) : undefined;
-    const match = findMatch(people, fullName, rowEmployeeId ?? bridgedEmployeeId);
+    // TeachOS account first (2026-11-09), then employee ID -- never the name.
+    const match = (teachosUserId ? people.find((p) => p.teachosUserId === teachosUserId) : undefined) ?? findMatch(people, fullName, rowEmployeeId ?? bridgedEmployeeId);
     const institute = cell(item, "institute_name", "Institute Name");
     const values = {
       teachosUserId: cell(item, "instructor_user_id", "TeachOS User Id"),
@@ -669,15 +669,9 @@ export async function reconcileDarwinFullRosterFallback(fullRosterRows: SheetRow
   await db.update(instructorsTable).set({ inDarwinFullRoster: false });
 
   const byEmployeeId = new Map<string, SheetRow>();
-  const byName = new Map<string, SheetRow>();
   for (const row of fullRosterRows) {
     const employeeId = cell(row, "Employee Id", "employee_id");
-    const fullName = cell(row, "Full Name", "full_name");
     if (employeeId && !byEmployeeId.has(employeeId)) byEmployeeId.set(employeeId, row);
-    if (fullName) {
-      const key = normalize(fullName);
-      if (!byName.has(key)) byName.set(key, row);
-    }
   }
 
   const candidates = await db
@@ -697,7 +691,8 @@ export async function reconcileDarwinFullRosterFallback(fullRosterRows: SheetRow
 
   let matchedCount = 0;
   for (const person of candidates) {
-    const match = (person.employeeId && byEmployeeId.get(person.employeeId)) || byName.get(normalize(person.fullName));
+    // Employee ID only (2026-11-09) -- the full-name lookup is removed.
+    const match = person.employeeId ? byEmployeeId.get(person.employeeId) : undefined;
     if (!match) continue;
 
     const employeeId = cell(match, "Employee Id", "employee_id");
@@ -744,7 +739,8 @@ export async function reconcileDarwinFullRosterFallback(fullRosterRows: SheetRow
     const employeeId = cell(match, "Employee Id", "employee_id");
     const fullName = cell(match, "Full Name", "full_name");
     if (!fullName) continue;
-    const existing = (employeeId ? everyone.find((p) => p.employeeId === employeeId) : undefined) ?? everyone.find((p) => normalize(p.fullName) === normalize(fullName));
+    if (!employeeId) continue; // employee ID only (2026-11-09)
+    const existing = everyone.find((p) => p.employeeId === employeeId);
     if (existing && existing.inDarwin) continue;
     // Same employee_id guard as above: never hand this ID to a row when another row already has it.
     if (employeeId && existing && existing.employeeId !== employeeId && everyone.some((p) => p.id !== existing.id && p.employeeId === employeeId)) continue;
@@ -814,7 +810,6 @@ export async function reconcileTeachosEmployeeIdReference(rows: SheetRow[]) {
   let conflictCount = 0;
   const people = await db.select().from(instructorsTable).where(eq(instructorsTable.inTeachos, true));
   const byTeachosId = new Map(people.filter((p) => p.teachosUserId).map((p) => [p.teachosUserId as string, p]));
-  const byName = new Map(people.map((p) => [normalize(p.fullName), p]));
   for (const item of rows) {
     const teachosUserId = cell(item, "Instructor User Id", "instructor_user_id");
     const employeeId = cell(item, "Employee Id", "employee_id");
@@ -832,7 +827,7 @@ export async function reconcileTeachosEmployeeIdReference(rows: SheetRow[]) {
         .values({ instructorUserId: teachosUserId, employeeId, fullName })
         .onConflictDoUpdate({ target: teachosIdReferenceTable.instructorUserId, set: { employeeId, fullName, syncedAt: new Date() } });
     }
-    const match = (teachosUserId && byTeachosId.get(teachosUserId)) || (fullName ? byName.get(normalize(fullName)) : undefined);
+    const match = teachosUserId ? byTeachosId.get(teachosUserId) : undefined; // TeachOS user id only (2026-11-09) -- no name match
     if (!match) {
       unmatchedCount += 1;
       continue;
