@@ -639,18 +639,18 @@ function ExitKpiCard({ exitCandidates }: { exitCandidates: InstructorSummary[] }
   }, [exitCandidates, approved]);
   // Three clearly separate lists in the pop-up (2026-10-10, per request): actual exits (approved), upcoming exits that
   // are Exited / Absconded and waiting for approval, and upcoming exits who are serving their notice period.
-  type ExitRowView = { key: string; name: string; employeeId: string | null; subject: string | null; manager: string | null; markedAs: string; approval: string; date: string | null; dateIsRaised: boolean };
+  type ExitRowView = { key: string; name: string; employeeId: string | null; subject: string | null; manager: string | null; deployed: string; markedAs: string; approval: string; date: string | null; dateIsRaised: boolean };
   const byDateDesc = (x: ExitRowView, y: ExitRowView) => (y.date ?? '').localeCompare(x.date ?? '') || x.name.localeCompare(y.name);
-  const fromPerson = (person: InstructorSummary): ExitRowView => ({ key: `u${person.id}`, name: person.full_name, employeeId: person.employee_id ?? null, subject: person.dept_area ?? null, manager: person.capability_manager ?? null, markedAs: REVIEW_LABELS[person.exit_verification ?? ''] ?? (person.exit_verification ?? '—'), approval: person.exit_flag_status ?? 'Pending', date: person.date_of_exit ?? person.exit_flag_date ?? null, dateIsRaised: !person.date_of_exit && !!person.exit_flag_date });
-  const exitRows = useMemo<ExitRowView[]>(() => approved.map((row) => ({ key: `a${row.id}`, name: row.full_name, employeeId: row.employee_id, subject: row.dept_area, manager: row.capability_manager, markedAs: 'Exited', approval: 'Approved', date: row.date_of_exit ?? row.exit_date, dateIsRaised: !row.date_of_exit && !!row.exit_date })).sort(byDateDesc), [approved]);
+  const fromPerson = (person: InstructorSummary): ExitRowView => ({ key: `u${person.id}`, name: person.full_name, employeeId: person.employee_id ?? null, subject: person.dept_area ?? null, manager: person.capability_manager ?? null, deployed: productLabel(person) === 'NIAT (Training)' ? 'Training' : 'Deployed', markedAs: REVIEW_LABELS[person.exit_verification ?? ''] ?? (person.exit_verification ?? '—'), approval: person.exit_flag_status ?? 'Pending', date: person.date_of_exit ?? person.exit_flag_date ?? null, dateIsRaised: !person.date_of_exit && !!person.exit_flag_date });
+  const exitRows = useMemo<ExitRowView[]>(() => approved.map((row) => ({ key: `a${row.id}`, name: row.full_name, employeeId: row.employee_id, subject: row.dept_area, manager: row.capability_manager, deployed: row.deployed_or_training ?? '—', markedAs: 'Exited', approval: 'Approved', date: row.date_of_exit ?? row.exit_date, dateIsRaised: !row.date_of_exit && !!row.exit_date })).sort(byDateDesc), [approved]);
   const pendingExitRows = useMemo<ExitRowView[]>(() => upcoming.filter((person) => person.exit_verification !== 'serving_notice_period').map(fromPerson).sort(byDateDesc), [upcoming]);
   const noticeRows = useMemo<ExitRowView[]>(() => upcoming.filter((person) => person.exit_verification === 'serving_notice_period').map(fromPerson).sort(byDateDesc), [upcoming]);
   const value = archiveQuery.isLoading ? '…' : archiveQuery.isError ? '—' : approved.length.toLocaleString('en-IN');
   const downloadExitLists = () => {
     const lists: [string, ExitRowView[]][] = [['Exit (approved)', exitRows], ['Upcoming -- Exited / Absconded, pending approval', pendingExitRows], ['Upcoming -- serving notice period', noticeRows]];
     downloadCsv(`exit-data-${new Date().toISOString().slice(0, 10)}.csv`, toCsv(
-      ['List', 'Name', 'Employee ID', 'Subject', 'Capability Manager', 'Marked as', 'Approval', 'Date of exit', 'Date type'],
-      lists.flatMap(([list, rows]) => rows.map((row) => [list, row.name, row.employeeId ?? '', row.subject ?? '', row.manager ?? '', row.markedAs, row.approval, row.date ?? '', row.date ? (row.dateIsRaised ? 'Date the exit was raised' : 'Last working day') : ''])),
+      ['List', 'Name', 'Employee ID', 'Subject', 'Capability Manager', 'Deployed / Training', 'Marked as', 'Approval', 'Date of exit', 'Date type'],
+      lists.flatMap(([list, rows]) => rows.map((row) => [list, row.name, row.employeeId ?? '', row.subject ?? '', row.manager ?? '', row.deployed, row.markedAs, row.approval, row.date ?? '', row.date ? (row.dateIsRaised ? 'Date the exit was raised' : 'Last working day') : ''])),
     ));
   };
   const chip = (text: string, tone: 'amber' | 'blue') => <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${tone === 'amber' ? 'bg-[#fbeed3] text-[#8a5a0b]' : 'bg-[#e1eaf1] text-primary'}`}>{text}</span>;
@@ -711,7 +711,7 @@ function ExitKpiCard({ exitCandidates }: { exitCandidates: InstructorSummary[] }
             <div className="overflow-auto rounded-lg border border-border">
               <table className="w-full text-left text-[12px]">
                 <thead className="bg-secondary font-mono-ui text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
-                  <tr><th className="px-3 py-2">Name</th><th className="px-3 py-2">Employee ID</th><th className="px-3 py-2">Subject</th><th className="px-3 py-2">Capability Manager</th>{section.showMarked && <th className="px-3 py-2">Marked as</th>}{section.key !== 'exits' && <th className="px-3 py-2">Approval</th>}<th className="px-3 py-2">Date of exit</th></tr>
+                  <tr><th className="px-3 py-2">Name</th><th className="px-3 py-2">Employee ID</th><th className="px-3 py-2">Subject</th><th className="px-3 py-2">Capability Manager</th><th className="px-3 py-2">Deployed / Training</th>{section.showMarked && <th className="px-3 py-2">Marked as</th>}{section.key !== 'exits' && <th className="px-3 py-2">Approval</th>}<th className="px-3 py-2">Date of exit</th></tr>
                 </thead>
                 <tbody>
                   {section.rows.map((row) => <tr key={row.key} className="border-t border-border/70" data-testid={`exit-row-${row.key}`}>
@@ -719,6 +719,7 @@ function ExitKpiCard({ exitCandidates }: { exitCandidates: InstructorSummary[] }
                     <td className="px-3 py-2 font-mono-ui text-muted-foreground">{row.employeeId ?? '—'}</td>
                     <td className="px-3 py-2 text-muted-foreground">{row.subject ?? '—'}</td>
                     <td className="px-3 py-2 text-muted-foreground">{row.manager ?? '—'}</td>
+                    <td className="px-3 py-2" title={row.deployed === 'Deployed' ? 'Had sessions scheduled (first session in Contribution)' : 'Never had a session scheduled'}>{row.deployed}</td>
                     {section.showMarked && <td className="px-3 py-2">{chip(row.markedAs, 'amber')}</td>}
                     {section.key !== 'exits' && <td className="px-3 py-2">{chip(row.approval, 'amber')}</td>}
                     <td className="whitespace-nowrap px-3 py-2 text-muted-foreground" title={row.dateIsRaised ? 'Date the exit was raised (no date of exit on the record)' : undefined}>{row.date ? (row.dateIsRaised ? `Raised ${formatExitDate(row.date)}` : formatExitDate(row.date)) : '—'}</td>
@@ -826,7 +827,7 @@ function formatExitDate(value?: string | null) {
 // "Exited (archive)" view (2026-10-08, per request) comes from the Instructor Archive -- every archive row whose
 // status is Exited, i.e. the approved exit records, whether or not the person is still in TeachOS.
 type ExitRow = { id: string; full_name: string; employee_id: string | null; teachos_user_id: string | null; dept_area: string | null; capability_manager: string | null; is_payroll: boolean; date_of_exit: string | null; exit_flag_status: string | null; exit_flag_date: string | null };
-type ArchiveExitRow = { id: number; full_name: string; employee_id: string | null; teachos_user_id: string | null; dept_area: string | null; capability_manager: string | null; is_payroll: boolean; date_of_exit: string | null; exit_status: string | null; exit_date: string | null; status: 'Active' | 'Exited' | 'SNP' };
+type ArchiveExitRow = { deployed_or_training?: string; deployment_date?: string | null; id: number; full_name: string; employee_id: string | null; teachos_user_id: string | null; dept_area: string | null; capability_manager: string | null; is_payroll: boolean; date_of_exit: string | null; exit_status: string | null; exit_date: string | null; status: 'Active' | 'Exited' | 'SNP' };
 // Approved exits only (2026-10-08, per request: "no pending for approval"): the archive also marks people Exited
 // from a Pending With Approver record or a manually set exit date, so the Overview checks the exit record's own
 // status. Pending ones stay in Exception 3; people exited by a manual date only are in the Archive tab.

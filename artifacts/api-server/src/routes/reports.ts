@@ -1787,8 +1787,24 @@ router.get("/reports/instructor-contribution", requireAuth, requireRole("admin")
     console.warn("[contribution] last-30-day sessions not readable:", (err as Error).message);
   }
 
+  // In-training demos (2026-11-09, per request: "training demo data -- instructors' average QA report, in the Contribution tab"). Same data
+  // and rule as the Training - Demos tab's In-training demos column (every TRAINING_DEMO + regular DEMOs up to the deployment date), added
+  // up over all courses: number of demos, how many were under 10 minutes, and the average QA of the 10+ minute ones (and of all).
+  // All-time, not affected by the date filter.
+  const trainingDemoByUid = new Map<string, { demos: number; short: number; sumLong: number; scoredLong: number; sum: number; scored: number }>();
+  try {
+    for (const t of await db.select().from(instructorDemoCourseTable)) {
+      if (t.evaluationKind !== "demo_training") continue;
+      const a = trainingDemoByUid.get(t.instructorUserId) ?? { demos: 0, short: 0, sumLong: 0, scoredLong: 0, sum: 0, scored: 0 };
+      a.demos += t.demos; a.short += t.demosShort; a.sumLong += t.scoreSumLong; a.scoredLong += t.scoredLong; a.sum += t.scoreSum; a.scored += t.scored;
+      trainingDemoByUid.set(t.instructorUserId, a);
+    }
+  } catch (err) {
+    console.warn("[contribution] in-training demos not readable (run the database push):", (err as Error).message);
+  }
   const rows = people.map((p) => {
     const contribution = p.teachosUserId ? byInstructor.get(p.teachosUserId) : undefined;
+    const trainingDemo = p.teachosUserId ? trainingDemoByUid.get(p.teachosUserId) : undefined;
     const range = ranged && p.teachosUserId ? rangeByInstructor.get(p.teachosUserId) : undefined;
     const last30 = p.teachosUserId ? last30ByInstructor.get(p.teachosUserId) : undefined;
     const lectureMinutes = ranged ? (range?.lectureMinutes ?? 0) : (contribution?.lectureMinutes ?? 0);
@@ -1840,6 +1856,10 @@ router.get("/reports/instructor-contribution", requireAuth, requireRole("admin")
       date_of_joining: joining.date,
       date_of_joining_source: joining.source,
       training_days: trainingDays !== null && trainingDays >= 0 ? trainingDays : null,
+      training_demos: trainingDemo?.demos ?? 0,
+      training_demos_short: trainingDemo?.short ?? 0,
+      training_demo_avg: trainingDemo && trainingDemo.scoredLong > 0 ? Math.round((trainingDemo.sumLong / trainingDemo.scoredLong) * 10) / 10 : null,
+      training_demo_avg_all: trainingDemo && trainingDemo.scored > 0 ? Math.round((trainingDemo.sum / trainingDemo.scored) * 10) / 10 : null,
       experience_years: experienceDays !== null && experienceDays >= 0 ? Math.round((experienceDays / 365.25) * 10) / 10 : null,
       experience_until_exit: !!exitDay,
       classification: p.classification,
@@ -1963,9 +1983,21 @@ export async function loadArchivePeople() { // exported for _tmp_archive_vs_over
     }
   }
 
+  // Deployed or training (2026-11-09, per request: "for these exits I need to know if they were deployed or training instructors"):
+  // Deployed = they had a first session ever scheduled (Contribution's deployment date, kept for people who left); never had a session
+  // = Training. Their campus is not used -- someone who has left TeachOS has none any more.
+  const deployedByUid = new Map<string, string | null>();
+  try {
+    for (const c of await db.select({ uid: instructorContributionTable.instructorUserId, d: instructorContributionTable.deploymentDate }).from(instructorContributionTable)) deployedByUid.set(c.uid, c.d);
+  } catch (err) {
+    console.warn("[archive] deployment dates not readable:", (err as Error).message);
+  }
   const people = allRows
     .filter((r) => r.inArchiveScope && !NOT_DEPARTMENT_CLASSIFICATIONS.has(r.classification ?? ""))
-    .map((r) => toApiArchiveSummary(r, r.employeeId ? archiveExitByEmployee.get(r.employeeId) : undefined))
+    .map((r) => {
+      const deploymentDate = r.teachosUserId ? deployedByUid.get(r.teachosUserId) ?? null : null;
+      return { ...toApiArchiveSummary(r, r.employeeId ? archiveExitByEmployee.get(r.employeeId) : undefined), deployment_date: deploymentDate, deployed_or_training: deploymentDate ? "Deployed" : "Training" };
+    })
     .sort((a, b) => a.full_name.localeCompare(b.full_name));
   return people;
 }
