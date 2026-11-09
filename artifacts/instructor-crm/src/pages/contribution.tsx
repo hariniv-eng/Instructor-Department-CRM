@@ -41,6 +41,11 @@ type ContributionRow = {
   date_of_joining_source: 'darwin' | 'exit' | 'archive' | 'manual' | null;
   // Training Duration: whole days from the date of joining to the deployment date (first session ever scheduled).
   training_days: number | null;
+  // In-training demos (2026-11-09): same as the Training - Demos tab's In-training demos, over all courses. Average = 10+ minute demos.
+  training_demos: number;
+  training_demos_short: number;
+  training_demo_avg: number | null;
+  training_demo_avg_all: number | null;
   // Experience (2026-10-15, per request): years in the organization from the date of joining to today (or to the date of exit once the
   // person has one, experience_until_exit), one decimal. Null when there is no joining date.
   experience_years: number | null;
@@ -326,12 +331,13 @@ export default function ContributionPage() {
   // Download CSV (2026-10-15, per request): everything the current date range, subject filter and search match -- every page, not just the
   // one on screen -- with the same columns as the table. Hours and counts are plain numbers so they sum and sort in a spreadsheet.
   const downloadTable = () => {
-    const headers = ['Employee ID', 'Name', 'Role', 'Role (by sessions, last 30 days)', 'Department', 'Subject', 'Subject (from sessions, last 30 days)', 'Product', 'Capability Manager', 'Date of Joining', 'Date of Joining Source', 'Deployment Date', 'Training Duration (days)', 'Experience (years)', 'Lecture Hrs', 'Lecture Sessions', 'Practice Hrs', 'Practice Sessions', 'Other Hrs', 'Other Sessions', 'Total Hrs', 'Sessions', 'Session Days', 'Demo Hrs', 'Demo Evaluations', 'AI Assessment Hrs', 'AI Assessment Evaluations', 'Learning Hrs', 'Learning Days', 'Avg Sessions / Day', 'Avg Hrs / Day', 'Learning Hrs / Day', 'Avg Demo / AI Hrs', 'Workload', 'Contribution', 'All Batches', 'Batches (Last 30 Days)'];
+    const headers = ['Employee ID', 'Name', 'Role', 'Role (by sessions, last 30 days)', 'Department', 'Subject', 'Subject (from sessions, last 30 days)', 'Product', 'Capability Manager', 'Date of Joining', 'Date of Joining Source', 'Deployment Date', 'Training Duration (days)', 'In-training Demos', 'In-training Demos under 10 min', 'In-training Avg QA (10+ min)', 'In-training Avg QA (all)', 'Experience (years)', 'Lecture Hrs', 'Lecture Sessions', 'Practice Hrs', 'Practice Sessions', 'Other Hrs', 'Other Sessions', 'Total Hrs', 'Sessions', 'Session Days', 'Demo Hrs', 'Demo Evaluations', 'AI Assessment Hrs', 'AI Assessment Evaluations', 'Learning Hrs', 'Learning Days', 'Avg Sessions / Day', 'Avg Hrs / Day', 'Learning Hrs / Day', 'Avg Demo / AI Hrs', 'Workload', 'Contribution', 'All Batches', 'Batches (Last 30 Days)'];
     const rows = searchedRows.map((row) => {
       const has = row.has_contribution_data;
       return [
         row.employee_id, row.full_name, row.role, sessionRole(row), row.department, row.subject_area, sessionSubjectText(row), row.product, row.capability_manager,
-        row.date_of_joining, row.date_of_joining_source, row.deployment_date, row.training_days, row.experience_years,
+        row.date_of_joining, row.date_of_joining_source, row.deployment_date, row.training_days,
+        row.training_demos || '', row.training_demos ? row.training_demos_short : '', row.training_demo_avg ?? '', row.training_demo_avg_all ?? '', row.experience_years,
         has ? row.lecture_hours : '', has ? row.lecture_sessions : '', has ? row.practice_hours : '', has ? row.practice_sessions : '', has ? row.other_hours : '', has ? row.other_sessions : '', has ? row.total_hours : '', has ? row.sessions_completed : '', has ? row.session_days : '',
         row.demo_evaluations > 0 ? row.demo_hours : '', row.demo_evaluations > 0 ? row.demo_evaluations : '',
         row.ai_assessment_evaluations > 0 ? row.ai_assessment_hours : '', row.ai_assessment_evaluations > 0 ? row.ai_assessment_evaluations : '',
@@ -465,6 +471,7 @@ export default function ContributionPage() {
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Date of joining from Darwinbox">Date of Joining</th>
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Date of the first session ever scheduled for this instructor">Deployment Date</th>
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Whole days from the date of joining to the deployment date (first session taken)">Training Duration</th>
+                <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="In-training demos (training demos + demos before the deployment date): average QA of the demos of 10 minutes or more, out of 10, with the number of demos. Same as the Training - Demos tab.">Training Demo QA</th>
                 <th className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Years in the organization: from the date of joining to today, or to the date of exit once the person has one">Experience</th>
                 <th className="whitespace-nowrap border-l border-border px-4 py-3 text-right font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Hours, with the number of Lecture sessions in brackets">Lecture Hrs (sessions)</th>
                 <th className="whitespace-nowrap px-4 py-3 text-right font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground" title="Hours, with the number of Practice sessions in brackets">Practice Hrs (sessions)</th>
@@ -503,6 +510,10 @@ export default function ContributionPage() {
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-foreground" data-testid={`cell-date-of-joining-${row.employee_id ?? row.full_name}`}><JoiningDateCell row={row} onSaved={refresh} /></td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-foreground" data-testid={`cell-deployment-date-${row.employee_id ?? row.full_name}`}>{row.deployment_date ? formatDay(row.deployment_date) : <span className="text-muted-foreground">—</span>}</td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] font-semibold tabular-nums text-foreground" data-testid={`cell-training-duration-${row.employee_id ?? row.full_name}`} title={row.training_days !== null ? `About ${Math.round((row.training_days / 7) * 10) / 10} weeks` : 'Needs both a date of joining and a deployment date'}>{row.training_days !== null ? `${row.training_days} ${row.training_days === 1 ? 'day' : 'days'}` : <span className="font-normal text-muted-foreground">—</span>}</td>
+                <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] tabular-nums text-foreground" data-testid={`cell-training-demo-qa-${row.employee_id ?? row.full_name}`}
+                  title={row.training_demos ? `${row.training_demos} in-training demo${row.training_demos === 1 ? '' : 's'} · ${row.training_demos_short} under 10 minutes (not in the average) · average QA ${row.training_demo_avg ?? '—'}/10 (10+ min), ${row.training_demo_avg_all ?? '—'}/10 (all)` : 'No in-training demos'}>
+                  {row.training_demos ? <span><span className="font-bold">{row.training_demo_avg !== null ? `${row.training_demo_avg.toFixed(1)}/10` : '—'}</span> <span className="text-[10px] text-muted-foreground">({row.training_demos} demo{row.training_demos === 1 ? '' : 's'})</span></span> : <span className="text-muted-foreground">—</span>}
+                </td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] font-semibold tabular-nums text-foreground" data-testid={`cell-experience-${row.employee_id ?? row.full_name}`} title={row.experience_years !== null ? (row.experience_until_exit ? 'Joining date to date of exit' : 'Joining date to today') : 'Needs a date of joining'}>{row.experience_years !== null ? `${row.experience_years.toFixed(1)} yrs` : <span className="font-normal text-muted-foreground">—</span>}</td>
                 {row.has_contribution_data
                   ? <>
