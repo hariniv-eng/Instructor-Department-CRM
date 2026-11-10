@@ -111,6 +111,7 @@ export default function DashboardPage() {
     const seen = new Set<number>();
     return [...removePeople, ...noticePeople, ...pendingPeople]
       .filter((person) => !person.is_payroll && person.exit_verification !== 'payroll_converted' && ['exited', 'absconded', 'serving_notice_period'].includes(person.exit_verification ?? ''))
+      .filter((person) => productLabel(person) !== 'Support') // Operations team left out of the Exit data (2026-11-09)
       .filter((person) => (seen.has(person.id) ? false : (seen.add(person.id), true)));
   }, [removePeople, noticePeople, pendingPeople]);
   const removeCount = removePeople.length;
@@ -626,7 +627,8 @@ function ExitKpiCard({ exitCandidates }: { exitCandidates: InstructorSummary[] }
   });
   // Payroll candidates are never shown here (2026-10-09, per request) -- they are handled in the Exceptions.
   const approved = useMemo(() => (archiveQuery.data?.people ?? [])
-    .filter((row) => isApprovedExit(row) && !row.is_payroll)
+    // Support (Operations team) left out (2026-11-09, per request: "two support people are included in the 19") -- same as the Product mix.
+    .filter((row) => isApprovedExit(row) && !row.is_payroll && !SUPPORT_CLASSIFICATIONS.has(row.classification ?? ''))
     .sort((a, b) => (b.date_of_exit ?? '').localeCompare(a.date_of_exit ?? '') || a.full_name.localeCompare(b.full_name)), [archiveQuery.data]);
   // Upcoming exits (2026-10-10, per request): everyone a Capability Manager marked Exited, Absconded or Serving Notice
   // Period (payroll candidates excluded), even while the exit is still pending approval -- except people already
@@ -827,10 +829,12 @@ function formatExitDate(value?: string | null) {
 // "Exited (archive)" view (2026-10-08, per request) comes from the Instructor Archive -- every archive row whose
 // status is Exited, i.e. the approved exit records, whether or not the person is still in TeachOS.
 type ExitRow = { id: string; full_name: string; employee_id: string | null; teachos_user_id: string | null; dept_area: string | null; capability_manager: string | null; is_payroll: boolean; date_of_exit: string | null; exit_flag_status: string | null; exit_flag_date: string | null };
-type ArchiveExitRow = { deployed_or_training?: string; deployment_date?: string | null; id: number; full_name: string; employee_id: string | null; teachos_user_id: string | null; dept_area: string | null; capability_manager: string | null; is_payroll: boolean; date_of_exit: string | null; exit_status: string | null; exit_date: string | null; status: 'Active' | 'Exited' | 'SNP' };
+type ArchiveExitRow = { classification?: string | null; deployed_or_training?: string; deployment_date?: string | null; id: number; full_name: string; employee_id: string | null; teachos_user_id: string | null; dept_area: string | null; capability_manager: string | null; is_payroll: boolean; date_of_exit: string | null; exit_status: string | null; exit_date: string | null; status: 'Active' | 'Exited' | 'SNP' };
 // Approved exits only (2026-10-08, per request: "no pending for approval"): the archive also marks people Exited
 // from a Pending With Approver record or a manually set exit date, so the Overview checks the exit record's own
 // status. Pending ones stay in Exception 3; people exited by a manual date only are in the Archive tab.
+// Operations team (product Support) -- not instructors or mentors, so not in the Exit data (2026-11-09, per request).
+const SUPPORT_CLASSIFICATIONS = new Set(['excluded_ops_managers', 'instructor_ops']);
 const isApprovedExit = (row: ArchiveExitRow) => row.status === 'Exited' && (row.exit_status ?? '').trim().toLowerCase() === 'approved';
 const toExitRow = (p: InstructorSummary): ExitRow => ({ id: String(p.id), full_name: p.full_name, employee_id: p.employee_id ?? null, teachos_user_id: p.teachos_user_id ?? null, dept_area: p.dept_area ?? null, capability_manager: p.capability_manager ?? null, is_payroll: !!p.is_payroll, date_of_exit: p.date_of_exit ?? null, exit_flag_status: p.exit_flag_status ?? null, exit_flag_date: p.exit_flag_date ?? null });
 

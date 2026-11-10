@@ -24,7 +24,7 @@ async function main() {
   console.log(`\n${month}: exits whose Date of Exit OR raised date is in this month: ${inMonth.length}`);
   console.log(`   Deployed ${inMonth.filter((p) => p.deployed_or_training === "Deployed").length} | Training ${inMonth.filter((p) => p.deployed_or_training === "Training").length}`);
   for (const p of inMonth.sort((a, b) => String(a.date_of_exit ?? "").localeCompare(String(b.date_of_exit ?? ""))))
-    console.log(`  ${p.employee_id ?? "(no id)"} | Date of Exit ${p.date_of_exit ?? "-"} | raised ${p.exit_date ?? "-"} | ${String(p.date_of_exit ?? "").startsWith(month) ? "LWD in month" : "raised in month only"} | ${p.deployed_or_training ?? "-"}${p.deployment_date ? ` (first session ${p.deployment_date})` : ""}`);
+    console.log(`  ${p.employee_id ?? "(no id)"} | Date of Exit ${p.date_of_exit ?? "-"} | raised ${p.exit_date ?? "-"} | ${String(p.date_of_exit ?? "").startsWith(month) ? "LWD in month" : "raised in month only"} | ${["excluded_ops_managers", "instructor_ops"].includes(String(p.classification ?? "")) ? "SUPPORT (Operations team)" : p.deployed_or_training ?? "-"}${p.deployment_date ? ` (first session ${p.deployment_date})` : ""}`);
   process.exit(0);
 }
 main().catch((e) => { console.error(e); process.exit(1); });
