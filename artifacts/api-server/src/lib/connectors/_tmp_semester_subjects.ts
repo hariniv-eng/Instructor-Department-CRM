@@ -35,7 +35,7 @@ async function main() {
   const contrib = new Map((await db.select().from(instructorContributionTable)).map((c) => [c.instructorUserId, c]));
 
   type Cnt = { s1: number; s3: number; both: number };
-  const byMain = new Map<string, Cnt>(), every = new Map<string, Cnt>();
+  const main = new Map<string, Cnt>(), every = new Map<string, Cnt>();
   const add = (m: Map<string, Cnt>, k: string, s1: boolean, s3: boolean) => {
     const c = m.get(k) ?? { s1: 0, s3: 0, both: 0 };
     if (s1) c.s1++; if (s3) c.s3++; if (s1 && s3) c.both++;
@@ -49,7 +49,7 @@ async function main() {
     if (!s1 && !s3) continue;
     if (s1) s1Total++; if (s3) s3Total++; if (s1 && s3) bothTotal++;
     const subj = subjectsOf((c?.sessionSubjects ?? {}) as Record<string, number>);
-    add(byMain, subj.label, s1, s3);
+    add(main, subj.label, s1, s3);
     for (const k of subj.list) add(every, k, s1, s3);
     if (subj.list.length > 1) multi++;
   }
@@ -60,7 +60,7 @@ async function main() {
   };
   console.log(`Population: NIAT (Deployed) ${instructorsOnly ? "instructors only" : "instructors + mentors"} teaching semester 1 or 3`);
   console.log(`Semester 1: ${s1Total} | Semester 3: ${s3Total} | in both: ${bothTotal} | different people: ${s1Total + s3Total - bothTotal}`);
-  print("1. By MAIN subject (each person once -- columns add up to the totals above):", byMain);
+  print("1. By MAIN subject (each person once -- columns add up to the totals above):", main);
   print(`2. By EVERY subject they teach (${multi} people teach more than one subject, so they appear in more than one row):`, every);
   process.exit(0);
 }
