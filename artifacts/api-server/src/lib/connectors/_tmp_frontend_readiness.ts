@@ -60,6 +60,7 @@ async function main() {
     const lectures = LECTURE_COURSES.find((x) => x.key === c.key)?.lectures.length ?? 0;
     let lp85 = 0, lp50 = 0, lpLow = 0, lpNone = 0, dAny = 0, aAny = 0, t100 = 0, t50 = 0, tAny = 0, dSum = 0, dScored = 0, aSum = 0, aScored = 0;
     const dPct: number[] = [], aPct: number[] = [], tDone: number[] = [];
+    let dTotal = 0, aTotal = 0;
     for (const p of fe) {
       const uid = p.teachosUserId!, k = `${uid}|${c.key}`;
       const l = lp.get(k);
@@ -67,13 +68,14 @@ async function main() {
       const d = demo.get(k), a = ai.get(k), t = taught.get(`${uid}|lecture:${c.key}`);
       dPct.push(pct(d?.covered ?? 0, lectures)); aPct.push(pct(a?.covered ?? 0, lectures));
       if (d?.covered) dAny++; if (a?.covered) aAny++;
-      if (d) { dSum += d.sum; dScored += d.scored; } if (a) { aSum += a.sum; aScored += a.scored; }
+      if (d) { dSum += d.sum; dScored += d.scored; dTotal += d.n; } if (a) { aSum += a.sum; aScored += a.scored; aTotal += a.n; }
       const done = t?.done ?? 0; tDone.push(done);
-      const tv = pct(done, t?.total || lectures); if (done) tAny++; if (tv >= 100) t100++; else if (tv >= 50) t50++;
+      const tv = pct(done, t?.total || lectures); if (done) tAny++; if (tv >= 85) t100++; else if (tv >= 50) t50++; // 2026-11-10: "taught 85% is complete" -- t100 now = 85%+
     }
+    console.log(`  demos (10+ min): ${dTotal} in total by ${dAny} instructors = ${dAny ? (dTotal / dAny).toFixed(1) : "-"} each | AI assessments: ${aTotal} in total by ${aAny} = ${aAny ? (aTotal / aAny).toFixed(1) : "-"} each`);
     console.log(`${c.sem} | ${c.name} | ${label} ${group.length} | ${lectures} | ${lp85} | ${lp50} | ${lpLow} (${lpNone}) | ${dAny} | ${avg(dPct)} | ${dScored ? (dSum / dScored).toFixed(1) : "-"} | ${aAny} | ${avg(aPct)} | ${aScored ? (aSum / aScored).toFixed(1) : "-"} | ${t100} | ${t50} | ${tAny} | ${avg(tDone)} of ${lectures}`);
   }
-  console.log("semester | course | instructors | lectures | portal 85%+ | portal 50-84% | portal below 50% (no data) | demoed (any) | demo lectures avg % | demo QA /10 | AI assessed (any) | AI lectures avg % | AI score /10 | taught 100% | taught 50-99% | taught any | lectures taught avg (of total)");
+  console.log("semester | course | instructors | lectures | portal 85%+ | portal 50-84% | portal below 50% (no data) | demoed (any) | demo lectures avg % | demo QA /10 | AI assessed (any) | AI lectures avg % | AI score /10 | taught 85%+ | taught 50-84% | taught any | lectures taught avg (of total)");
   console.log("A. CURRENT Frontend instructors (all of them, every course):");
   for (const c of COURSES) report(fe, c, "current Frontend");
   // B (2026-11-10, per request: "React -- for the instructors who have taught React, e.g. to cohort 2025 last semester"): per course, the
