@@ -91,7 +91,7 @@ async function main() {
       const courses = SEMESTERS[sem][s];
       if (!courses.length) { console.log(`${s} | ${group2.length} | no ${s} course in semester ${sem}`); continue; }
       const lpPct: number[] = [], demoPct: number[] = [], aiPct: number[] = [], taughtPct: number[] = [];
-      let lp50 = 0, lpBelow = 0, t75 = 0, t50 = 0, tBelow = 0;
+      let lp50 = 0, lpBelow = 0, t75 = 0, t50 = 0, tBelow = 0, t100 = 0, t50to99 = 0;
       let lp85 = 0, lpNone = 0, demoAny = 0, aiAny = 0, taught85 = 0, dSum = 0, dScored = 0, aSum = 0, aScored = 0;
       const lectures = courses.reduce((n, x) => n + lectureTotal(x.lecture), 0);
       for (const p of group2) {
@@ -109,15 +109,15 @@ async function main() {
             if (t) { td += t.done; tt += t.total; }
           }
           demoPct.push(pct(dc, lectures)); aiPct.push(pct(ac, lectures)); if (dc) demoAny++; if (ac) aiAny++;
-          const tv = pct(td, tt || lectures); taughtPct.push(tv); if (tv >= 85) taught85++; if (tv >= 75) t75++; else if (tv >= 50) t50++; else tBelow++;
+          const tv = pct(td, tt || lectures); taughtPct.push(tv); if (tv >= 85) taught85++; if (tv >= 75) t75++; else if (tv >= 50) t50++; else tBelow++; if (tv >= 100) t100++; else if (tv >= 50) t50to99++;
         }
       }
       const f = (v: number | null) => (v === null ? "-" : String(v));
       console.log(`${s} | ${group2.length} | ${f(mean(lpPct))} | ${lp85} | ${lpNone} | ${lectures ? demoAny : "-"} | ${lectures ? f(mean(demoPct)) : "-"} | ${dScored ? (dSum / dScored).toFixed(1) : "-"} | ${lectures ? aiAny : "-"} | ${lectures ? f(mean(aiPct)) : "-"} | ${aScored ? (aSum / aScored).toFixed(1) : "-"} | ${lectures ? f(mean(taughtPct)) : "-"} | ${lectures ? taught85 : "-"}`);
       other.push(group2.length);
-      simple.push(`${s} | ${group2.length} | ${lp85} | ${lp50} | ${lpBelow} | ${lectures ? f(mean(taughtPct)) : "-"} | ${lectures ? t75 : "-"} | ${lectures ? t50 : "-"} | ${lectures ? tBelow : "-"}`);
+      simple.push(`${s} | ${group2.length} | ${lp85} | ${lp50} | ${lpBelow} | ${lectures ? t100 : "-"} | ${lectures ? t50to99 : "-"}`);
     }
-    console.log("\nSIMPLE TABLE: subject | instructors | portal READY (85%+) | portal 50-84% | portal below 50% or no data | taught avg % of course | taught 75%+ | taught 50-74% | taught below 50%");
+    console.log("\nSIMPLE TABLE: subject | instructors | portal READY (85%+) | portal 50-84% | portal below 50% or no data | taught 100% of the course (n) | taught 50-99% (n)");
     for (const line of simple) console.log(line);
     const noSubject = people.filter((p) => !subjectsOf(cohortSubjects.get(p.teachosUserId!)?.get(cohort) ?? {}).some((s) => SUBJECTS.includes(s))).length;
     console.log(`(instructors with none of these 7 subjects WITH THIS COHORT -- other university courses / no lecture-practice sessions: ${noSubject}; people teaching 2 subjects count in both rows)`);
