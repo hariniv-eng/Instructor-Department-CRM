@@ -139,7 +139,9 @@ export function toISODate(value: string | null): string | null {
 // look-alike headers (Last Working Day, LWD, ...) and returned the request date
 // for pending resignations -- never "Exit Date" or any other fallback.
 function lastWorkingDateOf(rawData: Record<string, unknown>): string | null {
-  return cell(rawData, "Date Of Exit", "date_of_exit");
+  // "Lwd As Per Notice Period" as a backup (2026-11-09, per request: "if they have exited they surely have a date of exit"): Darwin's
+  // last working day by the notice period, filled on most exit records; used only when "Date Of Exit" is empty.
+  return cell(rawData, "Date Of Exit", "date_of_exit") ?? cell(rawData, "Lwd As Per Notice Period");
 }
 
 // Builds a lookup of the single most-recent exit record per person, by

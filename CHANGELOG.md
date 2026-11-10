@@ -22,7 +22,15 @@ Commit messages stay short (title + 2-3 lines); this file is the detailed record
 | What the Instructor Archive stores (joining date, gender, subject ...) | `artifacts/api-server/src/lib/archiveInstructors.ts` |
 | One-off read-only checks | `artifacts/api-server/src/lib/connectors/_tmp_*.ts` |
 
+## 2026-11-10
+- **New Capability Manager: Pasupuleti Sai Krishna Chakradhar (NW0007993)** -- added to the list of valid Capability Managers. Instructors whose TeachOS manager entry has his full name get him at the next sync, and he can be picked as a manual Capability Manager. If TeachOS records him under a shorter name, an alias is needed.
+  File: `artifacts/api-server/src/data/validCapabilityManagers.ts`. After pull: Publish, then Sync Now.
+
 ## 2026-11-09
+- **Exit data: Support (Operations team) left out** (per request: two support people were among the 19 October exits) -- the Overview Exit data count, its pop-up lists and CSV no longer include the Operations team (classification excluded_ops_managers / instructor_ops; product Support), same as the Product mix. `_tmp_exits_by_month.ts` labels them SUPPORT.
+  File: `artifacts/instructor-crm/src/pages/dashboard.tsx` (`ExitKpiCard`, `exitCandidates`). After pull: Publish.
+- **Date of exit: backup field** -- when a Darwin exit record has no "Date Of Exit", FCC now uses "Lwd As Per Notice Period" (filled on ~2,270 of 4,089 records). Checked: the 11 approved exits that show "Raised ..." (NW2000681, NW2000729, NW2000598, NW2000614, NW2000763, NW2000736, NW2000431, NW2000696, NW2000747, NW2000757, NW2000764) have ONLY "Exit Date" on their record and are not in Darwin's full roster -- Darwin sends no last working day for them anywhere.
+  Files: `artifacts/api-server/src/lib/reconcile.ts` (`lastWorkingDateOf`), `routes/reports.ts` (archive Date of Exit). After pull: Publish, then Sync Now (exits).
 - **Exit data: Deployed / Training column** (per request) -- the Overview Exit data pop-up (and its CSV) shows whether each person was Deployed or Training. For exits (archive): Deployed = they ever had a session scheduled (Contribution's deployment date), else Training -- the campus is not used, since people who left have none. For upcoming exits (still active): from their product. The Instructor Archive API now also returns `deployment_date` and `deployed_or_training`.
   Files: `artifacts/api-server/src/routes/reports.ts` (`loadArchivePeople`), `artifacts/instructor-crm/src/pages/dashboard.tsx` (`ExitKpiCard`). Also read-only `_tmp_exits_by_month.ts` (now shows Deployed / Training) and `_tmp_exit_date_fields.ts` (looks for the last working day under other field names). After pull: Publish.
 - **Contribution tab: Training Demo QA column** (per request) -- after Training Duration: the average QA (out of 10) of the person's in-training demos of 10 minutes or more, with the number of demos; hover shows how many were under 10 minutes and the average of all. Same data as the Training - Demos tab's In-training demos (training demos + demos up to the deployment date), all courses together, all-time. CSV adds In-training Demos, under 10 min, Avg QA (10+ min), Avg QA (all).

@@ -45,6 +45,7 @@ export const VALID_CAPABILITY_MANAGERS: string[] = [
   "Kushal Kumar Terli",
   "Meka Sri Satya Prudhvi Charan",
   "Nunna Naga Venkata Dasaradhi",
+  "Pasupuleti Sai Krishna Chakradhar", // NW0007993, added 2026-11-10 (per request: new Capability Manager)
   "Penumarthi Satya Syamala",
   "Pradeep Jat",
   "Preethi Vangaveti",
