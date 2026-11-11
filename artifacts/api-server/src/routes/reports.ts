@@ -1975,7 +1975,7 @@ export async function loadArchivePeople() { // exported for _tmp_archive_vs_over
     if (!exit.employeeId) continue;
     const status = (cell(exit.rawData, "Status", "status") ?? "").trim();
     const iso = toISODate(cell(exit.rawData, "Exit Date", "exit_date"));
-    const seen: Seen = { rank: iso ? parseLooseDate(iso) : -Infinity, id: exit.id, status, iso, lwd: toISODate(cell(exit.rawData, "Date Of Exit", "date_of_exit") ?? cell(exit.rawData, "Lwd As Per Notice Period")) }; // backup field, 2026-11-09
+    const seen: Seen = { rank: iso ? parseLooseDate(iso) : -Infinity, id: exit.id, status, iso, lwd: toISODate(cell(exit.rawData, "Date Of Exit", "date_of_exit")) }; // only "Date Of Exit" (2026-11-11: Lwd backup removed)
     if (newer(seen, latestByEmployee.get(exit.employeeId))) latestByEmployee.set(exit.employeeId, seen);
     if (seen.lwd && !["revoked", "rejected"].includes(status.toLowerCase()) && newer(seen, lwdFallbackByEmployee.get(exit.employeeId))) lwdFallbackByEmployee.set(exit.employeeId, seen);
     if (status.toLowerCase() === "approved" && iso && newer(seen, approvedByEmployee.get(exit.employeeId))) approvedByEmployee.set(exit.employeeId, seen);
