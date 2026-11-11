@@ -378,7 +378,9 @@ export const recomputeStatuses = async (options: { grantTeachosOnlyScope?: boole
     // date of exit has passed the present date, then it should be marked Exited automatically and moved to remove access in TeachOS").
     // Date of exit = the Darwin exit record's "Date Of Exit" (last working day); for a payroll-converted person, the date typed in by
     // hand. Passed = before today (IST), so the person moves the day after their last working day. Nothing else is ever changed.
-    const dateOfExit = row.manualExitDate ?? (classification === "payroll_converted" ? null : toISODate(exit?.lastWorkingDate ?? null)); // typed date wins (2026-11-11)
+    // Typed date wins; otherwise Darwin's last working day -- for a payroll person too, since they are marked Serving Notice Period here
+    // (2026-11-11, per request: approved SNP people with a Darwin date were never moved on).
+    const dateOfExit = row.manualExitDate ?? toISODate(exit?.lastWorkingDate ?? null);
     const snpEnded = row.exitVerification === "serving_notice_period" && !!dateOfExit && dateOfExit < todayIst;
     if (snpEnded) autoExited.push(`${row.employeeId ?? `row ${row.id}`}: serving_notice_period -> exited by the SYNC (date of exit ${dateOfExit} has passed)`);
     return db.update(instructorsTable).set({
