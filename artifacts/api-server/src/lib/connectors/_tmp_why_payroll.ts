@@ -15,7 +15,9 @@ const norm = (v: unknown) => String(v ?? "").toLowerCase().replace(/[^a-z]/g, ""
 async function main() {
   const q = process.argv.slice(2).filter((a) => a !== "--").join(" ").trim();
   if (!q) { console.log('usage: _tmp_why_payroll.ts "name"'); process.exit(1); }
-  const rows = await db.select().from(instructorsTable).where(sql`${instructorsTable.fullName} ILIKE ${"%" + q + "%"}`);
+  // An employee ID works too (2026-11-11): "NW0007056" searches the employee ID instead of the name.
+  const isId = /^NW\d{7}$/i.test(q);
+  const rows = await db.select().from(instructorsTable).where(isId ? sql`UPPER(TRIM(${instructorsTable.employeeId})) = ${q.toUpperCase()}` : sql`${instructorsTable.fullName} ILIKE ${"%" + q + "%"}`);
   console.log(`FCC rows matching "${q}": ${rows.length}`);
   const bq = new BigQuery({ projectId: config.BIGQUERY_PROJECT_ID, ...(config.BIGQUERY_CREDENTIALS_JSON ? { credentials: JSON.parse(config.BIGQUERY_CREDENTIALS_JSON) } : {}) });
   const T = `\`${config.BIGQUERY_PROJECT_ID}.${config.BIGQUERY_DATASET}.${process.env.NIAT_INSTRUCTOR_DETAILS_TABLE || "niat_instructor_details"}\``;
@@ -31,7 +33,7 @@ async function main() {
     const id = (r.employeeId ?? "").trim().toUpperCase();
     for (const [label, table] of [["Darwin active", darwinboxActiveTable], ["Darwin full roster", darwinboxFullRosterTable]] as const) {
       const byId = id ? await db.select().from(table).where(sql`UPPER(TRIM(${table.employeeId})) = ${id}`) : [];
-      const byName = (await db.select().from(table).where(sql`${table.fullName} ILIKE ${"%" + q + "%"}`)).filter((d) => !byId.some((b) => b.id === d.id));
+      const byName = (isId ? [] : await db.select().from(table).where(sql`${table.fullName} ILIKE ${"%" + q + "%"}`)).filter((d) => !byId.some((b) => b.id === d.id));
       for (const d of byId) { const raw = d.rawData as Record<string, unknown>; console.log(`   ${label}, SAME employee id: "${d.fullName}" | ${raw["Department"] ?? "-"} | ${raw["Designation"] ?? "-"} | ${raw["Employee Status"] ?? "-"}`); }
       for (const d of byName) { const raw = d.rawData as Record<string, unknown>; console.log(`   ${label}, similar NAME, employee id ${d.employeeId}: "${d.fullName}" | ${raw["Department"] ?? "-"} | ${raw["Designation"] ?? "-"} | ${raw["Employee Status"] ?? "-"} | same full name: ${norm(d.fullName) === norm(r.fullName) ? "yes" : "no"}`); }
       if (!byId.length && !byName.length) console.log(`   ${label}: nothing under this employee id or name`);

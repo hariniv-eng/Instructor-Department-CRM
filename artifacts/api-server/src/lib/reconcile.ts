@@ -5,12 +5,14 @@
 // behavior stays identical regardless of where the rows came from.
 
 import { and, eq } from "drizzle-orm";
-import { instructorsTable, darwinboxExitsTable, teachosIdReferenceTable, uploadsTable } from "@workspace/db";
+import { instructorsTable, darwinboxExitsTable, teachosIdReferenceTable, uploadsTable, darwinboxFullRosterTable, darwinboxActiveTable } from "@workspace/db";
 import { sdb as db, inSavepoint } from "./syncContext";
+import { NEEDS_REVIEW_TEACHOS_ONLY } from "../data/classificationOverrides";
 import { hasConfirmedInstructorDesignation, EXCLUDED_EMPLOYEES, type ExcludedOverride, OTHER_DEPARTMENT_EMPLOYEES, type OtherDepartmentOverride } from "../data/classificationOverrides";
 import { VALID_CAPABILITY_MANAGERS, CAPABILITY_MANAGER_ALIASES, CAPABILITY_MANAGER_BY_USER_ID } from "../data/validCapabilityManagers";
 import { classifyDepartment, classifyDeployment, subjectFromDesignation, subjectFromTeachosCategory } from "./departmentTaxonomy";
 import { archiveInstructors } from "./archiveInstructors";
+import { isIitKgpCampus } from "./product";
 
 export type SheetRow = Record<string, unknown>;
 
@@ -240,6 +242,17 @@ function findExit(row: InstructorRow, exits: { byEmployeeId: Map<string, ExitInf
 export const recomputeStatuses = async (options: { grantTeachosOnlyScope?: boolean } = {}) => {
   const rows = await db.select().from(instructorsTable);
   const exits = await loadLatestExitsByPerson();
+  // Darwin employees by employee ID, ACTIVE only (2026-11-11, per request: "if TeachOS gives an employee ID, check it in Darwin; if they
+  // are in Darwin but not in the Instructors department, file them as other department, not payroll"). Active only, so people who have
+  // left Darwin (payroll-converted instructors) are never caught by it.
+  const darwinActiveDept = new Map<string, string>();
+  for (const d of await db.select().from(darwinboxFullRosterTable)) {
+    const raw = d.rawData as Record<string, unknown>;
+    const status = String(raw["Employee Status"] ?? "Active").trim().toLowerCase();
+    if (d.employeeId && status === "active") darwinActiveDept.set(d.employeeId.trim().toUpperCase(), String(raw["Department"] ?? "another department"));
+  }
+  // Never for someone in the Instructors-department pull itself (they are instructors, whatever the link state).
+  for (const d of await db.select({ e: darwinboxActiveTable.employeeId }).from(darwinboxActiveTable)) if (d.e) darwinActiveDept.delete(d.e.trim().toUpperCase());
   // Serving notice period -> Exited (2026-11-09, per request): see snpEnded below. Logged after the loop.
   const todayIst = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
   const autoExited: string[] = [];
@@ -328,7 +341,9 @@ export const recomputeStatuses = async (options: { grantTeachosOnlyScope?: boole
     // instructor (Instructors – Gen AI) whose TeachOS institute is also "IIT
     // kharagpur". Per the 2026-09-16 request, that case (Darwin match + IIT
     // Kharagpur institute) should now count as a normal instructor instead.
-    const isIitKharagpurCampus = (row.institutes ?? []).some((institute) => /kharagpur/i.test(institute));
+    // 2026-11-11: also "IIT KGP" (e.g. "Nxtwave & IIT KGP OCN"), not only "Kharagpur" -- the same test as the IIT KGP product. Before, an
+    // IIT KGP campus person with no Darwin match was filed as payroll converted (ARUN MUNOLI).
+    const isIitKharagpurCampus = (row.institutes ?? []).some((institute) => /kharagpur/i.test(institute) || isIitKgpCampus(institute));
 
     let classification: string | null = null;
     let classificationReason: string | null = null;
@@ -354,6 +369,16 @@ export const recomputeStatuses = async (options: { grantTeachosOnlyScope?: boole
       classification = "instructor_ops";
       classificationReason = "Instructors department, but designation isn't an Instructor or Mentor role — tracked as Instructor Team Operations, not counted as an instructor";
       computedStatus = "instructor_ops";
+    } else if (isTeachosOnlyLeftover && NEEDS_REVIEW_TEACHOS_ONLY.some((n) => (n.teachosUserId && n.teachosUserId === row.teachosUserId) || (n.employeeId && n.employeeId === row.employeeId))) {
+      // Exception list (2026-11-11): known not to be payroll, not settled -- needs review, not payroll converted.
+      classification = null;
+      classificationReason = NEEDS_REVIEW_TEACHOS_ONLY.find((n) => (n.teachosUserId && n.teachosUserId === row.teachosUserId) || (n.employeeId && n.employeeId === row.employeeId))!.reason;
+      computedStatus = "needs_review";
+    } else if (isTeachosOnlyLeftover && row.employeeId && darwinActiveDept.has(row.employeeId.trim().toUpperCase())) {
+      // In TeachOS, and Darwin has this employee ID as an active employee outside the Instructors department (2026-11-11, per request).
+      classification = "excluded_other_department";
+      classificationReason = `In TeachOS; Darwin has employee ID ${row.employeeId} as an active employee in ${darwinActiveDept.get(row.employeeId.trim().toUpperCase())} -- not the Instructors department, so other department (not payroll converted)`;
+      computedStatus = "excluded";
     } else if (isTeachosOnlyLeftover && exit) {
       classification = "payroll_converted";
       classificationReason = `No Darwin record anywhere (primary Instructors department or full 3,000+ roster) — payroll-converted, with a Darwin exit record also on file (status: ${exit.status ?? "unknown"}), combined into the Payroll bucket (2026-09-04).`;
