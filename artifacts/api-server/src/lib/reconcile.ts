@@ -140,9 +140,10 @@ export function toISODate(value: string | null): string | null {
 // look-alike headers (Last Working Day, LWD, ...) and returned the request date
 // for pending resignations -- never "Exit Date" or any other fallback.
 function lastWorkingDateOf(rawData: Record<string, unknown>): string | null {
-  // "Lwd As Per Notice Period" as a backup (2026-11-09, per request: "if they have exited they surely have a date of exit"): Darwin's
-  // last working day by the notice period, filled on most exit records; used only when "Date Of Exit" is empty.
-  return cell(rawData, "Date Of Exit", "date_of_exit") ?? cell(rawData, "Lwd As Per Notice Period");
+  // ONLY Darwin's "Date Of Exit" (2026-11-11, per request). The "Lwd As Per Notice Period" backup added on 2026-11-09 is removed: it
+  // is a projected date that Darwin fills even while the exit is still Pending With Approver, so pending people got a date of exit
+  // and landed on the Remove access list. No date of exit in the exit data = no date of exit anywhere (a date typed in FCC still wins).
+  return cell(rawData, "Date Of Exit", "date_of_exit");
 }
 
 // Builds a lookup of the single most-recent exit record per person, by
