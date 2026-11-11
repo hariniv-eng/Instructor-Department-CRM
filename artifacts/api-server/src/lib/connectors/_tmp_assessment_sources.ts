@@ -26,13 +26,22 @@ async function main() {
     catch (e) { console.log(`  READ ${ref}: FAILED -- ${(e as Error).message.slice(0, 150)}`); }
   };
 
+  // Follow the chain of views (2026-11-11: the table is a view on another dataset's table of the same name), up to 4 levels: describe
+  // each table, read-test it, and go on to every table its SQL mentions (any quoting: `p.d.t`, `p`.`d`.`t`, `d.t`, `d`.`t`).
   const ds = config.BIGQUERY_DATASET!;
-  const main1 = await describe(ds, "z_niat_tech_instrctor_trainee_exam_best_scores_details");
-  // Every table the view's SQL mentions, then the config table by name in every dataset.
-  const sqlText = String(main1?.view?.query ?? "");
-  const refs = new Set([...sqlText.matchAll(/`([\w-]+\.[\w-]+\.[\w-]+)`|`([\w-]+\.[\w-]+)`/g)].map((m) => m[1] ?? `${P}.${m[2]}`));
-  console.log(`\nTables the view reads: ${refs.size ? [...refs].join(", ") : "(none found / not a view)"}`);
-  for (const ref of refs) await canRead(ref);
+  const seen = new Set<string>();
+  const follow = async (dataset: string, table: string, project: string, depth: number) => {
+    const key = `${project}.${dataset}.${table}`;
+    if (seen.has(key) || depth > 4) return;
+    seen.add(key);
+    const m = project === P ? await describe(dataset, table) : null;
+    await canRead(key);
+    const sql = String(m?.view?.query ?? "").replace(/`/g, "");
+    for (const x of sql.matchAll(/\b([\w-]+)\.([\w-]+)\.([\w-]+)\b|\b(?:FROM|JOIN)\s+([\w-]+)\.([\w-]+)\b/gi)) {
+      if (x[1]) await follow(x[2], x[3], x[1], depth + 1); else if (x[4]) await follow(x[4], x[5], P, depth + 1);
+    }
+  };
+  await follow(ds, "z_niat_tech_instrctor_trainee_exam_best_scores_details", P, 0);
   const [datasets] = await bq.getDatasets();
   for (const d of datasets) {
     try {
