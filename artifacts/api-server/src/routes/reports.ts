@@ -62,6 +62,8 @@ type ArchiveRow = typeof instructorArchiveTable.$inferSelect;
 // classification (TeachOS-only: no Darwin record anywhere, not IIT Kharagpur). The Employee Status dropdown does not change it.
 // Plus (2026-10-24, per request) people converted recently (e.g. after 16 Oct) whom Darwin has not dropped yet: anyone with a
 // Darwin exit record whose Capability Manager marked Payroll Converted also counts as Payroll.
+// Employee Status values that mean the person is leaving (2026-11-11): for them Darwin's exit date is a real exit date, payroll or not.
+export const LEAVING_MARKS = new Set(["serving_notice_period", "exited", "absconded"]);
 export const isPayrollPerson = (r: { classification?: string | null; exitFlag?: boolean | null; exitVerification?: string | null }): boolean =>
   r.classification === "payroll_converted" || (!!r.exitFlag && r.exitVerification === "payroll_converted");
 
@@ -313,7 +315,9 @@ const toApiInstructorSummary = (row: InstructorRow, contributionByTeachosId: Map
   // Converted person who is still in Darwin also gets their typed-in date back (before, the box saved it but showed Darwin's date).
   // A typed-in date of exit wins for everyone (2026-11-11, per request: NW0004547 -- payroll-converted in 2025, so Darwin's exit record says
   // 31 Oct 2025, but she really left on 31 Oct 2026, typed by hand). Payroll people: only the typed date, as before.
-  date_of_exit: row.manualExitDate ?? (isPayrollPerson(row) ? null : row.exitLastWorkingDate ?? null),
+  // + 2026-11-11 (per request: approved Serving-Notice people showed no date of exit): a payroll person whom a CM marked as LEAVING
+  // (Serving Notice Period / Exited / Absconded) uses Darwin's date when nothing is typed -- their exit record is then a real exit.
+  date_of_exit: row.manualExitDate ?? (isPayrollPerson(row) && !LEAVING_MARKS.has(row.exitVerification ?? "") ? null : row.exitLastWorkingDate ?? null),
   // Capability Manager's manual read on an exit-flagged record -- "exited" |
   // "serving_notice_period" | "payroll_converted" | null. Purely a tracking
   // label; see exitVerification's comment in the schema for why it never
@@ -820,7 +824,7 @@ router.get("/reports/instructors", async (_req, res) => {
   //     exit date has not passed yet (or the exit data has none for them, so
   //     there is nothing to move them on).
   const todayIst = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
-  const exitDateOf = (r: InstructorRow) => r.manualExitDate ?? (r.classification === "payroll_converted" ? null : r.exitLastWorkingDate) ?? null; // typed date wins (2026-11-11)
+  const exitDateOf = (r: InstructorRow) => r.manualExitDate ?? (r.classification === "payroll_converted" && !LEAVING_MARKS.has(r.exitVerification ?? "") ? null : r.exitLastWorkingDate) ?? null; // typed date wins; leaving payroll people use Darwin's (2026-11-11)
   const noticeEnded = (r: InstructorRow) => { const d = exitDateOf(r); return !!d && d < todayIst; };
   // A resignation still "Pending With Approver" with NO date of exit yet is not
   // an exit -- it stays in the Serving notice list only and is never added to

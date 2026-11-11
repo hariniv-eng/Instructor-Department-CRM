@@ -23,6 +23,8 @@ Commit messages stay short (title + 2-3 lines); this file is the detailed record
 | One-off read-only checks | `artifacts/api-server/src/lib/connectors/_tmp_*.ts` |
 
 ## 2026-11-11
+- **Serving notice: date of exit for payroll people** (per request) -- approved Serving Notice Period people who are payroll-converted showed no date of exit, because payroll people only used a typed date. Now anyone marked Serving Notice Period / Exited / Absconded uses Darwin's last working day when nothing is typed (typed date still wins). So their date shows in the Serving notice list, and once it has passed they move to Remove TeachOS access and are set to Exited at the next sync. Read-only `_tmp_snp_check.ts` lists every Serving Notice Period person with their date and list.
+  Files: `artifacts/api-server/src/routes/reports.ts` (`LEAVING_MARKS`, `date_of_exit`, `exitDateOf`), `lib/reconcile.ts` (`recomputeStatuses`). After pull: Publish, then Sync Now.
 - **A typed-in date of exit wins over Darwin's** (per request, NW0004547) -- she moved to payroll in 2025, so her Darwin exit record says Date Of Exit 31 Oct 2025; she actually left on 31 Oct 2026, typed by hand. The manual date of exit now wins for everyone who has one (before: only payroll people used it): Instructors tab, Instructor Archive, Exit data, Exception 2 lists, Contribution experience, and the serving-notice -> exited rule. People with no typed date are unchanged.
   Files: `artifacts/api-server/src/routes/reports.ts` (`date_of_exit`, `exitDateOf`, `loadArchivePeople`, experience), `lib/reconcile.ts` (`recomputeStatuses`). After pull: Publish (no sync needed).
 
