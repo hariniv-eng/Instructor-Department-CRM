@@ -41,7 +41,8 @@ export interface ExcludedOverride {
 // rule) — excluded from every instructor count, though they may still
 // appear in the raw TeachOS table itself.
 export const EXCLUDED_EMPLOYEES: ExcludedOverride[] = [
-  { teachosUserId: "c1c535360a574e3083ea9eceb32183dd", employeeId: "NW0007056", fullName: "(matched by employee ID)", classification: "excluded_other_department", reason: "User-directed (2026-11-11): has a Darwin record in another team -- not an instructor; was showing as payroll converted" },
+  { teachosUserId: "7a82059435ce48ceb1cf2f8349c967e6", fullName: "(matched by TeachOS user id)", classification: "excluded_non_department_team", reason: "User-directed (2026-11-11): Founders Team (TeachOS has \"Founders Team\" in place of an employee ID) -- an exception, shown under Excluded in the TeachOS breakdown, not payroll", decidedDate: "2026-11-11" },
+  { teachosUserId: "c1c535360a574e3083ea9eceb32183dd", employeeId: "NW0007056", fullName: "(matched by employee ID)", classification: "excluded_other_department", reason: "User-directed (2026-11-11): has a Darwin record in another team -- not an instructor; was showing as payroll converted", decidedDate: "2026-11-11" },
   { employeeId: "NW0005088", fullName: "Shaik Musharaf", classification: "excluded_other_department", reason: "Video Editor (Video House - NIAT) — support role, not a teaching/instructor designation", decidedDate: "2026-08-27" },
   { employeeId: "NW0007350", fullName: "Srinivas Vatturi", classification: "excluded_other_department", reason: "NIAT - Head of Operations (NIAT_Program Operations) — operations management, not a teaching/instructor designation", decidedDate: "2026-08-27" },
   { employeeId: "NW0001240", fullName: "Tejaswini Venkata", classification: "excluded_other_department", reason: "Head of Department - English and Communication Skills (Content – Aptitude & English) — HOD/managerial role, not a teaching/instructor designation", decidedDate: "2026-08-27" },
@@ -98,7 +99,6 @@ export const OTHER_DEPARTMENT_EMPLOYEES: OtherDepartmentOverride[] = [];
 // TeachOS with no Darwin match as payroll converted; these are known not to be payroll instructors but are not settled yet. Matched by
 // TeachOS user id (or employee ID). They stay in the department count under "needs review".
 export const NEEDS_REVIEW_TEACHOS_ONLY: { teachosUserId?: string; employeeId?: string; reason: string }[] = [
-  { teachosUserId: "7a82059435ce48ceb1cf2f8349c967e6", reason: "Founders Team, no employee ID in TeachOS -- exception, not payroll (2026-11-11)" },
 ];
 
 export interface ConfirmedInstructorOverride {
