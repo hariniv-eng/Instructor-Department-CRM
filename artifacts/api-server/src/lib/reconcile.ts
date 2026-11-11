@@ -12,7 +12,6 @@ import { hasConfirmedInstructorDesignation, EXCLUDED_EMPLOYEES, type ExcludedOve
 import { VALID_CAPABILITY_MANAGERS, CAPABILITY_MANAGER_ALIASES, CAPABILITY_MANAGER_BY_USER_ID } from "../data/validCapabilityManagers";
 import { classifyDepartment, classifyDeployment, subjectFromDesignation, subjectFromTeachosCategory } from "./departmentTaxonomy";
 import { archiveInstructors } from "./archiveInstructors";
-import { isIitKgpCampus } from "./product";
 
 export type SheetRow = Record<string, unknown>;
 
@@ -341,9 +340,9 @@ export const recomputeStatuses = async (options: { grantTeachosOnlyScope?: boole
     // instructor (Instructors – Gen AI) whose TeachOS institute is also "IIT
     // kharagpur". Per the 2026-09-16 request, that case (Darwin match + IIT
     // Kharagpur institute) should now count as a normal instructor instead.
-    // 2026-11-11: also "IIT KGP" (e.g. "Nxtwave & IIT KGP OCN"), not only "Kharagpur" -- the same test as the IIT KGP product. Before, an
-    // IIT KGP campus person with no Darwin match was filed as payroll converted (ARUN MUNOLI).
-    const isIitKharagpurCampus = (row.institutes ?? []).some((institute) => /kharagpur/i.test(institute) || isIitKgpCampus(institute));
+    // (2026-11-11: an "IIT KGP" spelling was added here and then taken back, per request -- ARUN MUNOLI stays as he is until TeachOS has
+    // his employee ID; then the Darwin-by-employee-ID check below files him.)
+    const isIitKharagpurCampus = (row.institutes ?? []).some((institute) => /kharagpur/i.test(institute));
 
     let classification: string | null = null;
     let classificationReason: string | null = null;
