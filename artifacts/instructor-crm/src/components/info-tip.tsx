@@ -30,7 +30,7 @@ export function InfoTip({ title, lines, className = '', tone = 'muted', testId }
 // number comes from. Keep in step with the rules in api-server/src/routes/reports.ts (computeDepartmentAndExceptionRows,
 // loadArchivePeople), api-server/src/lib/product.ts (productOf) and instructors.tsx (productLabel).
 export const OVERVIEW_INFO: Record<string, { title: string; lines: string[] }> = {
-  needsReview: { title: 'Needs review', lines: ['Darwin exit records (Approved / Pending) not yet reviewed by the Capability Manager.'] },
+  needsReview: { title: 'Needs review', lines: ['Darwin exit records (Approved / Pending) not yet reviewed by the Capability Manager.', 'Also new TeachOS-only people (no Darwin record, no exit record) -- not made Payroll automatically; set their Employee Status (e.g. Payroll Converted).'] },
   teachosActions: { title: 'TeachOS access actions', lines: ['Remove access (marked Exited) + give access (in Darwin, not in TeachOS) + open Movement Tracker changes.'] },
   approvalPending: { title: 'Approval pending', lines: ['Darwin exit records still "Pending With Approver".'] },
   department: { title: 'Instructor Department', lines: ['Darwin\'s Instructors department + TeachOS\'s payroll-converted instructors.'] },
