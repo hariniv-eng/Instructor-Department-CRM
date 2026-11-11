@@ -8,7 +8,12 @@ import { config } from "./config";
 const plain = (v: unknown): string => (v && typeof v === "object" && "value" in (v as object) ? String((v as { value: unknown }).value) : v == null ? "" : String(v));
 
 async function main() {
-  const bq = new BigQuery({ projectId: config.BIGQUERY_PROJECT_ID, ...(config.BIGQUERY_CREDENTIALS_JSON ? { credentials: JSON.parse(config.BIGQUERY_CREDENTIALS_JSON) } : {}) });
+  // 2026-11-11: the table reads a Google Sheet (Drive) underneath -- "Permission denied while getting Drive credentials". Ask for the Drive
+  // scope too; if it still fails, the sheet itself is not shared with this service account (its e-mail is printed below).
+  const creds = config.BIGQUERY_CREDENTIALS_JSON ? JSON.parse(config.BIGQUERY_CREDENTIALS_JSON) : undefined;
+  console.log(`FCC's BigQuery service account: ${creds?.client_email ?? "(default credentials)"}`);
+  const bq = new BigQuery({ projectId: config.BIGQUERY_PROJECT_ID, ...(creds ? { credentials: creds } : {}),
+    scopes: ["https://www.googleapis.com/auth/bigquery", "https://www.googleapis.com/auth/drive.readonly"] });
   const [datasets] = await bq.getDatasets();
   const found: string[] = [];
   for (const ds of datasets) {
