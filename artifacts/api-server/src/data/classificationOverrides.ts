@@ -41,6 +41,7 @@ export interface ExcludedOverride {
 // rule) — excluded from every instructor count, though they may still
 // appear in the raw TeachOS table itself.
 export const EXCLUDED_EMPLOYEES: ExcludedOverride[] = [
+  { teachosUserId: "c1c535360a574e3083ea9eceb32183dd", employeeId: "NW0007056", fullName: "(matched by employee ID)", classification: "excluded_other_department", reason: "User-directed (2026-11-11): has a Darwin record in another team -- not an instructor; was showing as payroll converted" },
   { employeeId: "NW0005088", fullName: "Shaik Musharaf", classification: "excluded_other_department", reason: "Video Editor (Video House - NIAT) — support role, not a teaching/instructor designation", decidedDate: "2026-08-27" },
   { employeeId: "NW0007350", fullName: "Srinivas Vatturi", classification: "excluded_other_department", reason: "NIAT - Head of Operations (NIAT_Program Operations) — operations management, not a teaching/instructor designation", decidedDate: "2026-08-27" },
   { employeeId: "NW0001240", fullName: "Tejaswini Venkata", classification: "excluded_other_department", reason: "Head of Department - English and Communication Skills (Content – Aptitude & English) — HOD/managerial role, not a teaching/instructor designation", decidedDate: "2026-08-27" },
@@ -92,6 +93,13 @@ export interface OtherDepartmentOverride {
 // bucket on its own once nothing overrides it first. Left in place (empty)
 // for the next person who needs the "other department" treatment.
 export const OTHER_DEPARTMENT_EMPLOYEES: OtherDepartmentOverride[] = [];
+
+// TeachOS-only people kept as an EXCEPTION (Needs review) instead of payroll converted (2026-11-11, per request): FCC files anyone in
+// TeachOS with no Darwin match as payroll converted; these are known not to be payroll instructors but are not settled yet. Matched by
+// TeachOS user id (or employee ID). They stay in the department count under "needs review".
+export const NEEDS_REVIEW_TEACHOS_ONLY: { teachosUserId?: string; employeeId?: string; reason: string }[] = [
+  { teachosUserId: "7a82059435ce48ceb1cf2f8349c967e6", reason: "Founders Team, no employee ID in TeachOS -- exception, not payroll (2026-11-11)" },
+];
 
 export interface ConfirmedInstructorOverride {
   teachosUserId?: string;
