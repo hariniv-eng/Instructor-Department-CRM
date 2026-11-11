@@ -37,9 +37,11 @@ async function main() {
     const m = project === P ? await describe(dataset, table) : null;
     await canRead(key);
     const sql = String(m?.view?.query ?? "").replace(/`/g, "");
-    for (const x of sql.matchAll(/\b([\w-]+)\.([\w-]+)\.([\w-]+)\b|\b(?:FROM|JOIN)\s+([\w-]+)\.([\w-]+)\b/gi)) {
-      if (x[1]) await follow(x[2], x[3], x[1], depth + 1); else if (x[4]) await follow(x[4], x[5], P, depth + 1);
-    }
+    // Three-part names (project.dataset.table) first; two-part (dataset.table) only when none -- a FROM before a three-part name used to
+    // be read as dataset.table and send the check to a dataset that does not exist (2026-11-11 fix).
+    const three = [...sql.matchAll(/([\w-]+)\.([\w-]+)\.([\w-]+)/g)];
+    if (three.length) for (const x of three) await follow(x[2], x[3], x[1], depth + 1);
+    else for (const x of sql.matchAll(/\b(?:FROM|JOIN)\s+([\w-]+)\.([\w-]+)/gi)) await follow(x[1], x[2], P, depth + 1);
   };
   await follow(ds, "z_niat_tech_instrctor_trainee_exam_best_scores_details", P, 0);
   const [datasets] = await bq.getDatasets();
