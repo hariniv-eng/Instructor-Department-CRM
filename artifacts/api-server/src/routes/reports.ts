@@ -311,7 +311,9 @@ const toApiInstructorSummary = (row: InstructorRow, contributionByTeachosId: Map
   // Capability Manager enters instead.
   // 2026-11-06 fix: the same "payroll" test as the Instructors tab's editable box (is_payroll / isPayrollPerson), so a CM-marked Payroll
   // Converted person who is still in Darwin also gets their typed-in date back (before, the box saved it but showed Darwin's date).
-  date_of_exit: isPayrollPerson(row) ? row.manualExitDate ?? null : row.exitLastWorkingDate ?? null,
+  // A typed-in date of exit wins for everyone (2026-11-11, per request: NW0004547 -- payroll-converted in 2025, so Darwin's exit record says
+  // 31 Oct 2025, but she really left on 31 Oct 2026, typed by hand). Payroll people: only the typed date, as before.
+  date_of_exit: row.manualExitDate ?? (isPayrollPerson(row) ? null : row.exitLastWorkingDate ?? null),
   // Capability Manager's manual read on an exit-flagged record -- "exited" |
   // "serving_notice_period" | "payroll_converted" | null. Purely a tracking
   // label; see exitVerification's comment in the schema for why it never
@@ -818,7 +820,7 @@ router.get("/reports/instructors", async (_req, res) => {
   //     exit date has not passed yet (or the exit data has none for them, so
   //     there is nothing to move them on).
   const todayIst = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
-  const exitDateOf = (r: InstructorRow) => (r.classification === "payroll_converted" ? r.manualExitDate : r.exitLastWorkingDate) ?? null;
+  const exitDateOf = (r: InstructorRow) => r.manualExitDate ?? (r.classification === "payroll_converted" ? null : r.exitLastWorkingDate) ?? null; // typed date wins (2026-11-11)
   const noticeEnded = (r: InstructorRow) => { const d = exitDateOf(r); return !!d && d < todayIst; };
   // A resignation still "Pending With Approver" with NO date of exit yet is not
   // an exit -- it stays in the Serving notice list only and is never added to
@@ -1820,7 +1822,7 @@ router.get("/reports/instructor-contribution", requireAuth, requireRole("admin")
     // Experience (2026-10-15, per request): years in the organization from the date of joining above to today, or to the date of exit
     // once there is one -- the same exit date the Instructors tab shows (payroll-converted people: the manual one; everyone else:
     // Darwin's last working day). Null when there is no joining date or the dates do not make sense.
-    const exitDay = p.classification === "payroll_converted" ? p.manualExitDate : p.exitLastWorkingDate;
+    const exitDay = p.manualExitDate ?? (p.classification === "payroll_converted" ? null : p.exitLastWorkingDate); // typed date wins (2026-11-11)
     const experienceEnd = exitDay ?? new Date().toISOString().slice(0, 10);
     const experienceDays = joining.date ? (Date.parse(`${experienceEnd}T00:00:00Z`) - Date.parse(`${joining.date}T00:00:00Z`)) / 86400000 : null;
     const trainingDays = joining.date && deploymentDay ? Math.round((Date.parse(`${deploymentDay}T00:00:00Z`) - Date.parse(`${joining.date}T00:00:00Z`)) / 86400000) : null;
@@ -1986,6 +1988,10 @@ export async function loadArchivePeople() { // exported for _tmp_archive_vs_over
   // Deployed or training (2026-11-09, per request: "for these exits I need to know if they were deployed or training instructors"):
   // Deployed = they had a first session ever scheduled (Contribution's deployment date, kept for people who left); never had a session
   // = Training. Their campus is not used -- someone who has left TeachOS has none any more.
+  // Typed-in date of exit (2026-11-11): the live row's manual date wins over Darwin's "Date Of Exit" on the archive page and the Exit data
+  // (NW0004547: her Darwin exit record is the 2025 payroll conversion; she left on 31 Oct 2026, typed by hand).
+  const manualExitByEmp = new Map<string, string>();
+  for (const m of await db.select({ e: instructorsTable.employeeId, d: instructorsTable.manualExitDate }).from(instructorsTable)) if (m.e && m.d) manualExitByEmp.set(m.e, m.d);
   const deployedByUid = new Map<string, string | null>();
   try {
     for (const c of await db.select({ uid: instructorContributionTable.instructorUserId, d: instructorContributionTable.deploymentDate }).from(instructorContributionTable)) deployedByUid.set(c.uid, c.d);
@@ -1996,7 +2002,9 @@ export async function loadArchivePeople() { // exported for _tmp_archive_vs_over
     .filter((r) => r.inArchiveScope && !NOT_DEPARTMENT_CLASSIFICATIONS.has(r.classification ?? ""))
     .map((r) => {
       const deploymentDate = r.teachosUserId ? deployedByUid.get(r.teachosUserId) ?? null : null;
-      return { ...toApiArchiveSummary(r, r.employeeId ? archiveExitByEmployee.get(r.employeeId) : undefined), deployment_date: deploymentDate, deployed_or_training: deploymentDate ? "Deployed" : "Training" };
+      const summary = toApiArchiveSummary(r, r.employeeId ? archiveExitByEmployee.get(r.employeeId) : undefined);
+      const manual = r.employeeId ? manualExitByEmp.get(r.employeeId) : undefined;
+      return { ...summary, ...(manual && summary.status !== "Active" ? { date_of_exit: manual } : {}), deployment_date: deploymentDate, deployed_or_training: deploymentDate ? "Deployed" : "Training" };
     })
     .sort((a, b) => a.full_name.localeCompare(b.full_name));
   return people;
@@ -2179,7 +2187,7 @@ router.get("/reports/instructor-profile/:id", async (req, res): Promise<void> =>
   };
   const [workload7, workload30] = [await windowWorkload(7), await windowWorkload(30)];
 
-  const exitDay = p.classification === "payroll_converted" ? p.manualExitDate : p.exitLastWorkingDate;
+  const exitDay = p.manualExitDate ?? (p.classification === "payroll_converted" ? null : p.exitLastWorkingDate); // typed date wins (2026-11-11)
   const experienceEnd = exitDay ?? new Date().toISOString().slice(0, 10);
   const experienceDays = joining.date ? (Date.parse(`${experienceEnd}T00:00:00Z`) - Date.parse(`${joining.date}T00:00:00Z`)) / 86400000 : null;
   const deploymentDay = contribution?.deploymentDate ?? null;

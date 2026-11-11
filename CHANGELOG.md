@@ -22,6 +22,10 @@ Commit messages stay short (title + 2-3 lines); this file is the detailed record
 | What the Instructor Archive stores (joining date, gender, subject ...) | `artifacts/api-server/src/lib/archiveInstructors.ts` |
 | One-off read-only checks | `artifacts/api-server/src/lib/connectors/_tmp_*.ts` |
 
+## 2026-11-11
+- **A typed-in date of exit wins over Darwin's** (per request, NW0004547) -- she moved to payroll in 2025, so her Darwin exit record says Date Of Exit 31 Oct 2025; she actually left on 31 Oct 2026, typed by hand. The manual date of exit now wins for everyone who has one (before: only payroll people used it): Instructors tab, Instructor Archive, Exit data, Exception 2 lists, Contribution experience, and the serving-notice -> exited rule. People with no typed date are unchanged.
+  Files: `artifacts/api-server/src/routes/reports.ts` (`date_of_exit`, `exitDateOf`, `loadArchivePeople`, experience), `lib/reconcile.ts` (`recomputeStatuses`). After pull: Publish (no sync needed).
+
 ## 2026-11-10
 - **New Capability Manager: Pasupuleti Sai Krishna Chakradhar (NW0007993)** -- added to the list of valid Capability Managers. Instructors whose TeachOS manager entry has his full name get him at the next sync, and he can be picked as a manual Capability Manager. If TeachOS records him under a shorter name, an alias is needed.
   File: `artifacts/api-server/src/data/validCapabilityManagers.ts`. After pull: Publish, then Sync Now.
