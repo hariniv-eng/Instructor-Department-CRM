@@ -98,6 +98,10 @@ export const OTHER_DEPARTMENT_EMPLOYEES: OtherDepartmentOverride[] = [];
 // TeachOS-only people kept as an EXCEPTION (Needs review) instead of payroll converted (2026-11-11, per request): FCC files anyone in
 // TeachOS with no Darwin match as payroll converted; these are known not to be payroll instructors but are not settled yet. Matched by
 // TeachOS user id (or employee ID). They stay in the department count under "needs review".
+// New TeachOS-only people (no Darwin record, no exit record) waiting for a Capability Manager's Employee Status (2026-11-11, per
+// request) -- the classification reconcile.ts gives them instead of payroll converted. Shown in the Overview "CM actions" list.
+export const TEACHOS_ONLY_UNREVIEWED = "teachos_only_unreviewed";
+
 export const NEEDS_REVIEW_TEACHOS_ONLY: { teachosUserId?: string; employeeId?: string; reason: string }[] = [
 ];
 

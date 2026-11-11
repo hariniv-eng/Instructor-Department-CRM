@@ -77,7 +77,7 @@ const CATEGORY_TABS: { key: CategoryKey; label: string; icon: typeof UsersRound;
   { key: 'mentors', label: 'Mentors', icon: GraduationCap, description: 'Darwin — Mentors department.' },
   { key: 'instructors_mentors', label: 'Instructors + Mentors', icon: Users, description: 'Instructors and Mentors combined, without the Operations team.' },
   { key: 'ops_team', label: 'Operations team', icon: Briefcase, description: 'Darwin — Delivery Support (Ops), filed under Operations rather than Instructor or Mentor.' },
-  { key: 'exception', label: 'Exception', icon: AlertTriangle, description: 'People still in Darwin or TeachOS with an Approved or Pending With Approver exit record that has not been reviewed yet. Use the Exit column to record what happened -- marking someone Serving Notice Period, Exited or Absconded moves them to the Overview tab (Exception 2: Serving notice period / Exit lists); Payroll Converted removes them from the queue.' },
+  { key: 'exception', label: 'Exception', icon: AlertTriangle, description: 'People still in Darwin or TeachOS with an Approved or Pending With Approver exit record that has not been reviewed yet, and new TeachOS-only people (no Darwin record, no exit record) -- they are no longer made Payroll Converted automatically: set their Employee Status. Use the Exit column to record what happened -- marking someone Serving Notice Period, Exited or Absconded moves them to the Overview tab (Exception 2: Serving notice period / Exit lists); Payroll Converted removes them from the queue.' },
 ];
 
 function formatCount(value: number | undefined) {
@@ -1275,7 +1275,8 @@ function ExitCell({ person }: { person: InstructorSummary }) {
   // should not be activated"). Payroll alone no longer opens it.
   // Back to the pre-2026-10-16 rule (2026-10-24, per request): dropdown for anyone with a Darwin exit record AND every payroll
   // instructor. A payroll person with nothing saved yet shows Payroll Converted (worked out here, not written by the sync).
-  if (!person.exit_flag && !person.is_payroll) {
+  // New TeachOS-only people waiting for review (2026-11-11) get the dropdown too.
+  if (!person.exit_flag && !person.is_payroll && person.classification !== 'teachos_only_unreviewed') {
     return <div className="truncate text-[12px] text-muted-foreground">—</div>;
   }
 

@@ -154,7 +154,7 @@ export default function DashboardPage() {
     />
 
     {report && <section aria-label="Exceptions" data-testid="banner-exceptions" className="mb-4 grid grid-cols-1 gap-3 animate-rise sm:grid-cols-3">
-      <ExceptionSegment label="CM actions" title="Needs review" meta="Exit record not reviewed yet — Capability Managers" count={reviewPeople.length} icon={<AlertTriangle size={16} />} href="/instructors?category=exception" testId="exception-1" info={OVERVIEW_INFO.needsReview} />
+      <ExceptionSegment label="CM actions" title="Needs review" meta="Not reviewed yet — Capability Managers" count={reviewPeople.length} icon={<AlertTriangle size={16} />} href="/instructors?category=exception" testId="exception-1" info={OVERVIEW_INFO.needsReview} />
       <ExceptionSegment label="Admin team actions" title="TeachOS access actions" meta={`${removeCount} remove · ${giveCount} give · ${movementCount} movement changes`} count={exception2Total} icon={<Trash2 size={16} />} active={activeException === 'remove'} onClick={() => setException2Open(true)} testId="exception-2" info={OVERVIEW_INFO.teachosActions} />
       <ExceptionSegment label="HRBP actions" title="Approval pending" meta="Exit approval pending — HRBP action" count={pendingPeople.length} icon={<Clock size={16} />} active={activeException === 'pending'} onClick={() => setActiveException(activeException === 'pending' ? null : 'pending')} testId="exception-3" info={OVERVIEW_INFO.approvalPending} />
     </section>}

@@ -7,7 +7,7 @@
 import { and, eq } from "drizzle-orm";
 import { instructorsTable, darwinboxExitsTable, teachosIdReferenceTable, uploadsTable, darwinboxFullRosterTable, darwinboxActiveTable } from "@workspace/db";
 import { sdb as db, inSavepoint } from "./syncContext";
-import { NEEDS_REVIEW_TEACHOS_ONLY } from "../data/classificationOverrides";
+import { NEEDS_REVIEW_TEACHOS_ONLY, TEACHOS_ONLY_UNREVIEWED } from "../data/classificationOverrides";
 import { hasConfirmedInstructorDesignation, EXCLUDED_EMPLOYEES, type ExcludedOverride, OTHER_DEPARTMENT_EMPLOYEES, type OtherDepartmentOverride } from "../data/classificationOverrides";
 import { VALID_CAPABILITY_MANAGERS, CAPABILITY_MANAGER_ALIASES, CAPABILITY_MANAGER_BY_USER_ID } from "../data/validCapabilityManagers";
 import { classifyDepartment, classifyDeployment, subjectFromDesignation, subjectFromTeachosCategory } from "./departmentTaxonomy";
@@ -386,10 +386,22 @@ export const recomputeStatuses = async (options: { grantTeachosOnlyScope?: boole
       classification = "iit_kharagpur_team";
       classificationReason = "No Darwin record anywhere (primary Instructors department or full 3,000+ roster), and TeachOS institute is IIT Kharagpur — tracked as its own team, not counted as a payroll-converted instructor.";
       computedStatus = "iit_kharagpur_team";
-    } else if (isTeachosOnlyLeftover) {
+    } else if (isTeachosOnlyLeftover && (row.classification === "payroll_converted" || !!row.exitVerification)) {
+      // 2026-11-11, per request: no longer automatic for NEW people. Stays payroll converted for everyone already filed as payroll
+      // converted before this change (the payroll list as of 2026-11-11), and for anyone a Capability Manager has since given an
+      // Employee Status (Payroll Converted, or Exited / Serving Notice Period / Absconded -- the existing payroll exit lists).
       classification = "payroll_converted";
-      classificationReason = "No Darwin record anywhere (primary Instructors department or full 3,000+ roster), no Darwin exit record, not IIT Kharagpur — remainder of the payroll-conversion pipeline.";
+      classificationReason = row.exitVerification && row.classification !== "payroll_converted"
+        ? `No Darwin record anywhere, no Darwin exit record — Capability Manager set Employee Status (${row.exitVerification}), so filed as payroll converted.`
+        : "No Darwin record anywhere (primary Instructors department or full 3,000+ roster), no Darwin exit record, not IIT Kharagpur — remainder of the payroll-conversion pipeline (kept as filed before 2026-11-11).";
       computedStatus = "payroll_converted";
+    } else if (isTeachosOnlyLeftover) {
+      // 2026-11-11, per request: a NEW TeachOS-only person with no Darwin record and no exit record is NOT payroll converted
+      // automatically. Shown in the Overview "CM actions" (Exception) list until a Capability Manager sets their Employee Status;
+      // the next sync then files them by the branch above.
+      classification = TEACHOS_ONLY_UNREVIEWED;
+      classificationReason = "In TeachOS only — no Darwin record and no Darwin exit record. Not payroll converted automatically (since 2026-11-11): waiting for the Capability Manager to set Employee Status.";
+      computedStatus = "needs_review";
     } else {
       computedStatus = row.inDarwin && row.darwinEmployeeStatus === "Active"
         ? "active"

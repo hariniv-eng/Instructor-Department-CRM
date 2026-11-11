@@ -6,7 +6,7 @@ import { cell, parseLooseDate, toISODate } from "../lib/reconcile";
 import { archiveInstructors } from "../lib/archiveInstructors";
 import { TRAINING_COURSE_TAXONOMY, isResolvedCourse } from "../data/trainingCourseTaxonomy";
 import { TECH_AREAS, normalizeSubjectArea } from "../lib/departmentTaxonomy";
-import { isPinnedConfirmedInstructor } from "../data/classificationOverrides";
+import { isPinnedConfirmedInstructor, TEACHOS_ONLY_UNREVIEWED } from "../data/classificationOverrides";
 import { productOf } from "../lib/product";
 import { taughtSubjectColumn, courseColumnOf, portalColumnOf, TAUGHT_SUBJECT_COLUMNS } from "../lib/connectors/taughtTraining";
 import { LECTURE_COURSES } from "../data/lectureSessions";
@@ -477,7 +477,10 @@ export function computeDepartmentAndExceptionRows(rawRows: InstructorRow[]) {
   //   4. not filed under a different team.
   const exitStatusLower = (r: InstructorRow) => (r.exitFlagStatus ?? "").trim().toLowerCase();
   const hasQueueExitStatus = (r: InstructorRow) => exitStatusLower(r) === "approved" || exitStatusLower(r).startsWith("pending");
-  const exceptionQueueRows = allRows.filter((r) => r.exitFlag && (r.inDarwin || r.inTeachos) && hasQueueExitStatus(r) && r.exitVerification !== "payroll_converted" && !NOT_DEPARTMENT_CLASSIFICATIONS.has(r.classification ?? ""));
+  // Plus (2026-11-11, per request) new TeachOS-only people with no Darwin record and no exit record: not payroll converted
+  // automatically any more -- they wait here until a Capability Manager sets their Employee Status.
+  const exceptionQueueRows = allRows.filter((r) => (r.exitFlag && (r.inDarwin || r.inTeachos) && hasQueueExitStatus(r) && r.exitVerification !== "payroll_converted" && !NOT_DEPARTMENT_CLASSIFICATIONS.has(r.classification ?? ""))
+    || (r.classification === TEACHOS_ONLY_UNREVIEWED && r.inTeachos));
   // Narrowed 2026-10-06 (per request: "in the exception, anyhow we will only be
   // showing not reviewed data and serving notice period instructor data, in
   // the Instructors tab"): the Instructors tab's Exception view shows only
@@ -723,7 +726,8 @@ router.get("/reports/instructors", async (_req, res) => {
   const unclassifiedDept = countedInstructorRows.filter((r) => !r.deptBucket).length;
 
   // Requirement #3: payroll vs non-payroll.
-  const payrollRows = [...payrollConvertedForCount, ...needsReviewForCount];
+  // Not payroll until a Capability Manager reviews them (2026-11-11).
+  const payrollRows = [...payrollConvertedForCount, ...needsReviewForCount.filter((r) => r.classification !== TEACHOS_ONLY_UNREVIEWED)];
   const nonPayrollRows = darwinInstructorsForCount;
 
   // Requirement #4: campus level — grouped by each entry in `institutes`
@@ -1040,7 +1044,7 @@ router.get("/reports/teachos-breakdown", requireAuth, requireRole("admin"), asyn
     && r.classification !== "iit_kharagpur_team"
     && r.classification !== "payroll_converted"
   );
-  const payrollRows = [...payrollConvertedRows, ...needsReviewRows];
+  const payrollRows = [...payrollConvertedRows, ...needsReviewRows.filter((r) => r.classification !== TEACHOS_ONLY_UNREVIEWED)];
 
   res.json({
     total_active: rows.length,
