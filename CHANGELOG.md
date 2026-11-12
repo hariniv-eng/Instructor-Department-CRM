@@ -23,6 +23,8 @@ Commit messages stay short (title + 2-3 lines); this file is the detailed record
 | One-off read-only checks | `artifacts/api-server/src/lib/connectors/_tmp_*.ts` |
 
 ## 2026-11-12
+- **Typed date of exit: payroll only, and logged** (per request: NW2000736 had a wrong typed date 2026-01-22 -- typed while he was briefly shown as payroll; Darwin has no Date Of Exit for him). `PATCH /instructors/:id/exit-date` now refuses to SET a date for anyone who is not payroll (clearing is always allowed), and every change is logged in the uploads table as "Date of exit change". One-off `_tmp_clear_exit_date.ts NW2000736 --apply` clears his wrong date.
+  Files: `artifacts/api-server/src/routes/instructors.ts`. After pull: Publish.
 - **Exit Breakdown: payroll instructors who left** (per request) -- a payroll person (already converted) who leaves has no Darwin exit; the Capability Manager types their date of exit in FCC. Such a person, with a typed date of exit of today or earlier, now counts as an exit in the tab (dated by the typed date) and is counted in the University payroll card. New "Exit type" column: Darwin exit approved / Payroll -- date typed in FCC. Scope "All approved exits" renamed "All exits". The archive API now also returns `manual_exit_date`.
   Files: `artifacts/instructor-crm/src/pages/exit-breakdown.tsx`, `artifacts/api-server/src/routes/reports.ts` (`loadArchivePeople`). After pull: Publish.
 - **Exit Breakdown: month table removed** (per request) -- the tab now has the totals, the scope buttons, search + filters and the People table only (the "Break down by" buttons went with the table; Month, Campus, Subject, Deployed / Training and Payroll / NxtWave stay as filters). File: `pages/exit-breakdown.tsx`. After pull: Publish.
