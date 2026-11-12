@@ -2012,7 +2012,7 @@ export async function loadArchivePeople() { // exported for _tmp_archive_vs_over
       const deploymentDate = r.teachosUserId ? deployedByUid.get(r.teachosUserId) ?? null : null;
       const summary = toApiArchiveSummary(r, r.employeeId ? archiveExitByEmployee.get(r.employeeId) : undefined);
       const manual = r.employeeId ? manualExitByEmp.get(r.employeeId) : undefined;
-      return { ...summary, ...(manual && summary.status !== "Active" ? { date_of_exit: manual } : {}), deployment_date: deploymentDate, deployed_or_training: deploymentDate ? "Deployed" : "Training" };
+      return { ...summary, ...(manual && summary.status !== "Active" ? { date_of_exit: manual } : {}), deployment_date: deploymentDate, deployed_or_training: deploymentDate ? "Deployed" : "Training", manual_exit_date: manual ?? null }; // manual_exit_date: Exit Breakdown payroll exits (2026-11-12)
     })
     .sort((a, b) => a.full_name.localeCompare(b.full_name));
   return people;
