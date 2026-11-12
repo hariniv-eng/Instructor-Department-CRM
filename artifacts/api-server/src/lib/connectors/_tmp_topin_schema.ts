@@ -18,9 +18,9 @@ async function main() {
   console.log(`Columns (${cols.length}): ${cols.join(", ")}\n`);
   const sensitive = /name|email|mail|phone|mobile|contact/i;
   for (const c of cols) {
-    const [d] = await bq.query({ query: `SELECT COUNT(DISTINCT CAST(\`${c}\` AS STRING)) AS n, COUNTIF(\`${c}\` IS NULL) AS nulls, MIN(CAST(\`${c}\` AS STRING)) AS lo, MAX(CAST(\`${c}\` AS STRING)) AS hi FROM ${T}` });
+    const [d] = await bq.query({ query: `SELECT COUNT(DISTINCT CAST(\`${c}\` AS STRING)) AS n, COUNTIF(\`${c}\` IS NULL) AS empties, MIN(CAST(\`${c}\` AS STRING)) AS lo, MAX(CAST(\`${c}\` AS STRING)) AS hi FROM ${T}` });
     const s = (d as Record<string, unknown>[])[0];
-    const head = `${c}: distinct ${plain(s.n)} | empty ${plain(s.nulls)}`;
+    const head = `${c}: distinct ${plain(s.n)} | empty ${plain(s.empties)}`;
     if (sensitive.test(c)) { console.log(`${head} | (values not shown)`); continue; }
     if (/(^|_)id$|user_id|uuid/i.test(c) && Number(plain(s.n)) > 50) { console.log(`${head} | ids (values not shown)`); continue; }
     if (Number(plain(s.n)) > 60) { console.log(`${head} | min ${plain(s.lo).slice(0, 40)} | max ${plain(s.hi).slice(0, 40)}`); continue; }
