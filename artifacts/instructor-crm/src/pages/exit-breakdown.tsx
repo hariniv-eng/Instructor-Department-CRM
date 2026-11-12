@@ -1,7 +1,8 @@
 // Exit Breakdown tab (2026-11-12, per request: "create an exit breakdown table"). Admin-only, like the Instructor Archive it reads.
-// Who counts as an exit: everyone the Instructor Archive marks Exited (the whole department: instructors, mentors, Support, payroll).
-// Three scopes on top: All department exits / Approved exits (the Overview Exit data rule: Darwin exit Approved, not payroll, not
-// Support) / Support only. One table: rows = the chosen breakdown (Campus, Subject, Deployed vs Training, University payroll vs
+// The month x breakdown table was removed (2026-11-12, per request); the page is the stats, scopes, filters and the People table.
+// Who counts as an exit (2026-11-12, per request: "it should only have approved exit data"): everyone the Instructor Archive marks
+// Exited whose Darwin exit is APPROVED -- pending / other exits are left out. Three scopes on top, all approved-only: All approved exits
+// (instructors, mentors, Support, payroll) / Instructors & mentors (the Overview Exit data rule: not payroll, not Support) / Support. One table: rows = the chosen breakdown (Campus, Subject, Deployed vs Training, University payroll vs
 // NxtWave), columns = month of the date of exit (Darwin's "Date Of Exit" or a date typed in FCC -- never the date the exit was raised;
 // people without one are in the "No date of exit" column), plus a Total.
 import { useMemo, useState } from 'react';
@@ -32,9 +33,9 @@ const isApproved = (p: ArchivePerson) => (p.exit_status ?? '').trim().toLowerCas
 
 type ScopeKey = 'all' | 'approved' | 'support';
 const SCOPES: { key: ScopeKey; label: string; note: string; test: (p: ArchivePerson) => boolean }[] = [
-  { key: 'all', label: 'All department exits', note: 'Everyone the Instructor Archive marks Exited: instructors, mentors, Support and payroll.', test: () => true },
-  { key: 'approved', label: 'Approved exits', note: 'Same rule as the Overview Exit data: Darwin exit Approved, not payroll, not Support.', test: (p) => isApproved(p) && !p.is_payroll && !isSupport(p) },
-  { key: 'support', label: 'Support', note: 'Operations team (Support) exits only.', test: isSupport },
+  { key: 'all', label: 'All approved exits', note: 'Every approved exit in the department: instructors, mentors, Support and payroll.', test: () => true },
+  { key: 'approved', label: 'Instructors & mentors', note: 'Same people as the Overview Exit data: approved, not payroll, not Support.', test: (p) => !p.is_payroll && !isSupport(p) },
+  { key: 'support', label: 'Support', note: 'Operations team (Support) approved exits only.', test: isSupport },
 ];
 
 type DimKey = 'campus' | 'subject' | 'deployed' | 'payroll';
@@ -47,7 +48,7 @@ const DIMS: { key: DimKey; label: string; of: (p: ArchivePerson) => string }[] =
 
 // Filters on the people table (2026-11-12, per request: "show them as a table like the Instructors tab, with multiple filters and a
 // search"). The same filters also narrow the breakdown table above, so both always show the same people.
-type FilterKey = 'month' | 'campus' | 'subject' | 'deployed' | 'payroll' | 'manager' | 'exitStatus';
+type FilterKey = 'month' | 'campus' | 'subject' | 'deployed' | 'payroll' | 'manager';
 const FILTERS: { key: FilterKey; label: string; of: (p: ArchivePerson) => string }[] = [
   { key: 'month', label: 'Month', of: (p) => monthLabel(monthOf(p)) },
   { key: 'campus', label: 'Campus', of: (p) => DIMS[0].of(p) },
@@ -55,9 +56,8 @@ const FILTERS: { key: FilterKey; label: string; of: (p: ArchivePerson) => string
   { key: 'deployed', label: 'Deployed / Training', of: (p) => DIMS[2].of(p) },
   { key: 'payroll', label: 'Payroll / NxtWave', of: (p) => DIMS[3].of(p) },
   { key: 'manager', label: 'Capability Manager', of: (p) => p.capability_manager || 'No Capability Manager' },
-  { key: 'exitStatus', label: 'Darwin exit status', of: (p) => p.exit_status || 'No exit record' },
 ];
-const EMPTY_FILTERS: Record<FilterKey, string[]> = { month: [], campus: [], subject: [], deployed: [], payroll: [], manager: [], exitStatus: [] };
+const EMPTY_FILTERS: Record<FilterKey, string[]> = { month: [], campus: [], subject: [], deployed: [], payroll: [], manager: [] };
 
 const NO_DATE = 'none';
 const monthOf = (p: ArchivePerson) => (p.date_of_exit ? p.date_of_exit.slice(0, 7) : NO_DATE);
@@ -73,11 +73,9 @@ export default function ExitBreakdownPage() {
     },
   });
   const [scope, setScope] = useState<ScopeKey>('all');
-  const [dim, setDim] = useState<DimKey>('campus');
   const scopeDef = SCOPES.find((s) => s.key === scope)!;
-  const dimDef = DIMS.find((d) => d.key === dim)!;
 
-  const exits = useMemo(() => (query.data?.people ?? []).filter((p) => p.status === 'Exited'), [query.data]);
+  const exits = useMemo(() => (query.data?.people ?? []).filter((p) => p.status === 'Exited' && isApproved(p)), [query.data]); // approved exits only
   const scoped = useMemo(() => exits.filter(scopeDef.test), [exits, scopeDef]);
   const [filters, setFilters] = useState<Record<FilterKey, string[]>>(EMPTY_FILTERS);
   const [search, setSearch] = useState('');
@@ -104,26 +102,12 @@ export default function ExitBreakdownPage() {
   const listRows = useMemo(() => [...people].sort((a, b) => (b.date_of_exit ?? '').localeCompare(a.date_of_exit ?? '') || a.full_name.localeCompare(b.full_name)), [people]);
   const pager = usePagedRows(listRows, 50);
 
-  const table = useMemo(() => {
-    const months = [...new Set(people.map(monthOf))].sort((a, b) => (a === NO_DATE ? 1 : b === NO_DATE ? -1 : b.localeCompare(a)));
-    const rows = new Map<string, Map<string, number>>();
-    for (const p of people) {
-      const r = dimDef.of(p);
-      const m = monthOf(p);
-      if (!rows.has(r)) rows.set(r, new Map());
-      rows.get(r)!.set(m, (rows.get(r)!.get(m) ?? 0) + 1);
-    }
-    const total = (cells: Map<string, number>) => [...cells.values()].reduce((a, b) => a + b, 0);
-    const sorted = [...rows.entries()].sort((a, b) => total(b[1]) - total(a[1]) || a[0].localeCompare(b[0]));
-    const monthTotals = months.map((m) => people.filter((p) => monthOf(p) === m).length);
-    return { months, rows: sorted.map(([label, cells]) => ({ label, cells, total: total(cells) })), monthTotals };
-  }, [people, dimDef]);
 
   const download = () => {
     downloadCsv(`exit-breakdown-${scope}-${new Date().toISOString().slice(0, 10)}.csv`, toCsv(
-      ['Name', 'Employee ID', 'Date of exit', 'Month', 'Campus', 'Subject', 'Deployed / Training', 'University payroll / NxtWave', 'Darwin exit status', 'Capability Manager'],
+      ['Name', 'Employee ID', 'Date of exit', 'Month', 'Campus', 'Subject', 'Deployed / Training', 'University payroll / NxtWave', 'Capability Manager'],
       listRows.map((p) => [
-        p.full_name, p.employee_id ?? '', p.date_of_exit ?? '', monthLabel(monthOf(p)), DIMS[0].of(p), DIMS[1].of(p), DIMS[2].of(p), DIMS[3].of(p), p.exit_status ?? '', p.capability_manager ?? '',
+        p.full_name, p.employee_id ?? '', p.date_of_exit ?? '', monthLabel(monthOf(p)), DIMS[0].of(p), DIMS[1].of(p), DIMS[2].of(p), DIMS[3].of(p), p.capability_manager ?? '',
       ]),
     ));
   };
@@ -133,16 +117,16 @@ export default function ExitBreakdownPage() {
 
   return <div className="mx-auto max-w-[1500px]">
     <PageIntro
-      eyebrow="instructor_archive — exited people, by month of exit"
+      eyebrow="instructor_archive — approved exits, by month of exit"
       title="Exit Breakdown"
-      description="Exits of the Instructor Department by month, split by campus, subject, deployed vs training, or university payroll vs NxtWave. The month is the date of exit (Darwin's Date Of Exit, or a date typed in FCC) -- never the date the exit was raised."
+      description="Approved exits (Darwin exit status Approved) of the Instructor Department. Filter by month, campus, subject, deployed vs training, university payroll vs NxtWave or Capability Manager, or search by name. The date is the date of exit (Darwin's Date Of Exit, or a date typed in FCC) -- never the date the exit was raised."
       action={<DownloadCsvButton onClick={download} disabled={people.length === 0} label={`Download CSV (${people.length})`} testId="button-download-exit-breakdown" />}
     />
     {query.isLoading && <SkeletonBlock className="h-[420px]" />}
     {query.isError && <QueryError message="Exit Breakdown is unavailable right now." />}
     {query.data && <>
       <div className="mb-5 grid max-w-3xl grid-cols-1 gap-3 sm:grid-cols-3">
-        <TopStat label={scopeDef.label} value={formatKpi(people.length)} meta="Exited, in this view" icon={<LogOut size={16} />} tone="navy" />
+        <TopStat label={scopeDef.label} value={formatKpi(people.length)} meta="Approved exits, in this view" icon={<LogOut size={16} />} tone="navy" />
         <TopStat label="NxtWave" value={formatKpi(people.length - payroll)} meta="Darwin employees" icon={<LogOut size={16} />} tone="teal" />
         <TopStat label="University payroll" value={formatKpi(payroll)} meta="Payroll converted" icon={<LogOut size={16} />} tone="amber" />
       </div>
@@ -155,46 +139,17 @@ export default function ExitBreakdownPage() {
         {FILTERS.map((f) => <MultiSelectFilter key={f.key} label={f.label} options={optionsFor(f.key)} selected={filters[f.key]} onChange={(next) => { setFilters((cur) => ({ ...cur, [f.key]: next })); pager.setPage(1); }} testId={`filter-exit-${f.key}`} />)}
         {anyFilter && <button type="button" data-testid="button-clear-exit-filters" onClick={() => { setFilters(EMPTY_FILTERS); setSearch(''); }} className="text-[12px] font-bold text-primary underline-offset-2 hover:underline">Clear filters</button>}
       </div>
-      <div className="mb-3 flex flex-wrap items-center gap-1.5">
-        <span className="mr-1 text-[11px] font-bold uppercase tracking-[0.1em] text-muted-foreground">Break down by</span>
-        {DIMS.map((d) => <button key={d.key} type="button" data-testid={`button-exit-dim-${d.key}`} onClick={() => setDim(d.key)} className={chip(dim === d.key)}>{d.label}</button>)}
-      </div>
-      <div className="overflow-x-auto rounded-xl border border-border bg-card">
-        <table className="w-full min-w-[640px] border-collapse text-[12px]">
-          <thead>
-            <tr className="border-b border-border bg-secondary/60 text-left">
-              <th className="sticky left-0 z-10 bg-secondary px-3 py-2.5 font-extrabold">{dimDef.label}</th>
-              {table.months.map((m) => <th key={m} className="whitespace-nowrap px-3 py-2.5 text-right font-bold">{monthLabel(m)}</th>)}
-              <th className="px-3 py-2.5 text-right font-extrabold">Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            {table.rows.length === 0 && <tr><td colSpan={table.months.length + 2} className="px-3 py-6 text-center text-muted-foreground">No exits in this view.</td></tr>}
-            {table.rows.map((r) => <tr key={r.label} className="border-b border-border/60 hover:bg-secondary/40">
-              <td className="sticky left-0 z-10 bg-card px-3 py-2 font-semibold">{r.label}</td>
-              {table.months.map((m) => <td key={m} className="px-3 py-2 text-right tabular-nums">{r.cells.get(m) || <span className="text-muted-foreground/50">–</span>}</td>)}
-              <td className="px-3 py-2 text-right font-extrabold tabular-nums">{r.total}</td>
-            </tr>)}
-            {table.rows.length > 0 && <tr className="bg-secondary/60 font-extrabold">
-              <td className="sticky left-0 z-10 bg-secondary px-3 py-2.5">Total</td>
-              {table.monthTotals.map((n, i) => <td key={table.months[i]} className="px-3 py-2.5 text-right tabular-nums">{n}</td>)}
-              <td className="px-3 py-2.5 text-right tabular-nums">{people.length}</td>
-            </tr>}
-          </tbody>
-        </table>
-      </div>
-
-      <h2 className="mb-2 mt-8 text-[14px] font-extrabold tracking-[-0.02em]">People ({people.length.toLocaleString('en-IN')})</h2>
+      <h2 className="mb-2 mt-2 text-[14px] font-extrabold tracking-[-0.02em]">People ({people.length.toLocaleString('en-IN')})</h2>
       <div className="overflow-x-auto rounded-xl border border-border bg-card">
         <table className="w-full min-w-[1100px] border-collapse text-[12px]">
           <thead>
             <tr className="border-b border-border bg-secondary/60 text-left">
-              {['Name', 'Employee ID', 'Date of exit', 'Campus', 'Subject', 'Deployed / Training', 'Payroll / NxtWave', 'Darwin exit status', 'Capability Manager'].map((h, i) =>
+              {['Name', 'Employee ID', 'Date of exit', 'Campus', 'Subject', 'Deployed / Training', 'Payroll / NxtWave', 'Capability Manager'].map((h, i) =>
                 <th key={h} className={`whitespace-nowrap px-3 py-2.5 font-extrabold ${i === 0 ? 'sticky left-0 z-10 bg-secondary' : ''}`}>{h}</th>)}
             </tr>
           </thead>
           <tbody>
-            {pager.pageRows.length === 0 && <tr><td colSpan={9} className="px-3 py-6 text-center text-muted-foreground">No people match these filters.</td></tr>}
+            {pager.pageRows.length === 0 && <tr><td colSpan={8} className="px-3 py-6 text-center text-muted-foreground">No people match these filters.</td></tr>}
             {pager.pageRows.map((p) => <tr key={p.id} className="border-b border-border/60 hover:bg-secondary/40" data-testid={`row-exit-${p.id}`}>
               <td className="sticky left-0 z-10 bg-card px-3 py-2 font-semibold">{p.full_name}</td>
               <td className="px-3 py-2 font-mono-ui text-[11px]">{p.employee_id ?? '—'}</td>
@@ -203,7 +158,6 @@ export default function ExitBreakdownPage() {
               <td className="px-3 py-2">{DIMS[1].of(p)}</td>
               <td className="px-3 py-2">{DIMS[2].of(p)}</td>
               <td className="px-3 py-2">{DIMS[3].of(p)}</td>
-              <td className="px-3 py-2">{p.exit_status ?? <span className="text-muted-foreground">No exit record</span>}</td>
               <td className="px-3 py-2">{p.capability_manager ?? <span className="text-muted-foreground">—</span>}</td>
             </tr>)}
           </tbody>
