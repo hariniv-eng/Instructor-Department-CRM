@@ -23,6 +23,7 @@ type ArchivePerson = {
   is_payroll: boolean;
   date_of_exit: string | null;
   exit_status: string | null;
+  exit_date: string | null; // Darwin "Exit Date" -- when the exit was raised (2026-11-12: own column, never used as the date of exit)
   status: 'Active' | 'Exited' | 'SNP';
   deployed_or_training?: string;
   manual_exit_date?: string | null;
@@ -57,8 +58,11 @@ const DIMS: { key: DimKey; label: string; of: (p: ArchivePerson) => string }[] =
 
 // Filters on the people table (2026-11-12, per request: "show them as a table like the Instructors tab, with multiple filters and a
 // search"). The same filters also narrow the breakdown table above, so both always show the same people.
-type FilterKey = 'month' | 'campus' | 'subject' | 'deployed' | 'payroll' | 'manager';
+// Role (2026-11-12, per request): Instructor / Mentor / Support, from the team the Instructor Archive filed the person under.
+const roleOf = (p: ArchivePerson) => (isSupport(p) ? 'Support' : p.classification === 'mentor' ? 'Mentor' : 'Instructor');
+type FilterKey = 'role' | 'month' | 'campus' | 'subject' | 'deployed' | 'payroll' | 'manager';
 const FILTERS: { key: FilterKey; label: string; of: (p: ArchivePerson) => string }[] = [
+  { key: 'role', label: 'Role', of: roleOf },
   { key: 'month', label: 'Month', of: (p) => monthLabel(monthOf(p)) },
   { key: 'campus', label: 'Campus', of: (p) => DIMS[0].of(p) },
   { key: 'subject', label: 'Subject', of: (p) => DIMS[1].of(p) },
@@ -66,7 +70,7 @@ const FILTERS: { key: FilterKey; label: string; of: (p: ArchivePerson) => string
   { key: 'payroll', label: 'Payroll / NxtWave', of: (p) => DIMS[3].of(p) },
   { key: 'manager', label: 'Capability Manager', of: (p) => p.capability_manager || 'No Capability Manager' },
 ];
-const EMPTY_FILTERS: Record<FilterKey, string[]> = { month: [], campus: [], subject: [], deployed: [], payroll: [], manager: [] };
+const EMPTY_FILTERS: Record<FilterKey, string[]> = { role: [], month: [], campus: [], subject: [], deployed: [], payroll: [], manager: [] };
 
 const NO_DATE = 'none';
 const monthOf = (p: ArchivePerson) => { const d = exitDateOf(p); return d ? d.slice(0, 7) : NO_DATE; };
@@ -114,9 +118,9 @@ export default function ExitBreakdownPage() {
 
   const download = () => {
     downloadCsv(`exit-breakdown-${scope}-${new Date().toISOString().slice(0, 10)}.csv`, toCsv(
-      ['Name', 'Employee ID', 'Date of exit', 'Month', 'Campus', 'Subject', 'Deployed / Training', 'University payroll / NxtWave', 'Exit type', 'Capability Manager'],
+      ['Name', 'Employee ID', 'Role', 'Exit date', 'Date of exit', 'Month', 'Campus', 'Subject', 'Deployed / Training', 'University payroll / NxtWave', 'Exit type', 'Capability Manager'],
       listRows.map((p) => [
-        p.full_name, p.employee_id ?? '', exitDateOf(p) ?? '', monthLabel(monthOf(p)), DIMS[0].of(p), DIMS[1].of(p), DIMS[2].of(p), DIMS[3].of(p), exitTypeOf(p), p.capability_manager ?? '',
+        p.full_name, p.employee_id ?? '', roleOf(p), p.exit_date ?? '', exitDateOf(p) ?? '', monthLabel(monthOf(p)), DIMS[0].of(p), DIMS[1].of(p), DIMS[2].of(p), DIMS[3].of(p), exitTypeOf(p), p.capability_manager ?? '',
       ]),
     ));
   };
@@ -153,15 +157,17 @@ export default function ExitBreakdownPage() {
         <table className="w-full min-w-[1100px] border-collapse text-[12px]">
           <thead>
             <tr className="border-b border-border bg-secondary/60 text-left">
-              {['Name', 'Employee ID', 'Date of exit', 'Campus', 'Subject', 'Deployed / Training', 'Payroll / NxtWave', 'Exit type', 'Capability Manager'].map((h, i) =>
+              {['Name', 'Employee ID', 'Role', 'Exit date', 'Date of exit', 'Campus', 'Subject', 'Deployed / Training', 'Payroll / NxtWave', 'Exit type', 'Capability Manager'].map((h, i) =>
                 <th key={h} className={`whitespace-nowrap px-3 py-2.5 font-extrabold ${i === 0 ? 'sticky left-0 z-10 bg-secondary' : ''}`}>{h}</th>)}
             </tr>
           </thead>
           <tbody>
-            {pager.pageRows.length === 0 && <tr><td colSpan={9} className="px-3 py-6 text-center text-muted-foreground">No people match these filters.</td></tr>}
+            {pager.pageRows.length === 0 && <tr><td colSpan={11} className="px-3 py-6 text-center text-muted-foreground">No people match these filters.</td></tr>}
             {pager.pageRows.map((p) => <tr key={p.id} className="border-b border-border/60 hover:bg-secondary/40" data-testid={`row-exit-${p.id}`}>
               <td className="sticky left-0 z-10 bg-card px-3 py-2 font-semibold">{p.full_name}</td>
               <td className="px-3 py-2 font-mono-ui text-[11px]">{p.employee_id ?? '—'}</td>
+              <td className="whitespace-nowrap px-3 py-2">{roleOf(p)}</td>
+              <td className="whitespace-nowrap px-3 py-2">{p.exit_date ? new Date(`${p.exit_date}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : <span className="text-muted-foreground">—</span>}</td>
               <td className="whitespace-nowrap px-3 py-2">{exitDateOf(p) ? new Date(`${exitDateOf(p)}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : <span className="text-muted-foreground">—</span>}</td>
               <td className="px-3 py-2">{DIMS[0].of(p)}</td>
               <td className="px-3 py-2">{DIMS[1].of(p)}</td>
