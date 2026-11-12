@@ -35,7 +35,6 @@
 import { BigQuery } from "@google-cloud/bigquery";
 import { config, missing } from "./config";
 import { runWithHardTimeout, HardTimeout } from "./timeout";
-import { getSchema } from "./instructorLearningStatus";
 import { TRAINING_COURSE_TAXONOMY } from "../../data/trainingCourseTaxonomy";
 import { TEACHING_COURSE_SUBJECTS, TAUGHT_COURSE_TITLE_SUBJECTS } from "../../data/teachingCourseSubjects";
 
