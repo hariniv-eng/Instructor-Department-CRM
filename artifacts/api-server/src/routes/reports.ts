@@ -9,6 +9,7 @@ import { TECH_AREAS, normalizeSubjectArea } from "../lib/departmentTaxonomy";
 import { isPinnedConfirmedInstructor, TEACHOS_ONLY_UNREVIEWED } from "../data/classificationOverrides";
 import { productOf } from "../lib/product";
 import { taughtSubjectColumn, courseColumnOf, portalColumnOf, TAUGHT_SUBJECT_COLUMNS } from "../lib/connectors/taughtTraining";
+import { ASSESSMENT_COURSES, fetchTopinAssessments, normUid } from "../lib/connectors/topinAssessments";
 import { LECTURE_COURSES } from "../data/lectureSessions";
 
 // Pinned edge-case instructors (NW0005068): see isPinnedConfirmedInstructor() in
@@ -1669,6 +1670,40 @@ router.get("/reports/demo-training", requireAuth, requireRole("admin"), async (_
     courses: [...courses.values()].sort((a, b) => TAUGHT_SUBJECT_COLUMNS.indexOf(a.subject as (typeof TAUGHT_SUBJECT_COLUMNS)[number]) - TAUGHT_SUBJECT_COLUMNS.indexOf(b.subject as (typeof TAUGHT_SUBJECT_COLUMNS)[number]) || a.order - b.order),
     subject_columns: TAUGHT_SUBJECT_COLUMNS,
     synced_at: demoRows[0]?.syncedAt ?? null,
+  });
+});
+
+// Training - Assessments (2026-11-12, per request: topin assessment data in FCC, all subjects). Same people as Training - Demos (NIAT
+// Deployed and Training, in TeachOS). Per instructor and course: Daily and Weekly exams taken + average best score (%). Read live from the
+// trainee exam best-scores view (connectors/topinAssessments.ts, cached 10 minutes; ?refresh=1 reads it again).
+router.get("/reports/topin-assessments", requireAuth, requireRole("admin"), async (req, res) => {
+  const allRows = await db.select().from(instructorsTable);
+  const people = allRows.filter((r) => r.inTeachos && r.teachosUserId && !TRAINING_STATS_EXCLUDED_CLASSIFICATIONS.has(r.classification ?? "") && DEMO_PRODUCTS.has(productOf(r)));
+  let data: Awaited<ReturnType<typeof fetchTopinAssessments>>;
+  try {
+    data = await fetchTopinAssessments(req.query.refresh === "1");
+  } catch (err) {
+    res.status(502).json({ error: `Assessment data is not readable right now: ${(err as Error).message.slice(0, 200)}` });
+    return;
+  }
+  const rows = people.flatMap((p) => {
+    const courses = data.byUid.get(normUid(p.teachosUserId!));
+    if (!courses) return [];
+    return [{
+      employee_id: p.employeeId,
+      full_name: p.fullName,
+      product: productOf(p),
+      subject_area: normalizeSubjectArea(p.deptArea || p.manualDeptArea || null),
+      capability_manager: p.teachosManager || p.manualCapabilityManager || null,
+      courses,
+    }];
+  }).sort((a, b) => a.full_name.localeCompare(b.full_name));
+  const used = new Set(rows.flatMap((r) => Object.keys(r.courses)));
+  res.json({
+    rows,
+    courses: ASSESSMENT_COURSES.filter((c) => used.has(c.key)).map((c) => ({ course_id: c.key, title: c.title, subject: c.subject })),
+    subject_columns: TAUGHT_SUBJECT_COLUMNS,
+    fetched_at: data.fetchedAt,
   });
 });
 
