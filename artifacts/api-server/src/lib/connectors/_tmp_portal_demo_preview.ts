@@ -46,7 +46,7 @@ async function main() {
   for (const r of units as Record<string, unknown>[]) {
     const k = courseOf(plain(r.cid), plain(r.ct), plain(r.tt));
     if (!k) continue;
-    const c = per.get(k) ?? { topics: new Set(), types: new Map(), unitKeys: new Set(), topicKeys: new Set(), list: [] };
+    const c: C = per.get(k) ?? { topics: new Set<string>(), types: new Map<string, number>(), unitKeys: new Set<string>(), topicKeys: new Set<string>(), list: [] };
     c.topics.add(plain(r.tt));
     c.types.set(plain(r.ty) || "(blank)", (c.types.get(plain(r.ty) || "(blank)") ?? 0) + 1);
     if (plain(r.ut)) c.unitKeys.add(demoNameKey(plain(r.ut)));
