@@ -22,6 +22,11 @@ Commit messages stay short (title + 2-3 lines); this file is the detailed record
 | What the Instructor Archive stores (joining date, gender, subject ...) | `artifacts/api-server/src/lib/archiveInstructors.ts` |
 | One-off read-only checks | `artifacts/api-server/src/lib/connectors/_tmp_*.ts` |
 
+## 2026-11-12
+- **New tab: Exit Breakdown** (Admin only, per request). One table of exits by month (columns, newest first, plus "No date of exit" and Total) against a chosen breakdown (rows): Campus, Subject, Deployed vs Training, or University payroll vs NxtWave. Three scopes: All department exits (everyone the Instructor Archive marks Exited -- instructors, mentors, Support, payroll), Approved exits (Overview Exit data rule) and Support. Month = date of exit only (Darwin's Date Of Exit or a typed date). Below it, a People table like the Instructors tab: search by name / employee ID and multi-select filters (Month, Campus, Subject, Deployed / Training, Payroll / NxtWave, Capability Manager, Darwin exit status); the filters narrow the breakdown table too. CSV download with the names. Reads the existing `/api/reports/instructor-archive`; no API or DB change.
+  Files: `artifacts/instructor-crm/src/pages/exit-breakdown.tsx` (new), `App.tsx`, `components/app-shell.tsx`. After pull: Publish (no Sync needed).
+
+
 ## 2026-11-11
 - **Date of exit = Darwin's "Date Of Exit" only** (per request: pending-approval people were on Remove access with a date the exit data does not have). The "Lwd As Per Notice Period" backup added on 2026-11-09 is removed -- Darwin fills that projected date even while an exit is still Pending With Approver, which gave pending people a date of exit and moved them onto the Remove access list. Now: no "Date Of Exit" in the exit data = no date of exit anywhere (Instructors tab, Overview lists, Archive, profile); a date typed in FCC by a Capability Manager still wins. Pending people without a date go back to the Serving notice list.
   Files: `artifacts/api-server/src/lib/reconcile.ts` (`lastWorkingDateOf`), `routes/reports.ts` (archive exit lookup). Check: `src/lib/connectors/_tmp_exit_date_origin.ts`. After pull: Publish, then Sync Now.
