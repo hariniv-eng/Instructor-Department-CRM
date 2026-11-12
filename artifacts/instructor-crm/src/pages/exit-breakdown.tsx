@@ -25,15 +25,24 @@ type ArchivePerson = {
   exit_status: string | null;
   status: 'Active' | 'Exited' | 'SNP';
   deployed_or_training?: string;
+  manual_exit_date?: string | null;
 };
 
 const SUPPORT_CLASSIFICATIONS = new Set(['excluded_ops_managers', 'instructor_ops']);
 const isSupport = (p: ArchivePerson) => SUPPORT_CLASSIFICATIONS.has(p.classification ?? '');
 const isApproved = (p: ArchivePerson) => (p.exit_status ?? '').trim().toLowerCase() === 'approved';
+// Payroll instructors who LEFT the organisation (2026-11-12, per request): they are not on Darwin, so they have no approved Darwin
+// exit -- the Capability Manager types their date of exit in FCC instead. A payroll person with a typed date of exit that is today or
+// earlier counts as an exit, dated by that typed date. (Payroll people the archive already marks Exited with an approved Darwin exit
+// stay in, as before.)
+const todayIst = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+const isPayrollExit = (p: ArchivePerson) => p.is_payroll && !!p.manual_exit_date && p.manual_exit_date <= todayIst;
+const exitDateOf = (p: ArchivePerson) => (isPayrollExit(p) ? p.manual_exit_date ?? null : p.date_of_exit);
+const exitTypeOf = (p: ArchivePerson) => (isPayrollExit(p) ? 'Payroll -- date typed in FCC' : 'Darwin exit approved');
 
 type ScopeKey = 'all' | 'approved' | 'support';
 const SCOPES: { key: ScopeKey; label: string; note: string; test: (p: ArchivePerson) => boolean }[] = [
-  { key: 'all', label: 'All approved exits', note: 'Every approved exit in the department: instructors, mentors, Support and payroll.', test: () => true },
+  { key: 'all', label: 'All exits', note: 'Every approved exit in the department (instructors, mentors, Support) plus payroll instructors who left (date of exit typed in FCC).', test: () => true },
   { key: 'approved', label: 'Instructors & mentors', note: 'Same people as the Overview Exit data: approved, not payroll, not Support.', test: (p) => !p.is_payroll && !isSupport(p) },
   { key: 'support', label: 'Support', note: 'Operations team (Support) approved exits only.', test: isSupport },
 ];
@@ -60,7 +69,7 @@ const FILTERS: { key: FilterKey; label: string; of: (p: ArchivePerson) => string
 const EMPTY_FILTERS: Record<FilterKey, string[]> = { month: [], campus: [], subject: [], deployed: [], payroll: [], manager: [] };
 
 const NO_DATE = 'none';
-const monthOf = (p: ArchivePerson) => (p.date_of_exit ? p.date_of_exit.slice(0, 7) : NO_DATE);
+const monthOf = (p: ArchivePerson) => { const d = exitDateOf(p); return d ? d.slice(0, 7) : NO_DATE; };
 const monthLabel = (m: string) => (m === NO_DATE ? 'No date of exit' : new Date(`${m}-01T00:00:00`).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' }));
 
 export default function ExitBreakdownPage() {
@@ -75,7 +84,7 @@ export default function ExitBreakdownPage() {
   const [scope, setScope] = useState<ScopeKey>('all');
   const scopeDef = SCOPES.find((s) => s.key === scope)!;
 
-  const exits = useMemo(() => (query.data?.people ?? []).filter((p) => p.status === 'Exited' && isApproved(p)), [query.data]); // approved exits only
+  const exits = useMemo(() => (query.data?.people ?? []).filter((p) => isPayrollExit(p) || (p.status === 'Exited' && isApproved(p))), [query.data]); // approved exits + payroll exits (typed date)
   const scoped = useMemo(() => exits.filter(scopeDef.test), [exits, scopeDef]);
   const [filters, setFilters] = useState<Record<FilterKey, string[]>>(EMPTY_FILTERS);
   const [search, setSearch] = useState('');
@@ -99,15 +108,15 @@ export default function ExitBreakdownPage() {
     return entries.map(([label, count]) => ({ key: label, label, count }));
   };
   const anyFilter = search.trim() !== '' || FILTERS.some((f) => filters[f.key].length > 0);
-  const listRows = useMemo(() => [...people].sort((a, b) => (b.date_of_exit ?? '').localeCompare(a.date_of_exit ?? '') || a.full_name.localeCompare(b.full_name)), [people]);
+  const listRows = useMemo(() => [...people].sort((a, b) => (exitDateOf(b) ?? '').localeCompare(exitDateOf(a) ?? '') || a.full_name.localeCompare(b.full_name)), [people]);
   const pager = usePagedRows(listRows, 50);
 
 
   const download = () => {
     downloadCsv(`exit-breakdown-${scope}-${new Date().toISOString().slice(0, 10)}.csv`, toCsv(
-      ['Name', 'Employee ID', 'Date of exit', 'Month', 'Campus', 'Subject', 'Deployed / Training', 'University payroll / NxtWave', 'Capability Manager'],
+      ['Name', 'Employee ID', 'Date of exit', 'Month', 'Campus', 'Subject', 'Deployed / Training', 'University payroll / NxtWave', 'Exit type', 'Capability Manager'],
       listRows.map((p) => [
-        p.full_name, p.employee_id ?? '', p.date_of_exit ?? '', monthLabel(monthOf(p)), DIMS[0].of(p), DIMS[1].of(p), DIMS[2].of(p), DIMS[3].of(p), p.capability_manager ?? '',
+        p.full_name, p.employee_id ?? '', exitDateOf(p) ?? '', monthLabel(monthOf(p)), DIMS[0].of(p), DIMS[1].of(p), DIMS[2].of(p), DIMS[3].of(p), exitTypeOf(p), p.capability_manager ?? '',
       ]),
     ));
   };
@@ -144,20 +153,21 @@ export default function ExitBreakdownPage() {
         <table className="w-full min-w-[1100px] border-collapse text-[12px]">
           <thead>
             <tr className="border-b border-border bg-secondary/60 text-left">
-              {['Name', 'Employee ID', 'Date of exit', 'Campus', 'Subject', 'Deployed / Training', 'Payroll / NxtWave', 'Capability Manager'].map((h, i) =>
+              {['Name', 'Employee ID', 'Date of exit', 'Campus', 'Subject', 'Deployed / Training', 'Payroll / NxtWave', 'Exit type', 'Capability Manager'].map((h, i) =>
                 <th key={h} className={`whitespace-nowrap px-3 py-2.5 font-extrabold ${i === 0 ? 'sticky left-0 z-10 bg-secondary' : ''}`}>{h}</th>)}
             </tr>
           </thead>
           <tbody>
-            {pager.pageRows.length === 0 && <tr><td colSpan={8} className="px-3 py-6 text-center text-muted-foreground">No people match these filters.</td></tr>}
+            {pager.pageRows.length === 0 && <tr><td colSpan={9} className="px-3 py-6 text-center text-muted-foreground">No people match these filters.</td></tr>}
             {pager.pageRows.map((p) => <tr key={p.id} className="border-b border-border/60 hover:bg-secondary/40" data-testid={`row-exit-${p.id}`}>
               <td className="sticky left-0 z-10 bg-card px-3 py-2 font-semibold">{p.full_name}</td>
               <td className="px-3 py-2 font-mono-ui text-[11px]">{p.employee_id ?? '—'}</td>
-              <td className="whitespace-nowrap px-3 py-2">{p.date_of_exit ? new Date(`${p.date_of_exit}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : <span className="text-muted-foreground">—</span>}</td>
+              <td className="whitespace-nowrap px-3 py-2">{exitDateOf(p) ? new Date(`${exitDateOf(p)}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : <span className="text-muted-foreground">—</span>}</td>
               <td className="px-3 py-2">{DIMS[0].of(p)}</td>
               <td className="px-3 py-2">{DIMS[1].of(p)}</td>
               <td className="px-3 py-2">{DIMS[2].of(p)}</td>
               <td className="px-3 py-2">{DIMS[3].of(p)}</td>
+              <td className="whitespace-nowrap px-3 py-2">{exitTypeOf(p)}</td>
               <td className="px-3 py-2">{p.capability_manager ?? <span className="text-muted-foreground">—</span>}</td>
             </tr>)}
           </tbody>
