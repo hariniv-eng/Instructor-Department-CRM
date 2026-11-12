@@ -4,6 +4,7 @@ import { db, instructorsTable, instructorArchiveTable, uploadsTable } from "@wor
 import { requireAuth, requireRole } from "../middlewares/auth";
 import { VALID_CAPABILITY_MANAGERS } from "../data/validCapabilityManagers";
 import { SUBJECT_AREAS, normalizeSubjectArea } from "../lib/departmentTaxonomy";
+import { isPayrollPerson } from "./reports";
 
 const router: IRouter = Router();
 const toApiInstructor = (row: typeof instructorsTable.$inferSelect) => ({
@@ -312,10 +313,21 @@ router.patch("/instructors/:id/exit-date", async (req, res): Promise<void> => {
     res.status(400).json({ error: "exit_date must be a real YYYY-MM-DD date (year 2000 or later), or null" });
     return;
   }
-  const [row] = await db.update(instructorsTable).set({ manualExitDate: raw }).where(eq(instructorsTable.id, Number(req.params.id))).returning();
-  if (!row) {
+  // 2026-11-12, per request (NW2000736 got a wrong typed date while he was briefly shown as payroll): a date can only be SET for a
+  // payroll person -- the same rule as the screen, which shows the calendar only for them. Clearing (null) is always allowed. Every
+  // change is logged in the uploads table ("Date of exit change"), like Employee Status changes.
+  const [current] = await db.select().from(instructorsTable).where(eq(instructorsTable.id, Number(req.params.id)));
+  if (!current) {
     res.status(404).json({ error: "Instructor not found" });
     return;
+  }
+  if (raw !== null && !isPayrollPerson(current)) {
+    res.status(400).json({ error: "A date of exit can only be typed for a payroll instructor. For everyone else it comes from Darwin's exit data." });
+    return;
+  }
+  const [row] = await db.update(instructorsTable).set({ manualExitDate: raw }).where(eq(instructorsTable.id, current.id)).returning();
+  if ((current.manualExitDate ?? null) !== (raw ?? null)) {
+    await db.insert(uploadsTable).values({ source: "Date of exit change", filename: `${current.employeeId ?? `row ${current.id}`}: ${current.manualExitDate ?? "(empty)"} -> ${raw ?? "(empty)"} on the page`, rowCount: 0 }).catch(() => {});
   }
   res.json(toApiInstructor(row));
 });
