@@ -61,3 +61,6 @@ darwinbox_exits_sample_response.json
 # CSV exports from `pnpm run export:*` — real names/emails/phone numbers,
 # never commit these.
 artifacts/api-server/exports/
+
+# Files Claude delivers (may contain staff names) -- never commit (2026-11-13)
+Claude outputs/
