@@ -47,16 +47,22 @@ export const isResolvedCourse = (c: TrainingCourseDef): boolean => c.courseTitle
 
 export const TRAINING_COURSE_TAXONOMY: TrainingCourseDef[] = [
   // --- Frontend Development ---
+  // HTML & CSS (2026) (2026-11-13, per request: "add all the course ids"): the current semester-1 portal course -- one course covering the
+  // HTML & CSS AND Modern Responsive UI lectures (HTML, CSS, Box Model, Flexbox, Media Queries, Grid, Positioning, Tailwind). Found with
+  // _tmp_person_courses.ts / _tmp_lp_course_detail.ts. Matched by course id ONLY: a small 25-unit portal course (d2563f3c...) has the same
+  // title "HTML & CSS" and must not be counted with it.
+  { key: "html_css_2026", courseIds: ["cf46b9923227407484b2f6867a00360d"], label: "HTML & CSS (2026)", trackGroup: "Frontend Development", courseTitles: [] },
   { key: "static_web", courseIds: ["6d41f35076d543379be03fe0b26b1b26"], label: "Static Web", trackGroup: "Frontend Development", courseTitles: ["Build Your Own Static Website"] },
   { key: "responsive_design", courseIds: ["62e43c70ee744afe8d1c26ca9c22947a"], label: "Responsive Design", trackGroup: "Frontend Development", courseTitles: ["Build Your Own Responsive Website"] },
   { key: "modern_responsive_ui", courseIds: ["1d571a66be1e49cda17f5b3b22d6d751"], label: "Modern Responsive UI", trackGroup: "Frontend Development", courseTitles: ["Modern Responsive Web Design"] },
-  { key: "javascript_sprint", label: "JavaScript Sprint", trackGroup: "Frontend Development", courseTitles: ["JavaScript Quick Revision"] },
+  { key: "javascript_sprint", courseIds: ["2a60221e23254a1eb4541122e3b4b678"], label: "JavaScript Sprint", trackGroup: "Frontend Development", courseTitles: ["JavaScript Quick Revision"] },
   { key: "javascript_essentials", courseIds: ["7e0446da981d4faab02df4dc605dba66"], label: "JavaScript Essentials", trackGroup: "Frontend Development", courseTitles: ["JS Essentials", "JavaScript Essentials"] },
   // Dynamic Web Application (2026-10-16, per request: "in Frontend we have a course named Dynamic Applications"). Confirmed in BigQuery with
   // _tmp_find_dynamic_course.ts: one title under two course ids (c0d9b357... 552 instructors, 5e93210e... 120 instructors). "Dynamic Website
   // TA Assessment" (a one-unit assessment) and "Phase 4: Dynamic Programming & Graph Theory" (DSA) are deliberately NOT included.
   { key: "dynamic_web_app", courseIds: ["c0d9b35787a741e2985faffaef636499", "5e93210ef183433da12d79d81deb01be"], label: "Dynamic Web App", trackGroup: "Frontend Development", courseTitles: ["Build Your Own Dynamic Web Application"] },
-  { key: "react_js", courseIds: ["f7b58b9d1a424a6681020bad28f37483"], label: "React JS", trackGroup: "Frontend Development", courseTitles: ["React JS", "Introduction to React JS"] },
+  // React JS ids 40ab5ebd... and fcac9e0c... added 2026-11-13 (both were already matched by title).
+  { key: "react_js", courseIds: ["f7b58b9d1a424a6681020bad28f37483", "40ab5ebd3def4fafadca3d39d921df1c", "fcac9e0c316c488ea869475f7ceb06a3"], label: "React JS", trackGroup: "Frontend Development", courseTitles: ["React JS", "Introduction to React JS"] },
   // --- Backend Development ---
   { key: "python", courseIds: ["b76ff0b83180494fa9a80e89c56421b1"], label: "Python", trackGroup: "Backend Development", courseTitles: ["Python Programming"] },
   { key: "sql", courseIds: ["d3cb79d46f31424cb0f8cddbdf68659f"], label: "SQL", trackGroup: "Backend Development", courseTitles: ["SQL"] },
@@ -164,7 +170,7 @@ export const TRAINING_COURSE_TAXONOMY: TrainingCourseDef[] = [
   // variants ("(P&S)" suffix, "&" vs "and").
   { key: "math_for_cs", courseIds: ["70850c6b459c4134a16c3e42d46eb794"], label: "Mathematics for Computer Science", trackGroup: "Maths", courseTitles: ["Math For Computer Science", "Mathematics For Computer Science - AU", "Math for CSE", "Mathematics for Computer Science"] },
   { key: "probability_statistics", courseIds: ["39ddb075b7e8448abac2b89baa4fb3f4"], label: "Probability and Statistics", trackGroup: "Maths", courseTitles: ["Probability and Statistics(P&S)", "Probability and Statistics", "Probability & Statistics"] },
-  { key: "linear_algebra_calculus", label: "Linear Algebra and Calculus", trackGroup: "Maths", courseTitles: ["Linear Algebra and Calculus"] },
+  { key: "linear_algebra_calculus", courseIds: ["ce546ef7181e427cb2b779492736e578"], label: "Linear Algebra and Calculus", trackGroup: "Maths", courseTitles: ["Linear Algebra and Calculus"] },
   // --- English (2026-10-14, per request: track English learning ONLY for English instructors) ---
   // Same four courses the Faculty-ops app uses for its English tab, found by course id (titles are the BigQuery
   // spellings confirmed with _tmp_course_id_check.ts). The Training Stats English tab lists only instructors whose

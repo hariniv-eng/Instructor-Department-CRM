@@ -22,6 +22,11 @@ Commit messages stay short (title + 2-3 lines); this file is the detailed record
 | What the Instructor Archive stores (joining date, gender, subject ...) | `artifacts/api-server/src/lib/archiveInstructors.ts` |
 | One-off read-only checks | `artifacts/api-server/src/lib/connectors/_tmp_*.ts` |
 
+## 2026-11-13
+- **Training - LP: course ids added** (per request: "all the course ids"). New Frontend column **HTML & CSS (2026)** = portal course `cf46b9923227407484b2f6867a00360d` (234 units: the current semester-1 course covering the HTML & CSS and Modern Responsive UI lectures), semester 1; matched by id only, because a small 25-unit course `d2563f3c...` has the same title. Ids added to columns that were matched by title only: JavaScript Sprint `2a60221e...`, React JS `40ab5ebd...` + `fcac9e0c...`, Linear Algebra and Calculus `ce546ef7...` (their numbers do not change).
+  Files: `artifacts/api-server/src/data/trainingCourseTaxonomy.ts`, `artifacts/instructor-crm/src/pages/training-stats.tsx` (`COURSE_SEMESTER`). After pull: Publish, then Training Status Sync Now.
+- `.gitignore`: the "Claude outputs/" folder (delivered files with staff names) is never committed.
+
 ## 2026-11-12
 - **New Training Stats view: Training - Assessments** (per request: topin assessment data in FCC, all subjects). Per instructor and course: Daily exams and Weekly exams -- exams taken and average best score (%), with the subject buttons, filters (Deployed / Training, Instructor subject, Capability Manager), search and CSV of Training - Demos. Read LIVE from `z_niat_tech_instrctor_trainee_exam_best_scores_details` (cached 10 min; Refresh reads again). No course column there, so exams are matched to a course by title -- rules in `ASSESSMENT_COURSES` (e.g. static_website_ = Static Web, responsive_web_ = Responsive Design, modern_responsive_ = Modern Responsive UI, js_sprint_ / JS_Essentials_, dynamic_web_, python_, databases_ = SQL, DSA, maths topics); whole-subject exams go to a General column per subject; mock / entry tests, daily quizzes and per-batch test exams are not counted.
   Files: `artifacts/api-server/src/lib/connectors/topinAssessments.ts` (new), `routes/reports.ts` (`GET /reports/topin-assessments`), `artifacts/instructor-crm/src/pages/topin-assessments.tsx` (new), `pages/training-stats.tsx`. No DB change. After pull: Publish.

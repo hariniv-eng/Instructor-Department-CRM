@@ -201,7 +201,7 @@ const HALF_COMPLETE_PCT = 50;
 // no semester yet and only count in the subject / product tables. DSML to follow.
 export const COURSE_SEMESTER: Record<string, number> = {
   // Frontend
-  static_web: 1, responsive_design: 1, modern_responsive_ui: 1,
+  html_css_2026: 1, static_web: 1, responsive_design: 1, modern_responsive_ui: 1,
   javascript_sprint: 2, javascript_essentials: 2, dynamic_web_app: 2,
   react_js: 3,
   // Backend
