@@ -72,7 +72,7 @@ type ContributionRow = {
   session_days: number;
   deployment_date: string | null;
   // Demo and AI-assessment hours (2026-10-14, per request): total recorded audio time of the person's Completed demo / AI assessment
-  // evaluations (BigQuery z_niat_instructors_demo_qa_rating_details, audio length converted from seconds to hours) and the number of
+  // evaluations (BigQuery niat_session_wise_qa_rating since 2026-11-16 -- DEMO + TRAINING_DEMO, AI_ASSESSMENT + TRAINING_AI_ASSESSMENT; audio length converted from seconds to hours) and the number of
   // evaluations. Both follow the date filter.
   demo_hours: number;
   demo_evaluations: number;
