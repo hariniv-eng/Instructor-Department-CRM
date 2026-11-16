@@ -7,6 +7,7 @@ import { ALL_PRODUCTS, MultiSelectFilter } from './instructors';
 import { TaughtTrainingView } from './taught-training';
 import { DemoTrainingView } from './demo-training';
 import { TopinAssessmentView } from './topin-assessments';
+import { TrainingReadinessView } from './training-readiness';
 
 // "Training Stats" (2026-09-23, per request): an instructor's OWN
 // training/upskilling progress, distinct from every other tab here, which
@@ -342,9 +343,11 @@ const TRAINING_VIEWS = [
   { key: 'taught', label: 'Taught in Class' },
   // Assessments (2026-11-12, per request): topin trainee exams -- Daily / Weekly exams taken and average best score (topin-assessments.tsx).
   { key: 'assessments', label: 'Training - Assessments' },
+  // Readiness (2026-11-16, per request: Pre-Deployment Readiness Phase 1) -- NIAT (Training) instructors, Green / Yellow / Red (training-readiness.tsx).
+  { key: 'readiness', label: 'Training - Readiness' },
 ] as const;
 export default function TrainingStatsPage() {
-  const [view, setView] = useState<'portal' | 'taught' | 'demos' | 'assessments'>('portal');
+  const [view, setView] = useState<'portal' | 'taught' | 'demos' | 'assessments' | 'readiness'>('portal');
   return <div className="mx-auto max-w-[1600px]">
     <div data-testid="training-view-toggle" className="mb-4 inline-flex rounded-lg border border-border bg-card p-1 shadow-sm">
       {TRAINING_VIEWS.map((v) => <button
@@ -355,7 +358,7 @@ export default function TrainingStatsPage() {
         className={`rounded-md px-3.5 py-1.5 text-[12px] font-bold transition-colors ${view === v.key ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
       >{v.label}</button>)}
     </div>
-    {view === 'portal' ? <LearningPortalStats /> : view === 'taught' ? <TaughtTrainingView /> : view === 'assessments' ? <TopinAssessmentView /> : <DemoTrainingView />}
+    {view === 'portal' ? <LearningPortalStats /> : view === 'taught' ? <TaughtTrainingView /> : view === 'assessments' ? <TopinAssessmentView /> : view === 'readiness' ? <TrainingReadinessView /> : <DemoTrainingView />}
   </div>;
 }
 
