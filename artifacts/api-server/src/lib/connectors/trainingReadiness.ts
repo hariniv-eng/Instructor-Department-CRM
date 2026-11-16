@@ -55,20 +55,40 @@ export async function fetchReadinessEvaluations(force = false): Promise<EvData> 
   return data;
 }
 
-export type ReadinessCourse = { key: string; title: string; lectures_total: number; demo_lectures: number; ai_lectures: number; both_lectures: number; demo_avg: number | null; ai_avg: number | null };
-export type Readiness = {
+// Semester of each course (2026-11-16, per request: "a semester-wise breakdown in the readiness dashboard"). Same semesters as Training -
+// LP (COURSE_SEMESTER in training-stats.tsx); lecture-list courses with their own keys placed by subject order: Introduction to English
+// Language -> Sem 1, DBMS -> Sem 2 (with SQL / MongoDB), DSA (C++) -> 2, DSA II -> 3, IPS -> 4. Topin exams on a whole subject (General
+// columns, DSA, Gen AI) have no semester and count only in "All semesters".
+export const LECTURE_SEMESTER: Record<string, number> = {
+  static_web: 1, modern_responsive_ui: 1, javascript_essentials: 2, dynamic_web_app: 2, react_js: 3,
+  python: 1, sql: 2, lecture_dbms: 2, mongodb: 2, node_js: 3,
+  lecture_dsa_c: 2, lecture_dsa_ii_hashing_linked_lists_stacks_trees_heaps: 3, lecture_ips: 4,
+  gen_ai: 1, llm: 2, ai_for_finance: 3,
+  quantitative_aptitude: 1, numerical_ability: 2, logical_reasoning: 3,
+  math_for_cs: 1, probability_statistics: 3,
+  lecture_introduction_to_english_language_and_communication: 1, english_foundation: 1, english_advanced: 2, english_applied: 3,
+};
+export const EXAM_SEMESTER: Record<string, number> = {
+  static_web: 1, responsive_design: 1, modern_responsive_ui: 1, javascript_sprint: 2, javascript_essentials: 2, dynamic_web_app: 2, react_js: 3,
+  python: 1, sql: 2, mongodb: 2, node_js: 3, math_for_cs: 1, probability_statistics: 3, linear_algebra_calculus: 4,
+};
+
+export type ReadinessCourse = { key: string; title: string; semester: number | null; lectures_total: number; demo_lectures: number; ai_lectures: number; both_lectures: number; demo_avg: number | null; ai_avg: number | null };
+export type ReadinessBlock = {
   has_lecture_list: boolean;
   lectures_total: number; demo_lectures: number; ai_lectures: number; both_lectures: number; complete: boolean;
   demo_avg: number | null; ai_avg: number | null; topn_avg: number | null; topn_exams: number;
   demo_colour: Colour; ai_colour: Colour; topn_colour: Colour; overall: "green" | "yellow" | "red";
-  courses: ReadinessCourse[];
 };
+/** Top level = all semesters; semesters = the same block for each semester the subject has courses in. */
+export type Readiness = ReadinessBlock & { courses: ReadinessCourse[]; semesters: Record<string, ReadinessBlock> };
+type Best = { demo: number | null; ai: number | null; demoDone: boolean; aiDone: boolean };
 
 export function readinessOf(subject: string | null, evs: Ev[], w: DemoWindow | undefined, exams: Record<string, ExamCell> | undefined,
   idx: ReturnType<typeof lectureNameIndex> = lectureNameIndex()): Readiness {
   const own = LECTURE_COURSES.map((c, ci) => ({ c, ci })).filter((x) => subject && x.c.subject === subject);
   const ownCi = new Set(own.map((x) => x.ci));
-  const best = new Map<string, { demo: number | null; ai: number | null; demoDone: boolean; aiDone: boolean }>(); // `${ci}|${n}`
+  const best = new Map<string, Best>(); // `${ci}|${n}`
   for (const e of evs) {
     if (!demoKindOf(e.type, e.date, w).endsWith("_training")) continue;
     const ai = e.type.endsWith("AI_ASSESSMENT");
@@ -81,31 +101,33 @@ export function readinessOf(subject: string | null, evs: Ev[], w: DemoWindow | u
       best.set(k, b);
     }
   }
+  const lecturesOf = (ci: number) => LECTURE_COURSES[ci].lectures.map((l) => best.get(`${ci}|${l.n}`)).filter((b): b is Best => !!b);
+  const scores = (lec: Best[], k: "demo" | "ai") => lec.flatMap((b) => (b[k] === null ? [] : [b[k] as number]));
   const courses: ReadinessCourse[] = own.map(({ c, ci }) => {
-    const lec = c.lectures.map((l) => best.get(`${ci}|${l.n}`)).filter((b): b is NonNullable<typeof b> => !!b);
-    return { key: c.key, title: c.title, lectures_total: c.lectures.length,
+    const lec = lecturesOf(ci);
+    return { key: c.key, title: c.title, semester: LECTURE_SEMESTER[c.key] ?? null, lectures_total: c.lectures.length,
       demo_lectures: lec.filter((b) => b.demoDone).length, ai_lectures: lec.filter((b) => b.aiDone).length, both_lectures: lec.filter((b) => b.demoDone && b.aiDone).length,
-      demo_avg: avg(lec.flatMap((b) => (b.demo === null ? [] : [b.demo]))), ai_avg: avg(lec.flatMap((b) => (b.ai === null ? [] : [b.ai]))) };
+      demo_avg: avg(scores(lec, "demo")), ai_avg: avg(scores(lec, "ai")) };
   });
-  const all = [...best.values()];
-  const demo_avg = avg(all.flatMap((b) => (b.demo === null ? [] : [b.demo])));
-  const ai_avg = avg(all.flatMap((b) => (b.ai === null ? [] : [b.ai])));
-  // Top-N: Daily + Weekly exams of the instructor's subject -- average best % over all those exams.
-  let n = 0, sum = 0;
-  for (const c of ASSESSMENT_COURSES) {
-    if (c.subject !== subject) continue;
-    for (const x of [exams?.[c.key]?.daily, exams?.[c.key]?.weekly]) if (x && x.avg !== null) { n += x.exams; sum += x.avg * x.exams; }
-  }
-  const topn_avg = n ? Math.round((sum / n) * 10) / 10 : null;
-  const lectures_total = courses.reduce((a, c) => a + c.lectures_total, 0);
-  const both = courses.reduce((a, c) => a + c.both_lectures, 0);
-  const complete = lectures_total > 0 && both === lectures_total;
-  const demo_colour = colourOf(demo_avg, READINESS_THRESHOLDS.demo), ai_colour = colourOf(ai_avg, READINESS_THRESHOLDS.ai), topn_colour = colourOf(topn_avg, READINESS_THRESHOLDS.topn);
-  const rank = Math.min(RANK[demo_colour], RANK[ai_colour], RANK[topn_colour]);
-  return {
-    has_lecture_list: own.length > 0, lectures_total, complete, both_lectures: both,
-    demo_lectures: courses.reduce((a, c) => a + c.demo_lectures, 0), ai_lectures: courses.reduce((a, c) => a + c.ai_lectures, 0),
-    demo_avg, ai_avg, topn_avg, topn_exams: n, demo_colour, ai_colour, topn_colour,
-    overall: rank === 2 ? "green" : rank === 1 ? "yellow" : "red", courses,
+  // One block for a set of courses (sem = null: all courses and every exam of the subject).
+  const block = (sem: number | null): ReadinessBlock => {
+    const cs = own.filter(({ c }) => sem === null || LECTURE_SEMESTER[c.key] === sem);
+    const lec = cs.flatMap(({ ci }) => lecturesOf(ci));
+    const demo_avg = avg(scores(lec, "demo")), ai_avg = avg(scores(lec, "ai"));
+    let n = 0, sum = 0; // Top-N: Daily + Weekly exams -- average best % over all those exams
+    for (const c of ASSESSMENT_COURSES) {
+      if (c.subject !== subject || (sem !== null && EXAM_SEMESTER[c.key] !== sem)) continue;
+      for (const x of [exams?.[c.key]?.daily, exams?.[c.key]?.weekly]) if (x && x.avg !== null) { n += x.exams; sum += x.avg * x.exams; }
+    }
+    const topn_avg = n ? Math.round((sum / n) * 10) / 10 : null;
+    const lectures_total = cs.reduce((a, { c }) => a + c.lectures.length, 0);
+    const both = lec.filter((b) => b.demoDone && b.aiDone).length;
+    const demo_colour = colourOf(demo_avg, READINESS_THRESHOLDS.demo), ai_colour = colourOf(ai_avg, READINESS_THRESHOLDS.ai), topn_colour = colourOf(topn_avg, READINESS_THRESHOLDS.topn);
+    const rank = Math.min(RANK[demo_colour], RANK[ai_colour], RANK[topn_colour]);
+    return { has_lecture_list: cs.length > 0, lectures_total, complete: lectures_total > 0 && both === lectures_total, both_lectures: both,
+      demo_lectures: lec.filter((b) => b.demoDone).length, ai_lectures: lec.filter((b) => b.aiDone).length,
+      demo_avg, ai_avg, topn_avg, topn_exams: n, demo_colour, ai_colour, topn_colour, overall: rank === 2 ? "green" : rank === 1 ? "yellow" : "red" };
   };
+  const sems = [...new Set(own.map(({ c }) => LECTURE_SEMESTER[c.key]).filter((x): x is number => x !== undefined))].sort((a, b) => a - b);
+  return { ...block(null), courses, semesters: Object.fromEntries(sems.map((x) => [String(x), block(x)])) };
 }
