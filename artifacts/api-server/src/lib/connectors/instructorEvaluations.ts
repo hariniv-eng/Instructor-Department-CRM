@@ -6,13 +6,20 @@
 // What counts: only evaluations whose status is Completed (Failed / Pending / still-processing ones have no result), and one
 // evaluation per session per type -- if a session was evaluated more than once with the same type, its longest recording is used, so
 // a re-run is not double counted.
+//
+// Source switched (2026-11-16, per request: "use only niat_session_wise_qa_rating -- it's better"): the small view above is a subset of
+// niat_session_wise_qa_rating (same evaluations, same scores / lengths -- checked for NW2000396), so this now reads the QA rating view
+// that Training - Demos already uses: one demo source for the whole app. Also per request, the newer training recordings now count:
+// Demo hours = DEMO + TRAINING_DEMO, AI Assessment hours = AI_ASSESSMENT + TRAINING_AI_ASSESSMENT (since 6 Oct 2026). A session evaluated
+// under both a plain and a training type counts once (its longest recording).
 import { BigQuery } from "@google-cloud/bigquery";
+import { QA_RATING_VIEW } from "./demoTraining";
 import { config, missing } from "./config";
 import { runWithHardTimeout } from "./timeout";
 
 export class InstructorEvaluationsError extends Error {}
 
-export const EVALUATION_TABLE = process.env.INSTRUCTOR_EVALUATION_TABLE || "z_niat_instructors_demo_qa_rating_details";
+export const EVALUATION_TABLE = process.env.INSTRUCTOR_EVALUATION_TABLE || QA_RATING_VIEW;
 
 export type EvaluationDailyRow = {
   instructor_user_id: string;
@@ -46,13 +53,15 @@ export async function fetchEvaluationDailyRows(): Promise<EvaluationDailyRow[]> 
       SUM(score) AS score_sum,
       COUNTIF(score IS NOT NULL) AS scored
     FROM (
-      SELECT instructor_user_id, session_date, evaluation_type, session_id, MAX(SAFE_CAST(audio_duration AS FLOAT64)) AS secs, MAX(SAFE_CAST(final_score AS FLOAT64)) AS score
+      SELECT instructor_user_id, SAFE_CAST(session_date AS DATE) AS session_date,
+        CASE WHEN evaluation_type IN ('DEMO', 'TRAINING_DEMO') THEN 'DEMO' ELSE 'AI_ASSESSMENT' END AS evaluation_type,
+        session_id, MAX(SAFE_CAST(audio_duration AS FLOAT64)) AS secs, MAX(SAFE_CAST(final_score AS FLOAT64)) AS score
       FROM \`${ref}\`
       WHERE UPPER(status) = 'COMPLETED'
         AND instructor_user_id IS NOT NULL
-        AND session_date IS NOT NULL
-        AND evaluation_type IN ('DEMO', 'AI_ASSESSMENT')
-      GROUP BY instructor_user_id, session_date, evaluation_type, session_id
+        AND SAFE_CAST(session_date AS DATE) IS NOT NULL
+        AND evaluation_type IN ('DEMO', 'TRAINING_DEMO', 'AI_ASSESSMENT', 'TRAINING_AI_ASSESSMENT')
+      GROUP BY 1, 2, 3, 4
     )
     WHERE secs IS NOT NULL
     GROUP BY instructor_user_id, session_date, evaluation_type

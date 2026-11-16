@@ -22,6 +22,10 @@ Commit messages stay short (title + 2-3 lines); this file is the detailed record
 | What the Instructor Archive stores (joining date, gender, subject ...) | `artifacts/api-server/src/lib/archiveInstructors.ts` |
 | One-off read-only checks | `artifacts/api-server/src/lib/connectors/_tmp_*.ts` |
 
+## 2026-11-16
+- **Demo Hrs / AI Assessment Hrs now read `niat_session_wise_qa_rating`** (per request: one demo source). `z_niat_instructors_demo_qa_rating_details` is a subset of it (same evaluations, scores and lengths -- checked for NW2000396) and is no longer read. The hours now also include the training recordings: Demo Hrs = DEMO + TRAINING_DEMO, AI Assessment Hrs = AI_ASSESSMENT + TRAINING_AI_ASSESSMENT (since 6 Oct 2026). Same counting rule: completed only, one recording per session per type (the longest). Affects Contribution and the instructor profile; numbers rise for instructors with training recordings.
+  Files: `artifacts/api-server/src/lib/connectors/instructorEvaluations.ts`, `artifacts/instructor-crm/src/pages/contribution.tsx` (comment). After pull: Publish, then Contribution Sync Now. (`INSTRUCTOR_EVALUATION_TABLE` still overrides the table if ever needed.)
+
 ## 2026-11-13
 - **Training - LP: course ids added** (per request: "all the course ids"). New Frontend column **HTML & CSS (2026)** = portal course `cf46b9923227407484b2f6867a00360d` (234 units: the current semester-1 course covering the HTML & CSS and Modern Responsive UI lectures), semester 1; matched by id only, because a small 25-unit course `d2563f3c...` has the same title. Ids added to columns that were matched by title only: JavaScript Sprint `2a60221e...`, React JS `40ab5ebd...` + `fcac9e0c...`, Linear Algebra and Calculus `ce546ef7...` (their numbers do not change).
   Files: `artifacts/api-server/src/data/trainingCourseTaxonomy.ts`, `artifacts/instructor-crm/src/pages/training-stats.tsx` (`COURSE_SEMESTER`). After pull: Publish, then Training Status Sync Now.
