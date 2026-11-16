@@ -22,6 +22,12 @@ Commit messages stay short (title + 2-3 lines); this file is the detailed record
 | What the Instructor Archive stores (joining date, gender, subject ...) | `artifacts/api-server/src/lib/archiveInstructors.ts` |
 | One-off read-only checks | `artifacts/api-server/src/lib/connectors/_tmp_*.ts` |
 
+## 2026-11-16 -- Training - Readiness: semester-wise
+
+Semester buttons on Training - Readiness (All semesters, Semester 1, 2, 3, 4). A semester shows only instructors whose subject has courses in it; demo / AI scores, Top-N, completion and colours are counted on that semester's courses only. Topin exams on a whole subject (General, DSA, Gen AI) count only in All semesters. Course breakdown shows the semester.
+- Semester per course: `LECTURE_SEMESTER` / `EXAM_SEMESTER` in `api-server/src/lib/connectors/trainingReadiness.ts` (same as Training - LP; Intro to English Language -> 1, DBMS -> 2, DSA (C++) -> 2, DSA II -> 3, IPS -> 4).
+- Files: `trainingReadiness.ts`, `instructor-crm/src/pages/training-readiness.tsx`. After pulling: Publish only.
+
 ## 2026-11-16 -- Training - Readiness view (Pre-Deployment Readiness, Phase 1)
 
 New view **Training - Readiness** in Training Stats, for NIAT (Training) instructors. Show only, nothing stored.

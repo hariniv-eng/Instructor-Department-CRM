@@ -10,15 +10,17 @@ import { MultiSelectFilter } from './instructors';
 // their subject), completion (a demo AND an AI assessment on every lecture of their subject's lecture lists), a colour per score and
 // overall = the lowest of the three, with "Incomplete" beside it. Show only. Server: GET /reports/training-readiness.
 type Colour = 'green' | 'yellow' | 'red' | 'none';
-type Course = { key: string; title: string; lectures_total: number; demo_lectures: number; ai_lectures: number; both_lectures: number; demo_avg: number | null; ai_avg: number | null };
-type Row = {
-  employee_id: string | null; full_name: string; subject_area: string | null; capability_manager: string | null;
+type Course = { key: string; title: string; semester: number | null; lectures_total: number; demo_lectures: number; ai_lectures: number; both_lectures: number; demo_avg: number | null; ai_avg: number | null };
+type Block = {
   has_lecture_list: boolean; lectures_total: number; demo_lectures: number; ai_lectures: number; both_lectures: number; complete: boolean;
   demo_avg: number | null; ai_avg: number | null; topn_avg: number | null; topn_exams: number;
-  demo_colour: Colour; ai_colour: Colour; topn_colour: Colour; overall: 'green' | 'yellow' | 'red'; courses: Course[];
+  demo_colour: Colour; ai_colour: Colour; topn_colour: Colour; overall: 'green' | 'yellow' | 'red';
 };
+// Semester-wise (2026-11-16, per request): the same block for each semester of the subject's courses; the top level is all semesters.
+type ApiRow = Block & { employee_id: string | null; full_name: string; subject_area: string | null; capability_manager: string | null; courses: Course[]; semesters: Record<string, Block> };
+type Row = ApiRow;
 type T = { green: number; yellow: number };
-type Resp = { rows: Row[]; thresholds: { demo: T; ai: T; topn: T }; fetched_at: string };
+type Resp = { rows: ApiRow[]; thresholds: { demo: T; ai: T; topn: T }; fetched_at: string };
 
 const QUERY_KEY = ['reports', 'training-readiness'];
 const NONE = '—';
@@ -62,8 +64,14 @@ export function TrainingReadinessView() {
       return response.json();
     },
   });
-  const all = query.data?.rows ?? [];
+  const apiRows = query.data?.rows ?? [];
   const t = query.data?.thresholds;
+  // Semester buttons: "All semesters", then every semester any instructor has courses in. A semester shows only instructors whose
+  // subject has courses in it, with every score / completion figure counted on that semester's courses (and its topin exams) only.
+  const semesters = useMemo(() => [...new Set(apiRows.flatMap((r) => Object.keys(r.semesters)))].sort((a, b) => Number(a) - Number(b)), [apiRows]);
+  const [sem, setSem] = useState<string>('all');
+  const activeSem = sem === 'all' || semesters.includes(sem) ? sem : 'all';
+  const all: Row[] = useMemo(() => (activeSem === 'all' ? apiRows : apiRows.flatMap((r) => (r.semesters[activeSem] ? [{ ...r, ...r.semesters[activeSem] }] : []))), [apiRows, activeSem]);
   const [subjects, setSubjects] = useState<string[]>([]);
   const [managers, setManagers] = useState<string[]>([]);
   const [overalls, setOveralls] = useState<string[]>([]);
@@ -102,7 +110,7 @@ export function TrainingReadinessView() {
       'Demo score (avg best /10)', 'Demo colour', 'AI score (avg best /10)', 'AI colour', 'Top-N exams', 'Top-N avg best %', 'Top-N colour', 'Overall'];
     const rows = searched.map((r) => [r.full_name, r.employee_id ?? '', r.subject_area ?? '', r.capability_manager ?? '', r.lectures_total, r.demo_lectures, r.ai_lectures, r.both_lectures,
       statusOf(r), r.demo_avg ?? '', LABEL[r.demo_colour], r.ai_avg ?? '', LABEL[r.ai_colour], r.topn_exams, r.topn_avg ?? '', LABEL[r.topn_colour], LABEL[r.overall]]);
-    downloadCsv('training-readiness.csv', toCsv(headers, rows));
+    downloadCsv(`training-readiness-${activeSem === 'all' ? 'all-semesters' : `semester-${activeSem}`}.csv`, toCsv(headers, rows));
   };
 
   const card = (label: string, value: number, tone: string) => <div className="rounded-xl border border-border bg-card px-4 py-3 shadow-sm">
@@ -114,13 +122,23 @@ export function TrainingReadinessView() {
     <PageIntro
       eyebrow="BigQuery / QA ratings + topin exams, read live"
       title="Training - Readiness"
-      description={`NIAT (Training) instructors. Demo and AI scores = best attempt per lecture, averaged over the lectures done (in-training only; demos under 10 minutes do not count). Top-N = average best % of Daily + Weekly topin exams in their subject. Complete = a demo AND an AI assessment on every lecture of their subject's courses. Green: demo ≥ ${t?.demo.green ?? 7.5}, AI ≥ ${t?.ai.green ?? 8.5}, Top-N ≥ ${t?.topn.green ?? 75}%. Yellow: demo ≥ ${t?.demo.yellow ?? 6.5}, AI ≥ ${t?.ai.yellow ?? 7.5}, Top-N ≥ ${t?.topn.yellow ?? 60}%. Below that: Red. Overall = the lowest of the three (no data counts as Red). Ready = overall Green and complete.`}
+      description={`NIAT (Training) instructors. Demo and AI scores = best attempt per lecture, averaged over the lectures done (in-training only; demos under 10 minutes do not count). Top-N = average best % of Daily + Weekly topin exams in their subject. Complete = a demo AND an AI assessment on every lecture of their subject's courses (of the semester picked). Pick a semester to count only that semester's courses and topin exams; subject-wide exams count only in All semesters. Green: demo ≥ ${t?.demo.green ?? 7.5}, AI ≥ ${t?.ai.green ?? 8.5}, Top-N ≥ ${t?.topn.green ?? 75}%. Yellow: demo ≥ ${t?.demo.yellow ?? 6.5}, AI ≥ ${t?.ai.yellow ?? 7.5}, Top-N ≥ ${t?.topn.yellow ?? 60}%. Below that: Red. Overall = the lowest of the three (no data counts as Red). Ready = overall Green and complete.`}
       action={<button type="button" data-testid="button-refresh-readiness" onClick={refresh} className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3.5 py-2.5 text-[12px] font-bold text-foreground transition-colors hover:bg-secondary"><RefreshCw size={14} /> Refresh</button>}
     />
     {query.isLoading && <SkeletonBlock className="h-[520px]" />}
     {query.isError && <QueryError message="Readiness data is unavailable right now." />}
 
-    {query.data && (all.length === 0 ? <EmptyState title="No training instructors" description="No NIAT (Training) instructors in TeachOS right now." /> : <>
+    {query.data && (apiRows.length === 0 ? <EmptyState title="No training instructors" description="No NIAT (Training) instructors in TeachOS right now." /> : <>
+      <div data-testid="readiness-semester-buttons" className="mb-4 flex flex-wrap gap-2 border-b border-border pb-3">
+        {['all', ...semesters].map((x) => {
+          const count = x === 'all' ? apiRows.length : apiRows.filter((r) => r.semesters[x]).length;
+          return <button key={x} type="button" data-testid={`button-readiness-sem-${x}`} onClick={() => setSem(x)}
+            className={`rounded-full px-4 py-2 text-[12px] font-bold transition-colors ${x === activeSem ? 'bg-primary text-primary-foreground shadow-sm' : 'bg-secondary text-muted-foreground hover:text-foreground'}`}>
+            {x === 'all' ? 'All semesters' : `Semester ${x}`} <span className="ml-1 tabular-nums opacity-75">{formatKpi(count)}</span>
+          </button>;
+        })}
+      </div>
+
       <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-5">
         {card('Ready', kpi.ready, 'text-[#256e65]')}
         {card('Green', kpi.green, 'text-[#256e65]')}
@@ -180,10 +198,11 @@ export function TrainingReadinessView() {
                     </tr>
                     {isOpen && <tr className="border-b border-border bg-[#f8fafb]">
                       <td colSpan={9} className="px-6 py-4">
-                        {r.courses.length === 0 ? <p className="text-[12px] text-muted-foreground">No lecture-list courses for {r.subject_area ?? 'this subject'}.</p> :
+                        {r.courses.filter((c) => activeSem === 'all' || String(c.semester) === activeSem).length === 0 ? <p className="text-[12px] text-muted-foreground">No lecture-list courses for {r.subject_area ?? 'this subject'}.</p> :
                           <table className="text-left">
-                            <thead><tr>{['Course', 'Lectures', 'With demo', 'With AI', 'Both', 'Demo avg', 'AI avg'].map((h) => <th key={h} className="px-3 py-1.5 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">{h}</th>)}</tr></thead>
-                            <tbody>{r.courses.map((c) => <tr key={c.key} className="text-[12px] tabular-nums">
+                            <thead><tr>{['Semester', 'Course', 'Lectures', 'With demo', 'With AI', 'Both', 'Demo avg', 'AI avg'].map((h) => <th key={h} className="px-3 py-1.5 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">{h}</th>)}</tr></thead>
+                            <tbody>{r.courses.filter((c) => activeSem === 'all' || String(c.semester) === activeSem).sort((a, b) => (a.semester ?? 99) - (b.semester ?? 99)).map((c) => <tr key={c.key} className="text-[12px] tabular-nums">
+                              <td className="px-3 py-1.5 text-muted-foreground">{c.semester ? `Sem ${c.semester}` : NONE}</td>
                               <td className="px-3 py-1.5 font-semibold text-foreground">{c.title}</td>
                               <td className="px-3 py-1.5">{c.lectures_total}</td>
                               <td className="px-3 py-1.5">{c.demo_lectures}</td>
