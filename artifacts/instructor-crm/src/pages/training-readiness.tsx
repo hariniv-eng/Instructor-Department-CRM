@@ -19,8 +19,10 @@ type Block = {
 // Semester-wise (2026-11-16, per request): the same block for each semester of the subject's courses; the top level is all semesters.
 // Learning now (2026-11-16): subject(s) from the last 30 days' demos, else learning-portal units, else the mapped subject; readiness is scored on these.
 type Activity = { subject: string; count: number; last: string | null };
-type Learning = { subjects: string[]; source: 'demos' | 'learning portal' | 'mapped subject'; demos: Activity[]; lp: Activity[] };
-type ApiRow = Block & { employee_id: string | null; full_name: string; subject_area: string | null; learning_now: Learning; role: 'Mentor' | 'Instructor'; capability_manager: string | null; courses: Course[]; semesters: Record<string, Block> };
+type Learning = { subjects: string[]; reading: string[]; source: 'demos' | 'learning portal' | 'mapped subject'; demos: Activity[]; lp: Activity[] };
+type ApiRow = Block & { employee_id: string | null; full_name: string; subject_area: string | null; learning_now: Learning; role: 'Mentor' | 'Instructor'; capability_manager: string | null; courses: Course[]; semesters: Record<string, Block>;
+  // 2+ subjects (2026-11-16): each subject's readiness on its own, all semesters + per semester.
+  by_subject: Record<string, Block & { semesters: Record<string, Block> }> | null };
 type Row = ApiRow;
 type T = { green: number; yellow: number };
 type Resp = { rows: ApiRow[]; thresholds: { demo: T; ai: T; topn: T }; learning_days: number; fetched_at: string };
@@ -78,6 +80,8 @@ export function TrainingReadinessView() {
   const semesters = useMemo(() => [...new Set(apiRows.flatMap((r) => Object.keys(r.semesters)))].sort((a, b) => Number(a) - Number(b)), [apiRows]);
   const [sem, setSem] = useState<string>('all');
   const activeSem = sem === 'all' || semesters.includes(sem) ? sem : 'all';
+  // Each subject's own block for the semester picked (only subjects that have courses in it).
+  const perSubject = (r: Row): [string, Block][] => Object.entries(r.by_subject ?? {}).flatMap(([x, b]) => { const blk = activeSem === 'all' ? b : b.semesters[activeSem]; return blk ? [[x, blk] as [string, Block]] : []; });
   const all: Row[] = useMemo(() => (activeSem === 'all' ? apiRows : apiRows.flatMap((r) => (r.semesters[activeSem] ? [{ ...r, ...r.semesters[activeSem] }] : []))), [apiRows, activeSem]);
   const [subjects, setSubjects] = useState<string[]>([]);
   const [managers, setManagers] = useState<string[]>([]);
@@ -115,9 +119,9 @@ export function TrainingReadinessView() {
   }), [searched]);
 
   const downloadTable = () => {
-    const headers = ['Name', 'Employee ID', 'Role', 'Mapped subject', 'Learning now', 'Learning now from', 'Mapped vs now', 'Capability Manager', 'Lectures total', 'Lectures with demo', 'Lectures with AI assessment', 'Lectures with both', 'Complete',
+    const headers = ['Name', 'Employee ID', 'Role', 'Mapped subject', 'Learning now', 'Per subject (overall)', 'Reading only (not scored)', 'Learning now from', 'Mapped vs now', 'Capability Manager', 'Lectures total', 'Lectures with demo', 'Lectures with AI assessment', 'Lectures with both', 'Complete',
       'Demo score (avg best /10)', 'Demo colour', 'AI score (avg best /10)', 'AI colour', 'Top-N exams', 'Top-N avg best %', 'Top-N colour', 'Overall'];
-    const rows = searched.map((r) => [r.full_name, r.employee_id ?? '', r.role, r.subject_area ?? '', nowLabel(r), r.learning_now.source, matchOf(r), r.capability_manager ?? '', r.lectures_total, r.demo_lectures, r.ai_lectures, r.both_lectures,
+    const rows = searched.map((r) => [r.full_name, r.employee_id ?? '', r.role, r.subject_area ?? '', nowLabel(r), perSubject(r).map(([x, b]) => `${x}: ${LABEL[b.overall]}${b.complete ? '' : ' (incomplete)'}`).join('; '), r.learning_now.reading.join(', '), r.learning_now.source, matchOf(r), r.capability_manager ?? '', r.lectures_total, r.demo_lectures, r.ai_lectures, r.both_lectures,
       statusOf(r), r.demo_avg ?? '', LABEL[r.demo_colour], r.ai_avg ?? '', LABEL[r.ai_colour], r.topn_exams, r.topn_avg ?? '', LABEL[r.topn_colour], LABEL[r.overall]]);
     downloadCsv(`training-readiness-${activeSem === 'all' ? 'all-semesters' : `semester-${activeSem}`}.csv`, toCsv(headers, rows));
   };
@@ -131,7 +135,7 @@ export function TrainingReadinessView() {
     <PageIntro
       eyebrow="BigQuery / QA ratings + topin exams, read live"
       title="Training - Readiness"
-      description={`NIAT (Training) instructors, scored on the subject(s) they are learning NOW: their in-training demos / AI assessments of the last ${query.data?.learning_days ?? 30} days (their top subject; mentors: every subject with at least a quarter of the top subject's count), else learning-portal units completed in that time, else their mapped subject. Demo and AI scores = best attempt per lecture, averaged over the lectures done (in-training only; demos under 10 minutes do not count). Top-N = average best % of Daily + Weekly topin exams in their subject. Complete = a demo AND an AI assessment on every lecture of their subject's courses (of the semester picked). Pick a semester to count only that semester's courses and topin exams; subject-wide exams count only in All semesters. Green: demo ≥ ${t?.demo.green ?? 7.5}, AI ≥ ${t?.ai.green ?? 8.5}, Top-N ≥ ${t?.topn.green ?? 75}%. Yellow: demo ≥ ${t?.demo.yellow ?? 6.5}, AI ≥ ${t?.ai.yellow ?? 7.5}, Top-N ≥ ${t?.topn.yellow ?? 60}%. Below that: Red. Overall = the lowest of the three (no data counts as Red). Ready = overall Green and complete.`}
+      description={`NIAT (Training) instructors, scored on the subject(s) they are learning NOW: their in-training demos / AI assessments of the last ${query.data?.learning_days ?? 30} days (their top subject plus every other subject with 2+ demos / AI assessments -- each such subject is scored, and shown on its own when you open the row), else their top learning-portal subject (units completed in that time), else their mapped subject. Subjects they only read on the learning portal show as "reading" and are not scored. Demo and AI scores = best attempt per lecture, averaged over the lectures done (in-training only; demos under 10 minutes do not count). Top-N = average best % of Daily + Weekly topin exams in their subject. Complete = a demo AND an AI assessment on every lecture of their subject's courses (of the semester picked). Pick a semester to count only that semester's courses and topin exams; subject-wide exams count only in All semesters. Green: demo ≥ ${t?.demo.green ?? 7.5}, AI ≥ ${t?.ai.green ?? 8.5}, Top-N ≥ ${t?.topn.green ?? 75}%. Yellow: demo ≥ ${t?.demo.yellow ?? 6.5}, AI ≥ ${t?.ai.yellow ?? 7.5}, Top-N ≥ ${t?.topn.yellow ?? 60}%. Below that: Red. Overall = the lowest of the three (no data counts as Red). Ready = overall Green and complete.`}
       action={<button type="button" data-testid="button-refresh-readiness" onClick={refresh} className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3.5 py-2.5 text-[12px] font-bold text-foreground transition-colors hover:bg-secondary"><RefreshCw size={14} /> Refresh</button>}
     />
     {query.isLoading && <SkeletonBlock className="h-[520px]" />}
@@ -203,6 +207,7 @@ export function TrainingReadinessView() {
                       <td className={td} title={`From ${r.learning_now.source} (last ${(query.data?.learning_days ?? 30)} days)`}>
                         <div className="flex flex-wrap items-center gap-1">
                           {r.learning_now.subjects.length ? r.learning_now.subjects.map((x) => <span key={x} className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${x === r.subject_area ? 'bg-secondary text-foreground' : 'bg-[#e6f0fb] text-[#2b59c3]'}`}>{x}</span>) : NONE}
+                          {r.learning_now.reading.map((x) => <span key={`r-${x}`} title="Learning-portal units only, no demos -- not scored" className="rounded-full border border-dashed border-border px-2 py-0.5 text-[10px] text-muted-foreground">reading {x}</span>)}
                         </div>
                         <div className="mt-0.5 text-[10px] text-muted-foreground">{matchOf(r) === 'Different subject' ? '⚠ differs · ' : ''}from {r.learning_now.source}</div>
                       </td>
@@ -215,6 +220,18 @@ export function TrainingReadinessView() {
                     </tr>
                     {isOpen && <tr className="border-b border-border bg-[#f8fafb]">
                       <td colSpan={10} className="px-6 py-4">
+                        {perSubject(r).length > 0 && <div className="mb-4">
+                          <div className="mb-1 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Each subject on its own</div>
+                          <table className="text-left"><thead><tr>{['Subject', 'Lectures done', 'Demo', 'AI', 'Top-N', 'Overall'].map((h) => <th key={h} className="px-3 py-1.5 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">{h}</th>)}</tr></thead>
+                            <tbody>{perSubject(r).map(([x, b]) => <tr key={x} className="text-[12px] tabular-nums">
+                              <td className="px-3 py-1.5 font-semibold text-foreground">{x}</td>
+                              <td className="px-3 py-1.5">{b.both_lectures} / {b.lectures_total}</td>
+                              <td className="px-3 py-1.5"><span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${CHIP[b.demo_colour]}`}>{f1(b.demo_avg)}</span> <span className="text-[10px] text-muted-foreground">{b.demo_lectures} lec</span></td>
+                              <td className="px-3 py-1.5"><span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${CHIP[b.ai_colour]}`}>{f1(b.ai_avg)}</span> <span className="text-[10px] text-muted-foreground">{b.ai_lectures} lec</span></td>
+                              <td className="px-3 py-1.5"><span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${CHIP[b.topn_colour]}`}>{f1(b.topn_avg, true)}</span> <span className="text-[10px] text-muted-foreground">{b.topn_exams} exams</span></td>
+                              <td className="px-3 py-1.5"><span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${CHIP[b.overall]}`}>{LABEL[b.overall]}</span>{!b.complete && <span className="ml-1 text-[10px] text-muted-foreground">incomplete</span>}</td>
+                            </tr>)}</tbody></table>
+                        </div>}
                         <div className="mb-3 flex flex-wrap gap-6 text-[11px]">
                           <div><span className="font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Demos + AI, last {(query.data?.learning_days ?? 30)} days</span>
                             <div className="mt-1">{r.learning_now.demos.length ? r.learning_now.demos.map((a) => `${a.subject} ${a.count} (last ${fmtDay(a.last)})`).join(' · ') : NONE}</div></div>

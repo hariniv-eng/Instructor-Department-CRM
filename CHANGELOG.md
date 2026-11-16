@@ -27,7 +27,7 @@ Commit messages stay short (title + 2-3 lines); this file is the detailed record
 Readiness is scored on the subject(s) each instructor is learning NOW, not only the mapped subject (check on 97 training instructors: 21 active only in another subject, 25 in several).
 - Learning now = subjects of in-training demos / AI assessments in the last 30 days (each subject with at least 25% of the top subject's count; topic names found in several subjects skipped); else learning-portal units COMPLETED in the last 30 days (completion_datetime, course -> subject as Taught in Class); else the mapped subject.
 - New columns Mapped subject / Learning now (blue = not the mapped subject, "differs" flag, source); filters Learning now and Mapped vs now; row click shows the 30-day demo and LP counts per subject.
-- Several subjects only for mentors (classification `mentor`); instructors get their single top subject (ties: most recent). Mentor tag beside the name, Role in the CSV.
+- (Replaced the same day) Several subjects for everyone, decided by DEMOS: the top demo / AI subject plus every other subject with 2+ demos / AI assessments in the last 30 days (`MIN_DEMOS`). No demos -> the single top learning-portal subject. Subjects only read on the learning portal show as "reading" (not scored). With 2+ subjects, each subject's own readiness (lectures, demo, AI, Top-N, overall, per semester) shows in the row breakdown and the CSV (`by_subject`, `bySubject()`). Mentor tag beside the name, Role in the CSV.
 - Settings: `LEARNING_DAYS`, `LEARNING_SHARE` in `api-server/src/lib/connectors/trainingReadiness.ts`. Check script: `_tmp_learning_subject.ts`.
 - After pulling: Publish only.
 

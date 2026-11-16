@@ -21,7 +21,7 @@ async function main() {
   for (const p of people) {
     const uid = normUid(p.teachosUserId!);
     const mapped = (normalizeSubjectArea(p.deptArea || p.manualDeptArea || null) as string | null) ?? null;
-    const l = learningNowOf(mapped, evs.byUid.get(uid) ?? [], { joining: null, deployed: deployed.get(uid) ?? null }, lp.get(uid), true, idx);
+    const l = learningNowOf(mapped, evs.byUid.get(uid) ?? [], { joining: null, deployed: deployed.get(uid) ?? null }, lp.get(uid), idx);
     const any = new Set([...l.demos, ...l.lp].map((a) => a.subject));
     if (any.size < 2) continue;
     const title = p.designation || "(no designation)";

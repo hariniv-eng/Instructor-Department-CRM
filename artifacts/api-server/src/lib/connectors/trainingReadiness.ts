@@ -138,16 +138,19 @@ export function readinessOf(subjects: string[], evs: Ev[], w: DemoWindow | undef
 // their learning-portal courses and their latest demos; if they are studying two subjects together, show both"). Checked on the 97
 // NIAT (Training) instructors with _tmp_learning_subject.ts: 21 were active only in another subject, 25 in several. The learning portal
 // is noisy (a few stray units in many subjects), so demos come first:
+// Rule (2026-11-16, per request: "taking demos or AI assessments is a big deal, reading is not" -- same rule for instructors and mentors):
 //   1. Demos / AI assessments in the last LEARNING_DAYS days (in-training, any subject; a topic name found in several subjects is skipped):
-//      every subject with at least LEARNING_SHARE of the top subject's count.
-//   2. Else learning-portal units COMPLETED in the last LEARNING_DAYS days (completion_datetime), course -> subject as in Taught in Class:
-//      the same share rule on unit counts.
-//   3. Else the mapped subject.
-// Several subjects only for MENTORS (classification 'mentor', 2026-11-16, per request); instructors get the single top subject.
+//      the top subject, plus every other subject with at least MIN_DEMOS of them -> all these subjects are scored.
+//   2. No demos: the top subject by learning-portal units COMPLETED in the last LEARNING_DAYS days (completion_datetime, course ->
+//      subject as in Taught in Class).
+//   3. Neither: the mapped subject.
+// "Reading": other subjects with at least LEARNING_SHARE of the top subject's learning-portal units but no (or too few) demos -- shown,
+// not scored.
 export const LEARNING_DAYS = 30;
 export const LEARNING_SHARE = 0.25;
+export const MIN_DEMOS = 2;
 export type SubjectActivity = { subject: string; count: number; last: string | null };
-export type LearningNow = { subjects: string[]; source: "demos" | "learning portal" | "mapped subject"; demos: SubjectActivity[]; lp: SubjectActivity[] };
+export type LearningNow = { subjects: string[]; reading: string[]; source: "demos" | "learning portal" | "mapped subject"; demos: SubjectActivity[]; lp: SubjectActivity[] };
 const sinceDay = () => new Date(Date.now() - LEARNING_DAYS * 86400000).toISOString().slice(0, 10);
 let lpCache: { at: number; data: Map<string, SubjectActivity[]> } | null = null;
 
@@ -178,7 +181,7 @@ export async function fetchRecentLpActivity(force = false): Promise<Map<string, 
   return data;
 }
 
-export function learningNowOf(mapped: string | null, evs: Ev[], w: DemoWindow | undefined, lp: SubjectActivity[] | undefined, multi: boolean,
+export function learningNowOf(mapped: string | null, evs: Ev[], w: DemoWindow | undefined, lp: SubjectActivity[] | undefined,
   idx: ReturnType<typeof lectureNameIndex> = lectureNameIndex()): LearningNow {
   const since = sinceDay();
   const dm = new Map<string, SubjectActivity>();
@@ -194,9 +197,21 @@ export function learningNowOf(mapped: string | null, evs: Ev[], w: DemoWindow | 
   const byCount = (a: SubjectActivity, b: SubjectActivity) => b.count - a.count || String(b.last ?? "").localeCompare(String(a.last ?? ""));
   const demos = [...dm.values()].sort(byCount);
   const lpList = [...(lp ?? [])].sort(byCount);
-  // Several subjects only for mentors (2026-11-16, per request); an instructor gets one -- the top one (ties: the most recent).
-  const pick = (list: SubjectActivity[]) => (multi ? list.filter((x) => x.count >= list[0].count * LEARNING_SHARE) : list.slice(0, 1)).map((x) => x.subject);
-  if (demos.length) return { subjects: pick(demos), source: "demos", demos, lp: lpList };
-  if (lpList.length) return { subjects: pick(lpList), source: "learning portal", demos, lp: lpList };
-  return { subjects: mapped ? [mapped] : [], source: "mapped subject", demos, lp: lpList };
+  const subjects = demos.length ? demos.filter((x, k) => k === 0 || x.count >= MIN_DEMOS).map((x) => x.subject)
+    : lpList.length ? [lpList[0].subject] : mapped ? [mapped] : [];
+  const source = demos.length ? "demos" : lpList.length ? "learning portal" : "mapped subject";
+  const reading = lpList.filter((x) => x.count >= lpList[0].count * LEARNING_SHARE && !subjects.includes(x.subject)).map((x) => x.subject);
+  return { subjects, reading, source, demos, lp: lpList };
+}
+
+/** The readiness of each subject on its own (instructors with 2+ subjects), all semesters + per semester. */
+export type SubjectReadiness = ReadinessBlock & { semesters: Record<string, ReadinessBlock> };
+export function bySubject(subjects: string[], evs: Ev[], w: DemoWindow | undefined, exams: Record<string, ExamCell> | undefined,
+  idx: ReturnType<typeof lectureNameIndex>): Record<string, SubjectReadiness> | null {
+  if (subjects.length < 2) return null;
+  return Object.fromEntries(subjects.map((x) => {
+    const { courses, ...rest } = readinessOf([x], evs, w, exams, idx);
+    void courses;
+    return [x, rest];
+  }));
 }
