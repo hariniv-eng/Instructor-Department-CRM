@@ -19,14 +19,23 @@ async function main() {
   const P = config.BIGQUERY_PROJECT_ID!;
   const bq = new BigQuery({ projectId: P, ...(config.BIGQUERY_CREDENTIALS_JSON ? { credentials: JSON.parse(config.BIGQUERY_CREDENTIALS_JSON) } : {}) });
   const ok: Record<string, string[]> = {};
+  // 2026-11-16: the data team may expose the tables as views in a dataset FCC already reads instead of granting the workspace --
+  // so each table is tried in the efficacy workspace first, then in niat_instructor_automation_data and niat_reverse_etl_bases.
+  const where: Record<string, string> = {};
   for (const t of TABLES) {
-    const T = `\`${P}.${DS}.${t}\``;
-    console.log(`\n================ ${DS}.${t}`);
+    let found = "";
+    for (const ds of [DS, config.BIGQUERY_DATASET!, "niat_reverse_etl_bases"]) {
+      if (t === "niat_session_wise_qa_rating" && ds !== DS) continue;
+      try { await bq.query({ query: `SELECT 1 FROM \`${P}.${ds}.${t}\` LIMIT 1` }); found = ds; break; }
+      catch (e) { console.log(`  ${ds}.${t}: ${/not found/i.test((e as Error).message) ? "does not exist" : "no access"}`); }
+    }
+    if (!found) { console.log(`  => ${t}: NOT READABLE anywhere yet`); continue; }
+    where[t] = found;
+    const T = `\`${P}.${found}.${t}\``;
+    console.log(`\n================ ${found}.${t}`);
     let cols: string[];
-    try {
-      const [r] = await bq.query({ query: `SELECT * FROM ${T} LIMIT 1` });
-      cols = Object.keys((r as Record<string, unknown>[])[0] ?? {});
-    } catch (e) { console.log(`  NOT READABLE -- ${(e as Error).message.slice(0, 220)}`); continue; }
+    const [r1] = await bq.query({ query: `SELECT * FROM ${T} LIMIT 1` });
+    cols = Object.keys((r1 as Record<string, unknown>[])[0] ?? {});
     ok[t] = cols;
     const user = cols.find((c) => /^instructor_user_id$/i.test(c));
     const date = cols.find((c) => /^session_date$/i.test(c)) ?? cols.find((c) => /session_start_datetime|created|date/i.test(c));
@@ -52,7 +61,7 @@ async function main() {
   const start = sc.find((c) => /session_start_datetime/i.test(c)) ?? sc.find((c) => /date/i.test(c));
   if (!title || !start || !sc.includes("demo_taken_status")) { console.log("\n(summary table has no title / date / demo_taken_status column -- skipped the per-class check)"); process.exit(0); }
   const [cls] = await bq.query({ query: `SELECT CAST(${start} AS STRING) AS d, ${title} AS t, demo_taken_status AS st${sc.includes("demo_qa_rating") ? ", demo_qa_rating AS r" : ""}
-    FROM \`${P}.${DS}.niat_sessions_wise_summary_details\` WHERE instructor_user_id = @u ORDER BY ${start} DESC LIMIT 15`, params: { u: p.teachosUserId } });
+    FROM \`${P}.${where["niat_sessions_wise_summary_details"]}.niat_sessions_wise_summary_details\` WHERE instructor_user_id = @u ORDER BY ${start} DESC LIMIT 15`, params: { u: p.teachosUserId } });
   const qaT = ok["niat_session_wise_qa_rating"] ? `${P}.${DS}.niat_session_wise_qa_rating` : `${P}.${config.BIGQUERY_DATASET}.niat_session_wise_qa_rating`;
   const [ev] = await bq.query({ query: `SELECT session_title AS t, evaluation_type AS ty, CAST(session_date AS STRING) AS d, final_score AS s, SAFE_CAST(audio_duration AS FLOAT64) / 60 AS m
     FROM \`${qaT}\` WHERE instructor_user_id = @u AND evaluation_type IN ('DEMO','AI_ASSESSMENT','TRAINING_DEMO','TRAINING_AI_ASSESSMENT') AND UPPER(status) = 'COMPLETED'`, params: { u: p.teachosUserId } });
