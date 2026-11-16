@@ -10,6 +10,8 @@ import { isPinnedConfirmedInstructor, TEACHOS_ONLY_UNREVIEWED } from "../data/cl
 import { productOf } from "../lib/product";
 import { taughtSubjectColumn, courseColumnOf, portalColumnOf, TAUGHT_SUBJECT_COLUMNS } from "../lib/connectors/taughtTraining";
 import { ASSESSMENT_COURSES, fetchTopinAssessments, normUid } from "../lib/connectors/topinAssessments";
+import { fetchReadinessEvaluations, readinessOf, READINESS_THRESHOLDS } from "../lib/connectors/trainingReadiness";
+import { lectureNameIndex } from "../lib/connectors/demoTraining";
 import { LECTURE_COURSES } from "../data/lectureSessions";
 
 // Pinned edge-case instructors (NW0005068): see isPinnedConfirmedInstructor() in
@@ -1705,6 +1707,37 @@ router.get("/reports/topin-assessments", requireAuth, requireRole("admin"), asyn
     subject_columns: TAUGHT_SUBJECT_COLUMNS,
     fetched_at: data.fetchedAt,
   });
+});
+
+// Training - Readiness (2026-11-16, per request: Phase 1 of the Pre-Deployment Readiness plan). NIAT (Training) instructors in TeachOS:
+// in-training demo score, AI assessment score, Top-N (topin Daily + Weekly exams of their subject), completion over every lecture of
+// their subject's lecture lists, a colour per score and overall. Read live (connectors/trainingReadiness.ts, cached 10 minutes;
+// ?refresh=1 reads again). Show only.
+router.get("/reports/training-readiness", requireAuth, requireRole("admin"), async (req, res) => {
+  const allRows = await db.select().from(instructorsTable);
+  const people = allRows.filter((r) => r.inTeachos && r.teachosUserId && !TRAINING_STATS_EXCLUDED_CLASSIFICATIONS.has(r.classification ?? "") && productOf(r) === "NIAT (Training)");
+  const deployedByUid = new Map((await db.select({ uid: instructorContributionTable.instructorUserId, d: instructorContributionTable.deploymentDate }).from(instructorContributionTable)).map((c) => [normUid(c.uid), c.d]));
+  const force = req.query.refresh === "1";
+  let evs: Awaited<ReturnType<typeof fetchReadinessEvaluations>>, topin: Awaited<ReturnType<typeof fetchTopinAssessments>>;
+  try {
+    [evs, topin] = await Promise.all([fetchReadinessEvaluations(force), fetchTopinAssessments(force)]);
+  } catch (err) {
+    res.status(502).json({ error: `Demo / assessment data is not readable right now: ${(err as Error).message.slice(0, 200)}` });
+    return;
+  }
+  const idx = lectureNameIndex();
+  const rows = people.map((p) => {
+    const uid = normUid(p.teachosUserId!);
+    const subject = (normalizeSubjectArea(p.deptArea || p.manualDeptArea || null) as string | null) ?? null;
+    return {
+      employee_id: p.employeeId,
+      full_name: p.fullName,
+      subject_area: subject,
+      capability_manager: p.teachosManager || p.manualCapabilityManager || null,
+      ...readinessOf(subject, evs.byUid.get(uid) ?? [], { joining: null, deployed: deployedByUid.get(uid) ?? null }, topin.byUid.get(uid), idx),
+    };
+  }).sort((a, b) => a.full_name.localeCompare(b.full_name));
+  res.json({ rows, thresholds: READINESS_THRESHOLDS, fetched_at: evs.fetchedAt });
 });
 
 // Manual Date of joining (2026-10-14, per request): sets or clears the typed-in joining date for someone Darwin has no date for

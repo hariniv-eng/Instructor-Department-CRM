@@ -22,6 +22,17 @@ Commit messages stay short (title + 2-3 lines); this file is the detailed record
 | What the Instructor Archive stores (joining date, gender, subject ...) | `artifacts/api-server/src/lib/archiveInstructors.ts` |
 | One-off read-only checks | `artifacts/api-server/src/lib/connectors/_tmp_*.ts` |
 
+## 2026-11-16 -- Training - Readiness view (Pre-Deployment Readiness, Phase 1)
+
+New view **Training - Readiness** in Training Stats, for NIAT (Training) instructors. Show only, nothing stored.
+- Demo score: in-training demos (10 min or longer), best score per lecture, averaged over the lectures done. AI score: same for in-training AI assessments.
+- Top-N: topin Daily + Weekly exams of the instructor's own subject, average best %.
+- Complete: a demo AND an AI assessment on every lecture of the subject's lecture-list courses.
+- Green: demo >= 7.5, AI >= 8.5, Top-N >= 75%. Yellow: demo >= 6.5, AI >= 7.5, Top-N >= 60%. Else Red. Overall = lowest of the three (no data = Red); "Incomplete" shown beside it; Ready = Green and complete.
+- Row click shows the per-course breakdown; filters Subject / CM / Overall / Completion; CSV.
+- Files: `api-server/src/lib/connectors/trainingReadiness.ts` (logic + thresholds), `routes/reports.ts` (`GET /reports/training-readiness`), `instructor-crm/src/pages/training-readiness.tsx`, `training-stats.tsx`.
+- After pulling: Publish only (read live from BigQuery, no sync, no DB push).
+
 ## 2026-11-16
 - **Demo Hrs / AI Assessment Hrs now read `niat_session_wise_qa_rating`** (per request: one demo source). `z_niat_instructors_demo_qa_rating_details` is a subset of it (same evaluations, scores and lengths -- checked for NW2000396) and is no longer read. The hours now also include the training recordings: Demo Hrs = DEMO + TRAINING_DEMO, AI Assessment Hrs = AI_ASSESSMENT + TRAINING_AI_ASSESSMENT (since 6 Oct 2026). Same counting rule: completed only, one recording per session per type (the longest). Affects Contribution and the instructor profile; numbers rise for instructors with training recordings.
   Files: `artifacts/api-server/src/lib/connectors/instructorEvaluations.ts`, `artifacts/instructor-crm/src/pages/contribution.tsx` (comment). After pull: Publish, then Contribution Sync Now. (`INSTRUCTOR_EVALUATION_TABLE` still overrides the table if ever needed.)
