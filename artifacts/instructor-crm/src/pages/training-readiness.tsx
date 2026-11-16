@@ -17,16 +17,23 @@ type Block = {
   demo_colour: Colour; ai_colour: Colour; topn_colour: Colour; overall: 'green' | 'yellow' | 'red';
 };
 // Semester-wise (2026-11-16, per request): the same block for each semester of the subject's courses; the top level is all semesters.
-type ApiRow = Block & { employee_id: string | null; full_name: string; subject_area: string | null; capability_manager: string | null; courses: Course[]; semesters: Record<string, Block> };
+// Learning now (2026-11-16): subject(s) from the last 30 days' demos, else learning-portal units, else the mapped subject; readiness is scored on these.
+type Activity = { subject: string; count: number; last: string | null };
+type Learning = { subjects: string[]; source: 'demos' | 'learning portal' | 'mapped subject'; demos: Activity[]; lp: Activity[] };
+type ApiRow = Block & { employee_id: string | null; full_name: string; subject_area: string | null; learning_now: Learning; role: 'Mentor' | 'Instructor'; capability_manager: string | null; courses: Course[]; semesters: Record<string, Block> };
 type Row = ApiRow;
 type T = { green: number; yellow: number };
-type Resp = { rows: ApiRow[]; thresholds: { demo: T; ai: T; topn: T }; fetched_at: string };
+type Resp = { rows: ApiRow[]; thresholds: { demo: T; ai: T; topn: T }; learning_days: number; fetched_at: string };
 
 const QUERY_KEY = ['reports', 'training-readiness'];
 const NONE = '—';
 const LABEL: Record<Colour, string> = { green: 'Green', yellow: 'Yellow', red: 'Red', none: 'No data' };
 const CHIP: Record<Colour, string> = { green: 'bg-[#e5f3ed] text-[#256e65]', yellow: 'bg-[#fff5dc] text-[#8a6212]', red: 'bg-[#fff0ec] text-[#9b4434]', none: 'bg-secondary text-muted-foreground' };
 const DOT: Record<Colour, string> = { green: 'bg-[#2f8f6b]', yellow: 'bg-[#d9a21b]', red: 'bg-[#c4553f]', none: 'bg-muted-foreground/40' };
+const nowLabel = (r: Row) => r.learning_now.subjects.join(' + ') || NONE;
+// Same = learning only the mapped subject; Also another = mapped + another; Different = mapped subject not among them.
+const matchOf = (r: Row) => (!r.subject_area || !r.learning_now.subjects.length ? 'No subject' : !r.learning_now.subjects.includes(r.subject_area) ? 'Different subject' : r.learning_now.subjects.length > 1 ? 'Mapped + another' : 'Same as mapped');
+const fmtDay = (d: string | null) => (d ? new Date(`${d}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : NONE);
 const statusOf = (r: Row) => (!r.has_lecture_list ? 'No lecture list' : r.complete ? 'Complete' : 'Incomplete');
 const th = 'whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground';
 const td = 'whitespace-nowrap border-r border-border px-4 py-3 text-[12px]';
@@ -76,12 +83,14 @@ export function TrainingReadinessView() {
   const [managers, setManagers] = useState<string[]>([]);
   const [overalls, setOveralls] = useState<string[]>([]);
   const [statuses, setStatuses] = useState<string[]>([]);
+  const [matches, setMatches] = useState<string[]>([]);
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState<string | null>(null);
   const refresh = () => { setForce(true); queryClient.invalidateQueries({ queryKey: QUERY_KEY }); };
 
   const pass = (r: Row, skip: string) =>
-    (skip === 'subject' || !subjects.length || subjects.includes(r.subject_area ?? NONE)) &&
+    (skip === 'subject' || !subjects.length || (r.learning_now.subjects.length ? r.learning_now.subjects : [NONE]).some((x) => subjects.includes(x))) &&
+    (skip === 'match' || !matches.length || matches.includes(matchOf(r))) &&
     (skip === 'cm' || !managers.length || managers.includes(r.capability_manager ?? NONE)) &&
     (skip === 'overall' || !overalls.length || overalls.includes(LABEL[r.overall])) &&
     (skip === 'status' || !statuses.length || statuses.includes(statusOf(r)));
@@ -96,7 +105,7 @@ export function TrainingReadinessView() {
     return q ? filtered.filter((r) => r.full_name.toLowerCase().includes(q) || (r.employee_id ?? '').toLowerCase().includes(q)) : filtered;
   }, [filtered, search]);
   const pager = usePagedRows(searched, 50);
-  const anyFilter = subjects.length + managers.length + overalls.length + statuses.length > 0;
+  const anyFilter = subjects.length + managers.length + overalls.length + statuses.length + matches.length > 0;
   const kpi = useMemo(() => ({
     ready: searched.filter((r) => r.overall === 'green' && r.complete).length,
     green: searched.filter((r) => r.overall === 'green').length,
@@ -106,9 +115,9 @@ export function TrainingReadinessView() {
   }), [searched]);
 
   const downloadTable = () => {
-    const headers = ['Name', 'Employee ID', 'Subject', 'Capability Manager', 'Lectures total', 'Lectures with demo', 'Lectures with AI assessment', 'Lectures with both', 'Complete',
+    const headers = ['Name', 'Employee ID', 'Role', 'Mapped subject', 'Learning now', 'Learning now from', 'Mapped vs now', 'Capability Manager', 'Lectures total', 'Lectures with demo', 'Lectures with AI assessment', 'Lectures with both', 'Complete',
       'Demo score (avg best /10)', 'Demo colour', 'AI score (avg best /10)', 'AI colour', 'Top-N exams', 'Top-N avg best %', 'Top-N colour', 'Overall'];
-    const rows = searched.map((r) => [r.full_name, r.employee_id ?? '', r.subject_area ?? '', r.capability_manager ?? '', r.lectures_total, r.demo_lectures, r.ai_lectures, r.both_lectures,
+    const rows = searched.map((r) => [r.full_name, r.employee_id ?? '', r.role, r.subject_area ?? '', nowLabel(r), r.learning_now.source, matchOf(r), r.capability_manager ?? '', r.lectures_total, r.demo_lectures, r.ai_lectures, r.both_lectures,
       statusOf(r), r.demo_avg ?? '', LABEL[r.demo_colour], r.ai_avg ?? '', LABEL[r.ai_colour], r.topn_exams, r.topn_avg ?? '', LABEL[r.topn_colour], LABEL[r.overall]]);
     downloadCsv(`training-readiness-${activeSem === 'all' ? 'all-semesters' : `semester-${activeSem}`}.csv`, toCsv(headers, rows));
   };
@@ -122,7 +131,7 @@ export function TrainingReadinessView() {
     <PageIntro
       eyebrow="BigQuery / QA ratings + topin exams, read live"
       title="Training - Readiness"
-      description={`NIAT (Training) instructors. Demo and AI scores = best attempt per lecture, averaged over the lectures done (in-training only; demos under 10 minutes do not count). Top-N = average best % of Daily + Weekly topin exams in their subject. Complete = a demo AND an AI assessment on every lecture of their subject's courses (of the semester picked). Pick a semester to count only that semester's courses and topin exams; subject-wide exams count only in All semesters. Green: demo ≥ ${t?.demo.green ?? 7.5}, AI ≥ ${t?.ai.green ?? 8.5}, Top-N ≥ ${t?.topn.green ?? 75}%. Yellow: demo ≥ ${t?.demo.yellow ?? 6.5}, AI ≥ ${t?.ai.yellow ?? 7.5}, Top-N ≥ ${t?.topn.yellow ?? 60}%. Below that: Red. Overall = the lowest of the three (no data counts as Red). Ready = overall Green and complete.`}
+      description={`NIAT (Training) instructors, scored on the subject(s) they are learning NOW: their in-training demos / AI assessments of the last ${query.data?.learning_days ?? 30} days (their top subject; mentors: every subject with at least a quarter of the top subject's count), else learning-portal units completed in that time, else their mapped subject. Demo and AI scores = best attempt per lecture, averaged over the lectures done (in-training only; demos under 10 minutes do not count). Top-N = average best % of Daily + Weekly topin exams in their subject. Complete = a demo AND an AI assessment on every lecture of their subject's courses (of the semester picked). Pick a semester to count only that semester's courses and topin exams; subject-wide exams count only in All semesters. Green: demo ≥ ${t?.demo.green ?? 7.5}, AI ≥ ${t?.ai.green ?? 8.5}, Top-N ≥ ${t?.topn.green ?? 75}%. Yellow: demo ≥ ${t?.demo.yellow ?? 6.5}, AI ≥ ${t?.ai.yellow ?? 7.5}, Top-N ≥ ${t?.topn.yellow ?? 60}%. Below that: Red. Overall = the lowest of the three (no data counts as Red). Ready = overall Green and complete.`}
       action={<button type="button" data-testid="button-refresh-readiness" onClick={refresh} className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3.5 py-2.5 text-[12px] font-bold text-foreground transition-colors hover:bg-secondary"><RefreshCw size={14} /> Refresh</button>}
     />
     {query.isLoading && <SkeletonBlock className="h-[520px]" />}
@@ -148,11 +157,12 @@ export function TrainingReadinessView() {
       </div>
 
       <div data-testid="readiness-filters" className="relative z-30 mb-5 flex flex-wrap items-center gap-4">
-        <MultiSelectFilter label="Subject" options={optionsFor('subject', (r) => r.subject_area ?? NONE)} selected={subjects} onChange={setSubjects} testId="select-readiness-subject" />
+        <MultiSelectFilter label="Learning now" options={(() => { const c = new Map<string, number>(); for (const r of all) if (pass(r, 'subject')) for (const x of (r.learning_now.subjects.length ? r.learning_now.subjects : [NONE])) c.set(x, (c.get(x) ?? 0) + 1); return [...c].sort((a, b) => a[0].localeCompare(b[0])).map(([key, count]) => ({ key, label: key, count })); })()} selected={subjects} onChange={setSubjects} testId="select-readiness-subject" />
+        <MultiSelectFilter label="Mapped vs now" options={optionsFor('match', matchOf)} selected={matches} onChange={setMatches} testId="select-readiness-match" />
         <MultiSelectFilter label="Capability Manager" options={optionsFor('cm', (r) => r.capability_manager ?? NONE)} selected={managers} onChange={setManagers} testId="select-readiness-cm" />
         <MultiSelectFilter label="Overall" options={optionsFor('overall', (r) => LABEL[r.overall])} selected={overalls} onChange={setOveralls} testId="select-readiness-overall" />
         <MultiSelectFilter label="Completion" options={optionsFor('status', statusOf)} selected={statuses} onChange={setStatuses} testId="select-readiness-status" />
-        {anyFilter && <button type="button" onClick={() => { setSubjects([]); setManagers([]); setOveralls([]); setStatuses([]); }} className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-[11px] font-bold text-foreground transition-colors hover:bg-secondary"><X size={13} /> Clear filters</button>}
+        {anyFilter && <button type="button" onClick={() => { setSubjects([]); setManagers([]); setOveralls([]); setStatuses([]); setMatches([]); }} className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-[11px] font-bold text-foreground transition-colors hover:bg-secondary"><X size={13} /> Clear filters</button>}
       </div>
 
       <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
@@ -171,7 +181,8 @@ export function TrainingReadinessView() {
                 <tr className="border-b border-border bg-[#f4f7f9]">
                   <th className={`sticky left-0 z-10 bg-[#f4f7f9] ${th}`}>Name</th>
                   <th className={th}>Employee ID</th>
-                  <th className={th}>Subject</th>
+                  <th className={th}>Mapped subject</th>
+                  <th className={th}>Learning now</th>
                   <th className={th}>Capability Manager</th>
                   <th className={th}>Lectures done (demo + AI)</th>
                   <th className={`${th} text-center`}>Demo score</th>
@@ -186,9 +197,15 @@ export function TrainingReadinessView() {
                   const isOpen = open === id;
                   return <Fragment key={id}>
                     <tr onClick={() => setOpen(isOpen ? null : id)} className="cursor-pointer border-b border-border/70 last:border-0 hover:bg-[#f8fafb]">
-                      <td className={`sticky left-0 z-10 bg-card font-semibold text-foreground ${td}`}><span className="inline-flex items-center gap-1.5">{isOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}{r.full_name}</span></td>
+                      <td className={`sticky left-0 z-10 bg-card font-semibold text-foreground ${td}`}><span className="inline-flex items-center gap-1.5">{isOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}{r.full_name}{r.role === 'Mentor' && <span className="rounded-full bg-secondary px-1.5 py-0.5 text-[9px] font-bold uppercase text-muted-foreground">Mentor</span>}</span></td>
                       <td className={`${td} font-mono-ui text-[11px]`}>{r.employee_id || NONE}</td>
                       <td className={td}>{r.subject_area || NONE}</td>
+                      <td className={td} title={`From ${r.learning_now.source} (last ${(query.data?.learning_days ?? 30)} days)`}>
+                        <div className="flex flex-wrap items-center gap-1">
+                          {r.learning_now.subjects.length ? r.learning_now.subjects.map((x) => <span key={x} className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${x === r.subject_area ? 'bg-secondary text-foreground' : 'bg-[#e6f0fb] text-[#2b59c3]'}`}>{x}</span>) : NONE}
+                        </div>
+                        <div className="mt-0.5 text-[10px] text-muted-foreground">{matchOf(r) === 'Different subject' ? '⚠ differs · ' : ''}from {r.learning_now.source}</div>
+                      </td>
                       <td className={`${td} text-muted-foreground`}>{r.capability_manager || NONE}</td>
                       <td className={td}>{r.has_lecture_list ? <Progress done={r.both_lectures} total={r.lectures_total} /> : <span className="text-[11px] text-muted-foreground">No lecture list for this subject</span>}</td>
                       <td className={`${td} text-center`}><Score v={r.demo_avg} c={r.demo_colour} sub={`${r.demo_lectures} lecture${r.demo_lectures === 1 ? '' : 's'}`} /></td>
@@ -197,8 +214,14 @@ export function TrainingReadinessView() {
                       <td className={td}><Overall r={r} /></td>
                     </tr>
                     {isOpen && <tr className="border-b border-border bg-[#f8fafb]">
-                      <td colSpan={9} className="px-6 py-4">
-                        {r.courses.filter((c) => activeSem === 'all' || String(c.semester) === activeSem).length === 0 ? <p className="text-[12px] text-muted-foreground">No lecture-list courses for {r.subject_area ?? 'this subject'}.</p> :
+                      <td colSpan={10} className="px-6 py-4">
+                        <div className="mb-3 flex flex-wrap gap-6 text-[11px]">
+                          <div><span className="font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Demos + AI, last {(query.data?.learning_days ?? 30)} days</span>
+                            <div className="mt-1">{r.learning_now.demos.length ? r.learning_now.demos.map((a) => `${a.subject} ${a.count} (last ${fmtDay(a.last)})`).join(' · ') : NONE}</div></div>
+                          <div><span className="font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Learning-portal units completed, last {(query.data?.learning_days ?? 30)} days</span>
+                            <div className="mt-1">{r.learning_now.lp.length ? r.learning_now.lp.map((a) => `${a.subject} ${a.count} (last ${fmtDay(a.last)})`).join(' · ') : NONE}</div></div>
+                        </div>
+                        {r.courses.filter((c) => activeSem === 'all' || String(c.semester) === activeSem).length === 0 ? <p className="text-[12px] text-muted-foreground">No lecture-list courses for {nowLabel(r)}.</p> :
                           <table className="text-left">
                             <thead><tr>{['Semester', 'Course', 'Lectures', 'With demo', 'With AI', 'Both', 'Demo avg', 'AI avg'].map((h) => <th key={h} className="px-3 py-1.5 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">{h}</th>)}</tr></thead>
                             <tbody>{r.courses.filter((c) => activeSem === 'all' || String(c.semester) === activeSem).sort((a, b) => (a.semester ?? 99) - (b.semester ?? 99)).map((c) => <tr key={c.key} className="text-[12px] tabular-nums">

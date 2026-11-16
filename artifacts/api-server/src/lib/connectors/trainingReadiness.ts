@@ -17,6 +17,8 @@ import { runWithHardTimeout } from "./timeout";
 import { LECTURE_COURSES } from "../../data/lectureSessions";
 import { QA_RATING_VIEW, demoKindOf, lectureNameIndex, matchDemoTopic, type DemoWindow } from "./demoTraining";
 import { ASSESSMENT_COURSES, normUid, type ExamCell } from "./topinAssessments";
+import { UNIT_COMPLETION_TABLE } from "./instructorLearningStatus";
+import { taughtSubjectColumn } from "./taughtTraining";
 
 export const READINESS_THRESHOLDS = { demo: { green: 7.5, yellow: 6.5 }, ai: { green: 8.5, yellow: 7.5 }, topn: { green: 75, yellow: 60 } } as const;
 export type Colour = "green" | "yellow" | "red" | "none";
@@ -84,9 +86,9 @@ export type ReadinessBlock = {
 export type Readiness = ReadinessBlock & { courses: ReadinessCourse[]; semesters: Record<string, ReadinessBlock> };
 type Best = { demo: number | null; ai: number | null; demoDone: boolean; aiDone: boolean };
 
-export function readinessOf(subject: string | null, evs: Ev[], w: DemoWindow | undefined, exams: Record<string, ExamCell> | undefined,
+export function readinessOf(subjects: string[], evs: Ev[], w: DemoWindow | undefined, exams: Record<string, ExamCell> | undefined,
   idx: ReturnType<typeof lectureNameIndex> = lectureNameIndex()): Readiness {
-  const own = LECTURE_COURSES.map((c, ci) => ({ c, ci })).filter((x) => subject && x.c.subject === subject);
+  const own = LECTURE_COURSES.map((c, ci) => ({ c, ci })).filter((x) => subjects.includes(x.c.subject));
   const ownCi = new Set(own.map((x) => x.ci));
   const best = new Map<string, Best>(); // `${ci}|${n}`
   for (const e of evs) {
@@ -116,7 +118,7 @@ export function readinessOf(subject: string | null, evs: Ev[], w: DemoWindow | u
     const demo_avg = avg(scores(lec, "demo")), ai_avg = avg(scores(lec, "ai"));
     let n = 0, sum = 0; // Top-N: Daily + Weekly exams -- average best % over all those exams
     for (const c of ASSESSMENT_COURSES) {
-      if (c.subject !== subject || (sem !== null && EXAM_SEMESTER[c.key] !== sem)) continue;
+      if (!subjects.includes(c.subject) || (sem !== null && EXAM_SEMESTER[c.key] !== sem)) continue;
       for (const x of [exams?.[c.key]?.daily, exams?.[c.key]?.weekly]) if (x && x.avg !== null) { n += x.exams; sum += x.avg * x.exams; }
     }
     const topn_avg = n ? Math.round((sum / n) * 10) / 10 : null;
@@ -130,4 +132,71 @@ export function readinessOf(subject: string | null, evs: Ev[], w: DemoWindow | u
   };
   const sems = [...new Set(own.map(({ c }) => LECTURE_SEMESTER[c.key]).filter((x): x is number => x !== undefined))].sort((a, b) => a - b);
   return { ...block(null), courses, semesters: Object.fromEntries(sems.map((x) => [String(x), block(x)])) };
+}
+
+// "Learning now" (2026-11-16, per request: "instructors may be mapped to one subject but be learning another right now -- take it from
+// their learning-portal courses and their latest demos; if they are studying two subjects together, show both"). Checked on the 97
+// NIAT (Training) instructors with _tmp_learning_subject.ts: 21 were active only in another subject, 25 in several. The learning portal
+// is noisy (a few stray units in many subjects), so demos come first:
+//   1. Demos / AI assessments in the last LEARNING_DAYS days (in-training, any subject; a topic name found in several subjects is skipped):
+//      every subject with at least LEARNING_SHARE of the top subject's count.
+//   2. Else learning-portal units COMPLETED in the last LEARNING_DAYS days (completion_datetime), course -> subject as in Taught in Class:
+//      the same share rule on unit counts.
+//   3. Else the mapped subject.
+// Several subjects only for MENTORS (classification 'mentor', 2026-11-16, per request); instructors get the single top subject.
+export const LEARNING_DAYS = 30;
+export const LEARNING_SHARE = 0.25;
+export type SubjectActivity = { subject: string; count: number; last: string | null };
+export type LearningNow = { subjects: string[]; source: "demos" | "learning portal" | "mapped subject"; demos: SubjectActivity[]; lp: SubjectActivity[] };
+const sinceDay = () => new Date(Date.now() - LEARNING_DAYS * 86400000).toISOString().slice(0, 10);
+let lpCache: { at: number; data: Map<string, SubjectActivity[]> } | null = null;
+
+/** Learning-portal units completed in the last LEARNING_DAYS days, per TeachOS user id (normUid) and subject. Cached 10 minutes. */
+export async function fetchRecentLpActivity(force = false): Promise<Map<string, SubjectActivity[]>> {
+  if (!force && lpCache && Date.now() - lpCache.at < 10 * 60 * 1000) return lpCache.data;
+  const bq = new BigQuery({ projectId: config.BIGQUERY_PROJECT_ID, ...(config.BIGQUERY_CREDENTIALS_JSON ? { credentials: JSON.parse(config.BIGQUERY_CREDENTIALS_JSON) } : {}) });
+  const [rows] = await runWithHardTimeout(() => bq.query({
+    query: `SELECT instructor_user_id AS u, REPLACE(LOWER(CAST(course_id AS STRING)), '-', '') AS cid, course_title AS t, COUNT(*) AS n, MAX(CAST(completion_datetime AS STRING)) AS d
+            FROM \`${config.BIGQUERY_PROJECT_ID}.${config.BIGQUERY_DATASET}.${UNIT_COMPLETION_TABLE}\`
+            WHERE completion_status = 'COMPLETED' AND completion_datetime >= DATE(@since) AND instructor_user_id IS NOT NULL GROUP BY 1, 2, 3`,
+    params: { since: sinceDay() },
+  }), 120000);
+  const acc = new Map<string, Map<string, SubjectActivity>>();
+  for (const r of rows as Record<string, unknown>[]) {
+    const subject = taughtSubjectColumn(plain(r.cid), plain(r.t));
+    if (!subject || subject === "Other") continue;
+    const uid = normUid(plain(r.u));
+    const m = acc.get(uid) ?? new Map<string, SubjectActivity>();
+    const x = m.get(subject) ?? { subject, count: 0, last: null };
+    const d = plain(r.d).slice(0, 10) || null;
+    x.count += Number(plain(r.n)) || 0;
+    if (d && (!x.last || d > x.last)) x.last = d;
+    m.set(subject, x); acc.set(uid, m);
+  }
+  const data = new Map([...acc].map(([u, m]) => [u, [...m.values()].sort((a, b) => b.count - a.count)]));
+  lpCache = { at: Date.now(), data };
+  return data;
+}
+
+export function learningNowOf(mapped: string | null, evs: Ev[], w: DemoWindow | undefined, lp: SubjectActivity[] | undefined, multi: boolean,
+  idx: ReturnType<typeof lectureNameIndex> = lectureNameIndex()): LearningNow {
+  const since = sinceDay();
+  const dm = new Map<string, SubjectActivity>();
+  for (const e of evs) {
+    if (!e.date || e.date < since || !demoKindOf(e.type, e.date, w).endsWith("_training")) continue;
+    const subs = new Set((matchDemoTopic(idx, e.title) ?? []).map((h) => LECTURE_COURSES[h.ci].subject));
+    if (subs.size !== 1) continue;
+    const [subject] = subs;
+    const x = dm.get(subject) ?? { subject, count: 0, last: null };
+    x.count++; if (!x.last || e.date > x.last) x.last = e.date;
+    dm.set(subject, x);
+  }
+  const byCount = (a: SubjectActivity, b: SubjectActivity) => b.count - a.count || String(b.last ?? "").localeCompare(String(a.last ?? ""));
+  const demos = [...dm.values()].sort(byCount);
+  const lpList = [...(lp ?? [])].sort(byCount);
+  // Several subjects only for mentors (2026-11-16, per request); an instructor gets one -- the top one (ties: the most recent).
+  const pick = (list: SubjectActivity[]) => (multi ? list.filter((x) => x.count >= list[0].count * LEARNING_SHARE) : list.slice(0, 1)).map((x) => x.subject);
+  if (demos.length) return { subjects: pick(demos), source: "demos", demos, lp: lpList };
+  if (lpList.length) return { subjects: pick(lpList), source: "learning portal", demos, lp: lpList };
+  return { subjects: mapped ? [mapped] : [], source: "mapped subject", demos, lp: lpList };
 }

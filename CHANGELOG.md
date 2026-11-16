@@ -22,6 +22,15 @@ Commit messages stay short (title + 2-3 lines); this file is the detailed record
 | What the Instructor Archive stores (joining date, gender, subject ...) | `artifacts/api-server/src/lib/archiveInstructors.ts` |
 | One-off read-only checks | `artifacts/api-server/src/lib/connectors/_tmp_*.ts` |
 
+## 2026-11-16 -- Training - Readiness: "Learning now" subject
+
+Readiness is scored on the subject(s) each instructor is learning NOW, not only the mapped subject (check on 97 training instructors: 21 active only in another subject, 25 in several).
+- Learning now = subjects of in-training demos / AI assessments in the last 30 days (each subject with at least 25% of the top subject's count; topic names found in several subjects skipped); else learning-portal units COMPLETED in the last 30 days (completion_datetime, course -> subject as Taught in Class); else the mapped subject.
+- New columns Mapped subject / Learning now (blue = not the mapped subject, "differs" flag, source); filters Learning now and Mapped vs now; row click shows the 30-day demo and LP counts per subject.
+- Several subjects only for mentors (classification `mentor`); instructors get their single top subject (ties: most recent). Mentor tag beside the name, Role in the CSV.
+- Settings: `LEARNING_DAYS`, `LEARNING_SHARE` in `api-server/src/lib/connectors/trainingReadiness.ts`. Check script: `_tmp_learning_subject.ts`.
+- After pulling: Publish only.
+
 ## 2026-11-16 -- Training - Readiness: semester-wise
 
 Semester buttons on Training - Readiness (All semesters, Semester 1, 2, 3, 4). A semester shows only instructors whose subject has courses in it; demo / AI scores, Top-N, completion and colours are counted on that semester's courses only. Topin exams on a whole subject (General, DSA, Gen AI) count only in All semesters. Course breakdown shows the semester.

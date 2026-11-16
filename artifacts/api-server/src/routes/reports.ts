@@ -10,7 +10,7 @@ import { isPinnedConfirmedInstructor, TEACHOS_ONLY_UNREVIEWED } from "../data/cl
 import { productOf } from "../lib/product";
 import { taughtSubjectColumn, courseColumnOf, portalColumnOf, TAUGHT_SUBJECT_COLUMNS } from "../lib/connectors/taughtTraining";
 import { ASSESSMENT_COURSES, fetchTopinAssessments, normUid } from "../lib/connectors/topinAssessments";
-import { fetchReadinessEvaluations, readinessOf, READINESS_THRESHOLDS } from "../lib/connectors/trainingReadiness";
+import { fetchReadinessEvaluations, fetchRecentLpActivity, learningNowOf, readinessOf, READINESS_THRESHOLDS, LEARNING_DAYS } from "../lib/connectors/trainingReadiness";
 import { lectureNameIndex } from "../lib/connectors/demoTraining";
 import { LECTURE_COURSES } from "../data/lectureSessions";
 
@@ -1718,9 +1718,9 @@ router.get("/reports/training-readiness", requireAuth, requireRole("admin"), asy
   const people = allRows.filter((r) => r.inTeachos && r.teachosUserId && !TRAINING_STATS_EXCLUDED_CLASSIFICATIONS.has(r.classification ?? "") && productOf(r) === "NIAT (Training)");
   const deployedByUid = new Map((await db.select({ uid: instructorContributionTable.instructorUserId, d: instructorContributionTable.deploymentDate }).from(instructorContributionTable)).map((c) => [normUid(c.uid), c.d]));
   const force = req.query.refresh === "1";
-  let evs: Awaited<ReturnType<typeof fetchReadinessEvaluations>>, topin: Awaited<ReturnType<typeof fetchTopinAssessments>>;
+  let evs: Awaited<ReturnType<typeof fetchReadinessEvaluations>>, topin: Awaited<ReturnType<typeof fetchTopinAssessments>>, lp: Awaited<ReturnType<typeof fetchRecentLpActivity>>;
   try {
-    [evs, topin] = await Promise.all([fetchReadinessEvaluations(force), fetchTopinAssessments(force)]);
+    [evs, topin, lp] = await Promise.all([fetchReadinessEvaluations(force), fetchTopinAssessments(force), fetchRecentLpActivity(force)]);
   } catch (err) {
     res.status(502).json({ error: `Demo / assessment data is not readable right now: ${(err as Error).message.slice(0, 200)}` });
     return;
@@ -1729,15 +1729,21 @@ router.get("/reports/training-readiness", requireAuth, requireRole("admin"), asy
   const rows = people.map((p) => {
     const uid = normUid(p.teachosUserId!);
     const subject = (normalizeSubjectArea(p.deptArea || p.manualDeptArea || null) as string | null) ?? null;
+    const w = { joining: null, deployed: deployedByUid.get(uid) ?? null };
+    // Readiness is scored on the subject(s) the instructor is learning NOW (2026-11-16), not only the mapped subject.
+    const isMentor = p.classification === "mentor";
+    const learning = learningNowOf(subject, evs.byUid.get(uid) ?? [], w, lp.get(uid), isMentor, idx);
     return {
       employee_id: p.employeeId,
       full_name: p.fullName,
       subject_area: subject,
+      learning_now: learning,
+      role: isMentor ? "Mentor" : "Instructor",
       capability_manager: p.teachosManager || p.manualCapabilityManager || null,
-      ...readinessOf(subject, evs.byUid.get(uid) ?? [], { joining: null, deployed: deployedByUid.get(uid) ?? null }, topin.byUid.get(uid), idx),
+      ...readinessOf(learning.subjects, evs.byUid.get(uid) ?? [], w, topin.byUid.get(uid), idx),
     };
   }).sort((a, b) => a.full_name.localeCompare(b.full_name));
-  res.json({ rows, thresholds: READINESS_THRESHOLDS, fetched_at: evs.fetchedAt });
+  res.json({ rows, thresholds: READINESS_THRESHOLDS, learning_days: LEARNING_DAYS, fetched_at: evs.fetchedAt });
 });
 
 // Manual Date of joining (2026-10-14, per request): sets or clears the typed-in joining date for someone Darwin has no date for
