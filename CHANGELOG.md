@@ -22,6 +22,10 @@ Commit messages stay short (title + 2-3 lines); this file is the detailed record
 | What the Instructor Archive stores (joining date, gender, subject ...) | `artifacts/api-server/src/lib/archiveInstructors.ts` |
 | One-off read-only checks | `artifacts/api-server/src/lib/connectors/_tmp_*.ts` |
 
+## 2026-11-17 -- Training Stats views: Instructor department only
+
+Taught in Class, Training - Demos, Training - Assessments and Training - Readiness now include only people the Instructors tab counts as Instructors or Mentors (`departmentIdsOf()` in `routes/reports.ts`, the same rule Training - LP already used). Robotics instructors and non-teaching staff who only have a TeachOS INSTRUCTOR account (e.g. NW0007471 and the 16 others found on 16 Nov) no longer appear. After pulling: Publish only.
+
 ## 2026-11-17 -- Mock demos count as normal demos
 
 MOCK recordings (16.7k completed since Jan 2024, every subject, still recorded) now count as regular demos in Training - Demos, Readiness and Contribution's Training Demo QA: in-training on/before the deployment date, after deployment after it; 10-minute rule for the average. Never treated as pre-preparedness (that rule only looks at DEMO / AI_ASSESSMENT). Topic titles like "Introduction to Python > Programming with Python" now match on the part after ">".
