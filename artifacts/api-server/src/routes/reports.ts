@@ -360,6 +360,15 @@ const toApiInstructorSummary = (row: InstructorRow, contributionByTeachosId: Map
 // definition below for the full "who counts as an Exception" reasoning
 // (unresolved exit-flagged people within the Instructor Department
 // population only — a review queue, not a headcount bucket).
+// Instructor department (2026-11-17, per report: Robotics instructors and non-teaching staff with a TeachOS INSTRUCTOR account, e.g.
+// NW0007471, showed in Training - Readiness). Same rule Training - LP already uses: only people the Instructors tab counts as Instructors or
+// Mentors (Darwin Instructors-department tech / non-tech, payroll / TeachOS-only instructors, mentors). Used by Taught in Class, Training -
+// Demos, Training - Assessments and Training - Readiness.
+function departmentIdsOf(rawRows: InstructorRow[]): Set<number> {
+  const { countedInstructorRows, mentors } = computeDepartmentAndExceptionRows(rawRows);
+  return new Set([...countedInstructorRows, ...mentors].map((r) => r.id));
+}
+
 export function computeDepartmentAndExceptionRows(rawRows: InstructorRow[]) {
   // Edge case (2026-10-07, per request: "she should be considered as an edge
   // case"): anyone on CONFIRMED_INSTRUCTOR_DESPITE_FULL_ROSTER (NW0005068,
@@ -1536,7 +1545,8 @@ const isNiatInstructor = (p: typeof instructorsTable.$inferSelect) =>
   productOf(p) === "NIAT (Deployed)" && (!p.enrolledPlans || /niat/i.test(p.enrolledPlans));
 router.get("/reports/taught-training", requireAuth, requireRole("admin"), async (_req, res) => {
   const allRows = await db.select().from(instructorsTable);
-  const people = allRows.filter((r) => r.inTeachos && r.teachosUserId && !TRAINING_STATS_EXCLUDED_CLASSIFICATIONS.has(r.classification ?? "") && isNiatInstructor(r));
+  const deptIds = departmentIdsOf(allRows);
+  const people = allRows.filter((r) => r.inTeachos && r.teachosUserId && deptIds.has(r.id) && (isConfirmedDespiteFullRoster(r) || !TRAINING_STATS_EXCLUDED_CLASSIFICATIONS.has(r.classification ?? "")) && isNiatInstructor(r));
   const byUid = new Map(people.map((p) => [p.teachosUserId!, p]));
   let taughtRows: (typeof instructorTaughtCourseTable.$inferSelect)[] = [];
   try {
@@ -1618,7 +1628,8 @@ router.get("/reports/taught-training", requireAuth, requireRole("admin"), async 
 const DEMO_PRODUCTS = new Set(["NIAT (Deployed)", "NIAT (Training)"]);
 router.get("/reports/demo-training", requireAuth, requireRole("admin"), async (_req, res) => {
   const allRows = await db.select().from(instructorsTable);
-  const people = allRows.filter((r) => r.inTeachos && r.teachosUserId && !TRAINING_STATS_EXCLUDED_CLASSIFICATIONS.has(r.classification ?? "") && DEMO_PRODUCTS.has(productOf(r)));
+  const deptIds = departmentIdsOf(allRows);
+  const people = allRows.filter((r) => r.inTeachos && r.teachosUserId && deptIds.has(r.id) && (isConfirmedDespiteFullRoster(r) || !TRAINING_STATS_EXCLUDED_CLASSIFICATIONS.has(r.classification ?? "")) && DEMO_PRODUCTS.has(productOf(r)));
   const byUid = new Map(people.map((p) => [p.teachosUserId!, p]));
   let demoRows: (typeof instructorDemoCourseTable.$inferSelect)[] = [];
   try {
@@ -1680,7 +1691,8 @@ router.get("/reports/demo-training", requireAuth, requireRole("admin"), async (_
 // trainee exam best-scores view (connectors/topinAssessments.ts, cached 10 minutes; ?refresh=1 reads it again).
 router.get("/reports/topin-assessments", requireAuth, requireRole("admin"), async (req, res) => {
   const allRows = await db.select().from(instructorsTable);
-  const people = allRows.filter((r) => r.inTeachos && r.teachosUserId && !TRAINING_STATS_EXCLUDED_CLASSIFICATIONS.has(r.classification ?? "") && DEMO_PRODUCTS.has(productOf(r)));
+  const deptIds = departmentIdsOf(allRows);
+  const people = allRows.filter((r) => r.inTeachos && r.teachosUserId && deptIds.has(r.id) && (isConfirmedDespiteFullRoster(r) || !TRAINING_STATS_EXCLUDED_CLASSIFICATIONS.has(r.classification ?? "")) && DEMO_PRODUCTS.has(productOf(r)));
   let data: Awaited<ReturnType<typeof fetchTopinAssessments>>;
   try {
     data = await fetchTopinAssessments(req.query.refresh === "1");
@@ -1715,7 +1727,8 @@ router.get("/reports/topin-assessments", requireAuth, requireRole("admin"), asyn
 // ?refresh=1 reads again). Show only.
 router.get("/reports/training-readiness", requireAuth, requireRole("admin"), async (req, res) => {
   const allRows = await db.select().from(instructorsTable);
-  const people = allRows.filter((r) => r.inTeachos && r.teachosUserId && !TRAINING_STATS_EXCLUDED_CLASSIFICATIONS.has(r.classification ?? "") && productOf(r) === "NIAT (Training)");
+  const deptIds = departmentIdsOf(allRows);
+  const people = allRows.filter((r) => r.inTeachos && r.teachosUserId && deptIds.has(r.id) && (isConfirmedDespiteFullRoster(r) || !TRAINING_STATS_EXCLUDED_CLASSIFICATIONS.has(r.classification ?? "")) && productOf(r) === "NIAT (Training)");
   const deployedByUid = new Map((await db.select({ uid: instructorContributionTable.instructorUserId, d: instructorContributionTable.deploymentDate }).from(instructorContributionTable)).map((c) => [normUid(c.uid), c.d]));
   const force = req.query.refresh === "1";
   let evs: Awaited<ReturnType<typeof fetchReadinessEvaluations>>, topin: Awaited<ReturnType<typeof fetchTopinAssessments>>, lp: Awaited<ReturnType<typeof fetchRecentLpActivity>>;
