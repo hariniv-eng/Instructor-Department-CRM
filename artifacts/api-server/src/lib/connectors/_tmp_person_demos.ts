@@ -1,90 +1,50 @@
-// One-off, READ-ONLY (2026-10-29, per request: "this instructor shows an average QA of 0 -- verify"). Lists every DEMO / TRAINING_DEMO /
-// AI evaluation of one person in niat_session_wise_qa_rating: date, type, status, final_score, recording length, which lecture-list course
-// the topic matches (what the Demos tab counts), and whether a report / transcript link exists. Then the average the Demos tab would show
-// per course. Also prints how many completed demos company-wide have a score of exactly 0. Writes nothing.
-//   pnpm exec tsx src/lib/connectors/_tmp_person_demos.ts NW0005240
+// One-off, READ-ONLY (2026-11-17, per request: "NW2000651 has 16 demos recorded but FCC shows 15"). For one employee ID: every DEMO /
+// TRAINING_DEMO (and AI) row in niat_session_wise_qa_rating, with what FCC does with it -- status, date, length, score, the lecture /
+// course its topic matches (same matching as Training - Demos), in-training or after deployment, and whether it is counted. Then what
+// FCC has STORED for her (instructor_demo_course, last Training Status sync) and when that sync ran.
+//   pnpm exec tsx src/lib/connectors/_tmp_person_demos.ts NW2000651
 import { BigQuery } from "@google-cloud/bigquery";
-import { eq } from "drizzle-orm";
-import { db, instructorsTable, instructorDemoCourseTable, instructorContributionTable, instructorManualJoiningTable } from "@workspace/db";
+import { desc, eq, like } from "drizzle-orm";
+import { db, instructorsTable, instructorDemoCourseTable, instructorContributionTable, uploadsTable } from "@workspace/db";
 import { config } from "./config";
-import { QA_RATING_VIEW, lectureNameIndex, matchDemoTopic, demoKindOf, type DemoKind } from "./demoTraining";
+import { QA_RATING_VIEW, demoKindOf, lectureNameIndex, matchDemoTopic } from "./demoTraining";
 import { LECTURE_COURSES } from "../../data/lectureSessions";
 
 const plain = (v: unknown): string => (v && typeof v === "object" && "value" in (v as object) ? String((v as { value: unknown }).value) : v == null ? "" : String(v));
+
 async function main() {
   const emp = (process.argv.slice(2).filter((a) => a !== "--")[0] ?? "").trim().toUpperCase();
   const [p] = await db.select().from(instructorsTable).where(eq(instructorsTable.employeeId, emp));
-  if (!p?.teachosUserId) { console.log(`${emp}: not in the CRM or no TeachOS user id`); process.exit(0); }
-  const bq = new BigQuery({ projectId: config.BIGQUERY_PROJECT_ID, ...(config.BIGQUERY_CREDENTIALS_JSON ? { credentials: JSON.parse(config.BIGQUERY_CREDENTIALS_JSON) } : {}) });
-  const V = `\`${config.BIGQUERY_PROJECT_ID}.${config.BIGQUERY_DATASET}.${QA_RATING_VIEW}\``;
-  const [rows] = await bq.query({ query: `SELECT CAST(session_date AS STRING) AS d, evaluation_type AS ty, status AS st, final_score AS s, session_title AS t,
-      ROUND(SAFE_CAST(audio_duration AS FLOAT64) / 60, 1) AS mins, report_url IS NOT NULL AND report_url != '' AS rep, transcript_url IS NOT NULL AND transcript_url != '' AS tr,
-      CAST(evaluation_creation_datetime AS STRING) AS created
-    FROM ${V} WHERE instructor_user_id = @uid AND evaluation_type IN ('DEMO', 'TRAINING_DEMO', 'AI_ASSESSMENT', 'TRAINING_AI_ASSESSMENT') ORDER BY d, created`,
-    params: { uid: p.teachosUserId } });
+  if (!p?.teachosUserId) { console.log(`${emp}: not in FCC or no TeachOS id`); process.exit(0); }
+  const [c] = await db.select().from(instructorContributionTable).where(eq(instructorContributionTable.instructorUserId, p.teachosUserId));
+  const w = { joining: p.dateOfJoining ?? null, deployed: c?.deploymentDate ?? null };
+  console.log(`${emp} | subject ${p.deptArea ?? p.manualDeptArea ?? "-"} | deployment date ${w.deployed ?? "not deployed"}`);
+  const P = config.BIGQUERY_PROJECT_ID!;
+  const bq = new BigQuery({ projectId: P, ...(config.BIGQUERY_CREDENTIALS_JSON ? { credentials: JSON.parse(config.BIGQUERY_CREDENTIALS_JSON) } : {}) });
+  const [rows] = await bq.query({ query: `SELECT evaluation_type ty, status st, CAST(session_date AS STRING) d, CAST(evaluation_creation_datetime AS STRING) cr, session_title t,
+      final_score s, SAFE_CAST(audio_duration AS FLOAT64) / 60 m FROM \`${P}.${config.BIGQUERY_DATASET}.${QA_RATING_VIEW}\`
+      WHERE instructor_user_id = @u AND evaluation_type IN ('DEMO', 'TRAINING_DEMO', 'AI_ASSESSMENT', 'TRAINING_AI_ASSESSMENT') ORDER BY cr`, params: { u: p.teachosUserId } });
   const idx = lectureNameIndex();
-  // In training vs after deployment (2026-11-07): same dates the sync uses.
-  const [manual] = await db.select().from(instructorManualJoiningTable).where(eq(instructorManualJoiningTable.employeeId, emp));
-  const [contrib] = await db.select({ d: instructorContributionTable.deploymentDate }).from(instructorContributionTable).where(eq(instructorContributionTable.instructorUserId, p.teachosUserId));
-  const win = { joining: p.dateOfJoining ?? manual?.dateOfJoining ?? null, deployed: contrib?.d ?? null };
-  const kindOf = (r: Record<string, unknown>): DemoKind => demoKindOf(plain(r.ty), plain(r.d) || null, win);
-  console.log(`${emp} · ${(rows as unknown[]).length} demo / AI evaluations · joining ${win.joining ?? "unknown"} · deployment (first session) ${win.deployed ?? "not deployed"}\n`);
-  // Count per type and status (2026-11-07, per request: "how many demos ... demos, training demos or AI assessments -- total count").
-  const counts = new Map<string, Map<string, number>>();
-  for (const r of rows as Record<string, unknown>[]) {
-    const ty = plain(r.ty), st = plain(r.st).toLowerCase() || "(blank)";
-    const m = counts.get(ty) ?? new Map<string, number>(); m.set(st, (m.get(st) ?? 0) + 1); counts.set(ty, m);
-  }
-  console.log("COUNTS (type: total -- by status)");
-  for (const ty of ["DEMO", "TRAINING_DEMO", "AI_ASSESSMENT", "TRAINING_AI_ASSESSMENT"]) {
-    const m = counts.get(ty) ?? new Map<string, number>();
-    const total = [...m.values()].reduce((x, y) => x + y, 0);
-    console.log(`  ${ty}: ${total}${total ? ` -- ${[...m].map(([k, v]) => `${k} ${v}`).join(", ")}` : ""}`);
-  }
-  console.log(`  ALL: ${(rows as unknown[]).length}\n`);
-  console.log("date | type | status | score | mins | report | transcript | topic | matched course #lecture | counted as");
-  const byCourse = new Map<string, { n: number; sum: number; scored: number; zero: number }>();
-  for (const r of rows as Record<string, unknown>[]) {
-    const hits = matchDemoTopic(idx, plain(r.t));
-    const where = hits ? [...new Set(hits.map((h) => `${LECTURE_COURSES[h.ci].title} ${h.n > 0 ? `#${h.n}` : "(old-course topic)"}`))].join(" / ") : "not in lecture list";
-    console.log(`  ${plain(r.d)} | ${plain(r.ty)} | ${plain(r.st)} | ${plain(r.s) || "-"} | ${plain(r.mins) || "-"} | ${r.rep ? "yes" : "no"} | ${r.tr ? "yes" : "no"} | ${plain(r.t)} | ${where} | ${kindOf(r)}`);
-    if (["DEMO", "TRAINING_DEMO"].includes(plain(r.ty)) && plain(r.st).toLowerCase() === "completed" && hits) {
-      for (const ci of new Set(hits.map((h) => h.ci))) {
-        const k = LECTURE_COURSES[ci].title, e = byCourse.get(k) ?? { n: 0, sum: 0, scored: 0, zero: 0 };
-        e.n++; if (plain(r.s) !== "") { e.sum += Number(plain(r.s)); e.scored++; if (Number(plain(r.s)) === 0) e.zero++; }
-        byCourse.set(k, e);
-      }
-    }
-  }
-  // Per course, all demos vs only recordings of 10 minutes or more (2026-11-07, per request: "how many above 10 minutes, how many unique
-  // sessions"). Completed DEMO / TRAINING_DEMO only; AI assessments separately below.
-  for (const kind of ["demo_training", "demo_deployed", "ai_training", "ai_deployed"] as const) {
-    const sum = new Map<string, { all: number; allL: Set<string>; allS: number[]; long: number; longL: Set<string>; longS: number[] }>();
-    for (const r of rows as Record<string, unknown>[]) {
-      if (kindOf(r) !== kind || plain(r.st).toLowerCase() !== "completed") continue;
+  const tally = { all: 0, completed: 0, matched: 0, training: 0 };
+  for (const kind of ["DEMO", "AI"]) {
+    console.log(`\n${kind === "DEMO" ? "DEMOS (DEMO + TRAINING_DEMO)" : "AI ASSESSMENTS"}:`);
+    for (const r of (rows as Record<string, unknown>[]).filter((x) => (kind === "DEMO") === plain(x.ty).endsWith("DEMO"))) {
+      const done = plain(r.st).toLowerCase() === "completed";
       const hits = matchDemoTopic(idx, plain(r.t));
-      const courses = hits ? [...new Set(hits.map((h) => LECTURE_COURSES[h.ci].title))] : ["(not in lecture list)"];
-      for (const c of courses) {
-        const e = sum.get(c) ?? { all: 0, allL: new Set(), allS: [], long: 0, longL: new Set(), longS: [] };
-        const lec = hits ? hits.filter((h) => LECTURE_COURSES[h.ci].title === c).map((h) => (h.n > 0 ? `#${h.n}` : plain(r.t))).join("/") : plain(r.t);
-        const sc = plain(r.s) === "" ? null : Number(plain(r.s));
-        e.all++; e.allL.add(lec); if (sc !== null) e.allS.push(sc);
-        if (Number(plain(r.mins)) >= 10) { e.long++; e.longL.add(lec); if (sc !== null) e.longS.push(sc); }
-        sum.set(c, e);
-      }
+      const courses = [...new Set((hits ?? []).map((h) => LECTURE_COURSES[h.ci].title))];
+      const k = demoKindOf(plain(r.ty), plain(r.d).slice(0, 10) || null, w);
+      const counted = done && !!hits && k.endsWith("_training");
+      if (kind === "DEMO") { tally.all++; if (done) tally.completed++; if (done && hits) tally.matched++; if (counted) tally.training++; }
+      const why = !done ? `NOT COUNTED: status ${plain(r.st)}` : !hits ? "NOT COUNTED: topic matches no lecture" : !k.endsWith("_training") ? "after deployment (not in-training)" : "counted";
+      console.log(`  ${plain(r.cr).slice(0, 16)} | ${plain(r.ty)} | ${plain(r.t)} | ${Math.round(Number(plain(r.m)) * 10) / 10} min | score ${plain(r.s) || "-"} | ${courses.join(" / ") || "-"} | ${why}`);
     }
-    const avg = (a: number[]) => (a.length ? (a.reduce((x, y) => x + y, 0) / a.length).toFixed(2) : "-");
-    console.log(`\n${{ demo_training: "IN-TRAINING DEMOS", demo_deployed: "DEMOS AFTER DEPLOYMENT", ai_training: "IN-TRAINING AI ASSESSMENTS", ai_deployed: "AI ASSESSMENTS AFTER DEPLOYMENT" }[kind]} per course (completed): all -> demos / different lectures / avg  ||  10 min or more -> demos / different lectures / avg`);
-    for (const [c, e] of sum) console.log(`  ${c}: ${e.all} / ${e.allL.size} / ${avg(e.allS)}  ||  ${e.long} / ${e.longL.size} / ${avg(e.longS)}`);
-    if (!sum.size) console.log("  (none)");
   }
-  console.log("\nWhat the Demos tab works out (course: completed demos, of which score 0, average):");
-  for (const [k, e] of byCourse) console.log(`  ${k}: ${e.n}, ${e.zero} at 0, avg ${e.scored ? (e.sum / e.scored).toFixed(2) : "-"}`);
-  const stored = await db.select().from(instructorDemoCourseTable).where(eq(instructorDemoCourseTable.instructorUserId, p.teachosUserId)).catch(() => []);
-  console.log(`Stored in the Demos tab now: ${stored.map((s) => `${s.courseTitle} ${s.lecturesDemoed}/${s.lecturesTotal}, ${s.demos} demos, avg ${s.scored ? (s.scoreSum / s.scored).toFixed(2) : "-"}`).join("; ") || "nothing"}`);
-  const [z] = await bq.query({ query: `SELECT evaluation_type AS ty, COUNTIF(final_score = 0) AS zero, COUNT(*) AS n, COUNTIF(final_score = 0 AND (report_url IS NULL OR report_url = '')) AS zero_no_report
-    FROM ${V} WHERE evaluation_type IN ('DEMO', 'TRAINING_DEMO') AND LOWER(status) = 'completed' GROUP BY 1` });
-  console.log(`\nCompany-wide, completed demos with score exactly 0: ${(z as Record<string, unknown>[]).map((r) => `${plain(r.ty)} ${plain(r.zero)} of ${plain(r.n)} (${plain(r.zero_no_report)} of them without a report)`).join("; ")}`);
+  console.log(`\nDemos in BigQuery: ${tally.all} | completed ${tally.completed} | completed + topic matched ${tally.matched} | in-training (what FCC counts) ${tally.training}`);
+  const stored = await db.select().from(instructorDemoCourseTable).where(eq(instructorDemoCourseTable.instructorUserId, p.teachosUserId));
+  console.log("\nStored in FCC (last Training Status sync):");
+  for (const s of stored) console.log(`  ${s.courseTitle} | ${s.evaluationKind} | demos ${s.demos} | last ${s.lastDemoDate ?? "-"}`);
+  const [last] = await db.select().from(uploadsTable).where(like(uploadsTable.source, "Instructor Demo Training%")).orderBy(desc(uploadsTable.uploadedAt)).limit(1);
+  console.log(`Last demo sync: ${last ? new Date(last.uploadedAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }) + " | " + last.source : "never"}`);
   process.exit(0);
 }
 main().catch((e) => { console.error(e); process.exit(1); });
