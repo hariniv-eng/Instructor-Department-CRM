@@ -24,7 +24,7 @@ Commit messages stay short (title + 2-3 lines); this file is the detailed record
 
 ## 2026-11-17 -- Training Stats views: Instructor department only
 
-Taught in Class, Training - Demos, Training - Assessments and Training - Readiness now include only people the Instructors tab counts as Instructors or Mentors (`departmentIdsOf()` in `routes/reports.ts`, the same rule Training - LP already used). Robotics instructors and non-teaching staff who only have a TeachOS INSTRUCTOR account (e.g. NW0007471 and the 16 others found on 16 Nov) no longer appear. After pulling: Publish only.
+Training - LP, Taught in Class, Training - Demos, Training - Assessments and Training - Readiness now include only people the Instructors tab counts as Instructors or Mentors (`departmentIdsOf()` in `routes/reports.ts`, the rule the Contribution tab already used). Correction the same day: Training - LP did NOT have it either; added there too. Robotics instructors and non-teaching staff who only have a TeachOS INSTRUCTOR account (e.g. NW0007471 and the 16 others found on 16 Nov) no longer appear. After pulling: Publish only.
 
 ## 2026-11-17 -- Mock demos count as normal demos
 
