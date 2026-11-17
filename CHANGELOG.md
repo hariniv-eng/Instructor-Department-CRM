@@ -22,6 +22,12 @@ Commit messages stay short (title + 2-3 lines); this file is the detailed record
 | What the Instructor Archive stores (joining date, gender, subject ...) | `artifacts/api-server/src/lib/archiveInstructors.ts` |
 | One-off read-only checks | `artifacts/api-server/src/lib/connectors/_tmp_*.ts` |
 
+## 2026-11-17 -- Training - Demos / Readiness: pre-preparedness recordings left out
+
+Pre-preparedness demos / AI assessments (the ones Contribution now counts) are no longer counted in Training - Demos (so "Demos after deployment" = non-preparation demos only), Readiness, or Contribution's Training Demo QA. Training types are never pre-preparedness, so in-training figures are unchanged except for rare plain demos before a class on/before the deployment day.
+- The rule now lives in one place: `api-server/src/lib/connectors/preparedness.ts` (`prepCtes`, `notPreparednessCondition`); used by `instructorEvaluations.ts`, `demoTraining.ts`, `trainingReadiness.ts`.
+- Check: `_tmp_prep_split_check.ts`. After pulling: Publish, then Training Status Sync Now and Contribution Sync Now.
+
 ## 2026-11-17 -- Contribution: Demo / AI = pre-preparedness only
 
 Contribution's Demo and AI assessment figures (hours, count, now also average score each) count ONLY pre-preparedness recordings: a plain DEMO / AI_ASSESSMENT on the topic of a class the instructor then took (completed class in niat_pre_lecture_readiness_check_list_details; topic = session_id of the class's QA-rated recording, else its title), recorded before the class. Rule checked on 19,773 classes (`_tmp_prep_demo_rule.ts`): "any time before" matches the checklist's demo count for 100% of classes, AI 99%. Training demos no longer count here (they stay in Training Demo QA / Training Stats). Workload (Avg Prep Demo / AI Hrs), the Instructors tab workload and the profile use the same figures.

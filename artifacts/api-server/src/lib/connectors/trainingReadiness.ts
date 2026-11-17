@@ -18,6 +18,7 @@ import { LECTURE_COURSES } from "../../data/lectureSessions";
 import { QA_RATING_VIEW, demoKindOf, lectureNameIndex, matchDemoTopic, type DemoWindow } from "./demoTraining";
 import { ASSESSMENT_COURSES, normUid, type ExamCell } from "./topinAssessments";
 import { UNIT_COMPLETION_TABLE } from "./instructorLearningStatus";
+import { notPreparednessCondition } from "./preparedness";
 import { taughtSubjectColumn } from "./taughtTraining";
 
 export const READINESS_THRESHOLDS = { demo: { green: 7.5, yellow: 6.5 }, ai: { green: 8.5, yellow: 7.5 }, topn: { green: 75, yellow: 60 } } as const;
@@ -42,7 +43,8 @@ export async function fetchReadinessEvaluations(force = false): Promise<EvData> 
                    evaluation_type AS ty, SAFE_CAST(audio_duration AS FLOAT64) / 60 AS mins
             FROM \`${config.BIGQUERY_PROJECT_ID}.${config.BIGQUERY_DATASET}.${QA_RATING_VIEW}\`
             WHERE evaluation_type IN ('DEMO', 'TRAINING_DEMO', 'AI_ASSESSMENT', 'TRAINING_AI_ASSESSMENT') AND LOWER(status) = 'completed'
-              AND instructor_user_id IS NOT NULL AND session_title IS NOT NULL`,
+              AND instructor_user_id IS NOT NULL AND session_title IS NOT NULL
+              AND ${notPreparednessCondition(`${config.BIGQUERY_PROJECT_ID}.${config.BIGQUERY_DATASET}.${QA_RATING_VIEW}`)}`,
   }), 120000);
   const byUid = new Map<string, Ev[]>();
   for (const r of rows as Record<string, unknown>[]) {
