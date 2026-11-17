@@ -22,6 +22,12 @@ Commit messages stay short (title + 2-3 lines); this file is the detailed record
 | What the Instructor Archive stores (joining date, gender, subject ...) | `artifacts/api-server/src/lib/archiveInstructors.ts` |
 | One-off read-only checks | `artifacts/api-server/src/lib/connectors/_tmp_*.ts` |
 
+## 2026-11-17 -- Mock demos count as normal demos
+
+MOCK recordings (16.7k completed since Jan 2024, every subject, still recorded) now count as regular demos in Training - Demos, Readiness and Contribution's Training Demo QA: in-training on/before the deployment date, after deployment after it; 10-minute rule for the average. Never treated as pre-preparedness (that rule only looks at DEMO / AI_ASSESSMENT). Topic titles like "Introduction to Python > Programming with Python" now match on the part after ">".
+- Files: `api-server/src/lib/connectors/demoTraining.ts`, `trainingReadiness.ts`, `routes/sync.ts` (log text), `instructor-crm/src/pages/demo-training.tsx` (description). Check: `_tmp_mock_subjects.ts`.
+- After pulling: Publish, then Training Status Sync Now.
+
 ## 2026-11-17 -- Training - Readiness: Date of joining column
 
 Date of joining column after Employee ID (same value as Contribution: Darwin, archive or typed-in; source on hover) with "N days ago"; CSV gets Date of joining and Days since joining. Files: `routes/reports.ts` (`/reports/training-readiness`), `instructor-crm/src/pages/training-readiness.tsx`. After pulling: Publish only.
