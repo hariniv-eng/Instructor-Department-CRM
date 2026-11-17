@@ -1927,6 +1927,9 @@ router.get("/reports/instructor-contribution", requireAuth, requireRole("admin")
       eval_avg_hours: evaluation && evaluation.demoCount + evaluation.aiCount > 0
         ? Math.round(((evaluation.demoCount > 0 ? evaluation.demoSeconds / 3600 / evaluation.demoCount : 0) + (evaluation.aiCount > 0 ? evaluation.aiSeconds / 3600 / evaluation.aiCount : 0)) * 100) / 100
         : null,
+      // Pre-preparedness demo / AI scores (2026-11-17): average final_score of each kind on its own, null when none has a score.
+      demo_avg_score: evaluation && evaluation.demoScored > 0 ? Math.round((evaluation.demoScoreSum / evaluation.demoScored) * 10) / 10 : null,
+      ai_avg_score: evaluation && evaluation.aiScored > 0 ? Math.round((evaluation.aiScoreSum / evaluation.aiScored) * 10) / 10 : null,
       eval_avg_score: evaluation && evaluation.demoScored + evaluation.aiScored > 0 ? Math.round(((evaluation.demoScored > 0 ? evaluation.demoScoreSum / evaluation.demoScored : 0) + (evaluation.aiScored > 0 ? evaluation.aiScoreSum / evaluation.aiScored : 0)) * 10) / 10 : null,
       // Learning hours: total time the person spent on course units (BigQuery z_niat_instructor_day_wise_unit_wise_time_spent_details,
       // seconds converted to hours, one decimal) and the number of days with activity. Follows the date filter.

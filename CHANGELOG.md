@@ -22,6 +22,12 @@ Commit messages stay short (title + 2-3 lines); this file is the detailed record
 | What the Instructor Archive stores (joining date, gender, subject ...) | `artifacts/api-server/src/lib/archiveInstructors.ts` |
 | One-off read-only checks | `artifacts/api-server/src/lib/connectors/_tmp_*.ts` |
 
+## 2026-11-17 -- Contribution: Demo / AI = pre-preparedness only
+
+Contribution's Demo and AI assessment figures (hours, count, now also average score each) count ONLY pre-preparedness recordings: a plain DEMO / AI_ASSESSMENT on the topic of a class the instructor then took (completed class in niat_pre_lecture_readiness_check_list_details; topic = session_id of the class's QA-rated recording, else its title), recorded before the class. Rule checked on 19,773 classes (`_tmp_prep_demo_rule.ts`): "any time before" matches the checklist's demo count for 100% of classes, AI 99%. Training demos no longer count here (they stay in Training Demo QA / Training Stats). Workload (Avg Prep Demo / AI Hrs), the Instructors tab workload and the profile use the same figures.
+- Files: `api-server/src/lib/connectors/instructorEvaluations.ts` (query; table override env READINESS_CHECKLIST_TABLE), `routes/reports.ts` (demo_avg_score, ai_avg_score), `instructor-crm/src/pages/contribution.tsx` (labels, scores, CSV).
+- After pulling: preview `_tmp_prep_demo_preview.ts`, Publish, then Contribution Sync Now (no DB push).
+
 ## 2026-11-16 -- Training - Readiness: "Learning now" subject
 
 Readiness is scored on the subject(s) each instructor is learning NOW, not only the mapped subject (check on 97 training instructors: 21 active only in another subject, 25 in several).
