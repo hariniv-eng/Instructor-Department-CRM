@@ -25,10 +25,15 @@
 // The joining date is the start of the training period; a DEMO dated BEFORE the joining date (rare -- rehires, test uploads) is kept in
 // "in training" rather than dropped (so the joining date only marks the start; nothing is cut by it). A DEMO with no date: after
 // deployment if the person is deployed, else in training.
+//
+// Pre-preparedness recordings LEFT OUT (2026-11-17, per request: "for deployed instructors, are pre-preparedness demos / AI assessments in
+// this data? If so, remove them"): a plain DEMO / AI_ASSESSMENT made to prepare for a class the instructor then took (preparedness.ts) is
+// not counted here -- it is on the Contribution tab instead. So "Demos after deployment" = their other, non-preparation demos.
 import { BigQuery } from "@google-cloud/bigquery";
 import { config, missing } from "./config";
 import { runWithHardTimeout } from "./timeout";
 import { LECTURE_COURSES } from "../../data/lectureSessions";
+import { notPreparednessCondition } from "./preparedness";
 
 export class DemoTrainingError extends Error {}
 export const QA_RATING_VIEW = process.env.QA_RATING_VIEW || "niat_session_wise_qa_rating";
@@ -133,7 +138,8 @@ export async function fetchDemoCourseRows(subjectByUid: Map<string, string | nul
     query: `SELECT instructor_user_id AS uid, session_title AS t, final_score AS s, CAST(session_date AS STRING) AS d,
                    evaluation_type AS ty, SAFE_CAST(audio_duration AS FLOAT64) / 60 AS mins
             FROM \`${config.BIGQUERY_PROJECT_ID}.${config.BIGQUERY_DATASET}.${QA_RATING_VIEW}\`
-            WHERE evaluation_type IN ('DEMO', 'TRAINING_DEMO', 'AI_ASSESSMENT', 'TRAINING_AI_ASSESSMENT') AND LOWER(status) = 'completed' AND instructor_user_id IS NOT NULL AND session_title IS NOT NULL`,
+            WHERE evaluation_type IN ('DEMO', 'TRAINING_DEMO', 'AI_ASSESSMENT', 'TRAINING_AI_ASSESSMENT') AND LOWER(status) = 'completed' AND instructor_user_id IS NOT NULL AND session_title IS NOT NULL
+              AND ${notPreparednessCondition(`${config.BIGQUERY_PROJECT_ID}.${config.BIGQUERY_DATASET}.${QA_RATING_VIEW}`)}`,
   }), QUERY_TIMEOUT_MS);
 
   const idx = lectureNameIndex();
