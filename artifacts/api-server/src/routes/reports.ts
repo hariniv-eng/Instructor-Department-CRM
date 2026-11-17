@@ -361,9 +361,9 @@ const toApiInstructorSummary = (row: InstructorRow, contributionByTeachosId: Map
 // (unresolved exit-flagged people within the Instructor Department
 // population only — a review queue, not a headcount bucket).
 // Instructor department (2026-11-17, per report: Robotics instructors and non-teaching staff with a TeachOS INSTRUCTOR account, e.g.
-// NW0007471, showed in Training - Readiness). Same rule Training - LP already uses: only people the Instructors tab counts as Instructors or
-// Mentors (Darwin Instructors-department tech / non-tech, payroll / TeachOS-only instructors, mentors). Used by Taught in Class, Training -
-// Demos, Training - Assessments and Training - Readiness.
+// NW0007471, showed in Training - Readiness). Only people the Instructors tab counts as Instructors or
+// Mentors (Darwin Instructors-department tech / non-tech, payroll / TeachOS-only instructors, mentors) -- the rule the Contribution tab
+// already used. Used by every Training Stats view: Training - LP, Taught in Class, Training - Demos, Training - Assessments, Training - Readiness.
 function departmentIdsOf(rawRows: InstructorRow[]): Set<number> {
   const { countedInstructorRows, mentors } = computeDepartmentAndExceptionRows(rawRows);
   return new Set([...countedInstructorRows, ...mentors].map((r) => r.id));
@@ -1449,8 +1449,9 @@ function resolveJoining(p: typeof instructorsTable.$inferSelect, lookups: Awaite
 
 router.get("/reports/training-stats", requireAuth, requireRole("admin"), async (_req, res) => {
   const allRows = await db.select().from(instructorsTable);
+  const deptIds = departmentIdsOf(allRows); // Instructor department only (2026-11-17), as Contribution
   const people = allRows
-    .filter((r) => r.inTeachos && !TRAINING_STATS_EXCLUDED_CLASSIFICATIONS.has(r.classification ?? ""))
+    .filter((r) => r.inTeachos && deptIds.has(r.id) && (isConfirmedDespiteFullRoster(r) || !TRAINING_STATS_EXCLUDED_CLASSIFICATIONS.has(r.classification ?? "")))
     .sort((a, b) => a.fullName.localeCompare(b.fullName));
 
   const statusRows = await db.select().from(instructorTrainingStatusTable);
