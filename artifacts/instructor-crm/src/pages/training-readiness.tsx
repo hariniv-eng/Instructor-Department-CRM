@@ -20,7 +20,7 @@ type Block = {
 // Learning now (2026-11-16): subject(s) from the last 30 days' demos, else learning-portal units, else the mapped subject; readiness is scored on these.
 type Activity = { subject: string; count: number; last: string | null };
 type Learning = { subjects: string[]; reading: string[]; source: 'demos' | 'learning portal' | 'mapped subject'; demos: Activity[]; lp: Activity[] };
-type ApiRow = Block & { employee_id: string | null; full_name: string; subject_area: string | null; learning_now: Learning; role: 'Mentor' | 'Instructor'; capability_manager: string | null; courses: Course[]; semesters: Record<string, Block>;
+type ApiRow = Block & { employee_id: string | null; full_name: string; subject_area: string | null; learning_now: Learning; role: 'Mentor' | 'Instructor'; date_of_joining: string | null; date_of_joining_source: string | null; capability_manager: string | null; courses: Course[]; semesters: Record<string, Block>;
   // 2+ subjects (2026-11-16): each subject's readiness on its own, all semesters + per semester.
   by_subject: Record<string, Block & { semesters: Record<string, Block> }> | null };
 type Row = ApiRow;
@@ -36,6 +36,9 @@ const nowLabel = (r: Row) => r.learning_now.subjects.join(' + ') || NONE;
 // Same = learning only the mapped subject; Also another = mapped + another; Different = mapped subject not among them.
 const matchOf = (r: Row) => (!r.subject_area || !r.learning_now.subjects.length ? 'No subject' : !r.learning_now.subjects.includes(r.subject_area) ? 'Different subject' : r.learning_now.subjects.length > 1 ? 'Mapped + another' : 'Same as mapped');
 const fmtDay = (d: string | null) => (d ? new Date(`${d}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : NONE);
+// Date of joining (2026-11-17, per request): same value as Contribution's (Darwin, archive, or typed in); days since = to today.
+const fmtJoin = (d: string) => new Date(`${d}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+const daysSince = (d: string | null) => (d ? Math.floor((Date.now() - new Date(`${d}T00:00:00`).getTime()) / 86400000) : null);
 const statusOf = (r: Row) => (!r.has_lecture_list ? 'No lecture list' : r.complete ? 'Complete' : 'Incomplete');
 const th = 'whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground';
 const td = 'whitespace-nowrap border-r border-border px-4 py-3 text-[12px]';
@@ -119,9 +122,9 @@ export function TrainingReadinessView() {
   }), [searched]);
 
   const downloadTable = () => {
-    const headers = ['Name', 'Employee ID', 'Role', 'Mapped subject', 'Learning now', 'Per subject (overall)', 'Reading only (not scored)', 'Learning now from', 'Mapped vs now', 'Capability Manager', 'Lectures total', 'Lectures with demo', 'Lectures with AI assessment', 'Lectures with both', 'Complete',
+    const headers = ['Name', 'Employee ID', 'Role', 'Date of joining', 'Days since joining', 'Mapped subject', 'Learning now', 'Per subject (overall)', 'Reading only (not scored)', 'Learning now from', 'Mapped vs now', 'Capability Manager', 'Lectures total', 'Lectures with demo', 'Lectures with AI assessment', 'Lectures with both', 'Complete',
       'Demo score (avg best /10)', 'Demo colour', 'AI score (avg best /10)', 'AI colour', 'Top-N exams', 'Top-N avg best %', 'Top-N colour', 'Overall'];
-    const rows = searched.map((r) => [r.full_name, r.employee_id ?? '', r.role, r.subject_area ?? '', nowLabel(r), perSubject(r).map(([x, b]) => `${x}: ${LABEL[b.overall]}${b.complete ? '' : ' (incomplete)'}`).join('; '), r.learning_now.reading.join(', '), r.learning_now.source, matchOf(r), r.capability_manager ?? '', r.lectures_total, r.demo_lectures, r.ai_lectures, r.both_lectures,
+    const rows = searched.map((r) => [r.full_name, r.employee_id ?? '', r.role, r.date_of_joining ?? '', daysSince(r.date_of_joining) ?? '', r.subject_area ?? '', nowLabel(r), perSubject(r).map(([x, b]) => `${x}: ${LABEL[b.overall]}${b.complete ? '' : ' (incomplete)'}`).join('; '), r.learning_now.reading.join(', '), r.learning_now.source, matchOf(r), r.capability_manager ?? '', r.lectures_total, r.demo_lectures, r.ai_lectures, r.both_lectures,
       statusOf(r), r.demo_avg ?? '', LABEL[r.demo_colour], r.ai_avg ?? '', LABEL[r.ai_colour], r.topn_exams, r.topn_avg ?? '', LABEL[r.topn_colour], LABEL[r.overall]]);
     downloadCsv(`training-readiness-${activeSem === 'all' ? 'all-semesters' : `semester-${activeSem}`}.csv`, toCsv(headers, rows));
   };
@@ -185,6 +188,7 @@ export function TrainingReadinessView() {
                 <tr className="border-b border-border bg-[#f4f7f9]">
                   <th className={`sticky left-0 z-10 bg-[#f4f7f9] ${th}`}>Name</th>
                   <th className={th}>Employee ID</th>
+                  <th className={th}>Date of joining</th>
                   <th className={th}>Mapped subject</th>
                   <th className={th}>Learning now</th>
                   <th className={th}>Capability Manager</th>
@@ -203,6 +207,7 @@ export function TrainingReadinessView() {
                     <tr onClick={() => setOpen(isOpen ? null : id)} className="cursor-pointer border-b border-border/70 last:border-0 hover:bg-[#f8fafb]">
                       <td className={`sticky left-0 z-10 bg-card font-semibold text-foreground ${td}`}><span className="inline-flex items-center gap-1.5">{isOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}{r.full_name}{r.role === 'Mentor' && <span className="rounded-full bg-secondary px-1.5 py-0.5 text-[9px] font-bold uppercase text-muted-foreground">Mentor</span>}</span></td>
                       <td className={`${td} font-mono-ui text-[11px]`}>{r.employee_id || NONE}</td>
+                      <td className={td} title={r.date_of_joining_source ? `Source: ${r.date_of_joining_source}` : undefined}>{r.date_of_joining ? <><div>{fmtJoin(r.date_of_joining)}</div><div className="text-[10px] text-muted-foreground">{daysSince(r.date_of_joining)} days ago</div></> : NONE}</td>
                       <td className={td}>{r.subject_area || NONE}</td>
                       <td className={td} title={`From ${r.learning_now.source} (last ${(query.data?.learning_days ?? 30)} days)`}>
                         <div className="flex flex-wrap items-center gap-1">
@@ -219,7 +224,7 @@ export function TrainingReadinessView() {
                       <td className={td}><Overall r={r} /></td>
                     </tr>
                     {isOpen && <tr className="border-b border-border bg-[#f8fafb]">
-                      <td colSpan={10} className="px-6 py-4">
+                      <td colSpan={11} className="px-6 py-4">
                         {perSubject(r).length > 0 && <div className="mb-4">
                           <div className="mb-1 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Each subject on its own</div>
                           <table className="text-left"><thead><tr>{['Subject', 'Lectures done', 'Demo', 'AI', 'Top-N', 'Overall'].map((h) => <th key={h} className="px-3 py-1.5 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">{h}</th>)}</tr></thead>
