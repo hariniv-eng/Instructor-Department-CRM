@@ -42,7 +42,7 @@ export async function fetchReadinessEvaluations(force = false): Promise<EvData> 
     query: `SELECT instructor_user_id AS uid, session_title AS t, final_score AS s, CAST(session_date AS STRING) AS d,
                    evaluation_type AS ty, SAFE_CAST(audio_duration AS FLOAT64) / 60 AS mins
             FROM \`${config.BIGQUERY_PROJECT_ID}.${config.BIGQUERY_DATASET}.${QA_RATING_VIEW}\`
-            WHERE evaluation_type IN ('DEMO', 'TRAINING_DEMO', 'AI_ASSESSMENT', 'TRAINING_AI_ASSESSMENT') AND LOWER(status) = 'completed'
+            WHERE evaluation_type IN ('DEMO', 'TRAINING_DEMO', 'MOCK', 'AI_ASSESSMENT', 'TRAINING_AI_ASSESSMENT') AND LOWER(status) = 'completed' -- MOCK = a normal demo (2026-11-17)
               AND instructor_user_id IS NOT NULL AND session_title IS NOT NULL
               AND ${notPreparednessCondition(`${config.BIGQUERY_PROJECT_ID}.${config.BIGQUERY_DATASET}.${QA_RATING_VIEW}`)}`,
   }), 120000);

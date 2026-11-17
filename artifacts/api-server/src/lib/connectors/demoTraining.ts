@@ -26,6 +26,10 @@
 // "in training" rather than dropped (so the joining date only marks the start; nothing is cut by it). A DEMO with no date: after
 // deployment if the person is deployed, else in training.
 //
+// MOCK recordings (2026-11-17, per request: "add the mock demos to their demo data, as normal demos -- not as pre-preparedness"): evaluation
+// type MOCK (16.7k completed since Jan 2024, every subject; still recorded) counts exactly like a plain DEMO -- in-training on or before the
+// deployment date, after deployment after it, 10-minute rule for the average. The pre-preparedness rule only looks at DEMO / AI_ASSESSMENT,
+// so a MOCK is never taken out as preparation.
 // Pre-preparedness recordings LEFT OUT (2026-11-17, per request: "for deployed instructors, are pre-preparedness demos / AI assessments in
 // this data? If so, remove them"): a plain DEMO / AI_ASSESSMENT made to prepare for a class the instructor then took (preparedness.ts) is
 // not counted here -- it is on the Contribution tab instead. So "Demos after deployment" = their other, non-preparation demos.
@@ -123,8 +127,9 @@ export function lectureNameIndex(): Map<string, { ci: number; n: number }[]> {
 }
 /** Lectures a demo topic name matches; a name without a number also matches the lecture's "Part 1" ("Building Social Media ... Workflow"). */
 export function matchDemoTopic(idx: Map<string, { ci: number; n: number }[]>, title: string): { ci: number; n: number }[] | undefined {
-  const k = demoNameKey(title);
-  return k ? idx.get(k) ?? (/\d$/.test(k) ? undefined : idx.get(`${k}1`)) : undefined;
+  const one = (t: string) => { const k = demoNameKey(t); return k ? idx.get(k) ?? (/\d$/.test(k) ? undefined : idx.get(`${k}1`)) : undefined; };
+  // "Course > Lecture" titles (2026-11-17, seen on MOCK recordings: "Introduction to Python > Programming with Python"): try the last part.
+  return one(title) ?? (title.includes(">") ? one(title.split(">").pop() ?? "") : undefined);
 }
 
 /** subjectByUid: TeachOS user id -> the instructor's subject (normalized, e.g. "Frontend", "English"), used only for names in several courses. */
@@ -138,7 +143,7 @@ export async function fetchDemoCourseRows(subjectByUid: Map<string, string | nul
     query: `SELECT instructor_user_id AS uid, session_title AS t, final_score AS s, CAST(session_date AS STRING) AS d,
                    evaluation_type AS ty, SAFE_CAST(audio_duration AS FLOAT64) / 60 AS mins
             FROM \`${config.BIGQUERY_PROJECT_ID}.${config.BIGQUERY_DATASET}.${QA_RATING_VIEW}\`
-            WHERE evaluation_type IN ('DEMO', 'TRAINING_DEMO', 'AI_ASSESSMENT', 'TRAINING_AI_ASSESSMENT') AND LOWER(status) = 'completed' AND instructor_user_id IS NOT NULL AND session_title IS NOT NULL
+            WHERE evaluation_type IN ('DEMO', 'TRAINING_DEMO', 'MOCK', 'AI_ASSESSMENT', 'TRAINING_AI_ASSESSMENT') AND LOWER(status) = 'completed' AND instructor_user_id IS NOT NULL AND session_title IS NOT NULL
               AND ${notPreparednessCondition(`${config.BIGQUERY_PROJECT_ID}.${config.BIGQUERY_DATASET}.${QA_RATING_VIEW}`)}`,
   }), QUERY_TIMEOUT_MS);
 
