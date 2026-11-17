@@ -22,6 +22,10 @@ Commit messages stay short (title + 2-3 lines); this file is the detailed record
 | What the Instructor Archive stores (joining date, gender, subject ...) | `artifacts/api-server/src/lib/archiveInstructors.ts` |
 | One-off read-only checks | `artifacts/api-server/src/lib/connectors/_tmp_*.ts` |
 
+## 2026-11-17 -- Training - Readiness: Date of joining column
+
+Date of joining column after Employee ID (same value as Contribution: Darwin, archive or typed-in; source on hover) with "N days ago"; CSV gets Date of joining and Days since joining. Files: `routes/reports.ts` (`/reports/training-readiness`), `instructor-crm/src/pages/training-readiness.tsx`. After pulling: Publish only.
+
 ## 2026-11-17 -- Training - Demos / Readiness: pre-preparedness recordings left out
 
 Pre-preparedness demos / AI assessments (the ones Contribution now counts) are no longer counted in Training - Demos (so "Demos after deployment" = non-preparation demos only), Readiness, or Contribution's Training Demo QA. Training types are never pre-preparedness, so in-training figures are unchanged except for rare plain demos before a class on/before the deployment day.

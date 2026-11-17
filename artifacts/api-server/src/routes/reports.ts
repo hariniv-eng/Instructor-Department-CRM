@@ -1726,8 +1726,10 @@ router.get("/reports/training-readiness", requireAuth, requireRole("admin"), asy
     return;
   }
   const idx = lectureNameIndex();
+  const joiningLookups = await loadJoiningLookups(); // date of joining, same source as Contribution (2026-11-17)
   const rows = people.map((p) => {
     const uid = normUid(p.teachosUserId!);
+    const joining = resolveJoining(p, joiningLookups);
     const subject = (normalizeSubjectArea(p.deptArea || p.manualDeptArea || null) as string | null) ?? null;
     const w = { joining: null, deployed: deployedByUid.get(uid) ?? null };
     // Readiness is scored on the subject(s) the instructor is learning NOW (2026-11-16), not only the mapped subject.
@@ -1739,6 +1741,8 @@ router.get("/reports/training-readiness", requireAuth, requireRole("admin"), asy
       subject_area: subject,
       learning_now: learning,
       role: isMentor ? "Mentor" : "Instructor",
+      date_of_joining: joining.date,
+      date_of_joining_source: joining.source,
       capability_manager: p.teachosManager || p.manualCapabilityManager || null,
       ...readinessOf(learning.subjects, evs.byUid.get(uid) ?? [], w, topin.byUid.get(uid), idx),
       by_subject: bySubject(learning.subjects, evs.byUid.get(uid) ?? [], w, topin.byUid.get(uid), idx), // 2+ subjects: each on its own
