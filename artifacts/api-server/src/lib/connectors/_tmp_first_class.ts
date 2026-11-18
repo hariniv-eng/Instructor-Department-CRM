@@ -9,7 +9,10 @@
 //   4. v3: their NAME (per request: "with names you get the data") against the schedule table's instructor name column -- names come from
 //      a CSV given on the command line (employee_id,name -- the list shared in the chat), NOT stored in the repo. Words compared in any order,
 //      letters only; a name that belongs to several TeachOS users is flagged, not guessed.
-// Writes first_class_dates.csv (employee IDs only, no names). The schedule table starts 2025-07-15: earlier first classes cannot be seen.
+// v4 (2026-11-18, per request: "what about getting the data by their name"): people still not found are matched LOOSELY by name against
+// every instructor name in the schedule table -- all words of the shorter name inside the longer one, or 2+ shared words (3+ letters each),
+// initials ignored. Only a single candidate is used; the TeachOS name it matched is written so it can be checked by hand.
+// Writes first_class_dates.csv (employee IDs; v4 adds the matched TeachOS name for loose matches -- delete the file after download). The schedule table starts 2025-07-15: earlier first classes cannot be seen.
 //   pnpm exec tsx src/lib/connectors/_tmp_first_class.ts [names.csv]
 import fs from "node:fs";
 import { BigQuery } from "@google-cloud/bigquery";
@@ -78,7 +81,33 @@ async function main() {
   const byMail = mailCol ? await agg(`LOWER(TRIM(CAST(${mailCol} AS STRING)))`, [...new Set(noUid.map((i) => mailOf.get(key(i))).filter((m): m is string => !!m))]) : new Map();
   const byName = nameCol ? await agg(sqlNameKey(nameCol), [...new Set(noUid.map((i) => nameOf.get(key(i))).filter((n): n is string => !!n))]) : new Map();
 
-  const head = ["employee_id", "matched_by", "first_class_taken", "first_class_type", "first_class_title", "first_completed_session_any_type", "first_session_scheduled_fcc_deployment_date", "completed_lecture_practice_sessions", "note"];
+  // v4: loose name match for everyone still not found.
+  const tokens = (n: string) => n.split(" ").filter((w) => w.length >= 3);
+  const loose = new Map<string, { uid: string; name: string }>();
+  const looseAmbiguous = new Map<string, number>();
+  if (nameCol) {
+    const [all] = await bq.query({ query: `SELECT DISTINCT CAST(${nameCol} AS STRING) n, instructor_user_id u FROM ${T} WHERE ${nameCol} IS NOT NULL` });
+    const pool = (all as Record<string, unknown>[]).map((r) => ({ raw: plain(r.n), k: nameKey(plain(r.n)), u: plain(r.u) }));
+    for (const id of IDS) {
+      const k = key(id);
+      if (uidOf.get(k) || byEmp.get(k) || (mailOf.get(k) && byMail.get(mailOf.get(k)!)) || (nameOf.get(k) && byName.get(nameOf.get(k)!))) continue;
+      const mine = tokens(nameOf.get(k) ?? "");
+      if (!mine.length) continue;
+      const hits = pool.filter((c) => {
+        const theirs = tokens(c.k);
+        if (!theirs.length) return false;
+        const shared = mine.filter((w) => theirs.includes(w)).length;
+        const [small, big] = mine.length <= theirs.length ? [mine, theirs] : [theirs, mine];
+        return (small.length >= 2 && small.every((w) => big.includes(w))) || shared >= 2;
+      });
+      const users = [...new Set(hits.map((h) => h.u))];
+      if (users.length === 1) loose.set(k, { uid: users[0], name: hits[0].raw });
+      else if (users.length > 1) looseAmbiguous.set(k, users.length);
+    }
+  }
+  const byLoose = await agg("instructor_user_id", [...new Set([...loose.values()].map((x) => x.uid))]);
+
+  const head = ["employee_id", "matched_by", "first_class_taken", "first_class_type", "first_class_title", "first_completed_session_any_type", "first_session_scheduled_fcc_deployment_date", "completed_lecture_practice_sessions", "note", "teachos_name_matched_loosely"];
   const out: string[] = [head.join(",")];
   const tally = new Map<string, number>();
   for (const id of IDS) {
@@ -92,16 +121,18 @@ async function main() {
       if (Number(plain(r?.users)) > 1) { how = "name (AMBIGUOUS)"; note = `${plain(r?.users)} TeachOS users have this name -- check by hand`; r = undefined; }
       else how = "name";
     }
+    else if (loose.get(k)) { how = "name (loose)"; r = byLoose.get(loose.get(k)!.uid); }
+    else if (looseAmbiguous.get(k)) { how = "name (loose, AMBIGUOUS)"; note = `${looseAmbiguous.get(k)} TeachOS users have a similar name -- check by hand`; }
     const fc = (r?.fc as Record<string, unknown>[] | undefined)?.[0];
     if (!note) note = !how ? "Not found (no TeachOS id, employee id, email or name match)" : !r ? "No sessions in the schedule table" : !fc ? "No class taken yet (no completed Lecture / Practice)" : "";
     const bucket = !how ? "not found" : how.includes("AMBIGUOUS") ? "name ambiguous" : !r ? `${how}: no sessions` : !fc ? `${how}: no class yet` : `${how}: first class found`;
     tally.set(bucket, (tally.get(bucket) ?? 0) + 1);
-    out.push([id, how || "none", plain(fc?.d).slice(0, 10), plain(fc?.ty), plain(fc?.t), plain(r?.first_completed_any).slice(0, 10), plain(r?.first_scheduled).slice(0, 10), r ? plain(r.n) : "", note].map(csvCell).join(","));
+    out.push([id, how || "none", plain(fc?.d).slice(0, 10), plain(fc?.ty), plain(fc?.t), plain(r?.first_completed_any).slice(0, 10), plain(r?.first_scheduled).slice(0, 10), r ? plain(r.n) : "", note, how === "name (loose)" ? loose.get(k)!.name : ""].map(csvCell).join(","));
   }
   fs.writeFileSync("first_class_dates.csv", out.join("\n"));
   console.log(`${IDS.length} employee IDs:`);
   for (const [b, n] of [...tally].sort((a, b) => b[1] - a[1])) console.log(`  ${b}: ${n}`);
-  console.log("Wrote first_class_dates.csv (employee IDs only, no names). Download it and attach it in the chat.");
+  console.log("Wrote first_class_dates.csv (employee IDs + the TeachOS name of loose matches). Download it, attach it in the chat, then: rm first_class_dates.csv");
   if (namesFile) console.log(`Delete the names file now: rm ${namesFile}`);
   process.exit(0);
 }
