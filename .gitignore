@@ -64,3 +64,6 @@ artifacts/api-server/exports/
 
 # Files Claude delivers (may contain staff names) -- never commit (2026-11-13)
 Claude outputs/
+
+# one-off data files (names) -- never commit
+artifacts/api-server/*.csv
