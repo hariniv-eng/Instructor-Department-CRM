@@ -20,7 +20,12 @@ import { db, instructorsTable, instructorArchiveTable, darwinboxExitsTable, darw
 import { cell } from "../reconcile";
 import { config } from "./config";
 import { SESSION_SCHEDULE_TABLE } from "./instructorContribution";
-import { IDS } from "./_tmp_first_class_ids";
+import { IDS as EXIT_IDS } from "./_tmp_first_class_ids";
+import { ACTIVE_IDS } from "./_tmp_active_ids";
+// --active (2026-11-18): the active-instructors list instead; output first_class_dates_active.csv.
+const ACTIVE = process.argv.includes("--active");
+const IDS = ACTIVE ? ACTIVE_IDS : EXIT_IDS;
+const OUT = ACTIVE ? "first_class_dates_active.csv" : "first_class_dates.csv";
 
 const plain = (v: unknown): string => (v && typeof v === "object" && "value" in (v as object) ? String((v as { value: unknown }).value) : v == null ? "" : String(v));
 const key = (s: string | null | undefined) => String(s ?? "").trim().toUpperCase();
@@ -29,7 +34,7 @@ const nameKey = (s: string) => s.toLowerCase().replace(/[^a-z ]/g, " ").split(" 
 const sqlNameKey = (col: string) => `ARRAY_TO_STRING(ARRAY(SELECT w FROM UNNEST(SPLIT(REGEXP_REPLACE(LOWER(IFNULL(CAST(${col} AS STRING), '')), r'[^a-z ]', ' '), ' ')) w WHERE w != '' ORDER BY w), ' ')`;
 
 async function main() {
-  const namesFile = process.argv.slice(2).filter((a) => a !== "--")[0];
+  const namesFile = process.argv.slice(2).filter((a) => a !== "--" && !a.startsWith("--"))[0];
   const nameOf = new Map<string, string>();
   if (namesFile) for (const line of fs.readFileSync(namesFile, "utf8").split(/\r?\n/)) {
     const [id, ...rest] = line.split(","); const n = rest.join(",").replace(/^"|"$/g, "").trim();
@@ -129,10 +134,10 @@ async function main() {
     tally.set(bucket, (tally.get(bucket) ?? 0) + 1);
     out.push([id, how || "none", plain(fc?.d).slice(0, 10), plain(fc?.ty), plain(fc?.t), plain(r?.first_completed_any).slice(0, 10), plain(r?.first_scheduled).slice(0, 10), r ? plain(r.n) : "", note, how === "name (loose)" ? loose.get(k)!.name : ""].map(csvCell).join(","));
   }
-  fs.writeFileSync("first_class_dates.csv", out.join("\n"));
+  fs.writeFileSync(OUT, out.join("\n"));
   console.log(`${IDS.length} employee IDs:`);
   for (const [b, n] of [...tally].sort((a, b) => b[1] - a[1])) console.log(`  ${b}: ${n}`);
-  console.log("Wrote first_class_dates.csv (employee IDs + the TeachOS name of loose matches). Download it, attach it in the chat, then: rm first_class_dates.csv");
+  console.log(`Wrote ${OUT} (employee IDs + the TeachOS name of loose matches). Download it, attach it in the chat, then: rm ${OUT}`);
   if (namesFile) console.log(`Delete the names file now: rm ${namesFile}`);
   process.exit(0);
 }
