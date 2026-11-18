@@ -2,11 +2,14 @@
 // taken"). Employee IDs from the request (no names in this file). For each: TeachOS user id (instructors table, else the Instructor Archive),
 // then from the session schedule table: first COMPLETED Lecture / Practice session (date, type, title, course), first completed session of
 // ANY type, first session ever SCHEDULED (any status -- what FCC calls the deployment date), and completed Lecture / Practice sessions in all.
+// 2026-11-18 v2: 318 of 399 had no TeachOS id in FCC (older / exited people). They are now looked up by their ORG EMAIL (FCC, archive,
+// Darwin exits / full roster / active) against the schedule table's instructor email column.
 // Writes first_class_dates.csv (employee IDs only, no names) and prints a summary.
 //   pnpm exec tsx src/lib/connectors/_tmp_first_class.ts
 import fs from "node:fs";
 import { BigQuery } from "@google-cloud/bigquery";
-import { db, instructorsTable, instructorArchiveTable } from "@workspace/db";
+import { db, instructorsTable, instructorArchiveTable, darwinboxExitsTable, darwinboxFullRosterTable, darwinboxActiveTable } from "@workspace/db";
+import { cell } from "../reconcile";
 import { config } from "./config";
 import { SESSION_SCHEDULE_TABLE } from "./instructorContribution";
 
@@ -60,6 +63,17 @@ async function main() {
   const uidOf = new Map<string, string>();
   for (const r of await db.select({ e: instructorArchiveTable.employeeId, u: instructorArchiveTable.teachosUserId }).from(instructorArchiveTable)) if (r.e && r.u) uidOf.set(key(r.e), r.u);
   for (const r of await db.select({ e: instructorsTable.employeeId, u: instructorsTable.teachosUserId }).from(instructorsTable)) if (r.e && r.u) uidOf.set(key(r.e), r.u);
+  // Org email of everyone on the list (v2), for people without a TeachOS id.
+  const mailOf = new Map<string, string>();
+  const addMail = (e: string | null | undefined, m: unknown) => { const mm = String(m ?? "").trim().toLowerCase(); if (e && mm.includes("@") && !mailOf.has(key(e))) mailOf.set(key(e), mm); };
+  for (const r of await db.select({ e: instructorsTable.employeeId, m: instructorsTable.orgEmail }).from(instructorsTable)) addMail(r.e, r.m);
+  for (const r of await db.select({ e: instructorArchiveTable.employeeId, m: instructorArchiveTable.orgEmail }).from(instructorArchiveTable)) addMail(r.e, r.m);
+  for (const t of [darwinboxExitsTable, darwinboxFullRosterTable, darwinboxActiveTable]) {
+    for (const r of await db.select().from(t)) {
+      const raw = (r.rawData ?? {}) as Record<string, unknown>;
+      addMail(r.employeeId ?? (cell(raw, "Employee Id", "employee_id") as string | null), cell(raw, "Org Email Id", "org_email"));
+    }
+  }
   const uids = [...new Set(IDS.map((i) => uidOf.get(key(i))).filter((u): u is string => !!u))];
   const P = config.BIGQUERY_PROJECT_ID!;
   const bq = new BigQuery({ projectId: P, ...(config.BIGQUERY_CREDENTIALS_JSON ? { credentials: JSON.parse(config.BIGQUERY_CREDENTIALS_JSON) } : {}) });
@@ -73,19 +87,39 @@ async function main() {
       COUNTIF(session_status = 'COMPLETED' AND session_type IN ('LECTURE', 'PRACTICE')) n
     FROM ${T} WHERE instructor_user_id IN UNNEST(@uids) GROUP BY 1`, params: { uids }, types: { uids: ["STRING"] } });
   const byUid = new Map((rows as Record<string, unknown>[]).map((r) => [plain(r.u), r]));
-  const head = ["employee_id", "found_in_fcc", "first_class_taken", "first_class_type", "first_class_title", "first_completed_session_any_type", "first_session_scheduled_fcc_deployment_date", "completed_lecture_practice_sessions", "note"];
+  const [one] = await bq.query({ query: `SELECT * FROM ${T} LIMIT 1` });
+  const cols = Object.keys((one as Record<string, unknown>[])[0] ?? {});
+  const mailCol = cols.find((c) => /^instructor_(e)?mail$/i.test(c)) ?? cols.find((c) => /instructor.*mail/i.test(c)) ?? null;
+  const [range] = await bq.query({ query: `SELECT MIN(CAST(session_start_datetime AS STRING)) lo FROM ${T}` });
+  console.log(`Schedule table: sessions from ${plain((range as Record<string, unknown>[])[0]?.lo).slice(0, 10)} | email column ${mailCol ?? "NONE"}`);
+  const mails = [...new Set(IDS.filter((i) => !uidOf.get(key(i))).map((i) => mailOf.get(key(i))).filter((m): m is string => !!m))];
+  const byMail = new Map<string, Record<string, unknown>>();
+  if (mailCol && mails.length) {
+    const [mr] = await bq.query({ query: `
+      SELECT LOWER(TRIM(${mailCol})) m, ANY_VALUE(instructor_user_id) u,
+        MIN(CAST(session_start_datetime AS STRING)) first_scheduled,
+        MIN(IF(session_status = 'COMPLETED', CAST(session_start_datetime AS STRING), NULL)) first_completed_any,
+        ARRAY_AGG(IF(session_status = 'COMPLETED' AND session_type IN ('LECTURE', 'PRACTICE'),
+          STRUCT(CAST(session_start_datetime AS STRING) AS d, session_type AS ty, CAST(session_title AS STRING) AS t), NULL) IGNORE NULLS ORDER BY session_start_datetime LIMIT 1) fc,
+        COUNTIF(session_status = 'COMPLETED' AND session_type IN ('LECTURE', 'PRACTICE')) n
+      FROM ${T} WHERE LOWER(TRIM(${mailCol})) IN UNNEST(@mails) GROUP BY 1`, params: { mails }, types: { mails: ["STRING"] } });
+    for (const r of mr as Record<string, unknown>[]) byMail.set(plain(r.m), r);
+  }
+  const head = ["employee_id", "matched_by", "first_class_taken", "first_class_type", "first_class_title", "first_completed_session_any_type", "first_session_scheduled_fcc_deployment_date", "completed_lecture_practice_sessions", "note"];
   const out: string[] = [head.join(",")];
   const tally = { taken: 0, none: 0, notFound: 0, noSessions: 0 };
   for (const id of IDS) {
-    const u = uidOf.get(key(id));
-    const r = u ? byUid.get(u) : undefined;
+    const mail = mailOf.get(key(id));
+    const viaMail = !uidOf.get(key(id)) && mail ? byMail.get(mail) : undefined;
+    const u = uidOf.get(key(id)) ?? (viaMail ? plain(viaMail.u) : undefined);
+    const r = uidOf.get(key(id)) ? byUid.get(u!) : viaMail;
     const fc = (r?.fc as Record<string, unknown>[] | undefined)?.[0];
-    const note = !u ? "Not in FCC / no TeachOS id" : !r ? "No sessions in the schedule table" : !fc ? "No class taken yet (no completed Lecture / Practice)" : "";
+    const note = !u ? (mail ? "No sessions found (by TeachOS id or email)" : "Not in FCC / Darwin data, no email")  : !r ? "No sessions in the schedule table" : !fc ? "No class taken yet (no completed Lecture / Practice)" : "";
     if (!u) tally.notFound++; else if (!r) tally.noSessions++; else if (!fc) tally.none++; else tally.taken++;
-    out.push([id, u ? "yes" : "no", plain(fc?.d).slice(0, 10), plain(fc?.ty), plain(fc?.t), plain(r?.first_completed_any).slice(0, 10), plain(r?.first_scheduled).slice(0, 10), r ? plain(r.n) : "", note].map(csvCell).join(","));
+    out.push([id, uidOf.get(key(id)) ? "yes (TeachOS id)" : viaMail ? "yes (by email)" : mail ? "email only" : "no", plain(fc?.d).slice(0, 10), plain(fc?.ty), plain(fc?.t), plain(r?.first_completed_any).slice(0, 10), plain(r?.first_scheduled).slice(0, 10), r ? plain(r.n) : "", note].map(csvCell).join(","));
   }
   fs.writeFileSync("first_class_dates.csv", out.join("\n"));
-  console.log(`${IDS.length} employee IDs | first class found ${tally.taken} | no class taken yet ${tally.none} | no sessions at all ${tally.noSessions} | not in FCC / no TeachOS id ${tally.notFound}`);
+  console.log(`${IDS.length} employee IDs | first class found ${tally.taken} | no class taken yet ${tally.none} | no sessions at all ${tally.noSessions} | no TeachOS id and no sessions by email ${tally.notFound} | matched by email ${IDS.filter((i) => !uidOf.get(key(i)) && mailOf.get(key(i)) && byMail.has(mailOf.get(key(i))!)).length} | no email known ${IDS.filter((i) => !uidOf.get(key(i)) && !mailOf.get(key(i))).length}`);
   console.log("Wrote first_class_dates.csv (employee IDs only, no names). Download it and attach it in the chat.");
   process.exit(0);
 }
