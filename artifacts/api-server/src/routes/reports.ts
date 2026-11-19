@@ -9,7 +9,7 @@ import { TECH_AREAS, normalizeSubjectArea } from "../lib/departmentTaxonomy";
 import { isPinnedConfirmedInstructor, TEACHOS_ONLY_UNREVIEWED } from "../data/classificationOverrides";
 import { productOf } from "../lib/product";
 import { taughtSubjectColumn, courseColumnOf, portalColumnOf, TAUGHT_SUBJECT_COLUMNS } from "../lib/connectors/taughtTraining";
-import { ASSESSMENT_COURSES, fetchTopinAssessments, normUid } from "../lib/connectors/topinAssessments";
+import { ASSESSMENT_COURSES, fetchTopinAssessments, normUid, topinCellsFor } from "../lib/connectors/topinAssessments";
 import { bySubject, fetchLpAptitudeScores, fetchLpSubjectAssessments, topinOverallOf, OVERALL_ASSESSMENT_SUBJECTS, type OverallAssessments, fetchReadinessEvaluations, fetchRecentLpActivity, learningNowOf, readinessOf, READINESS_THRESHOLDS, LEARNING_DAYS } from "../lib/connectors/trainingReadiness";
 import { lectureNameIndex } from "../lib/connectors/demoTraining";
 import { LECTURE_COURSES } from "../data/lectureSessions";
@@ -1707,8 +1707,9 @@ router.get("/reports/topin-assessments", requireAuth, requireRole("admin"), asyn
     return;
   }
   const rows = people.flatMap((p) => {
-    const courses = data.byUid.get(normUid(p.teachosUserId!));
-    if (!courses) return [];
+    const subjectArea = normalizeSubjectArea(p.deptArea || p.manualDeptArea || null);
+    const courses = topinCellsFor(data.byUid.get(normUid(p.teachosUserId!)), subjectArea === "Aptitude"); // Aptitude: all their exams (2026-11-19)
+    if (!courses || !Object.keys(courses).length) return [];
     return [{
       employee_id: p.employeeId,
       full_name: p.fullName,
@@ -1754,12 +1755,13 @@ router.get("/reports/training-readiness", requireAuth, requireRole("admin"), asy
     // Readiness is scored on the subject(s) the instructor is learning NOW (2026-11-16), not only the mapped subject.
     const isMentor = p.classification === "mentor";
     const learning = learningNowOf(subject, evs.byUid.get(uid) ?? [], w, lp.get(uid), idx);
-    const exams = { ...(topin.byUid.get(uid) ?? {}), ...(lpApt.get(uid) ?? {}) }; // topin + Aptitude learning-portal assessments (2026-11-19)
+    const topinCells = topinCellsFor(topin.byUid.get(uid), subject === "Aptitude" && !learning.subjects.includes("Maths")); // Aptitude: all their topin exams (2026-11-19); not when also learning Maths
+    const exams = { ...(topinCells ?? {}), ...(lpApt.get(uid) ?? {}) }; // topin + Aptitude learning-portal assessments (2026-11-19)
     // Overall assessments for Aptitude / Maths (2026-11-19): topin + learning-portal counts and averages, all semesters, show only.
     const overall: Record<string, OverallAssessments> = {};
     for (const s of OVERALL_ASSESSMENT_SUBJECTS) {
       if (!learning.subjects.includes(s) && subject !== s) continue;
-      const t = topinOverallOf(topin.byUid.get(uid), s), l = lpSubj.get(uid)?.[s];
+      const t = topinOverallOf(topinCells, s), l = lpSubj.get(uid)?.[s];
       overall[s] = { topin_exams: t.n, topin_avg: t.avg, lp_units: l?.n ?? 0, lp_avg: l?.avg ?? null };
     }
     return {

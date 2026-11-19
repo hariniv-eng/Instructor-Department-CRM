@@ -22,6 +22,11 @@ Commit messages stay short (title + 2-3 lines); this file is the detailed record
 | What the Instructor Archive stores (joining date, gender, subject ...) | `artifacts/api-server/src/lib/archiveInstructors.ts` |
 | One-off read-only checks | `artifacts/api-server/src/lib/connectors/_tmp_*.ts` |
 
+## 2026-11-19 -- Aptitude instructors: all their topin exams count
+
+Per request ("if we have any assessment, add them to their data in FCC"). `_tmp_aptitude_topin_people.ts` showed 50 of 51 Aptitude people have topin exams under their TeachOS id, but only 26 had one counted as Aptitude: the rest had titles matching no rule, or Aptitude exams with "Math" in the title counted as Maths. Now, for a person whose subject is Aptitude, every topin exam they took except technical / English ones (= Aptitude + Maths + unmatched titles) counts as their "Aptitude exams". Shown on Training - Assessments and in Readiness' "Assessments given (overall)" column (Readiness' Aptitude Top-N colour still comes from the learning portal). Not applied when an Aptitude person is also learning Maths now. Everyone else unchanged: unmatched exams still do not count.
+- Files: `api-server/src/lib/connectors/topinAssessments.ts` (`UNMATCHED_KEY`, `topinCellsFor`), `routes/reports.ts` (`/reports/topin-assessments`, `/reports/training-readiness`; `departmentIdsOf` exported for the check script). After pull: Publish only.
+
 ## 2026-11-19 -- Training - Readiness: Aptitude / Maths assessments given (overall)
 
 All semesters view only (per request): a new column "Assessments given (overall)" for instructors learning (or mapped to) Aptitude or Maths -- topin exams taken + average best %, and learning-portal assessments (EXAM + QUIZ units with a score, any course of that subject) + average best %. Overall only, because topin exams cannot be tied to a semester. Shown, not used for the colours. Also in the CSV (4 columns).
