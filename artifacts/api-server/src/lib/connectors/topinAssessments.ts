@@ -34,6 +34,35 @@ export const ASSESSMENT_COURSES: AssessmentCourse[] = [
 ];
 export const courseOfExam = (title: string): AssessmentCourse | null => ASSESSMENT_COURSES.find((c) => c.re.test(title.trim())) ?? null;
 
+// Aptitude instructors' topin exams (2026-11-19, per request: "if we have any assessment [for the Aptitude instructors], add them to
+// their data in FCC"). Checked with _tmp_aptitude_topin_people.ts: 50 of 51 Aptitude people have topin exams under their TeachOS id,
+// but only 26 had one counted as Aptitude -- the rest were titles matching no rule, or Aptitude exams with "Math" in the title
+// (APTI-Math, "Sem1 Aptitude (NS to Mixtures) - Math") counted as Maths. For a person whose subject is Aptitude, every topin exam they
+// took that is not a technical / English one (i.e. Aptitude + Maths + unmatched) now counts as their Aptitude exams. Everyone else:
+// unchanged, unmatched exams are still not counted.
+export const UNMATCHED_KEY = "unmatched";
+const FOLD_INTO_APTITUDE = (c: AssessmentCourse | undefined, key: string) => key === UNMATCHED_KEY || c?.subject === "Aptitude" || c?.subject === "Maths";
+const mergeStat = (a: ExamStat | null | undefined, b: ExamStat | null | undefined): ExamStat | null => {
+  if (!a) return b ?? null; if (!b) return a;
+  const n = a.exams + b.exams, an = a.avg === null ? 0 : a.exams, bn = b.avg === null ? 0 : b.exams;
+  const avg = an + bn ? Math.round((((a.avg ?? 0) * an + (b.avg ?? 0) * bn) / (an + bn)) * 10) / 10 : null;
+  const last = [a.last_date, b.last_date].filter((d): d is string => !!d).sort().pop() ?? null;
+  return { exams: n, avg, last_date: last };
+};
+/** Aptitude person: Aptitude + Maths + unmatched topin exams -> one "Aptitude exams" cell. Anyone else: drops the unmatched cell. */
+export function topinCellsFor(cells: Record<string, ExamCell> | undefined, isAptitude: boolean): Record<string, ExamCell> | undefined {
+  if (!cells) return cells;
+  const out: Record<string, ExamCell> = {};
+  let apt: ExamCell = { daily: null, weekly: null };
+  for (const [key, cell] of Object.entries(cells)) {
+    const c = ASSESSMENT_COURSES.find((x) => x.key === key);
+    if (isAptitude && FOLD_INTO_APTITUDE(c, key)) apt = { daily: mergeStat(apt.daily, cell.daily), weekly: mergeStat(apt.weekly, cell.weekly) };
+    else if (key !== UNMATCHED_KEY) out[key] = cell;
+  }
+  if (apt.daily || apt.weekly) out["aptitude_general"] = apt;
+  return out;
+}
+
 export type ExamStat = { exams: number; avg: number | null; last_date: string | null };
 export type ExamCell = { daily: ExamStat | null; weekly: ExamStat | null };
 // uid (TeachOS user id, lower case, no dashes) -> course key -> cell
@@ -55,8 +84,8 @@ export async function fetchTopinAssessments(force = false): Promise<TopinData> {
   const acc = new Map<string, { n: number; sum: number; last: string | null }>(); // `${uid}|${course}|${daily|weekly}`
   for (const r of rows as Record<string, unknown>[]) {
     const c = courseOfExam(plain(r.t));
-    if (!c) continue;
-    const k = `${normUid(plain(r.u))}|${c.key}|${plain(r.ty) === "Weekly" ? "weekly" : "daily"}`;
+    // Exams that match no rule are kept under UNMATCHED_KEY (2026-11-19): only Aptitude instructors use them (foldIntoAptitude).
+    const k = `${normUid(plain(r.u))}|${c?.key ?? UNMATCHED_KEY}|${plain(r.ty) === "Weekly" ? "weekly" : "daily"}`;
     const score = Math.min(100, Math.max(0, (Number(plain(r.s)) || 0) * 100));
     const d = plain(r.d).slice(0, 10) || null;
     const x = acc.get(k) ?? { n: 0, sum: 0, last: null };
