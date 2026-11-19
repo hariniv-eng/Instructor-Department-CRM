@@ -829,7 +829,7 @@ function formatExitDate(value?: string | null) {
 // "Exited (archive)" view (2026-10-08, per request) comes from the Instructor Archive -- every archive row whose
 // status is Exited, i.e. the approved exit records, whether or not the person is still in TeachOS.
 type ExitRow = { id: string; full_name: string; employee_id: string | null; teachos_user_id: string | null; dept_area: string | null; capability_manager: string | null; is_payroll: boolean; date_of_exit: string | null; exit_flag_status: string | null; exit_flag_date: string | null };
-type ArchiveExitRow = { classification?: string | null; deployed_or_training?: string; deployment_date?: string | null; id: number; full_name: string; employee_id: string | null; teachos_user_id: string | null; dept_area: string | null; capability_manager: string | null; is_payroll: boolean; date_of_exit: string | null; exit_status: string | null; exit_date: string | null; status: 'Active' | 'Exited' | 'SNP' };
+type ArchiveExitRow = { classification?: string | null; deployed_or_training?: string; deployment_date?: string | null; id: number; full_name: string; employee_id: string | null; teachos_user_id: string | null; dept_area: string | null; capability_manager: string | null; is_payroll: boolean; date_of_exit: string | null; exit_status: string | null; exit_date: string | null; status: 'Active' | 'Exited' | 'SNP' | 'Pending' };
 // Approved exits only (2026-10-08, per request: "no pending for approval"): the archive also marks people Exited
 // from a Pending With Approver record or a manually set exit date, so the Overview checks the exit record's own
 // status. Pending ones stay in Exception 3; people exited by a manual date only are in the Archive tab.

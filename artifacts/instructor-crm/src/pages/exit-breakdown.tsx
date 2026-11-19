@@ -24,7 +24,7 @@ type ArchivePerson = {
   date_of_exit: string | null;
   exit_status: string | null;
   exit_date: string | null; // Darwin "Exit Date" -- when the exit was raised (2026-11-12: own column, never used as the date of exit)
-  status: 'Active' | 'Exited' | 'SNP';
+  status: 'Active' | 'Exited' | 'SNP' | 'Pending';
   deployed_or_training?: string;
   manual_exit_date?: string | null;
 };

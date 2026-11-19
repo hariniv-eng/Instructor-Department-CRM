@@ -22,6 +22,16 @@ Commit messages stay short (title + 2-3 lines); this file is the detailed record
 | What the Instructor Archive stores (joining date, gender, subject ...) | `artifacts/api-server/src/lib/archiveInstructors.ts` |
 | One-off read-only checks | `artifacts/api-server/src/lib/connectors/_tmp_*.ts` |
 
+## 2026-11-19 -- Training - Readiness: scoring rules as tables
+
+The long description paragraph is replaced by a "How readiness is scored" panel (open by default, Hide / Show) with four small tables: Categories (Green / Yellow / Red thresholds per score), Overall / Complete / Ready (with an example), How each score is worked out (what counts and what does not), and Which subject they are scored on. Same rules; thresholds read from the API, so the panel always matches the colours. Nothing in the scoring changed.
+- File: `artifacts/instructor-crm/src/pages/training-readiness.tsx` (`ReadinessRules`). After pull: Publish only.
+
+## 2026-11-19 -- Instructor Archive: "Pending approval" status
+
+a person whose Darwin exit is still Pending With Approver now shows as Pending approval, not Exited; once Darwin approves it they move to Exited (and into Exit Breakdown / the Overview Exit data, which already counted only Approved exits). A person the Capability Manager marked Serving Notice Period stays SNP while pending, and becomes Exited only when the exit is Approved and the Date Of Exit has passed. New Pending approval card, filter button and CSV value on the Archive page; the API returns `pending_count`. Archive Exited now matches Exit Breakdown except people with only a stored exit date and no Darwin record (e.g. NW2000756).
+  Files: `artifacts/api-server/src/routes/reports.ts` (`toApiArchiveSummary`, `/reports/instructor-archive`), `artifacts/instructor-crm/src/pages/instructor-archive.tsx`; status type in `dashboard.tsx`, `exit-breakdown.tsx`. After pull: Publish (no Sync needed).
+
 ## 2026-11-17 -- Training Stats views: Instructor department only
 
 Training - LP, Taught in Class, Training - Demos, Training - Assessments and Training - Readiness now include only people the Instructors tab counts as Instructors or Mentors (`departmentIdsOf()` in `routes/reports.ts`, the rule the Contribution tab already used). Correction the same day: Training - LP did NOT have it either; added there too. Robotics instructors and non-teaching staff who only have a TeachOS INSTRUCTOR account (e.g. NW0007471 and the 16 others found on 16 Nov) no longer appear. After pulling: Publish only.

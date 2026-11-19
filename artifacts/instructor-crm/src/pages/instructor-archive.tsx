@@ -52,7 +52,7 @@ type ArchiveRow = {
   exit_date: string | null;
   date_of_exit: string | null;
   exit_status: string | null;
-  status: 'Active' | 'Exited' | 'SNP';
+  status: 'Active' | 'Exited' | 'SNP' | 'Pending';
   first_seen_at: string;
   last_synced_at: string;
 };
@@ -63,6 +63,7 @@ type ArchiveResponse = {
   active_count: number;
   exited_count: number;
   snp_count: number;
+  pending_count?: number;
 };
 
 const QUERY_KEY = ['reports', 'instructor-archive'];
@@ -93,9 +94,12 @@ function PayrollBadge({ isPayroll }: { isPayroll: boolean }) {
     : <span className="inline-flex rounded-full bg-secondary px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] text-muted-foreground">Nxtwave</span>;
 }
 
+// Pending approval (2026-11-19): Darwin exit raised but still Pending With Approver -- not counted as an exit until it is Approved.
+const statusLabel = (status: ArchiveRow['status']) => (status === 'Pending' ? 'Pending approval' : status);
+
 function StatusBadge({ status }: { status: ArchiveRow['status'] }) {
-  const toneClass = status === 'Active' ? 'bg-[#e5f3ed] text-[#256e65]' : status === 'SNP' ? 'bg-[#fff4dc] text-[#9a6b0c]' : 'bg-[#fdeeea] text-[#b45436]';
-  return <span className={`inline-flex rounded-full px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] ${toneClass}`}>{status}</span>;
+  const toneClass = status === 'Active' ? 'bg-[#e5f3ed] text-[#256e65]' : status === 'SNP' ? 'bg-[#fff4dc] text-[#9a6b0c]' : status === 'Pending' ? 'bg-[#e7f1fb] text-[#2f5f8f]' : 'bg-[#fdeeea] text-[#b45436]';
+  return <span className={`inline-flex rounded-full px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] ${toneClass}`}>{statusLabel(status)}</span>;
 }
 
 function formatDate(value: string | null): string {
@@ -110,7 +114,7 @@ export default function InstructorArchivePage() {
   const query = useArchive();
   const data = query.data;
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'snp' | 'exited'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'snp' | 'pending' | 'exited'>('all');
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: QUERY_KEY });
 
@@ -119,6 +123,7 @@ export default function InstructorArchivePage() {
     let rows = data.people;
     if (statusFilter === 'active') rows = rows.filter((row) => row.status === 'Active');
     if (statusFilter === 'snp') rows = rows.filter((row) => row.status === 'SNP');
+    if (statusFilter === 'pending') rows = rows.filter((row) => row.status === 'Pending');
     if (statusFilter === 'exited') rows = rows.filter((row) => row.status === 'Exited');
     const q = search.trim().toLowerCase();
     if (!q) return rows;
@@ -133,7 +138,7 @@ export default function InstructorArchivePage() {
     const rows = filteredRows.map((row) => [
       row.full_name, row.employee_id ?? '', row.gender ?? '', row.designation ?? '', bifurcationLabel(row.classification), row.dept_area ?? '', row.department ?? '',
       row.institutes.join(', '), row.capability_manager ?? '', row.darwin_manager ?? '', row.date_of_joining ?? '', row.is_payroll ? 'Payroll' : 'Nxtwave',
-      row.status, row.date_of_exit ?? '', row.exit_status ?? '',
+      statusLabel(row.status), row.date_of_exit ?? '', row.exit_status ?? '',
     ]);
     const suffix = statusFilter === 'all' ? '' : `-${statusFilter}`;
     downloadCsv(`instructor-archive${suffix}.csv`, toCsv(headers, rows));
@@ -143,6 +148,7 @@ export default function InstructorArchivePage() {
     { key: 'all', label: 'All' },
     { key: 'active', label: 'Active' },
     { key: 'snp', label: 'SNP' },
+    { key: 'pending', label: 'Pending approval' },
     { key: 'exited', label: 'Exited' },
   ];
 
@@ -158,7 +164,7 @@ export default function InstructorArchivePage() {
     {query.isError && <QueryError message="Instructor Archive is unavailable right now." />}
 
     {data && <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-      <div className="grid max-w-3xl grid-cols-1 gap-3 sm:grid-cols-4">
+      <div className="grid max-w-4xl grid-cols-1 gap-3 sm:grid-cols-5">
         <TopStat
           label="Total ever recorded"
           value={formatKpi(data.total)}
@@ -177,6 +183,13 @@ export default function InstructorArchivePage() {
           label="Serving notice (SNP)"
           value={formatKpi(data.snp_count)}
           meta="Marked Serving Notice Period"
+          icon={<Archive size={16} />}
+          tone="amber"
+        />
+        <TopStat
+          label="Pending approval"
+          value={formatKpi(data.pending_count ?? 0)}
+          meta="Exit raised in Darwin, not approved yet"
           icon={<Archive size={16} />}
           tone="amber"
         />

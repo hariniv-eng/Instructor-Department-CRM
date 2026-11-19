@@ -110,7 +110,12 @@ const toApiArchiveSummary = (row: ArchiveRow, approvedExit?: ApprovedExitFallbac
   // Same day boundary as the Overview's Exception 2, where such people already move from Serving notice to the remove-access list.
   const todayIst = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
   const snpEnded = manualSnp && (approvedExit?.status ?? "").trim().toLowerCase() === "approved" && !!approvedExit?.lastWorkingDate && approvedExit.lastWorkingDate < todayIst;
-  const status: "Active" | "Exited" | "SNP" = manualPayroll ? "Active" : manualSnp && !snpEnded ? "SNP" : exitDate ? "Exited" : "Active";
+  // Pending approval (2026-11-19, per request: "carry the pending-for-approval cases as pending, not as an exit; once approved, add them to
+  // exits; a serving-notice case is not an exit until the notice period is served"): a person whose deciding Darwin exit record is still
+  // Pending With Approver is "Pending", not Exited. A Capability Manager's Serving Notice Period mark wins over it (SNP), and SNP still
+  // turns Exited only when the exit is Approved and the Date Of Exit has passed (snpEnded above).
+  const pendingExit = (approvedExit?.status ?? "").trim().toLowerCase().startsWith("pending");
+  const status: "Active" | "Exited" | "SNP" | "Pending" = manualPayroll ? "Active" : manualSnp && !snpEnded ? "SNP" : pendingExit ? "Pending" : exitDate ? "Exited" : "Active";
   return {
     id: row.id,
     employee_id: row.employeeId,
@@ -2122,6 +2127,7 @@ router.get("/reports/instructor-archive", requireAuth, requireRole("admin"), asy
     active_count: people.filter((p) => p.status === "Active").length,
     exited_count: people.filter((p) => p.status === "Exited").length,
     snp_count: people.filter((p) => p.status === "SNP").length,
+    pending_count: people.filter((p) => p.status === "Pending").length,
   });
 });
 
