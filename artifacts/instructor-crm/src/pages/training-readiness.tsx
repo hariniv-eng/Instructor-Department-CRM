@@ -22,7 +22,9 @@ type Activity = { subject: string; count: number; last: string | null };
 type Learning = { subjects: string[]; reading: string[]; source: 'demos' | 'learning portal' | 'mapped subject'; demos: Activity[]; lp: Activity[] };
 type ApiRow = Block & { employee_id: string | null; full_name: string; subject_area: string | null; learning_now: Learning; role: 'Mentor' | 'Instructor'; date_of_joining: string | null; date_of_joining_source: string | null; capability_manager: string | null; courses: Course[]; semesters: Record<string, Block>;
   // 2+ subjects (2026-11-16): each subject's readiness on its own, all semesters + per semester.
-  by_subject: Record<string, Block & { semesters: Record<string, Block> }> | null };
+  by_subject: Record<string, Block & { semesters: Record<string, Block> }> | null;
+  // Aptitude / Maths (2026-11-19): topin + learning-portal assessments given and their average, all semesters (shown, not scored).
+  overall_assessments?: Record<string, { topin_exams: number; topin_avg: number | null; lp_units: number; lp_avg: number | null }> | null };
 type Row = ApiRow;
 type T = { green: number; yellow: number };
 type Resp = { rows: ApiRow[]; thresholds: { demo: T; ai: T; topn: T }; learning_days: number; fetched_at: string };
@@ -105,6 +107,7 @@ function ReadinessRules({ t, days }: { t?: { demo: Th; ai: Th; topn: Th }; days:
         <li><b>Overall = the lowest of the three.</b> Green, Yellow, Green gives Yellow.</li>
         <li><b>Ready = Overall Green</b> and a demo + AI assessment on every lecture.</li>
         <li><b>Scored on the subject they are learning now</b> (their demos in the last {days} days, else the learning portal, else their mapped subject).</li>
+        <li><b>Aptitude:</b> the exam score comes from the learning portal (exams + classroom quizzes of Quantitative Aptitude, Numerical Ability, Logical Reasoning, Advanced Aptitude), not topin.</li>
         <li className="text-muted-foreground">Best attempt per lecture counts. Demos under 10 minutes and pre-preparedness demos do not.</li>
       </ul>
     </div>}
@@ -167,11 +170,16 @@ export function TrainingReadinessView() {
     complete: searched.filter((r) => r.complete).length,
   }), [searched]);
 
+  // Overall assessments column (2026-11-19): All semesters view only, when any instructor is learning Aptitude or Maths.
+  const showOverall = activeSem === 'all' && searched.some((r) => r.overall_assessments);
   const downloadTable = () => {
     const headers = ['Name', 'Employee ID', 'Role', 'Date of joining', 'Days since joining', 'Mapped subject', 'Learning now', 'Per subject (overall)', 'Reading only (not scored)', 'Learning now from', 'Mapped vs now', 'Capability Manager', 'Lectures total', 'Lectures with demo', 'Lectures with AI assessment', 'Lectures with both', 'Complete',
-      'Demo score (avg best /10)', 'Demo colour', 'AI score (avg best /10)', 'AI colour', 'Top-N exams', 'Top-N avg best %', 'Top-N colour', 'Overall'];
+      'Demo score (avg best /10)', 'Demo colour', 'AI score (avg best /10)', 'AI colour', 'Top-N exams', 'Top-N avg best %', 'Top-N colour', 'Overall',
+      ...(showOverall ? ['Aptitude / Maths: topin exams (overall)', 'Topin avg best % (overall)', 'Learning-portal assessments (overall)', 'Learning-portal avg best % (overall)'] : [])];
     const rows = searched.map((r) => [r.full_name, r.employee_id ?? '', r.role, r.date_of_joining ?? '', daysSince(r.date_of_joining) ?? '', r.subject_area ?? '', nowLabel(r), perSubject(r).map(([x, b]) => `${x}: ${LABEL[b.overall]}${b.complete ? '' : ' (incomplete)'}`).join('; '), r.learning_now.reading.join(', '), r.learning_now.source, matchOf(r), r.capability_manager ?? '', r.lectures_total, r.demo_lectures, r.ai_lectures, r.both_lectures,
-      statusOf(r), r.demo_avg ?? '', LABEL[r.demo_colour], r.ai_avg ?? '', LABEL[r.ai_colour], r.topn_exams, r.topn_avg ?? '', LABEL[r.topn_colour], LABEL[r.overall]]);
+      statusOf(r), r.demo_avg ?? '', LABEL[r.demo_colour], r.ai_avg ?? '', LABEL[r.ai_colour], r.topn_exams, r.topn_avg ?? '', LABEL[r.topn_colour], LABEL[r.overall],
+      ...(showOverall ? (() => { const o = Object.entries(r.overall_assessments ?? {}); const j = (f: (v: (typeof o)[number][1]) => string | number) => o.map(([s, v]) => `${o.length > 1 ? `${s}: ` : ''}${f(v)}`).join('; ');
+        return [j((v) => v.topin_exams), j((v) => v.topin_avg ?? ''), j((v) => v.lp_units), j((v) => v.lp_avg ?? '')]; })() : [])]);
     downloadCsv(`training-readiness-${activeSem === 'all' ? 'all-semesters' : `semester-${activeSem}`}.csv`, toCsv(headers, rows));
   };
 
@@ -243,6 +251,7 @@ export function TrainingReadinessView() {
                   <th className={`${th} text-center`}>Demo score</th>
                   <th className={`${th} text-center`}>AI score</th>
                   <th className={`${th} text-center`}>Top-N</th>
+                  {showOverall && <th className={th} title="Aptitude / Maths only, all semesters: assessments given and average best %. Shown, not used for the colours.">Assessments given (overall)</th>}
                   <th className={th}>Overall</th>
                 </tr>
               </thead>
@@ -268,10 +277,15 @@ export function TrainingReadinessView() {
                       <td className={`${td} text-center`}><Score v={r.demo_avg} c={r.demo_colour} sub={`${r.demo_lectures} lecture${r.demo_lectures === 1 ? '' : 's'}`} /></td>
                       <td className={`${td} text-center`}><Score v={r.ai_avg} c={r.ai_colour} sub={`${r.ai_lectures} lecture${r.ai_lectures === 1 ? '' : 's'}`} /></td>
                       <td className={`${td} text-center`}><Score v={r.topn_avg} c={r.topn_colour} sub={`${r.topn_exams} exam${r.topn_exams === 1 ? '' : 's'}`} pct /></td>
+                      {showOverall && <td className={td}>{r.overall_assessments ? Object.entries(r.overall_assessments).map(([s, v]) => <div key={s} className="whitespace-nowrap text-[11px] leading-5">
+                        {Object.keys(r.overall_assessments ?? {}).length > 1 && <span className="mr-1 font-bold">{s}</span>}
+                        <span className="text-muted-foreground">Topin</span> <b className="tabular-nums">{v.topin_exams}</b>{v.topin_avg !== null && <span className="tabular-nums"> · {v.topin_avg}%</span>}
+                        <span className="ml-2 text-muted-foreground">LP</span> <b className="tabular-nums">{v.lp_units}</b>{v.lp_avg !== null && <span className="tabular-nums"> · {v.lp_avg}%</span>}
+                      </div>) : NONE}</td>}
                       <td className={td}><Overall r={r} /></td>
                     </tr>
                     {isOpen && <tr className="border-b border-border bg-[#f8fafb]">
-                      <td colSpan={11} className="px-6 py-4">
+                      <td colSpan={showOverall ? 12 : 11} className="px-6 py-4">
                         {perSubject(r).length > 0 && <div className="mb-4">
                           <div className="mb-1 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Each subject on its own</div>
                           <table className="text-left"><thead><tr>{['Subject', 'Lectures done', 'Demo', 'AI', 'Top-N', 'Overall'].map((h) => <th key={h} className="px-3 py-1.5 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">{h}</th>)}</tr></thead>

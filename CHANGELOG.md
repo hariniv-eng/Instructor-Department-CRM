@@ -22,6 +22,16 @@ Commit messages stay short (title + 2-3 lines); this file is the detailed record
 | What the Instructor Archive stores (joining date, gender, subject ...) | `artifacts/api-server/src/lib/archiveInstructors.ts` |
 | One-off read-only checks | `artifacts/api-server/src/lib/connectors/_tmp_*.ts` |
 
+## 2026-11-19 -- Training - Readiness: Aptitude / Maths assessments given (overall)
+
+All semesters view only (per request): a new column "Assessments given (overall)" for instructors learning (or mapped to) Aptitude or Maths -- topin exams taken + average best %, and learning-portal assessments (EXAM + QUIZ units with a score, any course of that subject) + average best %. Overall only, because topin exams cannot be tied to a semester. Shown, not used for the colours. Also in the CSV (4 columns).
+- Files: `api-server/src/lib/connectors/trainingReadiness.ts` (`fetchLpSubjectAssessments`, `topinOverallOf`, `OVERALL_ASSESSMENT_SUBJECTS`), `routes/reports.ts` (`overall_assessments`), `instructor-crm/src/pages/training-readiness.tsx`. After pull: Publish only.
+
+## 2026-11-19 -- Training - Readiness: Aptitude exam score from the learning portal
+
+Topin Aptitude exams cannot be split into courses, so for Aptitude only the Top-N score now comes from the learning portal (per request): best % of each EXAM and QUIZ unit (daily PRACTICE left out), averaged over the units the instructor took. Courses: Quantitative Aptitude (Sem 1), Numerical Ability (Sem 2), Logical Reasoning (Sem 3), Advanced / Advance Aptitude (All semesters only). Revision, bridge, mock, orientation and "Numerical Ability and Reasoning Skills for Engineers" are not counted. The topin "Aptitude exams" bucket is no longer used in Readiness (Training - Assessments still shows it). Every other subject is unchanged (topin). Same colour lines (75% / 60%). The scoring panel has one extra line saying so.
+- Files: `api-server/src/lib/connectors/trainingReadiness.ts` (`APTITUDE_LP_COURSES`, `fetchLpAptitudeScores`, `EXAM_SEMESTER`, `TOPN_COURSES`), `routes/reports.ts` (`/reports/training-readiness`), `instructor-crm/src/pages/training-readiness.tsx`. Check script: `_tmp_lp_aptitude_assessments.ts`. After pull: Publish only.
+
 ## 2026-11-19 -- Training - Readiness: scoring rules as a simple table
 
 The long description paragraph is replaced by a "How readiness is scored" panel (open by default, Hide / Show): one small table (Demo QA / AI assessment / Top-N against Green / Yellow / Red) and four short lines (Overall = lowest of the three; Ready = Green + demo and AI on every lecture; which subject is scored; what does not count). Same rules; thresholds read from the API. Nothing in the scoring changed.
