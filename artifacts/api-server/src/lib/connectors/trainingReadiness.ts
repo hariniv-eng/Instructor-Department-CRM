@@ -73,9 +73,100 @@ export const LECTURE_SEMESTER: Record<string, number> = {
   lecture_introduction_to_english_language_and_communication: 1, english_foundation: 1, english_advanced: 2, english_applied: 3,
 };
 export const EXAM_SEMESTER: Record<string, number> = {
+  lp_quantitative_aptitude: 1, lp_numerical_ability: 2, lp_logical_reasoning: 3, // Aptitude: learning-portal assessments (2026-11-19)
   static_web: 1, responsive_design: 1, modern_responsive_ui: 1, javascript_sprint: 2, javascript_essentials: 2, dynamic_web_app: 2, react_js: 3,
   python: 1, sql: 2, mongodb: 2, node_js: 3, math_for_cs: 1, probability_statistics: 3, linear_algebra_calculus: 4,
 };
+
+// Aptitude Top-N from the LEARNING PORTAL (2026-11-19, per request: "topin Aptitude exams cannot be split into courses -- for Aptitude
+// only, use the learning-portal assessments of each course instead: count them and average the scores"). Choices made with the user:
+// unit types EXAM + QUIZ (graded exams and classroom quizzes; daily PRACTICE left out), courses Quantitative Aptitude (Sem 1),
+// Numerical Ability (Sem 2), Logical Reasoning (Sem 3), plus Advanced / Advance Aptitude (no semester: counts only in All semesters).
+// Score = best % per unit (best_exam_percentage_score, units with a score), averaged over the units they took. Revision, bridge, mock,
+// orientation and "Numerical Ability and Reasoning Skills for Engineers" courses are not counted. Every other subject stays on topin.
+// The topin "Aptitude exams" bucket is no longer used here (it still shows on Training - Assessments).
+export const APTITUDE_LP_COURSES: { key: string; title: string; subject: string; titles: string[] }[] = [
+  { key: "lp_quantitative_aptitude", title: "Quantitative Aptitude (learning portal)", subject: "Aptitude", titles: ["quantitative aptitude"] },
+  { key: "lp_numerical_ability", title: "Numerical Ability (learning portal)", subject: "Aptitude", titles: ["numerical ability"] },
+  { key: "lp_logical_reasoning", title: "Logical Reasoning (learning portal)", subject: "Aptitude", titles: ["logical reasoning"] },
+  { key: "lp_advanced_aptitude", title: "Advanced Aptitude (learning portal)", subject: "Aptitude", titles: ["advanced aptitude", "advance aptitude"] },
+];
+export const APTITUDE_LP_UNIT_TYPES = ["EXAM", "QUIZ"];
+const TOPN_COURSES: { key: string; subject: string }[] = [...ASSESSMENT_COURSES.filter((c) => c.subject !== "Aptitude"), ...APTITUDE_LP_COURSES];
+let lpAptCache: { at: number; data: Map<string, Record<string, ExamCell>> } | null = null;
+
+/** Aptitude learning-portal assessment scores per TeachOS user id (normUid) -> course key -> cell (in `daily`). Cached 10 minutes. */
+export async function fetchLpAptitudeScores(force = false): Promise<Map<string, Record<string, ExamCell>>> {
+  if (!force && lpAptCache && Date.now() - lpAptCache.at < 10 * 60 * 1000) return lpAptCache.data;
+  const keyOfTitle = new Map(APTITUDE_LP_COURSES.flatMap((c) => c.titles.map((t) => [t, c.key] as const)));
+  const bq = new BigQuery({ projectId: config.BIGQUERY_PROJECT_ID, ...(config.BIGQUERY_CREDENTIALS_JSON ? { credentials: JSON.parse(config.BIGQUERY_CREDENTIALS_JSON) } : {}) });
+  const [rows] = await runWithHardTimeout(() => bq.query({
+    query: `SELECT instructor_user_id AS u, LOWER(TRIM(course_title)) AS t, COUNT(DISTINCT unit_id) AS n, AVG(best_exam_percentage_score) AS s,
+              MAX(CAST(COALESCE(completion_datetime, last_progress_date) AS STRING)) AS d
+            FROM \`${config.BIGQUERY_PROJECT_ID}.${config.BIGQUERY_DATASET}.${UNIT_COMPLETION_TABLE}\`
+            WHERE instructor_user_id IS NOT NULL AND best_exam_percentage_score IS NOT NULL AND unit_type IN UNNEST(@types)
+              AND LOWER(TRIM(course_title)) IN UNNEST(@titles) GROUP BY 1, 2`,
+    params: { types: APTITUDE_LP_UNIT_TYPES, titles: [...keyOfTitle.keys()] },
+  }), 120000);
+  const acc = new Map<string, Map<string, { n: number; sum: number; last: string | null }>>();
+  for (const r of rows as Record<string, unknown>[]) {
+    const key = keyOfTitle.get(plain(r.t));
+    if (!key) continue;
+    const uid = normUid(plain(r.u));
+    const m = acc.get(uid) ?? new Map();
+    const x = m.get(key) ?? { n: 0, sum: 0, last: null };
+    const n = Number(plain(r.n)) || 0, d = plain(r.d).slice(0, 10) || null;
+    x.n += n; x.sum += (Number(plain(r.s)) || 0) * n; if (d && (!x.last || d > x.last)) x.last = d;
+    m.set(key, x); acc.set(uid, m);
+  }
+  const data = new Map<string, Record<string, ExamCell>>();
+  for (const [uid, m] of acc) data.set(uid, Object.fromEntries([...m].map(([k, x]) => [k, { daily: { exams: x.n, avg: x.n ? Math.round((x.sum / x.n) * 10) / 10 : null, last_date: x.last }, weekly: null }])));
+  lpAptCache = { at: Date.now(), data };
+  return data;
+}
+
+// Overall assessments for Aptitude and Maths (2026-11-19, per request: "for Aptitude and Maths, in the All semesters view, for every
+// instructor: how many topin assessments and how many learning-portal assessments they have given, with the average -- we cannot tell
+// which topin exam belongs to which semester, so overall only"). Shown next to the scores; NOT used for the colours.
+//   topin = every topin Daily + Weekly exam of the subject (all of its course buckets, incl. the general one), average best %.
+//   learning portal = every EXAM + QUIZ unit with a score in any learning-portal course of the subject (subject of a course as in
+//   Taught in Class), average best %.
+export const OVERALL_ASSESSMENT_SUBJECTS = ["Aptitude", "Maths"];
+export type OverallAssessments = { topin_exams: number; topin_avg: number | null; lp_units: number; lp_avg: number | null };
+export function topinOverallOf(cells: Record<string, ExamCell> | undefined, subject: string): { n: number; avg: number | null } {
+  let n = 0, sum = 0;
+  for (const c of ASSESSMENT_COURSES) {
+    if (c.subject !== subject) continue;
+    for (const x of [cells?.[c.key]?.daily, cells?.[c.key]?.weekly]) if (x && x.avg !== null) { n += x.exams; sum += x.avg * x.exams; }
+  }
+  return { n, avg: n ? Math.round((sum / n) * 10) / 10 : null };
+}
+let lpSubjCache: { at: number; data: Map<string, Record<string, { n: number; avg: number | null }>> } | null = null;
+/** Learning-portal EXAM + QUIZ units with a score, per TeachOS user id (normUid) and subject (Aptitude / Maths). Cached 10 minutes. */
+export async function fetchLpSubjectAssessments(force = false): Promise<Map<string, Record<string, { n: number; avg: number | null }>>> {
+  if (!force && lpSubjCache && Date.now() - lpSubjCache.at < 10 * 60 * 1000) return lpSubjCache.data;
+  const bq = new BigQuery({ projectId: config.BIGQUERY_PROJECT_ID, ...(config.BIGQUERY_CREDENTIALS_JSON ? { credentials: JSON.parse(config.BIGQUERY_CREDENTIALS_JSON) } : {}) });
+  const [rows] = await runWithHardTimeout(() => bq.query({
+    query: `SELECT instructor_user_id AS u, REPLACE(LOWER(CAST(course_id AS STRING)), '-', '') AS cid, course_title AS t, COUNT(DISTINCT unit_id) AS n, AVG(best_exam_percentage_score) AS s
+            FROM \`${config.BIGQUERY_PROJECT_ID}.${config.BIGQUERY_DATASET}.${UNIT_COMPLETION_TABLE}\`
+            WHERE instructor_user_id IS NOT NULL AND best_exam_percentage_score IS NOT NULL AND unit_type IN UNNEST(@types) GROUP BY 1, 2, 3`,
+    params: { types: APTITUDE_LP_UNIT_TYPES },
+  }), 120000);
+  const acc = new Map<string, Map<string, { n: number; sum: number }>>();
+  for (const r of rows as Record<string, unknown>[]) {
+    const subject = taughtSubjectColumn(plain(r.cid), plain(r.t));
+    if (!subject || !OVERALL_ASSESSMENT_SUBJECTS.includes(subject)) continue;
+    const uid = normUid(plain(r.u));
+    const m = acc.get(uid) ?? new Map<string, { n: number; sum: number }>();
+    const x = m.get(subject) ?? { n: 0, sum: 0 };
+    const n = Number(plain(r.n)) || 0;
+    x.n += n; x.sum += (Number(plain(r.s)) || 0) * n;
+    m.set(subject, x); acc.set(uid, m);
+  }
+  const data = new Map([...acc].map(([u, m]) => [u, Object.fromEntries([...m].map(([s, x]) => [s, { n: x.n, avg: x.n ? Math.round((x.sum / x.n) * 10) / 10 : null }]))]));
+  lpSubjCache = { at: Date.now(), data };
+  return data;
+}
 
 export type ReadinessCourse = { key: string; title: string; semester: number | null; lectures_total: number; demo_lectures: number; ai_lectures: number; both_lectures: number; demo_avg: number | null; ai_avg: number | null };
 export type ReadinessBlock = {
@@ -119,7 +210,7 @@ export function readinessOf(subjects: string[], evs: Ev[], w: DemoWindow | undef
     const lec = cs.flatMap(({ ci }) => lecturesOf(ci));
     const demo_avg = avg(scores(lec, "demo")), ai_avg = avg(scores(lec, "ai"));
     let n = 0, sum = 0; // Top-N: Daily + Weekly exams -- average best % over all those exams
-    for (const c of ASSESSMENT_COURSES) {
+    for (const c of TOPN_COURSES) {
       if (!subjects.includes(c.subject) || (sem !== null && EXAM_SEMESTER[c.key] !== sem)) continue;
       for (const x of [exams?.[c.key]?.daily, exams?.[c.key]?.weekly]) if (x && x.avg !== null) { n += x.exams; sum += x.avg * x.exams; }
     }

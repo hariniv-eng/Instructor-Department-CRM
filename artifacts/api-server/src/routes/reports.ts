@@ -10,7 +10,7 @@ import { isPinnedConfirmedInstructor, TEACHOS_ONLY_UNREVIEWED } from "../data/cl
 import { productOf } from "../lib/product";
 import { taughtSubjectColumn, courseColumnOf, portalColumnOf, TAUGHT_SUBJECT_COLUMNS } from "../lib/connectors/taughtTraining";
 import { ASSESSMENT_COURSES, fetchTopinAssessments, normUid } from "../lib/connectors/topinAssessments";
-import { bySubject, fetchReadinessEvaluations, fetchRecentLpActivity, learningNowOf, readinessOf, READINESS_THRESHOLDS, LEARNING_DAYS } from "../lib/connectors/trainingReadiness";
+import { bySubject, fetchLpAptitudeScores, fetchLpSubjectAssessments, topinOverallOf, OVERALL_ASSESSMENT_SUBJECTS, type OverallAssessments, fetchReadinessEvaluations, fetchRecentLpActivity, learningNowOf, readinessOf, READINESS_THRESHOLDS, LEARNING_DAYS } from "../lib/connectors/trainingReadiness";
 import { lectureNameIndex } from "../lib/connectors/demoTraining";
 import { LECTURE_COURSES } from "../data/lectureSessions";
 
@@ -1737,9 +1737,9 @@ router.get("/reports/training-readiness", requireAuth, requireRole("admin"), asy
   const people = allRows.filter((r) => r.inTeachos && r.teachosUserId && deptIds.has(r.id) && (isConfirmedDespiteFullRoster(r) || !TRAINING_STATS_EXCLUDED_CLASSIFICATIONS.has(r.classification ?? "")) && productOf(r) === "NIAT (Training)");
   const deployedByUid = new Map((await db.select({ uid: instructorContributionTable.instructorUserId, d: instructorContributionTable.deploymentDate }).from(instructorContributionTable)).map((c) => [normUid(c.uid), c.d]));
   const force = req.query.refresh === "1";
-  let evs: Awaited<ReturnType<typeof fetchReadinessEvaluations>>, topin: Awaited<ReturnType<typeof fetchTopinAssessments>>, lp: Awaited<ReturnType<typeof fetchRecentLpActivity>>;
+  let evs: Awaited<ReturnType<typeof fetchReadinessEvaluations>>, topin: Awaited<ReturnType<typeof fetchTopinAssessments>>, lp: Awaited<ReturnType<typeof fetchRecentLpActivity>>, lpApt: Awaited<ReturnType<typeof fetchLpAptitudeScores>>, lpSubj: Awaited<ReturnType<typeof fetchLpSubjectAssessments>>;
   try {
-    [evs, topin, lp] = await Promise.all([fetchReadinessEvaluations(force), fetchTopinAssessments(force), fetchRecentLpActivity(force)]);
+    [evs, topin, lp, lpApt, lpSubj] = await Promise.all([fetchReadinessEvaluations(force), fetchTopinAssessments(force), fetchRecentLpActivity(force), fetchLpAptitudeScores(force), fetchLpSubjectAssessments(force)]);
   } catch (err) {
     res.status(502).json({ error: `Demo / assessment data is not readable right now: ${(err as Error).message.slice(0, 200)}` });
     return;
@@ -1754,6 +1754,14 @@ router.get("/reports/training-readiness", requireAuth, requireRole("admin"), asy
     // Readiness is scored on the subject(s) the instructor is learning NOW (2026-11-16), not only the mapped subject.
     const isMentor = p.classification === "mentor";
     const learning = learningNowOf(subject, evs.byUid.get(uid) ?? [], w, lp.get(uid), idx);
+    const exams = { ...(topin.byUid.get(uid) ?? {}), ...(lpApt.get(uid) ?? {}) }; // topin + Aptitude learning-portal assessments (2026-11-19)
+    // Overall assessments for Aptitude / Maths (2026-11-19): topin + learning-portal counts and averages, all semesters, show only.
+    const overall: Record<string, OverallAssessments> = {};
+    for (const s of OVERALL_ASSESSMENT_SUBJECTS) {
+      if (!learning.subjects.includes(s) && subject !== s) continue;
+      const t = topinOverallOf(topin.byUid.get(uid), s), l = lpSubj.get(uid)?.[s];
+      overall[s] = { topin_exams: t.n, topin_avg: t.avg, lp_units: l?.n ?? 0, lp_avg: l?.avg ?? null };
+    }
     return {
       employee_id: p.employeeId,
       full_name: p.fullName,
@@ -1763,8 +1771,9 @@ router.get("/reports/training-readiness", requireAuth, requireRole("admin"), asy
       date_of_joining: joining.date,
       date_of_joining_source: joining.source,
       capability_manager: p.teachosManager || p.manualCapabilityManager || null,
-      ...readinessOf(learning.subjects, evs.byUid.get(uid) ?? [], w, topin.byUid.get(uid), idx),
-      by_subject: bySubject(learning.subjects, evs.byUid.get(uid) ?? [], w, topin.byUid.get(uid), idx), // 2+ subjects: each on its own
+      ...readinessOf(learning.subjects, evs.byUid.get(uid) ?? [], w, exams, idx),
+      by_subject: bySubject(learning.subjects, evs.byUid.get(uid) ?? [], w, exams, idx),
+      overall_assessments: Object.keys(overall).length ? overall : null, // 2+ subjects: each on its own
     };
   }).sort((a, b) => a.full_name.localeCompare(b.full_name));
   res.json({ rows, thresholds: READINESS_THRESHOLDS, learning_days: LEARNING_DAYS, fetched_at: evs.fetchedAt });
