@@ -22,9 +22,9 @@ Commit messages stay short (title + 2-3 lines); this file is the detailed record
 | What the Instructor Archive stores (joining date, gender, subject ...) | `artifacts/api-server/src/lib/archiveInstructors.ts` |
 | One-off read-only checks | `artifacts/api-server/src/lib/connectors/_tmp_*.ts` |
 
-## 2026-11-19 -- Training - Readiness: scoring rules as tables
+## 2026-11-19 -- Training - Readiness: scoring rules as a simple table
 
-The long description paragraph is replaced by a "How readiness is scored" panel (open by default, Hide / Show) with four small tables: Categories (Green / Yellow / Red thresholds per score), Overall / Complete / Ready (with an example), How each score is worked out (what counts and what does not), and Which subject they are scored on. Same rules; thresholds read from the API, so the panel always matches the colours. Nothing in the scoring changed.
+The long description paragraph is replaced by a "How readiness is scored" panel (open by default, Hide / Show): one small table (Demo QA / AI assessment / Top-N against Green / Yellow / Red) and four short lines (Overall = lowest of the three; Ready = Green + demo and AI on every lecture; which subject is scored; what does not count). Same rules; thresholds read from the API. Nothing in the scoring changed.
 - File: `artifacts/instructor-crm/src/pages/training-readiness.tsx` (`ReadinessRules`). After pull: Publish only.
 
 ## 2026-11-19 -- Instructor Archive: "Pending approval" status

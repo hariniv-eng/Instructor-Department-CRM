@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState, type ReactNode } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronDown, ChevronRight, RefreshCw, X } from 'lucide-react';
 import { PageIntro, EmptyState, QueryError, SkeletonBlock, TablePager, TableSearchInput, DownloadCsvButton, usePagedRows, formatKpi } from '@/components/ui-pieces';
@@ -65,63 +65,48 @@ function Progress({ done, total }: { done: number; total: number }) {
   </div>;
 }
 
-// How readiness is scored (2026-11-19, per request: "convert this paragraph into a table, so the evaluation criteria and the constraints are
-// easy to understand -- who comes under Green / Yellow and why"). Replaces the long page description; same rules, nothing changed in the
-// scoring. Thresholds come from the API (READINESS_THRESHOLDS), so the panel always matches the colours in the table.
+// How readiness is scored (2026-11-19, per request: "convert this paragraph into a table"; then "the tables are very complicated -- make it
+// very simple"). One small table (score x colour) and three short lines. Same rules, nothing changed in the scoring. Thresholds come
+// from the API (READINESS_THRESHOLDS), so the panel always matches the colours in the table.
 type Th = { green: number; yellow: number };
 function ReadinessRules({ t, days }: { t?: { demo: Th; ai: Th; topn: Th }; days: number }) {
   const [open, setOpen] = useState(true);
   const d = t?.demo ?? { green: 7.5, yellow: 6.5 }, ai = t?.ai ?? { green: 8.5, yellow: 7.5 }, tn = t?.topn ?? { green: 75, yellow: 60 };
-  const th = 'border-b border-border bg-[#f4f7f9] px-3 py-2 text-left font-mono-ui text-[10px] uppercase tracking-[0.1em] text-muted-foreground';
-  const td = 'border-b border-border/70 px-3 py-2 align-top text-[12px] text-foreground';
-  const chip = (label: string, cls: string) => <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-[0.06em] ${cls}`}>{label}</span>;
-  const G = chip('Green', 'bg-[#e5f3ed] text-[#256e65]'), Y = chip('Yellow', 'bg-[#fff4dc] text-[#8a6212]'), R = chip('Red', 'bg-[#fdeeea] text-[#9b4434]');
-  const box = (title: string, body: ReactNode) => <div className="overflow-hidden rounded-lg border border-border bg-card">
-    <div className="border-b border-border px-3 py-2 text-[12px] font-bold text-foreground">{title}</div>
-    <div className="overflow-x-auto">{body}</div>
-  </div>;
-  return <div data-testid="readiness-rules" className="mb-6 rounded-xl border border-border bg-[#fafbfc] p-4">
+  const th = 'border-b border-border px-3 py-2 text-left text-[11px] font-bold';
+  const td = 'border-b border-border/70 px-3 py-2 text-[12px] text-foreground';
+  const rows: [string, string, string, string][] = [
+    ['Demo QA score', `${d.green} or more`, `${d.yellow} to under ${d.green}`, `Under ${d.yellow} or none`],
+    ['AI assessment score', `${ai.green} or more`, `${ai.yellow} to under ${ai.green}`, `Under ${ai.yellow} or none`],
+    ['Top-N exam score', `${tn.green}% or more`, `${tn.yellow}% to under ${tn.green}%`, `Under ${tn.yellow}% or none`],
+  ];
+  return <div data-testid="readiness-rules" className="mb-6 rounded-xl border border-border bg-card p-4">
     <button type="button" onClick={() => setOpen((o) => !o)} className="flex w-full items-center gap-2 text-left text-[13px] font-bold text-foreground" data-testid="button-readiness-rules">
       {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />} How readiness is scored
       <span className="ml-auto text-[11px] font-semibold text-muted-foreground">{open ? 'Hide' : 'Show'}</span>
     </button>
-    {open && <div className="mt-4 grid gap-4 xl:grid-cols-2">
-      {box('1. Categories: each score gets a colour', <table className="w-full border-collapse">
-        <thead><tr><th className={th}>Category</th><th className={th}>Demo QA score</th><th className={th}>AI assessment score</th><th className={th}>Top-N exam score</th></tr></thead>
-        <tbody>
-          <tr><td className={td}>{G}</td><td className={td}>{d.green} or more</td><td className={td}>{ai.green} or more</td><td className={td}>{tn.green}% or more</td></tr>
-          <tr><td className={td}>{Y}</td><td className={td}>{d.yellow} to below {d.green}</td><td className={td}>{ai.yellow} to below {ai.green}</td><td className={td}>{tn.yellow}% to below {tn.green}%</td></tr>
-          <tr><td className={td}>{R}</td><td className={td}>below {d.yellow}, or no demo</td><td className={td}>below {ai.yellow}, or no AI assessment</td><td className={td}>below {tn.yellow}%, or no exam</td></tr>
-        </tbody>
-      </table>)}
-      {box('2. Overall, Complete and Ready', <table className="w-full border-collapse">
-        <thead><tr><th className={th}>Term</th><th className={th}>Rule</th></tr></thead>
-        <tbody>
-          <tr><td className={`${td} font-semibold`}>Overall</td><td className={td}>The <b>lowest</b> of the three colours. {G} needs all three Green; one {R} score, or one score with no data, makes the instructor Red.</td></tr>
-          <tr><td className={`${td} font-semibold`}>Complete</td><td className={td}>A demo <b>and</b> an AI assessment on <b>every</b> lecture of their subject's courses (of the semester picked).</td></tr>
-          <tr><td className={`${td} font-semibold`}>Ready</td><td className={td}>Overall {G} <b>and</b> Complete.</td></tr>
-          <tr><td className={`${td} font-semibold`}>Example</td><td className={td}>Demo 7.8 ({G}), AI 7.9 ({Y}), Top-N 80% ({G}): Overall {Y}, not Ready.</td></tr>
-        </tbody>
-      </table>)}
-      {box('3. How each score is worked out', <table className="w-full border-collapse">
-        <thead><tr><th className={th}>Score</th><th className={th}>What counts</th><th className={th}>What does not count</th></tr></thead>
-        <tbody>
-          <tr><td className={`${td} font-semibold`}>Demo QA</td><td className={td}>In-training demos (mock demos too). Best attempt per lecture, averaged over the lectures done.</td><td className={td}>Demos under 10 minutes; pre-preparedness demos; demos after deployment.</td></tr>
-          <tr><td className={`${td} font-semibold`}>AI assessment</td><td className={td}>In-training AI assessments. Best attempt per lecture, averaged over the lectures done.</td><td className={td}>Pre-preparedness AI assessments; AI assessments after deployment.</td></tr>
-          <tr><td className={`${td} font-semibold`}>Top-N</td><td className={td}>Average best % of topin Daily + Weekly exams in their subject.</td><td className={td}>Exams that match no course (mock tests, entry tests). With a semester picked: subject-wide exams (they count only in All semesters).</td></tr>
-        </tbody>
-      </table>)}
-      {box('4. Which subject they are scored on', <table className="w-full border-collapse">
-        <thead><tr><th className={th}>Step</th><th className={th}>If they have</th><th className={th}>They are scored on</th></tr></thead>
-        <tbody>
-          <tr><td className={td}>1</td><td className={td}>Demos / AI assessments in the last {days} days</td><td className={td}>Their top subject, plus every other subject with 2 or more. Each is scored on its own (open the row).</td></tr>
-          <tr><td className={td}>2</td><td className={td}>No demos, but learning-portal units completed in the last {days} days</td><td className={td}>Their top learning-portal subject.</td></tr>
-          <tr><td className={td}>3</td><td className={td}>Neither</td><td className={td}>Their mapped subject.</td></tr>
-          <tr><td className={td}>Note</td><td className={td}>Subjects they only read on the learning portal</td><td className={td}>Shown as "reading", <b>not scored</b>.</td></tr>
-          <tr><td className={td}>Note</td><td className={td}>A semester button picked</td><td className={td}>Only that semester's courses and topin exams count.</td></tr>
-        </tbody>
-      </table>)}
-      <p className="text-[11px] text-muted-foreground xl:col-span-2">To see who is in each category, use the <b>Overall</b> filter below (Green / Yellow / Red). Ready = Overall Green with Completion = Complete. The cards show the counts.</p>
+    {open && <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-start">
+      <div className="overflow-x-auto rounded-lg border border-border">
+        <table className="border-collapse">
+          <thead><tr className="bg-[#f4f7f9]">
+            <th className={`${th} text-muted-foreground`}>Score</th>
+            <th className={`${th} text-[#256e65]`}>Green</th>
+            <th className={`${th} text-[#8a6212]`}>Yellow</th>
+            <th className={`${th} text-[#9b4434]`}>Red</th>
+          </tr></thead>
+          <tbody>{rows.map(([name, g, y, r]) => <tr key={name}>
+            <td className={`${td} font-semibold`}>{name}</td>
+            <td className={`${td} bg-[#f3faf6]`}>{g}</td>
+            <td className={`${td} bg-[#fffaf0]`}>{y}</td>
+            <td className={`${td} bg-[#fdf5f3]`}>{r}</td>
+          </tr>)}</tbody>
+        </table>
+      </div>
+      <ul className="flex max-w-xl list-disc flex-col gap-2 pl-5 text-[12px] leading-5 text-foreground">
+        <li><b>Overall = the lowest of the three.</b> Green, Yellow, Green gives Yellow.</li>
+        <li><b>Ready = Overall Green</b> and a demo + AI assessment on every lecture.</li>
+        <li><b>Scored on the subject they are learning now</b> (their demos in the last {days} days, else the learning portal, else their mapped subject).</li>
+        <li className="text-muted-foreground">Best attempt per lecture counts. Demos under 10 minutes and pre-preparedness demos do not.</li>
+      </ul>
     </div>}
   </div>;
 }
