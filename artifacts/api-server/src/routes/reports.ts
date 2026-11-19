@@ -369,7 +369,7 @@ const toApiInstructorSummary = (row: InstructorRow, contributionByTeachosId: Map
 // NW0007471, showed in Training - Readiness). Only people the Instructors tab counts as Instructors or
 // Mentors (Darwin Instructors-department tech / non-tech, payroll / TeachOS-only instructors, mentors) -- the rule the Contribution tab
 // already used. Used by every Training Stats view: Training - LP, Taught in Class, Training - Demos, Training - Assessments, Training - Readiness.
-function departmentIdsOf(rawRows: InstructorRow[]): Set<number> {
+export function departmentIdsOf(rawRows: InstructorRow[]): Set<number> { // exported for _tmp_aptitude_topin_people.ts (2026-11-19)
   const { countedInstructorRows, mentors } = computeDepartmentAndExceptionRows(rawRows);
   return new Set([...countedInstructorRows, ...mentors].map((r) => r.id));
 }
