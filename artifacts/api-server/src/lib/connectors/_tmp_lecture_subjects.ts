@@ -21,7 +21,7 @@ async function main() {
   const args = process.argv.slice(2).filter((a) => /^NW\d{7}$/i.test(a)).map((a) => a.toUpperCase());
   const ids = args.length ? args : DEFAULT;
   const people = (await db.select().from(instructorsTable)).filter((p) => p.employeeId && ids.includes(p.employeeId));
-  const uids = people.filter((p) => p.teachosUserId).map((p) => p.teachosUserId!);
+  const uids = people.filter((p) => p.teachosUserId).map((p) => normUid(p.teachosUserId!));
   const contrib = new Map((await db.select().from(instructorContributionTable)).map((c) => [normUid(c.instructorUserId), c]));
   const since = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
   const sess = new Map<string, { l: number; p: number; o: number }>();
@@ -30,10 +30,17 @@ async function main() {
   }
   const P = config.BIGQUERY_PROJECT_ID!;
   const bq = new BigQuery({ projectId: P, ...(config.BIGQUERY_CREDENTIALS_JSON ? { credentials: JSON.parse(config.BIGQUERY_CREDENTIALS_JSON) } : {}) });
-  const [rows] = await bq.query({ query: `SELECT instructor_user_id AS u, REPLACE(LOWER(CAST(course_id AS STRING)), '-', '') AS cid, CAST(course_title AS STRING) AS t,
-      COUNT(*) AS n, MAX(CAST(session_start_datetime AS STRING)) AS last, ARRAY_AGG(DISTINCT CAST(batch_name AS STRING) IGNORE NULLS LIMIT 5) AS batches
+  // Column names found the same way as fetchSessionSubjects (2026-11-21: the table has no plain course_id column).
+  const [colRows] = await bq.query({ query: `SELECT column_name FROM \`${P}.${config.BIGQUERY_DATASET}.INFORMATION_SCHEMA.COLUMNS\` WHERE table_name = @t`, params: { t: SESSION_SCHEDULE_TABLE } });
+  const cols = (colRows as Record<string, unknown>[]).map((r) => plain(r.column_name));
+  const idCol = cols.find((c) => /^course_id$/i.test(c)) ?? cols.find((c) => /course.*id/i.test(c));
+  const titleCol = cols.find((c) => /^course_title$/i.test(c)) ?? cols.find((c) => /course.*(title|name)/i.test(c));
+  const batchCol = cols.find((c) => /^batch_name$/i.test(c)) ?? cols.find((c) => /batch.*name/i.test(c));
+  console.error(`schedule columns used: course id ${idCol ?? "-"}, course title ${titleCol ?? "-"}, batch ${batchCol ?? "-"}`);
+  const [rows] = await bq.query({ query: `SELECT instructor_user_id AS u, ${idCol ? `REPLACE(LOWER(CAST(${idCol} AS STRING)), '-', '')` : "''"} AS cid, ${titleCol ? `CAST(${titleCol} AS STRING)` : "''"} AS t,
+      COUNT(*) AS n, MAX(CAST(session_start_datetime AS STRING)) AS last, ${batchCol ? `ARRAY_AGG(DISTINCT CAST(${batchCol} AS STRING) IGNORE NULLS LIMIT 5)` : "[]"} AS batches
     FROM \`${P}.${config.BIGQUERY_DATASET}.${SESSION_SCHEDULE_TABLE}\`
-    WHERE session_status = 'COMPLETED' AND session_type = 'LECTURE' AND instructor_user_id IN UNNEST(@u)
+    WHERE session_status = 'COMPLETED' AND session_type = 'LECTURE' AND REPLACE(LOWER(instructor_user_id), '-', '') IN UNNEST(@u)
       AND session_start_datetime >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 30 DAY) AND session_start_datetime <= CURRENT_DATETIME()
     GROUP BY 1, 2, 3 ORDER BY n DESC`, params: { u: uids } });
   const lec = new Map<string, { subject: string; course: string; n: number; last: string; batches: string[] }[]>();
