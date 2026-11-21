@@ -13,6 +13,7 @@
 // Aptitude instructors' topin exams all counted; adds role by sessions (Contribution rule) and the overall Aptitude / Maths assessment
 // counts (topin + learning portal, all semesters).
 // Writes semester_fit.csv (with names -- delete it after: rm semester_fit.csv).
+// Semester 1 (NIAT 2026) instructors get a second row for Semester 2, the semester they teach next.
 //   pnpm exec tsx src/lib/connectors/_tmp_semester_fit.ts
 import fs from "node:fs";
 import { BigQuery } from "@google-cloud/bigquery";
@@ -65,8 +66,11 @@ async function main() {
     const cohorts = contrib.get(uid)?.niatCohorts ?? [];
     const subject = (normalizeSubjectArea(p.deptArea || p.manualDeptArea || null) as string | null) ?? null;
     for (const cohort of cohorts) {
-      const sem = COHORT_SEMESTER[cohort];
-      if (!sem) continue;
+      const curSem = COHORT_SEMESTER[cohort];
+      if (!curSem) continue;
+      // Semester 1 instructors are also scored on Semester 2 -- the semester they teach next (2026-11-21, per request: "for all the
+      // Sem 1 instructors, what is their Semester 2 readiness?"). Those rows have semester 2 and the same cohort (NIAT 2026).
+      for (const sem of curSem === 1 ? [1, 2] : [curSem]) {
       const cells = topinCellsFor(topin.byUid.get(uid), subject === "Aptitude");
       const r = readinessOf(subject ? [subject] : [], evs.byUid.get(uid) ?? [], { joining: null, deployed: null }, { ...(cells ?? {}), ...(lpApt.get(uid) ?? {}) }, idx);
       const b = r.semesters[String(sem)];
@@ -80,6 +84,7 @@ async function main() {
         b?.demo_avg ?? "", demo, b?.ai_avg ?? "", ai, b?.topn_avg ?? "", b?.topn_exams ?? "", tn, qaAvg ?? "", scores.length, cq, overall,
         ...(() => { const x = sess.get(uid) ?? { l: 0, p: 0, o: 0 }; return [x.l > 0 ? "Instructor" : x.l + x.p + x.o > 0 ? "Mentor" : "No sessions", x.l, x.p, x.o]; })(),
         ...(subject === "Aptitude" || subject === "Maths" ? (() => { const t = topinOverallOf(cells, subject), l = lpSubj.get(uid)?.[subject]; return [t.n, t.avg ?? "", l?.n ?? 0, l?.avg ?? ""]; })() : ["", "", "", ""])].map(csvCell).join(","));
+      }
     }
   }
   fs.writeFileSync("semester_fit.csv", out.join("\n"));
