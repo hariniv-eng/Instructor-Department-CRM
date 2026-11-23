@@ -22,6 +22,11 @@ Commit messages stay short (title + 2-3 lines); this file is the detailed record
 | What the Instructor Archive stores (joining date, gender, subject ...) | `artifacts/api-server/src/lib/archiveInstructors.ts` |
 | One-off read-only checks | `artifacts/api-server/src/lib/connectors/_tmp_*.ts` |
 
+## 2026-11-23 -- Archive: a leaving mark beats the automatic payroll tag
+
+NW2000587 has the automatic payroll_converted classification (Darwin drops a person's active record when they leave), but his Capability Manager marked Serving Notice Period, his Darwin exit is Approved and the sync moved him to Exited on 23 Nov (date of exit 1 Oct). The Overview's Exit data left him out as "payroll" (Archive 37 / Exit Breakdown 36 / Overview 35). In the Instructor Archive, anyone marked Exited, Serving Notice Period or Absconded is now never payroll, so such people count in the Overview's Exit data, Exit Breakdown's Instructors & mentors scope and the daily exit snapshot. People with no leaving mark are unchanged.
+- File: `artifacts/api-server/src/routes/reports.ts` (`toApiArchiveSummary` is_payroll). After pull: Publish.
+
 ## 2026-11-23 -- Change log records who made an Employee Status / date of exit change
 
 Per request ("who marked NW2000671 as payroll converted, and when?"): the log only said "on the page". Each Employee Status change and typed date-of-exit change now ends "by <e-mail>" for a signed-in user, or "by Manager view (no login)" (those controls are open to Manager view, which has no login). Changes before today cannot say who. Read-only `_tmp_payroll_mark_history.ts NW...` shows one person's automatic payroll classification, Capability Manager mark, Darwin exit records and every change-log row about them.

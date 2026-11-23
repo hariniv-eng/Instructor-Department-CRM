@@ -148,7 +148,11 @@ const toApiArchiveSummary = (row: ArchiveRow, approvedExit?: ApprovedExitFallbac
     // payroll_converted classification: that tag also lands on people who resigned (Darwin drops their active record when they leave),
     // e.g. Rahul Kumar Singh -- CM-marked Exited, Darwin Approved -- showed as Payroll and was hidden from the Overview's exits.
     // Payroll people with no exit record still get Payroll Converted filled in by default by the sync (reconcile.ts), so they keep it.
-    is_payroll: isPayrollPerson(row),
+    // Leaving marks win (2026-11-23, per request: NW2000587 -- automatic payroll_converted classification, but his Capability Manager
+    // marked Serving Notice Period, Darwin exit Approved, date of exit 1 Oct passed and the sync moved him to Exited -- was hidden from
+    // the Overview's Exit data as "payroll"). Someone the CM marked Exited / Serving Notice Period / Absconded is leaving, not a payroll
+    // move, so the Archive (and the Overview, Exit Breakdown and exit snapshot, which read it) does not treat them as payroll.
+    is_payroll: isPayrollPerson(row) && !LEAVING_MARKS.has(row.exitVerification ?? ""),
     exit_date: exitDate,
     // Date of Exit column: ONLY the Darwin exit data's "Date Of Exit" (last working day); blank when the record has none, never the request date. Payroll people are Active, so blank.
     // Enforced explicitly (2026-10-08): an Active person never shows a Date of Exit, payroll or not.
