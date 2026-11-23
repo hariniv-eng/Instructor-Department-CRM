@@ -22,6 +22,11 @@ Commit messages stay short (title + 2-3 lines); this file is the detailed record
 | What the Instructor Archive stores (joining date, gender, subject ...) | `artifacts/api-server/src/lib/archiveInstructors.ts` |
 | One-off read-only checks | `artifacts/api-server/src/lib/connectors/_tmp_*.ts` |
 
+## 2026-11-23 -- Change log records who made an Employee Status / date of exit change
+
+Per request ("who marked NW2000671 as payroll converted, and when?"): the log only said "on the page". Each Employee Status change and typed date-of-exit change now ends "by <e-mail>" for a signed-in user, or "by Manager view (no login)" (those controls are open to Manager view, which has no login). Changes before today cannot say who. Read-only `_tmp_payroll_mark_history.ts NW...` shows one person's automatic payroll classification, Capability Manager mark, Darwin exit records and every change-log row about them.
+- File: `artifacts/api-server/src/routes/instructors.ts` (`changedBy`). After pull: Publish.
+
 ## 2026-11-23 -- Daily sync: three 5 AM tries
 
 On 20, 22 and 23 Nov no 5 AM run reached the app, so the sync crept forward one source at a time (8:29 ... 10:41) whenever someone opened FCC and Autoscale put the server back to sleep mid-catch-up. The GitHub workflow now calls /api/sync/daily at 05:03, 05:27 and 06:01 IST (odd minutes; GitHub often delays or drops runs on the hour); each call syncs only the sources still behind, so a later try finishes what an earlier one missed and does nothing once all are current. Runs queue instead of overlapping; time limit 30 min, curl up to 25 min with 3 retries.
