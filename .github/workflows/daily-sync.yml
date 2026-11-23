@@ -5,15 +5,25 @@
 #   APP_URL           https://instructor-department-crm.replit.app
 name: Daily sync
 
+# 2026-11-23: three tries instead of one. GitHub often starts scheduled runs late or drops them at busy times (on the hour and half
+# hour), and on 20, 22 and 23 Nov no 5 AM run reached the app, so the sync crept forward one source at a time whenever someone opened
+# FCC. Each call syncs ONLY the sources still behind (runDailySyncIfDue), so a later try finishes what an earlier one missed and does
+# nothing when everything is already current. Odd minutes avoid GitHub's busiest moments.
 on:
   schedule:
-    - cron: "30 23 * * *" # 23:30 UTC = 05:00 IST (GitHub may start it a few minutes late)
+    - cron: "33 23 * * *" # 05:03 IST (must be after 04:45 IST, or the app treats it as yesterday's run and skips it)
+    - cron: "57 23 * * *" # 05:27 IST
+    - cron: "31 0 * * *"  # 06:01 IST
   workflow_dispatch: {} # lets you run it by hand from the Actions tab to test
+
+concurrency:
+  group: daily-sync # a later try waits for an earlier one instead of running alongside it
+  cancel-in-progress: false
 
 jobs:
   sync:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - name: Call the daily sync endpoint
         env:
@@ -22,7 +32,7 @@ jobs:
         run: |
           # The server holds the request open until the sync is finished.
           curl --silent --show-error --fail-with-body \
-            --max-time 1100 --retry 2 --retry-delay 30 --retry-all-errors \
+            --max-time 1500 --retry 3 --retry-delay 60 --retry-all-errors \
             -X POST "$APP_URL/api/sync/daily" \
             -H "Authorization: Bearer $SYNC_CRON_SECRET"
           echo
