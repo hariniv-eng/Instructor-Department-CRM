@@ -26,6 +26,9 @@ const router: IRouter = Router();
 // Accept a request that arrives a little before 5:00 sharp (clock skew on the
 // outside scheduler) as already "due".
 const DUE_GRACE_MS = 15 * 60 * 1000;
+// How long a trigger waits for a sync that is already running before it gives up (2026-11-23). Below the workflow's curl --max-time
+// (1500 s in daily-sync.yml, 500 s in exits-refresh.yml); the exits refresh rarely meets a running sync.
+const WAIT_FOR_RUNNING_MS = 20 * 60 * 1000;
 
 function secretMatches(provided: string, expected: string): boolean {
   const a = Buffer.from(provided);
@@ -51,7 +54,17 @@ async function handleTokenTrigger(req: Request, res: Response, run: () => Promis
   res.flushHeaders();
   const keepAlive = setInterval(() => res.write(" "), 15 * 1000);
   try {
-    const outcome = await run();
+    // Another sync already running (2026-11-23): usually a catch-up started in the background when someone opened FCC. With no request
+    // open, Autoscale starves that background work, so on 23 Nov it crawled from 8:29 to 10:41 while this trigger (GitHub ran it at
+    // 9:23) returned "already_running" at once and closed. Now the trigger WAITS, keeping its request (and the server) busy, re-checks
+    // every 20s and, once the other sync is done, runs whatever sources are still behind. Gives up after WAIT_FOR_RUNNING_MS, inside the
+    // workflow's curl limit, and the next scheduled try picks up from there.
+    const started = Date.now();
+    let outcome = await run();
+    while (!outcome.ran && outcome.reason === "already_running" && Date.now() - started < WAIT_FOR_RUNNING_MS) {
+      await new Promise((r) => setTimeout(r, 20 * 1000));
+      outcome = await run();
+    }
     res.end(JSON.stringify(outcome));
   } catch (err) {
     logger.error({ err }, `${label} request failed`);

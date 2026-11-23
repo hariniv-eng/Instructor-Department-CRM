@@ -22,6 +22,12 @@ Commit messages stay short (title + 2-3 lines); this file is the detailed record
 | What the Instructor Archive stores (joining date, gender, subject ...) | `artifacts/api-server/src/lib/archiveInstructors.ts` |
 | One-off read-only checks | `artifacts/api-server/src/lib/connectors/_tmp_*.ts` |
 
+## 2026-11-23 -- Daily sync: three 5 AM tries
+
+On 20, 22 and 23 Nov no 5 AM run reached the app, so the sync crept forward one source at a time (8:29 ... 10:41) whenever someone opened FCC and Autoscale put the server back to sleep mid-catch-up. The GitHub workflow now calls /api/sync/daily at 05:03, 05:27 and 06:01 IST (odd minutes; GitHub often delays or drops runs on the hour); each call syncs only the sources still behind, so a later try finishes what an earlier one missed and does nothing once all are current. Runs queue instead of overlapping; time limit 30 min, curl up to 25 min with 3 retries.
+- **Trigger waits for a running sync:** on 23 Nov GitHub started the 5 AM run at 9:23; a background catch-up (started when someone opened FCC at 8:29) already held the lock, so the trigger answered "already_running" at once and closed, and with no request open Autoscale starved the catch-up (Exits 9:45, TeachOS 10:00, Training 10:22, Contribution 10:41). The daily and exits triggers now keep their request open, re-check every 20 s for up to 20 min, then run whatever is still behind. Exits refresh curl limit raised to 25 min to match.
+- Files: `.github/workflows/daily-sync.yml`, `.github/workflows/exits-refresh.yml`, `artifacts/api-server/src/routes/cron.ts` (`handleTokenTrigger`, `WAIT_FOR_RUNNING_MS`). After pull: Publish (for cron.ts). Test it: GitHub -> Actions -> Daily sync -> Run workflow.
+
 ## 2026-11-19 -- Aptitude instructors: all their topin exams count
 
 Per request ("if we have any assessment, add them to their data in FCC"). `_tmp_aptitude_topin_people.ts` showed 50 of 51 Aptitude people have topin exams under their TeachOS id, but only 26 had one counted as Aptitude: the rest had titles matching no rule, or Aptitude exams with "Math" in the title counted as Maths. Now, for a person whose subject is Aptitude, every topin exam they took except technical / English ones (= Aptitude + Maths + unmatched titles) counts as their "Aptitude exams". Shown on Training - Assessments and in Readiness' "Assessments given (overall)" column (Readiness' Aptitude Top-N colour still comes from the learning portal). Not applied when an Aptitude person is also learning Maths now. Everyone else unchanged: unmatched exams still do not count.
