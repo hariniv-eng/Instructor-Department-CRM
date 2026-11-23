@@ -5,6 +5,10 @@
 // Allowed values: exited, serving_notice_period, payroll_converted, absconded, clear. Dry run unless --apply.
 //   pnpm exec tsx src/lib/connectors/_tmp_set_employee_status.ts NW2000671 exited            (dry run: shows the current value)
 //   pnpm exec tsx src/lib/connectors/_tmp_set_employee_status.ts NW2000671 exited --apply    (sets it)
+// --clear-archive-exit-date (2026-11-23, NW2000756): also empties the exit date STORED on his Instructor Archive row -- the Archive calls
+// anyone with a stored date Exited, and the sync keeps that date forever (archiveInstructors keep()). Use only for someone still working
+// with no Darwin exit record; a later real Darwin exit fills it again.
+//   pnpm exec tsx src/lib/connectors/_tmp_set_employee_status.ts NW2000756 clear --clear-archive-exit-date [--apply]
 import { sql } from "drizzle-orm";
 import { db, instructorsTable, instructorArchiveTable, uploadsTable } from "@workspace/db";
 
@@ -13,6 +17,7 @@ const VALUES = ["exited", "serving_notice_period", "payroll_converted", "abscond
 async function main() {
   const args = process.argv.slice(2);
   const apply = args.includes("--apply");
+  const clearDate = args.includes("--clear-archive-exit-date");
   const ids = args.filter((a) => /^NW\d{7}$/i.test(a)).map((a) => a.toUpperCase());
   const value = args.find((a) => VALUES.includes(a.toLowerCase()))?.toLowerCase();
   if (!ids.length || !value) { console.log(`usage: _tmp_set_employee_status.ts NW0000000 <${VALUES.join("|")}> [--apply]`); process.exit(1); }
@@ -22,11 +27,11 @@ async function main() {
     const arch = await db.select().from(instructorArchiveTable).where(sql`UPPER(TRIM(${instructorArchiveTable.employeeId})) = ${emp}`);
     if (!live.length && !arch.length) { console.log(`${emp}: not found`); continue; }
     for (const r of live) console.log(`${emp} live row ${r.id}: ${r.exitVerification ?? "(empty)"} -> ${next ?? "(empty)"}`);
-    for (const a of arch) console.log(`${emp} archive row ${a.id}: ${a.exitVerification ?? "(empty)"} -> ${next ?? "(empty)"}`);
+    for (const a of arch) console.log(`${emp} archive row ${a.id}: ${a.exitVerification ?? "(empty)"} -> ${next ?? "(empty)"}${clearDate ? ` | stored exit date ${a.exitDate ?? "(empty)"} -> (empty)` : ""}`);
     if (!apply) continue;
     await db.update(instructorsTable).set({ exitVerification: next }).where(sql`UPPER(TRIM(${instructorsTable.employeeId})) = ${emp}`);
-    await db.update(instructorArchiveTable).set({ exitVerification: next }).where(sql`UPPER(TRIM(${instructorArchiveTable.employeeId})) = ${emp}`);
-    await db.insert(uploadsTable).values({ source: "Employee Status change", filename: `${emp}: ${live[0]?.exitVerification ?? arch[0]?.exitVerification ?? "(empty)"} -> ${next ?? "(empty)"} by script (per request, not on the Instructors tab)`, rowCount: 0 });
+    await db.update(instructorArchiveTable).set(clearDate ? { exitVerification: next, exitDate: null } : { exitVerification: next }).where(sql`UPPER(TRIM(${instructorArchiveTable.employeeId})) = ${emp}`);
+    await db.insert(uploadsTable).values({ source: "Employee Status change", filename: `${emp}: ${live[0]?.exitVerification ?? arch[0]?.exitVerification ?? "(empty)"} -> ${next ?? "(empty)"} by script (per request, not on the Instructors tab)${clearDate ? "; archive exit date cleared" : ""}`, rowCount: 0 });
     console.log(`${emp}: saved and logged`);
   }
   if (!apply) console.log("\nDry run -- nothing changed. Add --apply to save.");
