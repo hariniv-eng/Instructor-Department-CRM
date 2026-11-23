@@ -5,6 +5,19 @@ import { requireAuth, requireRole } from "../middlewares/auth";
 import { VALID_CAPABILITY_MANAGERS } from "../data/validCapabilityManagers";
 import { SUBJECT_AREAS, normalizeSubjectArea } from "../lib/departmentTaxonomy";
 import { isPayrollPerson } from "./reports";
+import { SESSION_COOKIE_NAME, getSessionUser } from "../lib/auth";
+
+// Who made a change (2026-11-23, per request: "who marked NW2000671 as payroll converted, and when?" -- the log only said "on the page").
+// These routes are open to Manager view, which has no login, so a change there is recorded as "Manager view (no login)"; a signed-in
+// user is recorded by e-mail. The log row's time is uploaded_at.
+async function changedBy(req: { cookies?: Record<string, string> }): Promise<string> {
+  try {
+    const user = await getSessionUser(req.cookies?.[SESSION_COOKIE_NAME]);
+    return user?.email ? `by ${user.email}` : "by Manager view (no login)";
+  } catch {
+    return "by (unknown)";
+  }
+}
 
 const router: IRouter = Router();
 const toApiInstructor = (row: typeof instructorsTable.$inferSelect) => ({
@@ -296,7 +309,7 @@ router.patch("/instructors/:id/exit-verification", async (req, res): Promise<voi
     : row.teachosUserId ? eq(instructorArchiveTable.teachosUserId, row.teachosUserId) : null;
   if (archiveKey) await db.update(instructorArchiveTable).set({ exitVerification: raw }).where(archiveKey);
   // Change log (2026-11-09): every Employee Status saved from the page, old -> new, in the uploads log (see recomputeStatuses for the sync side).
-  await db.insert(uploadsTable).values({ source: "Employee Status change", filename: `${row.employeeId ?? `row ${row.id}`}: ${current.exitVerification ?? "(empty)"} -> ${raw ?? "(empty)"} on the page`, rowCount: 0 }).catch(() => {});
+  await db.insert(uploadsTable).values({ source: "Employee Status change", filename: `${row.employeeId ?? `row ${row.id}`}: ${current.exitVerification ?? "(empty)"} -> ${raw ?? "(empty)"} on the page ${await changedBy(req)}`, rowCount: 0 }).catch(() => {});
   res.json(toApiInstructor(row));
 });
 
@@ -327,7 +340,7 @@ router.patch("/instructors/:id/exit-date", async (req, res): Promise<void> => {
   }
   const [row] = await db.update(instructorsTable).set({ manualExitDate: raw }).where(eq(instructorsTable.id, current.id)).returning();
   if ((current.manualExitDate ?? null) !== (raw ?? null)) {
-    await db.insert(uploadsTable).values({ source: "Date of exit change", filename: `${current.employeeId ?? `row ${current.id}`}: ${current.manualExitDate ?? "(empty)"} -> ${raw ?? "(empty)"} on the page`, rowCount: 0 }).catch(() => {});
+    await db.insert(uploadsTable).values({ source: "Date of exit change", filename: `${current.employeeId ?? `row ${current.id}`}: ${current.manualExitDate ?? "(empty)"} -> ${raw ?? "(empty)"} on the page ${await changedBy(req)}`, rowCount: 0 }).catch(() => {});
   }
   res.json(toApiInstructor(row));
 });
