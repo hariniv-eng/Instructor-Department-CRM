@@ -14,6 +14,8 @@ on:
     - cron: "33 23 * * *" # 05:03 IST (must be after 04:45 IST, or the app treats it as yesterday's run and skips it)
     - cron: "57 23 * * *" # 05:27 IST
     - cron: "31 0 * * *"  # 06:01 IST
+    - cron: "13 1 * * *"  # 06:43 IST (2026-11-25: GitHub-only kept; two later tries so a delayed or dropped early run is still caught
+    - cron: "7 2 * * *"   # 07:37 IST  before people start work -- each does nothing if everything is already current)
   workflow_dispatch: {} # lets you run it by hand from the Actions tab to test
 
 concurrency:
