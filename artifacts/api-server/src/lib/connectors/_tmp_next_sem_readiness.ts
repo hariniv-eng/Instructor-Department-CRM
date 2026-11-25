@@ -11,6 +11,8 @@
 // Writes next_sem_readiness.csv (HAS NAMES): gzip it and download it, then delete both:
 //   pnpm exec tsx src/lib/connectors/_tmp_next_sem_readiness.ts && gzip -kf next_sem_readiness.csv
 //   rm next_sem_readiness.csv next_sem_readiness.csv.gz
+// 2026-11-25 update (per request): no lectures to a cohort in the last 30 days -> look back 60 days before falling back to the mapped
+// subject; no sessions at all in 30 days -> role by sessions over 60 days. Extra columns at the end: lectures_60d_in_subject, role_window.
 import fs from "node:fs";
 import { BigQuery } from "@google-cloud/bigquery";
 import { gte } from "drizzle-orm";
@@ -45,9 +47,14 @@ async function main() {
   const people = all.filter((p) => p.teachosUserId && dept.has(p.id) && productOf(p) === "NIAT (Deployed)");
   const contrib = new Map((await db.select().from(instructorContributionTable)).map((c) => [normUid(c.instructorUserId), c]));
   const since = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+  const since60 = new Date(Date.now() - 60 * 86400000).toISOString().slice(0, 10);
   const sess = new Map<string, { l: number; p: number; o: number }>();
-  for (const d of await db.select().from(instructorContributionDailyTable).where(gte(instructorContributionDailyTable.sessionDate, since))) {
-    const k = normUid(d.instructorUserId); const x = sess.get(k) ?? { l: 0, p: 0, o: 0 }; x.l += d.lectureSessions; x.p += d.practiceSessions; x.o += d.otherSessions; sess.set(k, x);
+  const sess60 = new Map<string, { l: number; p: number; o: number }>();
+  for (const d of await db.select().from(instructorContributionDailyTable).where(gte(instructorContributionDailyTable.sessionDate, since60))) {
+    const k = normUid(d.instructorUserId);
+    for (const m of String(d.sessionDate) >= since ? [sess, sess60] : [sess60]) {
+      const x = m.get(k) ?? { l: 0, p: 0, o: 0 }; x.l += d.lectureSessions; x.p += d.practiceSessions; x.o += d.otherSessions; m.set(k, x);
+    }
   }
   const stored = new Map<string, Map<string, { done: number; total: number }>>();
   for (const s of await db.select().from(instructorTrainingStatusTable)) {
@@ -61,33 +68,41 @@ async function main() {
   const titleCol = cols.find((c) => /^course_title$/i.test(c)) ?? cols.find((c) => /course.*(title|name)/i.test(c));
   const batchCol = cols.find((c) => /^batch_name$/i.test(c)) ?? cols.find((c) => /batch.*name/i.test(c));
   const [lec] = await bq.query({ query: `SELECT REPLACE(LOWER(instructor_user_id), '-', '') AS u, ${idCol ? `REPLACE(LOWER(CAST(${idCol} AS STRING)), '-', '')` : "''"} AS cid,
-      ${titleCol ? `CAST(${titleCol} AS STRING)` : "''"} AS t, ${batchCol ? `CAST(${batchCol} AS STRING)` : "''"} AS b, COUNT(*) AS n FROM \`${P}.${DS}.${SESSION_SCHEDULE_TABLE}\`
-      WHERE session_status = 'COMPLETED' AND session_type = 'LECTURE' AND session_start_datetime >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 30 DAY)
+      ${titleCol ? `CAST(${titleCol} AS STRING)` : "''"} AS t, ${batchCol ? `CAST(${batchCol} AS STRING)` : "''"} AS b, COUNTIF(session_start_datetime >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 30 DAY)) AS n, COUNT(*) AS n60 FROM \`${P}.${DS}.${SESSION_SCHEDULE_TABLE}\`
+      WHERE session_status = 'COMPLETED' AND session_type = 'LECTURE' AND session_start_datetime >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 60 DAY)
         AND session_start_datetime <= CURRENT_DATETIME() GROUP BY 1, 2, 3, 4` });
   const lecBy = new Map<string, Map<string, number>>();
+  const lecBy60 = new Map<string, Map<string, number>>();
   for (const r of lec as Record<string, unknown>[]) {
     const s = subj(taughtSubjectColumn(plain(r.cid), plain(r.t)));
     if (!s || s === "General" || s === "Other") continue;
     const key = `${plain(r.u)}|${cohortForBatch(plain(r.b)) ?? "?"}`;
-    const m = lecBy.get(key) ?? new Map(); m.set(s, (m.get(s) ?? 0) + Number(plain(r.n))); lecBy.set(key, m);
+    if (Number(plain(r.n)) > 0) { const m = lecBy.get(key) ?? new Map(); m.set(s, (m.get(s) ?? 0) + Number(plain(r.n))); lecBy.set(key, m); }
+    const m60 = lecBy60.get(key) ?? new Map(); m60.set(s, (m60.get(s) ?? 0) + Number(plain(r.n60))); lecBy60.set(key, m60);
   }
   const [evs, topin, lpApt] = await Promise.all([fetchReadinessEvaluations(true), fetchTopinAssessments(true), fetchLpAptitudeScores(true)]);
   const idx = lectureNameIndex();
   const head = ["employee_id", "name", "capability_manager", "fcc_team", "role_by_sessions", "cohort", "current_sem", "next_sem", "subject", "subject_from", "lectures_30d_in_subject",
     "lp_courses_next_sem", "lp_units_completed", "lp_units_total", "lp_pct", "lectures_next_sem", "lectures_with_demo", "demo_avg", "lectures_with_ai", "ai_avg", "lectures_with_both",
-    "topn_avg_pct", "topn_exams", "demo", "ai", "topn", "category", "no_data_for"];
+    "topn_avg_pct", "topn_exams", "demo", "ai", "topn", "category", "no_data_for", "lectures_60d_in_subject", "role_window"];
   const out = [head.join(",")];
   const tally = new Map<string, number>();
   for (const p of people) {
     const uid = normUid(p.teachosUserId!);
     const mapped = subj(p.deptArea || p.manualDeptArea);
-    const x = sess.get(uid) ?? { l: 0, p: 0, o: 0 };
+    const x30 = sess.get(uid) ?? { l: 0, p: 0, o: 0 };
+    const use60 = x30.l + x30.p + x30.o === 0;
+    const x = use60 ? (sess60.get(uid) ?? { l: 0, p: 0, o: 0 }) : x30;
     const role = x.l > 0 ? "Instructor" : x.l + x.p + x.o > 0 ? "Mentor" : "No sessions";
+    const roleWindow = use60 ? "60 days (none in 30)" : "30 days";
     for (const cohort of contrib.get(uid)?.niatCohorts ?? []) {
       const pair = NEXT[cohort]; if (!pair) continue;
       const [cur, next] = pair;
+      const l60 = lecBy60.get(`${uid}|${cohort}`) ?? new Map<string, number>();
       const taught = [...(lecBy.get(`${uid}|${cohort}`) ?? new Map<string, number>())].sort((a, b) => b[1] - a[1]);
-      const subjects: [string, string, number][] = taught.length ? taught.map(([s, n]) => [s, `lectures to ${cohort} (30 days)`, n]) : mapped ? [[mapped, "mapped subject", 0]] : [];
+      const taught60 = [...l60].sort((a, b) => b[1] - a[1]);
+      const subjects: [string, string, number][] = taught.length ? taught.map(([s, n]) => [s, `lectures to ${cohort} (30 days)`, n])
+        : taught60.length ? taught60.map(([s]) => [s, `lectures to ${cohort} (60 days, none in 30)`, 0]) : mapped ? [[mapped, "mapped subject", 0]] : [];
       for (const [S, from, n] of subjects.length ? subjects : [["(no subject)", "none", 0] as [string, string, number]]) {
         const defs = TRAINING_COURSE_TAXONOMY.filter((d) => TRACK_SUBJECT[d.trackGroup] === S && COURSE_SEMESTER[d.key] === next);
         const st = stored.get(uid);
@@ -102,10 +117,11 @@ async function main() {
         out.push([p.employeeId, p.fullName, p.teachosManager || p.manualCapabilityManager || "", p.classification === "mentor" ? "Mentor" : "Instructor", role, cohort, cur, next, S, from, n,
           defs.map((d) => d.label).join(" + "), defs.length ? done : "", defs.length ? total : "", defs.length && total ? Math.round((done / total) * 100) : defs.length ? 0 : "",
           b?.lectures_total ?? "", b?.demo_lectures ?? "", b?.demo_avg ?? "", b?.ai_lectures ?? "", b?.ai_avg ?? "", b?.both_lectures ?? "", b?.topn_avg ?? "", b?.topn_exams ?? "",
-          demo, ai, tn, cat, nod].map(csv).join(","));
+          demo, ai, tn, cat, nod, l60.get(S) ?? 0, roleWindow].map(csv).join(","));
       }
     }
   }
+  console.log(`Subject from 60-day lectures: ${out.filter((l) => l.includes("60 days, none in 30")).length} rows`);
   fs.writeFileSync("next_sem_readiness.csv", out.join("\n"));
   console.log(`NIAT (Deployed) people: ${people.length} | rows: ${out.length - 1}`);
   for (const [k, v] of [...tally].sort()) console.log(`  ${k}: ${v}`);
