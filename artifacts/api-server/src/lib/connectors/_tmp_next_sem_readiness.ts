@@ -15,6 +15,10 @@
 // subject; no sessions at all in 30 days -> role by sessions over 60 days. Extra columns at the end: lectures_60d_in_subject, role_window.
 // 2026-11-25 update 2 (per request: "instructor readiness for current semester"): the same row is also scored on the CURRENT semester's
 // lectures of that subject (cur_* columns) -- demo, AI, Top-N only (no class QA, no learning portal except Aptitude Top-N), same rules.
+// 2026-11-25 update 3 (per request: "not only the subject they teach now -- a Backend Sem 1 instructor may also teach DSA next semester;
+// if they record demos or write topin exams for another subject, add that subject too, subject-wise"): besides the subjects they teach,
+// every other subject with ANY demo / AI assessment on its next-semester lectures, or ANY topin exam of its next-semester courses, gets
+// its own row (subject_from = "other subject: ..."); learning-portal exams do not add a subject. Same scoring per subject.
 import fs from "node:fs";
 import { BigQuery } from "@google-cloud/bigquery";
 import { gte } from "drizzle-orm";
@@ -25,6 +29,7 @@ import { fetchTopinAssessments, normUid, topinCellsFor } from "./topinAssessment
 import { lectureNameIndex } from "./demoTraining";
 import { taughtSubjectColumn } from "./taughtTraining";
 import { SESSION_SCHEDULE_TABLE, TRACK_SUBJECT, cohortForBatch } from "./instructorContribution";
+import { LECTURE_COURSES } from "../../data/lectureSessions";
 import { TRAINING_COURSE_TAXONOMY } from "../../data/trainingCourseTaxonomy";
 import { normalizeSubjectArea } from "../departmentTaxonomy";
 import { productOf } from "../product";
@@ -37,6 +42,7 @@ const COURSE_SEMESTER: Record<string, number> = {
   quantitative_aptitude: 1, numerical_ability: 2, logical_reasoning: 3, advanced_aptitude: 4, math_for_cs: 1, probability_statistics: 3, linear_algebra_calculus: 4,
   english_foundation: 1, english_advanced: 2, english_applied: 3,
 };
+const ALL_SUBJECTS = [...new Set(LECTURE_COURSES.map((c) => c.subject))];
 const NEXT: Record<string, [number, number]> = { "NIAT 2026": [1, 2], "NIAT 2025": [3, 4], "NIAT 2024": [5, 6] };
 const plain = (v: unknown): string => (v && typeof v === "object" && "value" in (v as object) ? String((v as { value: unknown }).value) : v == null ? "" : String(v));
 const subj = (s: string | null | undefined) => (s === "Math for Computer Science" ? "Maths" : ((normalizeSubjectArea(s ?? null) as string | null) ?? s ?? null));
@@ -107,6 +113,14 @@ async function main() {
       const taught60 = [...l60].sort((a, b) => b[1] - a[1]);
       const subjects: [string, string, number][] = taught.length ? taught.map(([s, n]) => [s, `lectures to ${cohort} (30 days)`, n])
         : taught60.length ? taught60.map(([s]) => [s, `lectures to ${cohort} (60 days, none in 30)`, 0]) : mapped ? [[mapped, "mapped subject", 0]] : [];
+      // Other subjects with next-semester evidence (demos / AI on its next-semester lectures, or topin exams of its next-semester courses).
+      for (const X of ALL_SUBJECTS) {
+        if (subjects.some(([s]) => s === X)) continue;
+        const e = readinessOf([X], evs.byUid.get(uid) ?? [], { joining: null, deployed: null }, topinCellsFor(topin.byUid.get(uid), false) ?? {}, idx).semesters[String(next)];
+        if (!e) continue;
+        const what = [e.demo_lectures ? `${e.demo_lectures} demo` : "", e.ai_lectures ? `${e.ai_lectures} AI` : "", e.topn_exams ? `${e.topn_exams} topin` : ""].filter(Boolean);
+        if (what.length) subjects.push([X, `other subject: ${what.join(", ")}`, 0]);
+      }
       for (const [S, from, n] of subjects.length ? subjects : [["(no subject)", "none", 0] as [string, string, number]]) {
         const defs = TRAINING_COURSE_TAXONOMY.filter((d) => TRACK_SUBJECT[d.trackGroup] === S && COURSE_SEMESTER[d.key] === next);
         const st = stored.get(uid);
@@ -132,6 +146,7 @@ async function main() {
       }
     }
   }
+  console.log(`Other-subject rows (next-semester evidence): ${out.filter((l) => l.includes("other subject:")).length}`);
   console.log(`Subject from 60-day lectures: ${out.filter((l) => l.includes("60 days, none in 30")).length} rows`);
   fs.writeFileSync("next_sem_readiness.csv", out.join("\n"));
   console.log(`NIAT (Deployed) people: ${people.length} | rows: ${out.length - 1}`);
