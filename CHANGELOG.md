@@ -22,6 +22,16 @@ Commit messages stay short (title + 2-3 lines); this file is the detailed record
 | What the Instructor Archive stores (joining date, gender, subject ...) | `artifacts/api-server/src/lib/archiveInstructors.ts` |
 | One-off read-only checks | `artifacts/api-server/src/lib/connectors/_tmp_*.ts` |
 
+## 2026-11-25 -- Daily sync: five GitHub tries
+
+Decision: keep GitHub Actions as the only outside trigger (no cron-job.org, no Reserved VM for now). Two more tries added, 06:43 and 07:37 IST, after 05:03 / 05:27 / 06:01, so a run GitHub delays or drops is still caught before the working day. Each try syncs only what is still behind.
+- File: `.github/workflows/daily-sync.yml`. After push: nothing to publish.
+
+## 2026-11-25 -- Stuck syncs clear themselves
+
+On 20 and 25 Nov a sync started in the background (Autoscale gives it almost no CPU when no request is open) stalled after Darwin, kept the sync lock and left a connection "idle in transaction" for hours, so every later sync was refused. Now: (1) Postgres rolls back any transaction left idle for 15 minutes; (2) a sync that finds the lock held for more than 30 minutes ends that connection (and transactions idle 10+ minutes) and runs -- what `_tmp_sync_health.ts --release` did by hand. A normal sync takes about a minute.
+- Files: `lib/db/src/index.ts` (pool `connect`), `artifacts/api-server/src/lib/syncContext.ts` (`releaseStaleLock`, `withSyncLock`). After pull: Publish.
+
 ## 2026-11-23 -- Archive: a leaving mark beats the automatic payroll tag
 
 NW2000587 has the automatic payroll_converted classification (Darwin drops a person's active record when they leave), but his Capability Manager marked Serving Notice Period, his Darwin exit is Approved and the sync moved him to Exited on 23 Nov (date of exit 1 Oct). The Overview's Exit data left him out as "payroll" (Archive 37 / Exit Breakdown 36 / Overview 35). In the Instructor Archive, anyone marked Exited, Serving Notice Period or Absconded is now never payroll, so such people count in the Overview's Exit data, Exit Breakdown's Instructors & mentors scope and the daily exit snapshot. People with no leaving mark are unchanged.

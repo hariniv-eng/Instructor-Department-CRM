@@ -53,10 +53,43 @@ const SYNC_LOCK_KEY = 8420011; // arbitrary, just has to be the same everywhere
 
 export type LockResult<T> = { ran: true; value: T } | { ran: false };
 
+const STALE_LOCK_MINUTES = 30;
+
+async function releaseStaleLock(client: { query: (q: string, v?: unknown[]) => Promise<{ rows: Array<Record<string, unknown>> }> }): Promise<boolean> {
+  try {
+    const { rows } = await client.query(
+      `SELECT l.pid FROM pg_locks l JOIN pg_stat_activity a ON a.pid = l.pid
+        WHERE l.locktype = 'advisory' AND l.objid = $1 AND l.granted AND a.pid <> pg_backend_pid()
+          AND COALESCE(a.state_change, a.backend_start) < now() - ($2 || ' minutes')::interval`,
+      [SYNC_LOCK_KEY, String(STALE_LOCK_MINUTES)],
+    );
+    if (!rows.length) return false;
+    for (const r of rows) await client.query("SELECT pg_terminate_backend($1)", [r.pid]);
+    await client.query(
+      `SELECT pg_terminate_backend(pid) FROM pg_stat_activity
+        WHERE datname = current_database() AND state = 'idle in transaction' AND pid <> pg_backend_pid()
+          AND state_change < now() - interval '10 minutes'`,
+    );
+    console.warn(`[sync] released a stale sync lock held for over ${STALE_LOCK_MINUTES} minutes (pid ${rows.map((r) => r.pid).join(", ")})`);
+    await new Promise((r) => setTimeout(r, 1000));
+    return true;
+  } catch (err) {
+    console.warn("[sync] could not check for a stale sync lock:", (err as Error).message);
+    return false;
+  }
+}
+
 export async function withSyncLock<T>(fn: () => Promise<T>): Promise<LockResult<T>> {
   const client = await pool.connect();
   try {
-    const { rows } = await client.query("select pg_try_advisory_lock($1::bigint) as ok", [SYNC_LOCK_KEY]);
+    let { rows } = await client.query("select pg_try_advisory_lock($1::bigint) as ok", [SYNC_LOCK_KEY]);
+    // Stale lock (2026-11-25): on 20 and 25 Nov a sync starved by Autoscale kept the lock for hours and every later sync -- the 5 AM
+    // trigger, Sync Now, the catch-up -- was refused as "already running". A normal sync takes about a minute, so a lock held for more
+    // than STALE_LOCK_MINUTES belongs to a stuck run: end that connection (and any transaction left idle for 10+ minutes, which still
+    // holds rows) and take the lock. Same as `_tmp_sync_health.ts --release`, done automatically.
+    if (!rows[0]?.ok && (await releaseStaleLock(client))) {
+      ({ rows } = await client.query("select pg_try_advisory_lock($1::bigint) as ok", [SYNC_LOCK_KEY]));
+    }
     if (!rows[0]?.ok) return { ran: false };
     try {
       return { ran: true, value: await fn() };
