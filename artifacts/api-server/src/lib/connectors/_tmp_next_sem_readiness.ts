@@ -13,6 +13,8 @@
 //   rm next_sem_readiness.csv next_sem_readiness.csv.gz
 // 2026-11-25 update (per request): no lectures to a cohort in the last 30 days -> look back 60 days before falling back to the mapped
 // subject; no sessions at all in 30 days -> role by sessions over 60 days. Extra columns at the end: lectures_60d_in_subject, role_window.
+// 2026-11-25 update 2 (per request: "instructor readiness for current semester"): the same row is also scored on the CURRENT semester's
+// lectures of that subject (cur_* columns) -- demo, AI, Top-N only (no class QA, no learning portal except Aptitude Top-N), same rules.
 import fs from "node:fs";
 import { BigQuery } from "@google-cloud/bigquery";
 import { gte } from "drizzle-orm";
@@ -84,7 +86,9 @@ async function main() {
   const idx = lectureNameIndex();
   const head = ["employee_id", "name", "capability_manager", "fcc_team", "role_by_sessions", "cohort", "current_sem", "next_sem", "subject", "subject_from", "lectures_30d_in_subject",
     "lp_courses_next_sem", "lp_units_completed", "lp_units_total", "lp_pct", "lectures_next_sem", "lectures_with_demo", "demo_avg", "lectures_with_ai", "ai_avg", "lectures_with_both",
-    "topn_avg_pct", "topn_exams", "demo", "ai", "topn", "category", "no_data_for", "lectures_60d_in_subject", "role_window"];
+    "topn_avg_pct", "topn_exams", "demo", "ai", "topn", "category", "no_data_for", "lectures_60d_in_subject", "role_window",
+    "cur_lectures", "cur_lectures_with_demo", "cur_demo_avg", "cur_lectures_with_ai", "cur_ai_avg", "cur_lectures_with_both", "cur_topn_avg_pct", "cur_topn_exams",
+    "cur_demo", "cur_ai", "cur_topn", "cur_category", "cur_no_data_for"];
   const out = [head.join(",")];
   const tally = new Map<string, number>();
   for (const p of people) {
@@ -108,7 +112,12 @@ async function main() {
         const st = stored.get(uid);
         const done = defs.reduce((a, d) => a + (st?.get(d.key)?.done ?? 0), 0), total = defs.reduce((a, d) => a + (st?.get(d.key)?.total ?? 0), 0);
         const cells = { ...(topinCellsFor(topin.byUid.get(uid), S === "Aptitude") ?? {}), ...(lpApt.get(uid) ?? {}) };
-        const b = readinessOf([S], evs.byUid.get(uid) ?? [], { joining: null, deployed: null }, cells, idx).semesters[String(next)];
+        const rd = readinessOf([S], evs.byUid.get(uid) ?? [], { joining: null, deployed: null }, cells, idx);
+        const b = rd.semesters[String(next)], bc = rd.semesters[String(cur)];
+        const cDemo = colour(bc?.demo_avg ?? null, 7.5, 6.5), cAi = colour(bc?.ai_avg ?? null, 8.5, 7.5), cTn = colour(bc?.topn_avg ?? null, 75, 60);
+        const cCat = !bc ? "Not scored (no lecture list for this subject in that semester)" : ["Red", "Yellow", "Green"][Math.min(({ Green: 2, Yellow: 1 } as Record<string, number>)[cDemo] ?? 0, ({ Green: 2, Yellow: 1 } as Record<string, number>)[cAi] ?? 0, ({ Green: 2, Yellow: 1 } as Record<string, number>)[cTn] ?? 0)];
+        const cNod = bc ? [["Demo QA", cDemo], ["AI assessment", cAi], ["Top-N", cTn]].filter(([, c]) => c === "No data").map(([k]) => k).join(", ") : "";
+        tally.set(`Current Sem ${cur} ${cCat}`, (tally.get(`Current Sem ${cur} ${cCat}`) ?? 0) + 1);
         const demo = colour(b?.demo_avg ?? null, 7.5, 6.5), ai = colour(b?.ai_avg ?? null, 8.5, 7.5), tn = colour(b?.topn_avg ?? null, 75, 60);
         const R: Record<string, number> = { Green: 2, Yellow: 1 };
         const cat = !b ? "Not scored (no lecture list for this subject in that semester)" : ["Red", "Yellow", "Green"][Math.min(R[demo] ?? 0, R[ai] ?? 0, R[tn] ?? 0)];
@@ -117,7 +126,9 @@ async function main() {
         out.push([p.employeeId, p.fullName, p.teachosManager || p.manualCapabilityManager || "", p.classification === "mentor" ? "Mentor" : "Instructor", role, cohort, cur, next, S, from, n,
           defs.map((d) => d.label).join(" + "), defs.length ? done : "", defs.length ? total : "", defs.length && total ? Math.round((done / total) * 100) : defs.length ? 0 : "",
           b?.lectures_total ?? "", b?.demo_lectures ?? "", b?.demo_avg ?? "", b?.ai_lectures ?? "", b?.ai_avg ?? "", b?.both_lectures ?? "", b?.topn_avg ?? "", b?.topn_exams ?? "",
-          demo, ai, tn, cat, nod, l60.get(S) ?? 0, roleWindow].map(csv).join(","));
+          demo, ai, tn, cat, nod, l60.get(S) ?? 0, roleWindow,
+          bc?.lectures_total ?? "", bc?.demo_lectures ?? "", bc?.demo_avg ?? "", bc?.ai_lectures ?? "", bc?.ai_avg ?? "", bc?.both_lectures ?? "", bc?.topn_avg ?? "", bc?.topn_exams ?? "",
+          cDemo, cAi, cTn, cCat, cNod].map(csv).join(","));
       }
     }
   }
