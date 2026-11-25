@@ -8,6 +8,7 @@ import { TaughtTrainingView } from './taught-training';
 import { DemoTrainingView } from './demo-training';
 import { TopinAssessmentView } from './topin-assessments';
 import { TrainingReadinessView } from './training-readiness';
+import { DeployedReadinessView } from './deployed-readiness';
 
 // "Training Stats" (2026-09-23, per request): an instructor's OWN
 // training/upskilling progress, distinct from every other tab here, which
@@ -345,9 +346,12 @@ const TRAINING_VIEWS = [
   { key: 'assessments', label: 'Training - Assessments' },
   // Readiness (2026-11-16, per request: Pre-Deployment Readiness Phase 1) -- NIAT (Training) instructors, Green / Yellow / Red (training-readiness.tsx).
   { key: 'readiness', label: 'Training - Readiness' },
+  // Deployed readiness (2026-11-25, per request: "a system for instructor readiness for the deployed instructors ... add it to fcc now") --
+  // NIAT (Deployed) instructors, next / current semester, subject-wise (deployed-readiness.tsx).
+  { key: 'deployed', label: 'Deployed - Readiness' },
 ] as const;
 export default function TrainingStatsPage() {
-  const [view, setView] = useState<'portal' | 'taught' | 'demos' | 'assessments' | 'readiness'>('portal');
+  const [view, setView] = useState<'portal' | 'taught' | 'demos' | 'assessments' | 'readiness' | 'deployed'>('portal');
   return <div className="mx-auto max-w-[1600px]">
     <div data-testid="training-view-toggle" className="mb-4 inline-flex rounded-lg border border-border bg-card p-1 shadow-sm">
       {TRAINING_VIEWS.map((v) => <button
@@ -358,7 +362,7 @@ export default function TrainingStatsPage() {
         className={`rounded-md px-3.5 py-1.5 text-[12px] font-bold transition-colors ${view === v.key ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
       >{v.label}</button>)}
     </div>
-    {view === 'portal' ? <LearningPortalStats /> : view === 'taught' ? <TaughtTrainingView /> : view === 'assessments' ? <TopinAssessmentView /> : view === 'readiness' ? <TrainingReadinessView /> : <DemoTrainingView />}
+    {view === 'portal' ? <LearningPortalStats /> : view === 'taught' ? <TaughtTrainingView /> : view === 'assessments' ? <TopinAssessmentView /> : view === 'readiness' ? <TrainingReadinessView /> : view === 'deployed' ? <DeployedReadinessView /> : <DemoTrainingView />}
   </div>;
 }
 

@@ -20,7 +20,17 @@ Commit messages stay short (title + 2-3 lines); this file is the detailed record
 | Instructors tab table (columns, frozen header / name column) | `artifacts/instructor-crm/src/pages/instructors.tsx` (`CategoryTable`, `PersonRow`, `STICKY_NAME_CELL`) |
 | Overview card explanations (the (i) icon texts) | `artifacts/instructor-crm/src/components/info-tip.tsx` (`OVERVIEW_INFO`) |
 | What the Instructor Archive stores (joining date, gender, subject ...) | `artifacts/api-server/src/lib/archiveInstructors.ts` |
+| Deployed - Readiness tab (subjects, semesters, rules) | `artifacts/api-server/src/lib/connectors/deployedReadiness.ts`; page: `artifacts/instructor-crm/src/pages/deployed-readiness.tsx` |
 | One-off read-only checks | `artifacts/api-server/src/lib/connectors/_tmp_*.ts` |
+
+## 2026-11-25 -- Training Stats: new "Deployed - Readiness" tab
+
+Readiness for NIAT (Deployed) instructors: are they ready for the semester their batch moves to next (NIAT 2026: Sem 1 -> 2, NIAT 2025: Sem 3 -> 4, NIAT 2024: Sem 5 -> 6)? Same rules as Training - Readiness (demo QA, AI assessment, Top-N; lowest of the three; no data = Red), scored on the next semester's lectures and topin exams, with a "Current semester" switch for comparison.
+- One row per instructor x batch x subject. Subjects = what they teach that batch now (lectures in the last 30 days, else 60 days, else the mapped subject) PLUS any other subject they have a next-semester demo, AI assessment or topin exam for (blue chip, "Other subject").
+- Row: lectures done (demo + AI) out of the semester's lectures, the three scores, the category for the semester picked and the other one. Expand: all their subjects side by side (current vs next) and the course breakdown.
+- Filters: subject, subject from, Capability Manager, category, role by sessions; batch buttons; CSV download.
+- Every demo counts (in-training, after deployment, mock); pre-preparedness and under-10-minute demos do not. Learning portal: only Aptitude Top-N, as on Training - Readiness. Show only, nothing stored.
+- Files: `artifacts/api-server/src/lib/connectors/deployedReadiness.ts` (new), `artifacts/api-server/src/routes/reports.ts` (`/reports/deployed-readiness`), `artifacts/instructor-crm/src/pages/deployed-readiness.tsx` (new), `artifacts/instructor-crm/src/pages/training-stats.tsx` (tab). Review script with the same logic: `_tmp_next_sem_readiness.ts`. After push: typecheck + Publish.
 
 ## 2026-11-25 -- Daily sync: five GitHub tries
 

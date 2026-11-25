@@ -12,6 +12,7 @@ import { taughtSubjectColumn, courseColumnOf, portalColumnOf, TAUGHT_SUBJECT_COL
 import { ASSESSMENT_COURSES, fetchTopinAssessments, normUid, topinCellsFor } from "../lib/connectors/topinAssessments";
 import { bySubject, fetchLpAptitudeScores, fetchLpSubjectAssessments, topinOverallOf, OVERALL_ASSESSMENT_SUBJECTS, type OverallAssessments, fetchReadinessEvaluations, fetchRecentLpActivity, learningNowOf, readinessOf, READINESS_THRESHOLDS, LEARNING_DAYS } from "../lib/connectors/trainingReadiness";
 import { lectureNameIndex } from "../lib/connectors/demoTraining";
+import { buildDeployedReadiness, DEPLOYED_COHORT_SEMESTERS, LECTURE_DAYS, LECTURE_DAYS_FALLBACK } from "../lib/connectors/deployedReadiness";
 import { LECTURE_COURSES } from "../data/lectureSessions";
 
 // Pinned edge-case instructors (NW0005068): see isPinnedConfirmedInstructor() in
@@ -1783,6 +1784,23 @@ router.get("/reports/training-readiness", requireAuth, requireRole("admin"), asy
     };
   }).sort((a, b) => a.full_name.localeCompare(b.full_name));
   res.json({ rows, thresholds: READINESS_THRESHOLDS, learning_days: LEARNING_DAYS, fetched_at: evs.fetchedAt });
+});
+
+// Deployed - Readiness (2026-11-25, per request: "a system for instructor readiness for the deployed instructors -- are they capable of
+// taking the next semester", then "we need to add it to fcc now"). NIAT (Deployed) instructors in the department, one row per instructor x
+// batch x subject, scored with the Training - Readiness rules on the next semester's (and the current semester's) lectures and topin
+// exams. Subjects = what they teach that batch now + any other subject with next-semester demos / AI / topin. connectors/deployedReadiness.ts.
+// Show only; ?refresh=1 reads again.
+router.get("/reports/deployed-readiness", requireAuth, requireRole("admin"), async (req, res) => {
+  const allRows = await db.select().from(instructorsTable);
+  const deptIds = departmentIdsOf(allRows);
+  const people = allRows.filter((r) => r.teachosUserId && deptIds.has(r.id) && productOf(r) === "NIAT (Deployed)");
+  try {
+    const { rows, fetchedAt } = await buildDeployedReadiness(people, req.query.refresh === "1");
+    res.json({ rows, thresholds: READINESS_THRESHOLDS, lecture_days: LECTURE_DAYS, lecture_days_fallback: LECTURE_DAYS_FALLBACK, cohort_semesters: DEPLOYED_COHORT_SEMESTERS, fetched_at: fetchedAt });
+  } catch (err) {
+    res.status(502).json({ error: `Demo / assessment / session data is not readable right now: ${(err as Error).message.slice(0, 200)}` });
+  }
 });
 
 // Manual Date of joining (2026-10-14, per request): sets or clears the typed-in joining date for someone Darwin has no date for
