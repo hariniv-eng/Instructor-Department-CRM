@@ -20,11 +20,12 @@ async function main() {
              MIN(semester_start_date) AS st, MAX(semester_end_date) AS en,
              LOGICAL_OR(SAFE_CAST(CAST(is_current_semester AS STRING) AS BOOL)) AS cur, COUNT(*) AS n
       FROM ${T} GROUP BY 1, 2, 3, 4),
+    sem2 AS (
+      SELECT *, LEAD(CONCAT(s, ' from ', CAST(st AS STRING))) OVER (PARTITION BY ty, u, b ORDER BY st) AS nxt FROM sem),
     pick AS (
       SELECT *, ROW_NUMBER() OVER (PARTITION BY ty, u, b ORDER BY cur DESC, (CURRENT_DATE('Asia/Kolkata') BETWEEN st AND en) DESC, st DESC) AS k
-      FROM sem WHERE cur OR CURRENT_DATE('Asia/Kolkata') BETWEEN st AND en OR st <= CURRENT_DATE('Asia/Kolkata'))
-    SELECT p.ty, p.u, p.b, p.s, CAST(p.st AS STRING) AS st, CAST(p.en AS STRING) AS en, p.cur,
-           (SELECT CONCAT(x.s, ' from ', CAST(x.st AS STRING)) FROM sem x WHERE x.ty = p.ty AND x.u = p.u AND x.b = p.b AND x.st > p.st ORDER BY x.st LIMIT 1) AS nxt
+      FROM sem2 WHERE cur OR CURRENT_DATE('Asia/Kolkata') BETWEEN st AND en OR st <= CURRENT_DATE('Asia/Kolkata'))
+    SELECT p.ty, p.u, p.b, p.s, CAST(p.st AS STRING) AS st, CAST(p.en AS STRING) AS en, p.cur, p.nxt
     FROM pick p WHERE k = 1 ORDER BY p.ty, p.u, p.b` });
   const list = rows as Record<string, unknown>[];
   const out = [["institute_type", "university", "batch", "current_semester", "semester_start", "semester_end", "flagged_current", "next_semester"].join(",")];
