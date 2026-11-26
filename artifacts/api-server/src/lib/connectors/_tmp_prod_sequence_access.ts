@@ -9,7 +9,7 @@ import { config } from "./config";
 
 const TABLE = "niat_schedule_details_as_per_prod_sequence";
 const plain = (v: unknown): string => (v && typeof v === "object" && "value" in (v as object) ? String((v as { value: unknown }).value) : v == null ? "" : String(v));
-const hide = /name|mail|phone|mobile|url|link|remark|comment|feedback|transcript|instructor_id|user_id/i;
+const hide = /^(?!batch_name|section_name|course_name|unit_name|topic_name|session_name).*(name|mail|phone|mobile|url|link|remark|comment|feedback|transcript|instructor_id|user_id)/i;
 
 async function main() {
   const P = config.BIGQUERY_PROJECT_ID!;
@@ -26,7 +26,8 @@ async function main() {
       console.log(`  READABLE: ${plain((cnt as Record<string, unknown>).n)} rows, ${list.length} columns`);
       for (const [c, t] of list) {
         if (hide.test(c) || !/STRING|INT|BOOL/.test(t)) { console.log(`  - ${c} (${t})`); continue; }
-        const [top] = await bq.query({ query: `SELECT CAST(${c} AS STRING) AS v, COUNT(*) AS n, COUNT(DISTINCT CAST(${c} AS STRING)) OVER () AS d FROM ${full} GROUP BY 1 ORDER BY n DESC LIMIT 8` });
+        const [top] = await bq.query({ query: `WITH g AS (SELECT CAST(${c} AS STRING) AS v, COUNT(*) AS n FROM ${full} GROUP BY 1)
+          SELECT v, n, (SELECT COUNT(*) FROM g) AS d FROM g ORDER BY n DESC LIMIT 8` });
         const rows = top as Record<string, unknown>[];
         const d = rows.length ? plain(rows[0].d) : "0";
         console.log(`  - ${c} (${t}) -- ${d} distinct: ${rows.map((r) => `${plain(r.v).slice(0, 40)} [${plain(r.n)}]`).join(" | ")}`);
