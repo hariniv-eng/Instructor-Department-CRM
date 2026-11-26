@@ -3,7 +3,7 @@
 //   1. Is the sync lock (Postgres advisory lock 8420011, lib/syncContext.ts) held right now, by which connection, since when, doing what?
 //      If it is held while no sync is running, every 5am / catch-up / Sync Now run is skipped as "already running".
 //   2. Every uploads-table entry since yesterday 00:00 IST (successful syncs AND "... FAILED" entries with their error).
-//   --release: ends the connection that holds the lock (only that one), so the next sync can run.
+//   --release: ends the connection that holds the lock, and any connection idle in a transaction for 10+ minutes, so the next sync can run.
 //   pnpm exec tsx src/lib/connectors/_tmp_sync_health.ts [--release]
 import { gte, desc } from "drizzle-orm";
 import { db, pool, uploadsTable } from "@workspace/db";
@@ -31,6 +31,12 @@ async function main() {
       console.log(`\n--release: ended connection ${l.pid}: ${rows[0]?.ok}`);
     }
     if (!locks.length) console.log("\n--release: nothing to release, the lock is free");
+    // 2026-11-26 (lock held + an archive update "idle in transaction" for 30+ minutes): also end connections stuck idle in a
+    // transaction for over 10 minutes -- their open row locks would block the next sync's archive update (same as releaseStaleLock).
+    const { rows: idle } = await pool.query(`SELECT pid, pg_terminate_backend(pid) AS ok FROM pg_stat_activity
+      WHERE datname = current_database() AND state = 'idle in transaction' AND pid <> pg_backend_pid() AND state_change < now() - interval '10 minutes'`);
+    for (const r of idle) console.log(`--release: ended idle-in-transaction connection ${r.pid}: ${r.ok}`);
+    if (!idle.length) console.log("--release: no connection stuck idle in transaction");
   }
   process.exit(0);
 }
