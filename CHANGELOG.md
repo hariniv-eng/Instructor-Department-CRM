@@ -23,6 +23,15 @@ Commit messages stay short (title + 2-3 lines); this file is the detailed record
 | Deployed - Readiness tab (subjects, semesters, rules) | `artifacts/api-server/src/lib/connectors/deployedReadiness.ts`; page: `artifacts/instructor-crm/src/pages/deployed-readiness.tsx` |
 | One-off read-only checks | `artifacts/api-server/src/lib/connectors/_tmp_*.ts` |
 
+## 2026-11-27 -- Training tab: Semester 6 courses (Emerging Tech group)
+
+Per request ("also do it for Sem 6"), from KKH Batch-2's Semester 6 (the only Semester 6 batch) and its learning-portal courses (`_tmp_batch_sem_courses.ts KKH 6`, `_tmp_lp_content_for_courses.ts KKH 6`):
+- ML moved from Semester 5 to **Semester 6**; Deep Learning gets **Semester 6** and its portal course 90d18553... ("INTRODUCTION TO DEEP LEARNING", 210 units) besides 8347d32f....
+- New group **Emerging Tech** (Tech sub-tab), Semester 6: Practical Software Engineering (3d3d4f4b...) and Internet of Things ("Get Started with Internet of Things", c41ce78c...). No instructor subject maps to it yet.
+- Computer Networks, Operating Systems and Language Analytics: KKH takes them in Semester 6 on the same portal courses as CDU, so they stay Semester 4 (per request).
+- Not added (no learning-portal course): Data Visualization, Robotics Operating System.
+- Files: `artifacts/api-server/src/data/trainingCourseTaxonomy.ts`, `artifacts/instructor-crm/src/pages/training-stats.tsx`, `artifacts/api-server/src/lib/connectors/instructorContribution.ts`. After pull: typecheck + Publish, then Sync Now (Training Status).
+
 ## 2026-11-27 -- Training tab: Semester 4 courses (CS Core and Interdisciplinary groups)
 
 Per request ("map those subjects as Sem 4 courses and record them in the Training tab"), from the CDU Semester 4 prod sequence (niat_schedule_details_as_per_prod_sequence) and the matching learning-portal courses (`_tmp_lp_content_for_courses.ts`, `_tmp_find_course_id.ts`). Already there as Semester 4: IPS (DSA), Advanced Aptitude, Linear Algebra and Calculus, Language Analytics. Added, all Semester 4, matched by course id only:

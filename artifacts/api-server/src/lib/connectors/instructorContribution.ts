@@ -499,7 +499,7 @@ async function fetchCohortBatchWindows(): Promise<Map<string, { recent: string[]
 export const TRACK_SUBJECT: Record<string, string> = {
   "Frontend Development": "Frontend", "Backend Development": "Backend", DSA: "DSA", "Gen AI": "GenAI",
   DSML: "Artificial Intelligence & Emerging Technologies", Aptitude: "Aptitude", Maths: "Maths", English: "English",
-  "CS Core": "CS Core", Interdisciplinary: "Interdisciplinary & Applied Sciences", // 2026-11-27 (Semester 4 courses)
+  "CS Core": "CS Core", "Emerging Tech": "Emerging Tech", Interdisciplinary: "Interdisciplinary & Applied Sciences", // 2026-11-27 (Semester 4 / 6 courses)
 };
 // Orientation / intro courses (same rule as ORIENTATION_COURSE in taughtTraining.ts -- kept as a copy to avoid a circular import).
 const ORIENTATION_TITLE = /^(intro|introduction) to (tech|software( development)?|operating systems?|os|computers?)\b|orientation|welcome webinar|webinar/i;

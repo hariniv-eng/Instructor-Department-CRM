@@ -22,8 +22,8 @@
 // mark pending" -- ship with what's confirmed, fill in the rest once
 // answered.
 // "CS Core" and "Interdisciplinary" (2026-11-27, per request: Semester 4 courses -- Computer Networks / Operating Systems as a new subject,
-// Environmental Science in a new Interdisciplinary group).
-export type TrainingTrackGroup = "Frontend Development" | "Backend Development" | "DSA" | "Gen AI" | "DSML" | "CS Core" | "Aptitude" | "Maths" | "English" | "Interdisciplinary";
+// Environmental Science in a new Interdisciplinary group); "Emerging Tech" (same day: Semester 6 -- Practical Software Engineering, IoT).
+export type TrainingTrackGroup = "Frontend Development" | "Backend Development" | "DSA" | "Gen AI" | "DSML" | "CS Core" | "Emerging Tech" | "Aptitude" | "Maths" | "English" | "Interdisciplinary";
 
 export type TrainingCourseDef = {
   key: string;
@@ -148,7 +148,9 @@ export const TRAINING_COURSE_TAXONOMY: TrainingCourseDef[] = [
   // --- DSML ---
   { key: "ml", courseIds: ["919bb576966a48dfa1e0b8b071fc7f69"], label: "ML", trackGroup: "DSML", courseTitles: [] },
   { key: "supervised_learning", label: "Supervised Learning", trackGroup: "DSML", courseTitles: ["Supervised Learning: Regression", "Supervised Learning: Classification"] },
-  { key: "deep_learning", courseIds: ["8347d32f770a49579696335a4eec5828"], label: "Deep Learning", trackGroup: "DSML", courseTitles: ["Introduction to Deep Learning and ANN", "Introduction to Deep Learning"] },
+  // Deep Learning (2026-11-27, per request: KKH Semester 6 "Introduction to DeepLearning"): + portal course 90d18553... ("INTRODUCTION TO DEEP
+  // LEARNING", 210 units, every KKH lecture has a unit -- _tmp_lp_content_for_courses.ts KKH 6). Semester 6 (COURSE_SEMESTER).
+  { key: "deep_learning", courseIds: ["8347d32f770a49579696335a4eec5828", "90d1855388db4c029eb3eb9869c882d9"], label: "Deep Learning", trackGroup: "DSML", courseTitles: ["Introduction to Deep Learning and ANN", "Introduction to Deep Learning"] },
   { key: "ml_projects", courseIds: ["611beb92cdf746fd8f4a8b794dbc7b71"], label: "ML Projects", trackGroup: "DSML", courseTitles: ["Machine Learning & AI Projects"] },
   { key: "nlp", courseIds: ["74536befa3df4e8aa2958b727fa2f2b6"], label: "NLP", trackGroup: "DSML", courseTitles: ["Introduction to Natural Language Processing"] },
   { key: "data_foundation", courseIds: ["58aeb728b2524b0897c478cb22e8acdc"], label: "Data Foundation", trackGroup: "DSML", courseTitles: [] },
@@ -157,6 +159,14 @@ export const TRAINING_COURSE_TAXONOMY: TrainingCourseDef[] = [
   // smaller portal courses with the same titles (27fbd90e... 40 units, 0441adda... 44 units) must not be counted with them.
   { key: "computer_networks", courseIds: ["6e937f2929d54a649e3106eb23f456e1"], label: "Computer Networks", trackGroup: "CS Core", courseTitles: [] },
   { key: "operating_systems", courseIds: ["91b2de7926d14101b4f45156a5649ebf"], label: "Operating Systems", trackGroup: "CS Core", courseTitles: [] },
+  // KKH Batch-2 takes Computer Networks, Operating Systems and Language Analytics in Semester 6 -- on the SAME portal courses as CDU
+  // (6e937f29..., 91b2de79..., 7288e9d8...), so they stay Semester 4 here (per request: "only for KKH CN and OS will be in Sem 6, and English").
+  // --- Emerging Tech --- (2026-11-27, per request: KKH Semester 6, a new group). Matched by course id only.
+  //   Practical Software Engineering: 3d3d4f4b..., 78 units in 7 topics, 50 instructors (10 / 20 KKH lecture titles have a unit).
+  //   Internet of Things: "Get Started with Internet of Things" c41ce78c..., 31 units in 7 topics, 19 instructors (matched by title only).
+  // Not added: Data Visualization and Robotics Operating System (KKH Semester 6) have no learning-portal course.
+  { key: "practical_software_engineering", courseIds: ["3d3d4f4b2df54db5bed585a3e0164ecd"], label: "Practical Software Engineering", trackGroup: "Emerging Tech", courseTitles: [] },
+  { key: "iot", courseIds: ["c41ce78c1b0745b2978fb4ea16d364af"], label: "Internet of Things", trackGroup: "Emerging Tech", courseTitles: [] },
   // --- Aptitude ---
   // Added 2026-09-24 per request ("we only have tech instructors related
   // data, now we need to also get the aptitude, math and also english") --

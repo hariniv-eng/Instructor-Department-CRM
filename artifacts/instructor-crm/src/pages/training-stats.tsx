@@ -94,7 +94,7 @@ const QUERY_KEY = ['reports', 'training-stats'];
 // trainingCourseTaxonomy.ts.
 const SUB_TABS: { key: string; label: string; trackGroups: string[]; subjectAreas: string[] | 'TECH' }[] = [
   // CS Core and Interdisciplinary groups (2026-11-27, per request: Semester 4 courses).
-  { key: 'tech', label: 'Tech', trackGroups: ['Frontend Development', 'Backend Development', 'DSA', 'Gen AI', 'DSML', 'CS Core'], subjectAreas: 'TECH' },
+  { key: 'tech', label: 'Tech', trackGroups: ['Frontend Development', 'Backend Development', 'DSA', 'Gen AI', 'DSML', 'CS Core', 'Emerging Tech'], subjectAreas: 'TECH' },
   { key: 'math_aptitude', label: 'Maths and Aptitude', trackGroups: ['Aptitude', 'Maths', 'Interdisciplinary'], subjectAreas: ['Aptitude', 'Maths', 'Interdisciplinary & Applied Sciences'] },
   { key: 'english', label: 'English', trackGroups: ['English'], subjectAreas: ['English'] },
 ];
@@ -128,6 +128,7 @@ export const SUBJECT_TRACK: Record<string, string> = {
   // (Computer Networks, Operating Systems) has no instructor subject yet -- its columns show for everyone on the Tech sub-tab.
   'Interdisciplinary & Applied Sciences': 'Interdisciplinary',
   'CS Core': 'CS Core',
+  'Emerging Tech': 'Emerging Tech',
 };
 
 // Groups the flat taxonomy list into [{ trackGroup, defs }] in taxonomy
@@ -226,8 +227,10 @@ export const COURSE_SEMESTER: Record<string, number> = {
   // Semester 4 (2026-11-27, per request, from the CDU Semester 4 prod sequence): Production AI Engineering (Gen AI), Computer Networks and
   // Operating Systems (CS Core), Environmental Science (Interdisciplinary).
   production_ai: 4, computer_networks: 4, operating_systems: 4, environmental_science: 4,
-  // DSML (2026-10-16): ML in semester 5; the other DSML courses to follow.
-  ml: 5,
+  // DSML: ML was semester 5 (2026-10-16); moved to semester 6 with Deep Learning (2026-11-27, per request, from KKH Batch-2's Semester 6).
+  ml: 6, deep_learning: 6,
+  // Emerging Tech (2026-11-27, KKH Semester 6).
+  practical_software_engineering: 6, iot: 6,
 };
 const SEMESTERS = [...new Set(Object.values(COURSE_SEMESTER))].sort((a, b) => a - b);
 
