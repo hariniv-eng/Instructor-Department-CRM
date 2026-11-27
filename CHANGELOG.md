@@ -23,6 +23,15 @@ Commit messages stay short (title + 2-3 lines); this file is the detailed record
 | Deployed - Readiness tab (subjects, semesters, rules) | `artifacts/api-server/src/lib/connectors/deployedReadiness.ts`; page: `artifacts/instructor-crm/src/pages/deployed-readiness.tsx` |
 | One-off read-only checks | `artifacts/api-server/src/lib/connectors/_tmp_*.ts` |
 
+## 2026-11-27 -- Training tab: Semester 4 courses (CS Core and Interdisciplinary groups)
+
+Per request ("map those subjects as Sem 4 courses and record them in the Training tab"), from the CDU Semester 4 prod sequence (niat_schedule_details_as_per_prod_sequence) and the matching learning-portal courses (`_tmp_lp_content_for_courses.ts`, `_tmp_find_course_id.ts`). Already there as Semester 4: IPS (DSA), Advanced Aptitude, Linear Algebra and Calculus, Language Analytics. Added, all Semester 4, matched by course id only:
+- Production AI Engineering (Gen AI) -- 3b6305a6..., the portal course behind "Production of AI systems using LLM".
+- New group **CS Core** (Tech sub-tab): Computer Networks (6e937f29...) and Operating Systems (91b2de79...). Smaller same-name portal courses are not counted. No instructor subject maps to CS Core yet.
+- New group **Interdisciplinary** (Maths and Aptitude sub-tab): Environmental Science (53251ac6...); Interdisciplinary & Applied Sciences instructors are measured on it.
+- Taught in Class: sessions on these course ids now get their subject from this list (Production AI -> GenAI; CS Core / Interdisciplinary stay in "Other").
+- Files: `artifacts/api-server/src/data/trainingCourseTaxonomy.ts`, `artifacts/instructor-crm/src/pages/training-stats.tsx` (`SUB_TABS`, `SUBJECT_TRACK`, `COURSE_SEMESTER`), `artifacts/api-server/src/lib/connectors/instructorContribution.ts` (`TRACK_SUBJECT`). After pull: typecheck + Publish, then Sync Now (Training Status) so the new columns fill.
+
 ## 2026-11-25 -- Training Stats: new "Deployed - Readiness" tab
 
 Readiness for NIAT (Deployed) instructors: are they ready for the semester their batch moves to next (NIAT 2026: Sem 1 -> 2, NIAT 2025: Sem 3 -> 4, NIAT 2024: Sem 5 -> 6)? Same rules as Training - Readiness (demo QA, AI assessment, Top-N; lowest of the three; no data = Red), scored on the next semester's lectures and topin exams, with a "Current semester" switch for comparison.

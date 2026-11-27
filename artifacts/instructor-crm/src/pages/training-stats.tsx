@@ -93,8 +93,9 @@ const QUERY_KEY = ['reports', 'training-stats'];
 // below. "english" maps to the English track group (4 courses) in the backend
 // trainingCourseTaxonomy.ts.
 const SUB_TABS: { key: string; label: string; trackGroups: string[]; subjectAreas: string[] | 'TECH' }[] = [
-  { key: 'tech', label: 'Tech', trackGroups: ['Frontend Development', 'Backend Development', 'DSA', 'Gen AI', 'DSML'], subjectAreas: 'TECH' },
-  { key: 'math_aptitude', label: 'Maths and Aptitude', trackGroups: ['Aptitude', 'Maths'], subjectAreas: ['Aptitude', 'Maths'] },
+  // CS Core and Interdisciplinary groups (2026-11-27, per request: Semester 4 courses).
+  { key: 'tech', label: 'Tech', trackGroups: ['Frontend Development', 'Backend Development', 'DSA', 'Gen AI', 'DSML', 'CS Core'], subjectAreas: 'TECH' },
+  { key: 'math_aptitude', label: 'Maths and Aptitude', trackGroups: ['Aptitude', 'Maths', 'Interdisciplinary'], subjectAreas: ['Aptitude', 'Maths', 'Interdisciplinary & Applied Sciences'] },
   { key: 'english', label: 'English', trackGroups: ['English'], subjectAreas: ['English'] },
 ];
 
@@ -123,6 +124,10 @@ export const SUBJECT_TRACK: Record<string, string> = {
   Aptitude: 'Aptitude',
   Maths: 'Maths',
   English: 'English',
+  // 2026-11-27: Interdisciplinary & Applied Sciences instructors on the Interdisciplinary courses (Environmental Science). CS Core
+  // (Computer Networks, Operating Systems) has no instructor subject yet -- its columns show for everyone on the Tech sub-tab.
+  'Interdisciplinary & Applied Sciences': 'Interdisciplinary',
+  'CS Core': 'CS Core',
 };
 
 // Groups the flat taxonomy list into [{ trackGroup, defs }] in taxonomy
@@ -218,6 +223,9 @@ export const COURSE_SEMESTER: Record<string, number> = {
   math_for_cs: 1, probability_statistics: 3, linear_algebra_calculus: 4,
   // English
   english_foundation: 1, english_advanced: 2, english_applied: 3, language_analytics: 4,
+  // Semester 4 (2026-11-27, per request, from the CDU Semester 4 prod sequence): Production AI Engineering (Gen AI), Computer Networks and
+  // Operating Systems (CS Core), Environmental Science (Interdisciplinary).
+  production_ai: 4, computer_networks: 4, operating_systems: 4, environmental_science: 4,
   // DSML (2026-10-16): ML in semester 5; the other DSML courses to follow.
   ml: 5,
 };

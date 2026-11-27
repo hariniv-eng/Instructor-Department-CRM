@@ -21,7 +21,9 @@
 // why each pending one is unresolved. Per request (2026-09-23): "Build now,
 // mark pending" -- ship with what's confirmed, fill in the rest once
 // answered.
-export type TrainingTrackGroup = "Frontend Development" | "Backend Development" | "DSA" | "Gen AI" | "DSML" | "Aptitude" | "Maths" | "English";
+// "CS Core" and "Interdisciplinary" (2026-11-27, per request: Semester 4 courses -- Computer Networks / Operating Systems as a new subject,
+// Environmental Science in a new Interdisciplinary group).
+export type TrainingTrackGroup = "Frontend Development" | "Backend Development" | "DSA" | "Gen AI" | "DSML" | "CS Core" | "Aptitude" | "Maths" | "English" | "Interdisciplinary";
 
 export type TrainingCourseDef = {
   key: string;
@@ -139,6 +141,10 @@ export const TRAINING_COURSE_TAXONOMY: TrainingCourseDef[] = [
   { key: "gen_ai", courseIds: ["b9811b34585b47e0a0be65f1081a74f2"], label: "Gen AI", trackGroup: "Gen AI", courseTitles: ["Generative AI", "Intro to Generative AI"] },
   { key: "llm", courseIds: ["8874b64282db42748d71b9940316db8d"], label: "LLM", trackGroup: "Gen AI", courseTitles: ["Building LLM Applications", "Building LLM Applications Part - 2", "Building  LLM  Applications"] },
   { key: "ai_for_finance", courseIds: ["85dac56985f54205b71ae86327f39b92"], label: "AI for Finance", trackGroup: "Gen AI", courseTitles: ["AI for Finance"] },
+  // Production AI Engineering (2026-11-27, per request: "map the Sem 4 courses and record them in the Training tab") -- the portal course behind
+  // "Production of AI systems using LLM" (CDU Semester 4, prod sequence 3fc64ce6...): LangGraph agents, production RAG, embeddings, retrieval.
+  // Found with _tmp_find_course_id.ts: 91 units in 7 topics, 32 instructors. Matched by course id only.
+  { key: "production_ai", courseIds: ["3b6305a6ceab4483a02d57b599d61a19"], label: "Production AI Engineering", trackGroup: "Gen AI", courseTitles: [] },
   // --- DSML ---
   { key: "ml", courseIds: ["919bb576966a48dfa1e0b8b071fc7f69"], label: "ML", trackGroup: "DSML", courseTitles: [] },
   { key: "supervised_learning", label: "Supervised Learning", trackGroup: "DSML", courseTitles: ["Supervised Learning: Regression", "Supervised Learning: Classification"] },
@@ -146,6 +152,11 @@ export const TRAINING_COURSE_TAXONOMY: TrainingCourseDef[] = [
   { key: "ml_projects", courseIds: ["611beb92cdf746fd8f4a8b794dbc7b71"], label: "ML Projects", trackGroup: "DSML", courseTitles: ["Machine Learning & AI Projects"] },
   { key: "nlp", courseIds: ["74536befa3df4e8aa2958b727fa2f2b6"], label: "NLP", trackGroup: "DSML", courseTitles: ["Introduction to Natural Language Processing"] },
   { key: "data_foundation", courseIds: ["58aeb728b2524b0897c478cb22e8acdc"], label: "Data Foundation", trackGroup: "DSML", courseTitles: [] },
+  // --- CS Core --- (2026-11-27, per request: Semester 4 Computer Networks and Operating Systems as a new subject). Course ids from
+  // _tmp_lp_content_for_courses.ts (CDU Semester 4): the main portal courses (every schedule lecture has a unit). Matched by course id ONLY:
+  // smaller portal courses with the same titles (27fbd90e... 40 units, 0441adda... 44 units) must not be counted with them.
+  { key: "computer_networks", courseIds: ["6e937f2929d54a649e3106eb23f456e1"], label: "Computer Networks", trackGroup: "CS Core", courseTitles: [] },
+  { key: "operating_systems", courseIds: ["91b2de7926d14101b4f45156a5649ebf"], label: "Operating Systems", trackGroup: "CS Core", courseTitles: [] },
   // --- Aptitude ---
   // Added 2026-09-24 per request ("we only have tech instructors related
   // data, now we need to also get the aptitude, math and also english") --
@@ -179,6 +190,9 @@ export const TRAINING_COURSE_TAXONOMY: TrainingCourseDef[] = [
   { key: "english_advanced", courseIds: ["bfd0a2efeb934e4bbc1c9acac895d6a4"], label: "Communicative English Advanced", trackGroup: "English", courseTitles: ["Communicative English Advanced"] },
   { key: "english_applied", courseIds: ["e27acac864114f34abdeec3948e91e96"], label: "Communicative English Applied", trackGroup: "English", courseTitles: ["Applied Communicative English", "Communicative English Applied"] },
   { key: "language_analytics", courseIds: ["7288e9d8992549758490a8a87b8b3dd9"], label: "Language Analytics", trackGroup: "English", courseTitles: ["Language Analytics"] },
+  // --- Interdisciplinary --- (2026-11-27, per request: Environmental Science, Semester 4 at CDU). Portal course matched by title in
+  // _tmp_lp_content_for_courses.ts (20 units in 3 topics, 3 instructors). Matched by course id only.
+  { key: "environmental_science", courseIds: ["53251ac6dc7d44839752e8c07b721f96"], label: "Environmental Science", trackGroup: "Interdisciplinary", courseTitles: [] },
 ];
 
 export function resolvedCourseDefs(): TrainingCourseDef[] {
