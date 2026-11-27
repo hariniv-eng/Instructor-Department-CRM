@@ -59,7 +59,9 @@ const plain = (v: unknown): string => (v && typeof v === "object" && "value" in 
 const cleanId = (s: string) => s.replace(/-/g, "").toLowerCase();
 
 // The subject COLUMNS of the "Taught in class" view (2026-10-19, per request: one row per instructor, a column per subject).
-export const TAUGHT_SUBJECT_COLUMNS = ["Frontend", "Backend", "DSA", "GenAI", "Artificial Intelligence & Emerging Technologies", "Aptitude", "Maths", "English", "Other"] as const;
+// CS Core, Emerging Tech, Interdisciplinary & Applied Sciences (2026-11-27, per request: the Semester 4 / 6 courses get their own columns
+// in Taught in Class / Training - Demos instead of "Other").
+export const TAUGHT_SUBJECT_COLUMNS = ["Frontend", "Backend", "DSA", "GenAI", "Artificial Intelligence & Emerging Technologies", "CS Core", "Emerging Tech", "Aptitude", "Maths", "English", "Interdisciplinary & Applied Sciences", "Other"] as const;
 // Column of a course: its subject by id, else by title (TAUGHT_COURSE_TITLE_SUBJECTS); Math for Computer Science counts as Maths;
 // anything else (other subjects, unmapped) is "Other"; general/orientation courses get null = left out of the view.
 // Orientation / introduction courses (2026-10-19, per request: "intro to OS, intro to software... all these orientation sessions should
