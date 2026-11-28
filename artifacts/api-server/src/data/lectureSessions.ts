@@ -21,6 +21,14 @@ export type LectureCourse = { key: string; portalKey: string | null; title: stri
 // prod sequence shared 2026-10-27 -- 48 lectures (the main unit of each topic; Tutorial / Classroom Quiz / MCQ / Coding Practice / Module
 // Quiz are not lectures). Own key (not the Training Stats "ips" key) so the column stays after DSA II.
 // GenAI order (2026-10-29, per request): Introduction to Gen AI first, then LLM, then AI for Finance (columns follow this order).
+// Semester 4 and 6 courses (2026-11-27, per request: "add the new Sem 4 / Sem 6 subjects to Training - LP, Training - Demos, Taught in Class
+// and the other tabs"): built with _tmp_build_sem46_lectures.ts from the prod sequence (niat_schedule_details_as_per_prod_sequence) --
+// Semester 4 from CDU Batch-1 (Advanced Aptitude, Language Analytics, Linear Algebra and Calculus, Computer Networks, Operating Systems,
+// Production AI Engineering, Environmental Science), Semester 6 from KKH Batch-2 (Introduction to ML, Introduction to Deep Learning,
+// Data Visualization, Practical Software Engineering, Internet of Things, Robotics Operating System). Lectures in prod order; unit IDs
+// from the scheduled sessions' resource_id, else the portal unit with the same title. Some lectures have no unit ID yet (not held yet,
+// no portal unit): they count for demos (matched by title) but not in Taught in Class until re-built. "Your Learning Journey"
+// (orientation) left out. Appended at the end; LECTURE_SEMESTER (trainingReadiness.ts) gives their semesters.
 export const LECTURE_COURSES: LectureCourse[] = [
  {
   "key": "python",
@@ -4962,6 +4970,2340 @@ export const LECTURE_COURSES: LectureCourse[] = [
     "unitIds": [
      "7f2fa71a2d6d4508b14bcdcdb9530aa2"
     ]
+   }
+  ]
+ },
+ {
+  "key": "advanced_aptitude",
+  "portalKey": "advanced_aptitude",
+  "title": "Advanced Aptitude",
+  "subject": "Aptitude",
+  "lectures": [
+   {
+    "n": 1,
+    "name": "Introduction-Advanced Aptitude",
+    "unitIds": [
+     "9da5cbfea247484f976b6b1b52db07e3"
+    ]
+   },
+   {
+    "n": 2,
+    "name": "Decision making and Logical Sequence",
+    "unitIds": [
+     "aeeca238346f422594e212eea92f534f",
+     "06fb9a23d8b049e9a721c5a80981c388",
+     "e6ed2f4102df46b6bff9658700021dd2",
+     "65fccc61230b44a28f14dc36651c0fa2"
+    ]
+   },
+   {
+    "n": 3,
+    "name": "Statements and Arguments",
+    "unitIds": [
+     "3e31359282a947e5a914dd3dd8a15f7a",
+     "3f2afa0104b44a76b01fe002ad378c8a",
+     "10d0a68af96b43b9964a772ef4b09525",
+     "5a954aa5eef247f58712366f7a0a64b8"
+    ]
+   },
+   {
+    "n": 4,
+    "name": "Input and Output",
+    "unitIds": [
+     "643115a878614b1cb021a4d7d40bfbf2",
+     "56c41f8929424ad9b5a4e15cf6ee7add",
+     "0c4937beee5f4c55954564e2fc6abe10",
+     "12f7bb01dacc420899e8067c56871b8b"
+    ]
+   },
+   {
+    "n": 5,
+    "name": "Cryptarithmatic",
+    "unitIds": []
+   },
+   {
+    "n": 6,
+    "name": "Game based Aptitude",
+    "unitIds": [
+     "d84fcb49948a4601afb9547966d9472f"
+    ]
+   },
+   {
+    "n": 7,
+    "name": "Functions",
+    "unitIds": [
+     "fd162d44a44044b89353d777a4847ab6"
+    ]
+   },
+   {
+    "n": 8,
+    "name": "Progressions",
+    "unitIds": [
+     "cd53742dfa2a47209104771eecd47a51"
+    ]
+   },
+   {
+    "n": 9,
+    "name": "Simplification",
+    "unitIds": [
+     "7d1fb300a5dc4838beaef74e173bc7ff"
+    ]
+   },
+   {
+    "n": 10,
+    "name": "Equations",
+    "unitIds": [
+     "18185b4d69444fd38d7f379cf9d241dc"
+    ]
+   },
+   {
+    "n": 11,
+    "name": "Algebra",
+    "unitIds": [
+     "2295971903f14637836333cae49e0ac7"
+    ]
+   },
+   {
+    "n": 12,
+    "name": "Base System",
+    "unitIds": [
+     "6836ff7a75034a6da9908fc938c71a20"
+    ]
+   },
+   {
+    "n": 13,
+    "name": "Logarithms",
+    "unitIds": [
+     "82f1a11f4ae44482a1c8a125790a15fb"
+    ]
+   },
+   {
+    "n": 14,
+    "name": "Surds and Indices",
+    "unitIds": [
+     "747a8250439d40ee94ff167259a6b0ee"
+    ]
+   },
+   {
+    "n": 15,
+    "name": "Geometry 1",
+    "unitIds": [
+     "8bfe2505d405421daf3878e80e857d17"
+    ]
+   },
+   {
+    "n": 16,
+    "name": "Geometry 2",
+    "unitIds": [
+     "5e80addcc58b4d7999e6d9dabd767061"
+    ]
+   },
+   {
+    "n": 17,
+    "name": "Mensuration",
+    "unitIds": []
+   },
+   {
+    "n": 18,
+    "name": "Statistics",
+    "unitIds": [
+     "ccce63723f8b46c78fbe9c98d07063e7"
+    ]
+   },
+   {
+    "n": 19,
+    "name": "Heights and Distance",
+    "unitIds": []
+   }
+  ]
+ },
+ {
+  "key": "language_analytics",
+  "portalKey": "language_analytics",
+  "title": "Language Analytics",
+  "subject": "English",
+  "lectures": [
+   {
+    "n": 1,
+    "name": "Verbal ability: Question solving strategies part-1",
+    "unitIds": [
+     "d1c4459da73340db85cd4cca2fcdaf50"
+    ]
+   },
+   {
+    "n": 2,
+    "name": "Synonyms and Antonyms",
+    "unitIds": [
+     "3ab2a4ffa9c7457b88151828b092ae53",
+     "28105c60c3c3495c9ecb6faec081540f"
+    ]
+   },
+   {
+    "n": 3,
+    "name": "Idioms, Phrases and One word substitutions",
+    "unitIds": [
+     "8d4e533979384c47bca670bfbf644148",
+     "85ebf01c900e414d9e2cd44da2123ed9"
+    ]
+   },
+   {
+    "n": 4,
+    "name": "Fill in the blanks and Cloze test",
+    "unitIds": [
+     "04b0c49ec1c5452a96d97fffc0be0ee7",
+     "7f3ce47419ed4f728e209983e3acd357"
+    ]
+   },
+   {
+    "n": 5,
+    "name": "Analogy, Contextual words and Miscellaneous vocabulary usage",
+    "unitIds": [
+     "bcb5433500eb4576a735eb7ff320f545",
+     "6ee9c5f97ed043fc8c1608fd7c1d526a"
+    ]
+   },
+   {
+    "n": 6,
+    "name": "Verbal ability: Question solving strategies part-2",
+    "unitIds": [
+     "8bd713027bab49eb80ad9d8f6f902452"
+    ]
+   },
+   {
+    "n": 7,
+    "name": "Reading comprehesion",
+    "unitIds": [
+     "07d011658024408f924674e3fdb685b3"
+    ]
+   },
+   {
+    "n": 8,
+    "name": "Sentence completion and Paragraph completion",
+    "unitIds": [
+     "5402556cfee44beb834bcf38e1b53055"
+    ]
+   },
+   {
+    "n": 9,
+    "name": "Verbal ability: Question solving strategies part-3",
+    "unitIds": [
+     "51a127e40de149529d64bcb6c13b5cde"
+    ]
+   },
+   {
+    "n": 10,
+    "name": "Spot the error and Sentence correction",
+    "unitIds": [
+     "834c4dbd062c4b1083ce5c6e702b3ee5"
+    ]
+   },
+   {
+    "n": 11,
+    "name": "Spell check",
+    "unitIds": [
+     "2332dc0947a34510a2927bb6c71dcaf3"
+    ]
+   },
+   {
+    "n": 12,
+    "name": "Jumbled words and Jumbled sentences",
+    "unitIds": [
+     "c2bd7622e36947f6b12b079804165b4e"
+    ]
+   },
+   {
+    "n": 13,
+    "name": "Sentence construction and Clauses",
+    "unitIds": [
+     "152260ea1fe04ac4b8fa8e46d5835a72"
+    ]
+   },
+   {
+    "n": 14,
+    "name": "Transformation of Sentences",
+    "unitIds": [
+     "a83a9cfedea04c3f8fa80bfbd6a9688c"
+    ]
+   },
+   {
+    "n": 15,
+    "name": "Active-Passive Voice",
+    "unitIds": [
+     "a7b72ba0ab064556a2bd40f79d98bd48"
+    ]
+   },
+   {
+    "n": 16,
+    "name": "Direct-Indirect Speech",
+    "unitIds": [
+     "97d75e5312ee46c4a49ef67fbc557863"
+    ]
+   },
+   {
+    "n": 17,
+    "name": "Paragraph and essay writing",
+    "unitIds": [
+     "c0d1d9c880494179a52af59337ec1284"
+    ]
+   },
+   {
+    "n": 18,
+    "name": "Report and summary writing",
+    "unitIds": [
+     "504e6e934c704e94a579b43db430fad3"
+    ]
+   },
+   {
+    "n": 19,
+    "name": "Academic Writing Essentials",
+    "unitIds": [
+     "82932d01d53140e5bf5dd5b7ff0537d1"
+    ]
+   },
+   {
+    "n": 20,
+    "name": "Email and letter writing",
+    "unitIds": [
+     "5c2ade25994b47f4ae08d8a698cfb228"
+    ]
+   }
+  ]
+ },
+ {
+  "key": "linear_algebra_calculus",
+  "portalKey": "linear_algebra_calculus",
+  "title": "Linear Algebra and Calculus",
+  "subject": "Maths",
+  "lectures": [
+   {
+    "n": 1,
+    "name": "Introduction to Linear Algebra",
+    "unitIds": [
+     "98ee6f32db5a43058a2c530327e24a7a",
+     "d4e58d9ff4524f05bb633c52b24c2b2b",
+     "2678dc3af93f4d9391329a4e50540c8f"
+    ]
+   },
+   {
+    "n": 2,
+    "name": "Scalars and Vectors",
+    "unitIds": [
+     "9e4decf493af49fba8749c3e56641377",
+     "45caae1d045e49138d668449e4010df2",
+     "82df955e9a384e588feb29af18e7d990"
+    ]
+   },
+   {
+    "n": 3,
+    "name": "Dot Product and Cross Product",
+    "unitIds": [
+     "282201579ab74bd7a6deaadb37ee69b5",
+     "e9d16c65692d40ae88c0e68545b0b78e",
+     "df26bb32ae6e40cb9faf69f159ab6603"
+    ]
+   },
+   {
+    "n": 4,
+    "name": "Scalars and Vectors - Implementation",
+    "unitIds": [
+     "0cf5a5f2bbe5455db4b3b63538f1d61c",
+     "df972f4feef44081ad8b60d02791908d",
+     "6efbeafbb6364102953e3cdf45abc1dc"
+    ]
+   },
+   {
+    "n": 5,
+    "name": "Dot Product and Cross Product - Implementation",
+    "unitIds": [
+     "faf2a25d1ad44788a94dc317a2b228f9"
+    ]
+   },
+   {
+    "n": 6,
+    "name": "Vector Spaces, Basis and Dimension",
+    "unitIds": [
+     "456ad2bce79849788a59e565a0791283",
+     "f2a282794c6b465086f694b4ee13d49c",
+     "7d74dba8c3514f9cb95a1ed81a7f9338"
+    ]
+   },
+   {
+    "n": 7,
+    "name": "Matrix Operations",
+    "unitIds": [
+     "98ee4b6f9ec647f6a7cdb18ddde3807e",
+     "41d0eb39e767433793d22806940deb4e",
+     "3a30d1668c2d48ea85dbd75a614af600"
+    ]
+   },
+   {
+    "n": 8,
+    "name": "Vector Spaces, Basis and Dimension- Implementation",
+    "unitIds": [
+     "e696f6a40cac4ae0bbc6f7425bce6ea4"
+    ]
+   },
+   {
+    "n": 9,
+    "name": "Matrix Operations - Implementation",
+    "unitIds": [
+     "d2776787ee4e4ea2a5a4b2b1e00cdb32"
+    ]
+   },
+   {
+    "n": 10,
+    "name": "Matrix Properties",
+    "unitIds": [
+     "ceb7fd34f8dd451d816feceff8d3032c"
+    ]
+   },
+   {
+    "n": 11,
+    "name": "Determinants and Inverses",
+    "unitIds": [
+     "e53d3a0a83da4edd8c89c309e8c0368a"
+    ]
+   },
+   {
+    "n": 12,
+    "name": "Matrix Properties - Implementation",
+    "unitIds": [
+     "8da59b5d76a34b0993013479b6d2b040"
+    ]
+   },
+   {
+    "n": 13,
+    "name": "Determinants and Inverses - Implementation",
+    "unitIds": [
+     "5234391c244e49e8aaee63f97f7901fc"
+    ]
+   },
+   {
+    "n": 14,
+    "name": "Row Reduction Techniques",
+    "unitIds": [
+     "4ec47dbcd59d4f7381dc756696d9044e"
+    ]
+   },
+   {
+    "n": 15,
+    "name": "Matrix Subspaces & Rank Theorem",
+    "unitIds": [
+     "8a39223c54b2418abf5fc3a1d2bc5633"
+    ]
+   },
+   {
+    "n": 16,
+    "name": "Rank by Minor Method",
+    "unitIds": [
+     "d353ad26cc7845d7a777b211ec616c0c"
+    ]
+   },
+   {
+    "n": 17,
+    "name": "Solving Systems of Equations",
+    "unitIds": [
+     "7e2f50bad6dd436f9f758ad1d2684285"
+    ]
+   },
+   {
+    "n": 18,
+    "name": "Solving Linear Systems - Numerical Methods",
+    "unitIds": [
+     "9bd037ab5a7a47ccb4bf141e8d7f6e72"
+    ]
+   },
+   {
+    "n": 19,
+    "name": "Matrix Subspaces & Rank Theorem - Implementation",
+    "unitIds": [
+     "6cd501a0e5694c898ef6610facfc48fe"
+    ]
+   },
+   {
+    "n": 20,
+    "name": "Solving Systems of Equations - Implementation",
+    "unitIds": [
+     "1c686448b6e64f67a9bf9abebb5caca2"
+    ]
+   },
+   {
+    "n": 21,
+    "name": "Eigenvalues and Eigenvectors",
+    "unitIds": [
+     "02049d76839749d0af8564794ecdedec"
+    ]
+   },
+   {
+    "n": 22,
+    "name": "Eigenvalues and Eigenvectors - Implementation",
+    "unitIds": [
+     "e6a0546c15ab491182b5e7235fe8d4c4"
+    ]
+   },
+   {
+    "n": 23,
+    "name": "Surds and Irrational Roots",
+    "unitIds": [
+     "7656275c9c524139a80bac925088721d"
+    ]
+   },
+   {
+    "n": 24,
+    "name": "Roots in A.P., G.P., and H.P.",
+    "unitIds": [
+     "b7ec61a2b08a42bbab420951e2924531"
+    ]
+   },
+   {
+    "n": 25,
+    "name": "Relationship Between Roots and Coefficients",
+    "unitIds": [
+     "8a879f912cfb4fa6a3b79952b6206fff"
+    ]
+   },
+   {
+    "n": 26,
+    "name": "Formation of Equations",
+    "unitIds": [
+     "8d4aeecbf6ae45b3bc060d58015e5897"
+    ]
+   },
+   {
+    "n": 27,
+    "name": "Root Transformations",
+    "unitIds": [
+     "d975777096214fc38ff60ac99ffc086b"
+    ]
+   },
+   {
+    "n": 28,
+    "name": "Transformation of Equations",
+    "unitIds": [
+     "67765e59324246bca65872de499f85bf"
+    ]
+   },
+   {
+    "n": 29,
+    "name": "Reciprocal Equations",
+    "unitIds": [
+     "99ee4bfc269142bc83f81f1a304087f7"
+    ]
+   },
+   {
+    "n": 30,
+    "name": "Reciprocal Equations - Implementation",
+    "unitIds": [
+     "200a441c5a2640fb863e046e14c41a1d"
+    ]
+   },
+   {
+    "n": 31,
+    "name": "Singular Value Decomposition (SVD)",
+    "unitIds": [
+     "28174179b50a4ba1a53529fb34d9932f"
+    ]
+   },
+   {
+    "n": 32,
+    "name": "Singular Value Decomposition (SVD) - Implementation",
+    "unitIds": [
+     "3a32e8efee964a23b51e94fe9fc9f204"
+    ]
+   },
+   {
+    "n": 33,
+    "name": "Limits of Functions",
+    "unitIds": [
+     "1ce5f1c68c394944a7fd27461c256965"
+    ]
+   },
+   {
+    "n": 34,
+    "name": "Continuity and Discontinuities",
+    "unitIds": [
+     "a1313a5083c84ea7983ed9c63fa65bfa"
+    ]
+   },
+   {
+    "n": 35,
+    "name": "Cartesian and Polar Coordinates",
+    "unitIds": [
+     "b43319afead64497a65e18f8eeab7969"
+    ]
+   },
+   {
+    "n": 36,
+    "name": "Functions of Two Variables",
+    "unitIds": [
+     "2a92dc08e83b4c829097bac4ec669811"
+    ]
+   },
+   {
+    "n": 37,
+    "name": "Derivatives and Tangents",
+    "unitIds": [
+     "b1fb217ce02f4c758f9533d3de4b153b"
+    ]
+   },
+   {
+    "n": 38,
+    "name": "Properties of Derivatives",
+    "unitIds": [
+     "47dd85696e374cb0a0597f0a3da3ef15"
+    ]
+   },
+   {
+    "n": 39,
+    "name": "Increasing & Decreasing Functions,Global Minima & Maxima",
+    "unitIds": [
+     "a0614dbf5340421ab40240ac8bbe4df0"
+    ]
+   },
+   {
+    "n": 40,
+    "name": "Sketching Graphs",
+    "unitIds": [
+     "ba6f890b5d7b45458fa3f84bdd23642a"
+    ]
+   },
+   {
+    "n": 41,
+    "name": "Partial Derivatives",
+    "unitIds": [
+     "c6d0ef4854ac4d5d8e44b854dd022a7b"
+    ]
+   },
+   {
+    "n": 42,
+    "name": "Gradient Vectors and Chain Rule",
+    "unitIds": [
+     "e45928214e7f44a1a19ad31c2b874474"
+    ]
+   },
+   {
+    "n": 43,
+    "name": "Jacobian and Hessian Matrices",
+    "unitIds": [
+     "1b6345a7eb0e46d89c1a5a208ae743c1"
+    ]
+   },
+   {
+    "n": 44,
+    "name": "Newton's Method for Optimization",
+    "unitIds": [
+     "7af72a02870f4d738459c8a50f9600ca"
+    ]
+   },
+   {
+    "n": 45,
+    "name": "Multi-variable Optimization",
+    "unitIds": [
+     "9d499720efce4cd99e7d729ea73c0616"
+    ]
+   },
+   {
+    "n": 46,
+    "name": "Total Differential",
+    "unitIds": [
+     "185101e9c2b341ccba540f40df8e6a77"
+    ]
+   },
+   {
+    "n": 47,
+    "name": "Lagrange's Multiplier Method",
+    "unitIds": [
+     "64577ffa7d9842a29ee9dc4597582a81"
+    ]
+   }
+  ]
+ },
+ {
+  "key": "computer_networks",
+  "portalKey": "computer_networks",
+  "title": "Computer Networks",
+  "subject": "CS Core",
+  "lectures": [
+   {
+    "n": 1,
+    "name": "Fundamentals of Computer Networks",
+    "unitIds": [
+     "3137fc8d13ed493ba5a07752ab63cdbd",
+     "2a9de51ce53441c3ac2d79fe144d86e4",
+     "b5ac5011df904b5980170df18d6c1a76",
+     "c20971b03de34f7284ec8e1bc046744a"
+    ]
+   },
+   {
+    "n": 2,
+    "name": "Web Request & Network Models",
+    "unitIds": [
+     "4cce3c7eb50e4ec09ef629af8e88f924",
+     "6590a14572ca45ae8115f289a048aa75",
+     "5a7bfe6015764e5da7b06fb9d86f013b",
+     "49b6ce634aee40b7a335df58f5a8ca8a"
+    ]
+   },
+   {
+    "n": 3,
+    "name": "Web Essentials – WWW, HTTP, DNS",
+    "unitIds": [
+     "3971eef71da740a9a25add81013a1b7f",
+     "9184289b95b540c098ac56bf6dbe829f",
+     "376d2920305f4731b71f3fd88d59c7bc",
+     "345c179c189e4bada7f0b3c606164af6"
+    ]
+   },
+   {
+    "n": 4,
+    "name": "Internet Communication Protocols",
+    "unitIds": [
+     "1ed72ac1d0514bac8ef2656c446ed964",
+     "71ac16ec749c49f08ab2e9ce7f068c72",
+     "0e95b41fa31e4fedb7cf131eda0ddb43",
+     "20db2d785b91445ba29f2eab3fa276ad"
+    ]
+   },
+   {
+    "n": 5,
+    "name": "REST APIs, Cookies & Sessions",
+    "unitIds": [
+     "acdef01dda934f5a97cf59d6ba35c0a6",
+     "1113119b07a84a37b1e256e5a78bc43c",
+     "d83ee98658684463842c500ae0ad46e4",
+     "9092e7ec081e4e57b1648cf545133e0d"
+    ]
+   },
+   {
+    "n": 6,
+    "name": "Understanding TLS and HTTPS",
+    "unitIds": [
+     "1a3f4b9dca524bd9b6b409db94f451cc"
+    ]
+   },
+   {
+    "n": 7,
+    "name": "Remote Logging & NMS",
+    "unitIds": [
+     "701d8d9aca72420b8d0acd15af45dda0"
+    ]
+   },
+   {
+    "n": 8,
+    "name": "Multimedia Networking & VoIP",
+    "unitIds": [
+     "d0715c1838364fef9238493616783ab0"
+    ]
+   },
+   {
+    "n": 9,
+    "name": "Introduction to Transport Layer",
+    "unitIds": [
+     "74425f73b51e40429f72ba764f13e142"
+    ]
+   },
+   {
+    "n": 10,
+    "name": "Understanding TCP and UDP",
+    "unitIds": [
+     "27f4469ed1b94d4b88c724a24b98b9bd"
+    ]
+   },
+   {
+    "n": 11,
+    "name": "TCP Handshakes and States",
+    "unitIds": [
+     "fbf22da29b504232a84fd4828c930140"
+    ]
+   },
+   {
+    "n": 12,
+    "name": "TCP State Diagram and Connection",
+    "unitIds": [
+     "1fe88e9ce5214e01b813e74a47861db9"
+    ]
+   },
+   {
+    "n": 13,
+    "name": "TCP Header, Lifecycle & Key Concepts",
+    "unitIds": [
+     "8127492a344e4317a00a1df2b282001b"
+    ]
+   },
+   {
+    "n": 14,
+    "name": "TCP: Data, Flow & Congestion",
+    "unitIds": [
+     "8f664c4bc2474b9cb9ecbf5f29cb2299"
+    ]
+   },
+   {
+    "n": 15,
+    "name": "SCTP & Quality of Service",
+    "unitIds": [
+     "58628084599d4c55a5981b1ac4ab8254"
+    ]
+   },
+   {
+    "n": 16,
+    "name": "Network Layer & IP Addressing",
+    "unitIds": [
+     "65bc9137d7db4c62a43b62c87454f6f8"
+    ]
+   },
+   {
+    "n": 17,
+    "name": "DHCP & IP Address Assignment",
+    "unitIds": [
+     "5d8887abf4da423daa3105c8b095cbe6"
+    ]
+   },
+   {
+    "n": 18,
+    "name": "Packet Delivery Mechanisms",
+    "unitIds": [
+     "53dc1c208c8348a7a2edf2d6ce197ff0"
+    ]
+   },
+   {
+    "n": 19,
+    "name": "Routing Algorithms",
+    "unitIds": [
+     "2c453bbbc2ef4b0794fa748029aab8f6"
+    ]
+   },
+   {
+    "n": 20,
+    "name": "Internet Scaling Mechanisms",
+    "unitIds": [
+     "65fc9517b1e94f1a9ecac1aa1e1af1f6"
+    ]
+   },
+   {
+    "n": 21,
+    "name": "ICMP in Action",
+    "unitIds": [
+     "b9e6f7e70d3e46b7816dfffc20f87dcb"
+    ]
+   },
+   {
+    "n": 22,
+    "name": "Data Link Layer | Part I",
+    "unitIds": [
+     "5968998b2ff847ffbba6718699454420"
+    ]
+   },
+   {
+    "n": 23,
+    "name": "Data Link Layer | Part II",
+    "unitIds": [
+     "314949480fc241819689c7a6b3cb905b"
+    ]
+   },
+   {
+    "n": 24,
+    "name": "Multiple Access Protocols",
+    "unitIds": [
+     "76283ac54010494082610399fe466056"
+    ]
+   },
+   {
+    "n": 25,
+    "name": "Wired LANs",
+    "unitIds": [
+     "cfda56fae28d4e46a373c7c294083fe5"
+    ]
+   },
+   {
+    "n": 26,
+    "name": "Wireless LANs",
+    "unitIds": [
+     "36525ead36c0447b8ae873dbb76ab646"
+    ]
+   },
+   {
+    "n": 27,
+    "name": "Physical Layer",
+    "unitIds": [
+     "c4ed17f315bc44df80d0e672fad2aadb"
+    ]
+   },
+   {
+    "n": 28,
+    "name": "Transmission Media & Switching",
+    "unitIds": [
+     "3625d146895b467387fb3cec39e114d1"
+    ]
+   },
+   {
+    "n": 29,
+    "name": "Network Troubleshooting & Real World",
+    "unitIds": [
+     "4329255549c941dd8e91140d64ebc63e"
+    ]
+   },
+   {
+    "n": 30,
+    "name": "Network Security Essentials",
+    "unitIds": [
+     "3a9b70d7995c4fdd86752717ab9cfb67"
+    ]
+   },
+   {
+    "n": 31,
+    "name": "Modern Internet Infrastructure",
+    "unitIds": [
+     "ca585308b43b4efe99f1b43b34498031"
+    ]
+   }
+  ]
+ },
+ {
+  "key": "operating_systems",
+  "portalKey": "operating_systems",
+  "title": "Operating Systems",
+  "subject": "CS Core",
+  "lectures": [
+   {
+    "n": 1,
+    "name": "Introduction to Operating System",
+    "unitIds": [
+     "9d58c925e99a4ebfaf98761d5bd213c5",
+     "0b0d41255b4549d3a68623a426be88aa",
+     "2c193b8c7d3a430d81f457d7be8fee8a",
+     "509953ac7cfa4311879c84fd45020980"
+    ]
+   },
+   {
+    "n": 2,
+    "name": "Understanding Binary System",
+    "unitIds": [
+     "d07249371b174b8481b7cf22f1cfe626",
+     "c6958824071f49d6b83e014c100761ad",
+     "c97c43f623c3430c99061a70b286a2ab"
+    ]
+   },
+   {
+    "n": 3,
+    "name": "OS Functions and Services",
+    "unitIds": [
+     "347515af32f4438c9aedd3d2ee275f1d",
+     "2d0c7f3308b94b11a7d5b6823683d977",
+     "18c5847da3584e68a07ced0e1555d9d8",
+     "ca9c2f960b7f4fd8a6ddc102c2ce297c"
+    ]
+   },
+   {
+    "n": 4,
+    "name": "OS Structures and Case Studies",
+    "unitIds": [
+     "bf8f0f3954e947b0b5ee77a00d42480f",
+     "ffae88f241a14475a21c224a39484ecf",
+     "07e2d22fdb8b461ebf4b18b563cec65e",
+     "701dff13214c4dcb839316c5bcf725a3"
+    ]
+   },
+   {
+    "n": 5,
+    "name": "Getting Started with Command Line",
+    "unitIds": [
+     "e663c65dc33146639b30c171bd22eafb",
+     "bed254287c1542e7af2156338c189a2e",
+     "6d0011cfec184f75a5f1abfea068de44",
+     "c29abe30d3dc4429a9dcbc2d229f1b54"
+    ]
+   },
+   {
+    "n": 6,
+    "name": "Working with File System",
+    "unitIds": [
+     "1db236eb966d4db0ae4df1c845c4b706"
+    ]
+   },
+   {
+    "n": 7,
+    "name": "Working With Files",
+    "unitIds": [
+     "b61cf884d35e49deb012292576651130"
+    ]
+   },
+   {
+    "n": 8,
+    "name": "Miscellaneous Commands",
+    "unitIds": [
+     "9de2114214bd40fb943e046d452444a1"
+    ]
+   },
+   {
+    "n": 9,
+    "name": "Process Concept, States & PCB",
+    "unitIds": [
+     "548492a411e140c1a0a6fb21e971fe32"
+    ]
+   },
+   {
+    "n": 10,
+    "name": "Threads, Multithreading & Concurrency",
+    "unitIds": [
+     "0ee17c8e16af4fb2be4f8db3e23b7090"
+    ]
+   },
+   {
+    "n": 11,
+    "name": "Process Control & Operations",
+    "unitIds": [
+     "b4bb2d964dbf45b4bbfaa5e123e0b2e6"
+    ]
+   },
+   {
+    "n": 12,
+    "name": "Scheduling Concepts, Criteria & Types",
+    "unitIds": [
+     "2bf7593a7c3848ffbbbfa6bdbf30c898"
+    ]
+   },
+   {
+    "n": 13,
+    "name": "Scheduling Algorithms | Part I",
+    "unitIds": [
+     "068ec1c446824ad284a9b8f34f486255"
+    ]
+   },
+   {
+    "n": 14,
+    "name": "Scheduling Algorithms | Part II",
+    "unitIds": [
+     "9942814cf796474d95c5bccdf28e4408"
+    ]
+   },
+   {
+    "n": 15,
+    "name": "Concurrency & The Critical-Section Problem",
+    "unitIds": [
+     "ebca3d83a04843fbb74195b50956bfca"
+    ]
+   },
+   {
+    "n": 16,
+    "name": "Synchronization Tools",
+    "unitIds": [
+     "0632d61367134391869137c8e999eb24"
+    ]
+   },
+   {
+    "n": 17,
+    "name": "Classic Synchronization Problems & IPC",
+    "unitIds": [
+     "cbd503f1dbab4c688ce3088861091dfc"
+    ]
+   },
+   {
+    "n": 18,
+    "name": "Deadlock Characterization & Prevention",
+    "unitIds": [
+     "0c551ee1abca4f84b893db64a2391148"
+    ]
+   },
+   {
+    "n": 19,
+    "name": "Deadlock Avoidance: Banker's Algorithm",
+    "unitIds": [
+     "5790dede0fdf44169c8e3593f0f0bb0c"
+    ]
+   },
+   {
+    "n": 20,
+    "name": "Deadlock Detection & Recovery",
+    "unitIds": [
+     "b97d9a59d2304e0f9c91ea8d5b3ce853"
+    ]
+   },
+   {
+    "n": 21,
+    "name": "Memory Management Fundamentals",
+    "unitIds": [
+     "e9e93ba060a148928e9a8c2cda281a3f"
+    ]
+   },
+   {
+    "n": 22,
+    "name": "Cache Memory & Mapping",
+    "unitIds": [
+     "c00a00518ba6437fa4a035f6bad28c33"
+    ]
+   },
+   {
+    "n": 23,
+    "name": "Memory Allocation – Contiguous",
+    "unitIds": [
+     "697f6c7d5b2944aaba58a817cf8fc788"
+    ]
+   },
+   {
+    "n": 24,
+    "name": "Paging & Segmentation",
+    "unitIds": [
+     "90205c4cc0cc40f9bd9fa3d65295e743"
+    ]
+   },
+   {
+    "n": 25,
+    "name": "Virtual Memory & Demand Paging",
+    "unitIds": [
+     "e350cf5c590e49189900908680663740"
+    ]
+   },
+   {
+    "n": 26,
+    "name": "Page Replacement Algorithms & Belady's Anomaly",
+    "unitIds": [
+     "4f0e5b2b96ef44bb9751e6b871eafaa5"
+    ]
+   },
+   {
+    "n": 27,
+    "name": "Thrashing, Working Set & Frame Allocation",
+    "unitIds": [
+     "151dd7ad83f3456c82e3ea1938563391"
+    ]
+   },
+   {
+    "n": 28,
+    "name": "File System Concepts & Directories",
+    "unitIds": [
+     "c26f792c02704ffda6f22e7edff067a1"
+    ]
+   },
+   {
+    "n": 29,
+    "name": "File System Implementation",
+    "unitIds": [
+     "e8e44090386c4a819f2be4b8d932b68f"
+    ]
+   },
+   {
+    "n": 30,
+    "name": "I/O Systems & I/O Models",
+    "unitIds": [
+     "18f656e6438b4a9db48d16227a9cd865"
+    ]
+   },
+   {
+    "n": 31,
+    "name": "Spooling, Buffering & Disk Structure",
+    "unitIds": [
+     "1bda3c9f0cfd4656a80bae00d9cc85bd"
+    ]
+   },
+   {
+    "n": 32,
+    "name": "Disk Scheduling Algorithms",
+    "unitIds": [
+     "f8dbba04e3ab4b7ba10544325d7a6fc0"
+    ]
+   },
+   {
+    "n": 33,
+    "name": "RAID & Storage Management",
+    "unitIds": [
+     "d9de1c2e2a664b50a97c9f1c32edd9e7"
+    ]
+   },
+   {
+    "n": 34,
+    "name": "OS Security & Protection",
+    "unitIds": [
+     "f6949ec31a6b471bb2f06cf9ec3ce26e"
+    ]
+   }
+  ]
+ },
+ {
+  "key": "production_ai",
+  "portalKey": "production_ai",
+  "title": "Production AI Engineering",
+  "subject": "GenAI",
+  "lectures": [
+   {
+    "n": 1,
+    "name": "Introduction to LangGraph",
+    "unitIds": [
+     "bf5fb7efe2eb4d5098c2be3ce7b5e02b",
+     "c19c2e8d485b4619ae58bf7179b9e5e9",
+     "24d756ba1edc4c53913cd45df2e621ba",
+     "8ab1120d27db45788bfb528fa247c290"
+    ]
+   },
+   {
+    "n": 2,
+    "name": "Building Coding Agent using LangGraph – Part 1",
+    "unitIds": [
+     "8313a9d731c043b38c899b4609ff0f43",
+     "2be9eec0acfc43a8a60453df50d1737a",
+     "3db12bbd1d6941a98cc8d78117fd5c3c",
+     "b8443b8c33d74f258895a42603c720b8"
+    ]
+   },
+   {
+    "n": 3,
+    "name": "Building Coding Agent using LangGraph – Part 2",
+    "unitIds": [
+     "53580a04e3bc471b9d4a2fd5967d2451",
+     "85d1dc2a777b4c7fbfa14c0b203ed36f",
+     "94f698d49b64499d8af03ba15733582a",
+     "c56e82b128d94367b973df1457829e28"
+    ]
+   },
+   {
+    "n": 4,
+    "name": "Building Coding Agent using LangGraph – Part 1 Coding Practice",
+    "unitIds": [
+     "3da4e5afe0ae4e469ad13c42a02d81a3"
+    ]
+   }
+  ]
+ },
+ {
+  "key": "environmental_science",
+  "portalKey": "environmental_science",
+  "title": "Environmental Science",
+  "subject": "Interdisciplinary & Applied Sciences",
+  "lectures": [
+   {
+    "n": 1,
+    "name": "Earth's Systems and Cycles",
+    "unitIds": []
+   },
+   {
+    "n": 2,
+    "name": "Ecosystem Dynamics",
+    "unitIds": []
+   },
+   {
+    "n": 3,
+    "name": "Ecosystems and Biomes",
+    "unitIds": []
+   },
+   {
+    "n": 4,
+    "name": "Biodiversity and Conservation",
+    "unitIds": []
+   },
+   {
+    "n": 5,
+    "name": "Natural Resource Management",
+    "unitIds": []
+   },
+   {
+    "n": 6,
+    "name": "Global Warming - 1",
+    "unitIds": []
+   },
+   {
+    "n": 7,
+    "name": "Global Warming - 2",
+    "unitIds": []
+   },
+   {
+    "n": 8,
+    "name": "Planetary Boundaries - 1",
+    "unitIds": []
+   },
+   {
+    "n": 9,
+    "name": "Planetary Boundaries - 2",
+    "unitIds": []
+   },
+   {
+    "n": 10,
+    "name": "Global Sustainability - 1",
+    "unitIds": []
+   },
+   {
+    "n": 11,
+    "name": "Global Sustainability - 2",
+    "unitIds": []
+   },
+   {
+    "n": 12,
+    "name": "Economy and Sustainability-1",
+    "unitIds": []
+   },
+   {
+    "n": 13,
+    "name": "Economy and Sustainability-2",
+    "unitIds": []
+   },
+   {
+    "n": 14,
+    "name": "Environmental Crisis",
+    "unitIds": []
+   }
+  ]
+ },
+ {
+  "key": "ml",
+  "portalKey": "ml",
+  "title": "Introduction to ML",
+  "subject": "Artificial Intelligence & Emerging Technologies",
+  "lectures": [
+   {
+    "n": 1,
+    "name": "Introduction to Machine Learning",
+    "unitIds": [
+     "aa399c02f2b0457596cd7bcc87a98991"
+    ]
+   },
+   {
+    "n": 2,
+    "name": "Data Analysis with Pandas part 1",
+    "unitIds": []
+   },
+   {
+    "n": 3,
+    "name": "Data Analysis with Pandas part 2",
+    "unitIds": []
+   },
+   {
+    "n": 4,
+    "name": "KNN",
+    "unitIds": [
+     "fafee67c42f44b90ac46fd836e3b7094"
+    ]
+   },
+   {
+    "n": 5,
+    "name": "KNN Implementation",
+    "unitIds": [
+     "42c69476367644ef88b62b7df95cf0e9"
+    ]
+   },
+   {
+    "n": 6,
+    "name": "KNN Advanced",
+    "unitIds": [
+     "f207f78c6409430e87ecf274c33c8236"
+    ]
+   },
+   {
+    "n": 7,
+    "name": "Support Vector Machine",
+    "unitIds": []
+   },
+   {
+    "n": 8,
+    "name": "SVM Implementation",
+    "unitIds": [
+     "00104cc884e34e5a91bac5bdfa4f9cbe"
+    ]
+   },
+   {
+    "n": 9,
+    "name": "Naive Bayes Part 1",
+    "unitIds": [
+     "f7bb0cf47ade43ca8a202740a827d0f0"
+    ]
+   },
+   {
+    "n": 10,
+    "name": "Naive Bayes Implementation",
+    "unitIds": [
+     "568bb641fc154a8b82517b79b83a7a95"
+    ]
+   },
+   {
+    "n": 11,
+    "name": "Evaluation Metrics",
+    "unitIds": [
+     "4b26cfde475d4e35a781fb2927608f66"
+    ]
+   },
+   {
+    "n": 12,
+    "name": "Evaluation Metrics Implementation",
+    "unitIds": [
+     "e9621c82786f4134bea2b919e244f567"
+    ]
+   },
+   {
+    "n": 13,
+    "name": "Bias and Vairance",
+    "unitIds": []
+   },
+   {
+    "n": 14,
+    "name": "Decision Tree part 1",
+    "unitIds": [
+     "fd4cffb4e8e244f999ef601eebb976b8"
+    ]
+   },
+   {
+    "n": 15,
+    "name": "Decision Tree part 2",
+    "unitIds": [
+     "6adab30624cf4efab69574b3444697d9"
+    ]
+   },
+   {
+    "n": 16,
+    "name": "Decision Tree Implementation part 1",
+    "unitIds": [
+     "3ea7aa511f584ebca5c682c94ff06461"
+    ]
+   },
+   {
+    "n": 17,
+    "name": "Decision Tree Implementation part 2",
+    "unitIds": [
+     "6aef2838d3d447429ebcab8f2fd649f2"
+    ]
+   },
+   {
+    "n": 18,
+    "name": "Hyperparameter Tuning part 1",
+    "unitIds": [
+     "e1c2f69cdcd24830b1ab35ddc58c05d2"
+    ]
+   },
+   {
+    "n": 19,
+    "name": "Hyperparameter Tuning part 2",
+    "unitIds": [
+     "26becbd763ce4ff4bcfc93f9687ae47f",
+     "c872eb3ffedd48068b2252d7e5aace4a",
+     "4abd8b6f32ce41b587019e9bfa404707"
+    ]
+   },
+   {
+    "n": 20,
+    "name": "Capstone Project: 1.1 Problem Statement",
+    "unitIds": []
+   },
+   {
+    "n": 21,
+    "name": "Capstone Project: 1.3 Missing Values and Outliers Treatment",
+    "unitIds": []
+   },
+   {
+    "n": 22,
+    "name": "Capstone Project: 1.5 Evaluation Metrics",
+    "unitIds": []
+   },
+   {
+    "n": 23,
+    "name": "Capstone Project: 1.7 Feature Engineering - 2",
+    "unitIds": [
+     "92c19b658a434278a90cce29f93ce35c",
+     "eb7cd93041084ec28424fa025360065c",
+     "3251fa34213a4b8b83d9c8cfe19a7315"
+    ]
+   },
+   {
+    "n": 24,
+    "name": "Simple Linear Regression",
+    "unitIds": [
+     "ed339dfce78f45bba5203588966a1a2a",
+     "b3e07b06c67d424dbb811890ed49b5fc",
+     "e56bc21d36b341e093fd75c76971df1f",
+     "398e259bb9b0402ea84b70603b9425ae"
+    ]
+   },
+   {
+    "n": 25,
+    "name": "Simple Linear Regression Implementation",
+    "unitIds": [
+     "6d1d0c1892d444d180749f45047f94eb",
+     "ba6f81f9230c41ee97acaa94a7d35b36",
+     "e81ca31c2b68413eb832cb418922f7f8",
+     "e326ac9e757146f389862516bc5be6d3",
+     "ec6d976e136b46f1bc979dd7d7e3389f"
+    ]
+   },
+   {
+    "n": 26,
+    "name": "Multiple Linear Regression",
+    "unitIds": [
+     "a93ab3de76c1424180d612b455feae96"
+    ]
+   },
+   {
+    "n": 27,
+    "name": "Multiple Linear Regression Implementaion",
+    "unitIds": [
+     "0650fb338ec44d82b2f21498a80a9f55",
+     "0b3903a7264a4b0b94f3197b4fe5ab29",
+     "a93ab3de76c1424180d612b455feae96",
+     "f3055523c4c846f68892b1d3ccc9300a"
+    ]
+   },
+   {
+    "n": 28,
+    "name": "Polynomial Regression",
+    "unitIds": [
+     "aff13bcaf90f4af1a9bb423affbe022a"
+    ]
+   },
+   {
+    "n": 29,
+    "name": "Polynomial Regression - Continued",
+    "unitIds": [
+     "b61824cbf5f443a8a87613f52d190018",
+     "8fd98a66247546a286a4e8ee0aab0916",
+     "f6386c4e40ea4d87a2582a536b4cb66e",
+     "aff13bcaf90f4af1a9bb423affbe022a"
+    ]
+   },
+   {
+    "n": 30,
+    "name": "Gradient Descent - 1",
+    "unitIds": [
+     "6e95dd9b397646b1899465b7efa85ff4",
+     "daad1911bb8d46b8876b1ee7cf07310b",
+     "5d0253a9dbbb456593ba60b2d665a00e",
+     "f39c688f064f4d0f8fa865cfaa3d0544"
+    ]
+   },
+   {
+    "n": 31,
+    "name": "Gradient Descent - 2",
+    "unitIds": [
+     "f58a02c6879143feae6fc91653978e37",
+     "6dece71e455040dd85a159aa50213d96",
+     "b6ceeb0340a54243941cabcf53c9b672",
+     "47687052350049c9877f08180848bad0"
+    ]
+   },
+   {
+    "n": 32,
+    "name": "Gradient Descent Implementation",
+    "unitIds": [
+     "422baed6fc144a559784f56ee44273d8",
+     "959cde974f8c4d91abc5ae0c31b09fa4",
+     "ab850cc2fa8847018823df24750d1f2e"
+    ]
+   },
+   {
+    "n": 33,
+    "name": "Assumptions of Linear Regression",
+    "unitIds": [
+     "5b5e22ceda3e4dd9909d04e3f74bcaeb",
+     "18660ad65aec498ba165160784a8e673",
+     "8eb6d54cf8b24d5281b2f4af7151a839",
+     "270fe1ce03c54cf2bac2ad419a873157"
+    ]
+   },
+   {
+    "n": 34,
+    "name": "Assumptions of Linear Regression Implementation",
+    "unitIds": [
+     "e46d5639a1ca4b90bee0f2bab6270d54",
+     "b56736489f6c44cab63d77419135344b",
+     "edc853f3d8994433b43d917a9f4e4868"
+    ]
+   },
+   {
+    "n": 35,
+    "name": "Regularization",
+    "unitIds": []
+   },
+   {
+    "n": 36,
+    "name": "Regularization Implementation",
+    "unitIds": []
+   },
+   {
+    "n": 37,
+    "name": "Logistic Regression",
+    "unitIds": []
+   },
+   {
+    "n": 38,
+    "name": "Logistic Regression Implementation",
+    "unitIds": []
+   },
+   {
+    "n": 39,
+    "name": "KNN Regression",
+    "unitIds": []
+   },
+   {
+    "n": 40,
+    "name": "Support Vector Regression",
+    "unitIds": []
+   },
+   {
+    "n": 41,
+    "name": "Support Vector Regression Implementation",
+    "unitIds": []
+   },
+   {
+    "n": 42,
+    "name": "Decision Tree Regression",
+    "unitIds": []
+   },
+   {
+    "n": 43,
+    "name": "Decision Tree Regression Implementation",
+    "unitIds": []
+   },
+   {
+    "n": 44,
+    "name": "Introduction to Ensemble Algorithms",
+    "unitIds": []
+   },
+   {
+    "n": 45,
+    "name": "Voting",
+    "unitIds": []
+   },
+   {
+    "n": 46,
+    "name": "Stacking",
+    "unitIds": []
+   },
+   {
+    "n": 47,
+    "name": "Bagging",
+    "unitIds": []
+   },
+   {
+    "n": 48,
+    "name": "Random Forest",
+    "unitIds": []
+   },
+   {
+    "n": 49,
+    "name": "AUC - ROC Curve",
+    "unitIds": []
+   },
+   {
+    "n": 50,
+    "name": "Random Forest Implementation",
+    "unitIds": []
+   },
+   {
+    "n": 51,
+    "name": "Feature Importance",
+    "unitIds": []
+   },
+   {
+    "n": 52,
+    "name": "Boosting methods and Adaboost",
+    "unitIds": []
+   },
+   {
+    "n": 53,
+    "name": "Gradient Boosting Regression",
+    "unitIds": []
+   },
+   {
+    "n": 54,
+    "name": "Gradient Boosting Classification",
+    "unitIds": []
+   },
+   {
+    "n": 55,
+    "name": "XG boost",
+    "unitIds": []
+   },
+   {
+    "n": 56,
+    "name": "Boosting Implementation - Classification",
+    "unitIds": []
+   },
+   {
+    "n": 57,
+    "name": "Tutorial | Boosting Implementation - Classification",
+    "unitIds": []
+   },
+   {
+    "n": 58,
+    "name": "Introduction to Unsupervised Learning",
+    "unitIds": []
+   },
+   {
+    "n": 59,
+    "name": "K-Means Clustering",
+    "unitIds": []
+   },
+   {
+    "n": 60,
+    "name": "K-Means Clustering - Part 2",
+    "unitIds": []
+   },
+   {
+    "n": 61,
+    "name": "K-Means Clustering - Part 3",
+    "unitIds": []
+   },
+   {
+    "n": 62,
+    "name": "K-Means Implementation",
+    "unitIds": []
+   },
+   {
+    "n": 63,
+    "name": "Apriori Algorithm",
+    "unitIds": []
+   },
+   {
+    "n": 64,
+    "name": "Apriori Implementation",
+    "unitIds": []
+   },
+   {
+    "n": 65,
+    "name": "ECLAT Algorithm",
+    "unitIds": []
+   },
+   {
+    "n": 66,
+    "name": "ECLAT Implementation",
+    "unitIds": []
+   },
+   {
+    "n": 67,
+    "name": "Dimensionality Reduction",
+    "unitIds": []
+   },
+   {
+    "n": 68,
+    "name": "Dimensionality Reduction Part 2 (PCA)-",
+    "unitIds": []
+   },
+   {
+    "n": 69,
+    "name": "Dimensionality Reduction Part 2 (PCA)",
+    "unitIds": []
+   },
+   {
+    "n": 70,
+    "name": "Dimensionality Reduction Part 3",
+    "unitIds": []
+   },
+   {
+    "n": 71,
+    "name": "Dimensionality Reduction Implementation",
+    "unitIds": []
+   }
+  ]
+ },
+ {
+  "key": "deep_learning",
+  "portalKey": "deep_learning",
+  "title": "Introduction to Deep Learning",
+  "subject": "Artificial Intelligence & Emerging Technologies",
+  "lectures": [
+   {
+    "n": 1,
+    "name": "Overview of Deep Learning",
+    "unitIds": [
+     "89df7be500ba45a79b5c167bcab7e36e"
+    ]
+   },
+   {
+    "n": 2,
+    "name": "Biological Inspiration & History of Deep Learning",
+    "unitIds": [
+     "b5c29b905f744bb88d2fb6de49686f73",
+     "c597d34cf9c446e2b6887efb873a051d",
+     "8314777a2e394cebbffeeaa4176fdad5",
+     "8486190a90904c008b68a99c3c5fd63d",
+     "4238f2dbc7434fd7b934347236c9c889",
+     "5937882406524054aa368a3412310c5c",
+     "2994ea14d1304811952b7c799b9109f0",
+     "7d81611a14e841359beba2f2e22d4b1c"
+    ]
+   },
+   {
+    "n": 3,
+    "name": "Perceptron Implementation",
+    "unitIds": [
+     "126f87fc56184a7993295cee4dd41779",
+     "6f4bb591351a4fffb9d5682155f5cb6e",
+     "f9e61854305849d5bfeb9aa6625ab3a8",
+     "705d860345d74618ae29e75414968f28"
+    ]
+   },
+   {
+    "n": 4,
+    "name": "Layers in Neural Networks",
+    "unitIds": [
+     "4ac20126b5a4453e8cebddf8f514ff1c",
+     "b85ec0475b6d4687a636b92a9af7482d",
+     "273063d96a3c49ebb8123d38c6b5de9e",
+     "faf159ff9f93482ea2c0660bf65fc2e1"
+    ]
+   },
+   {
+    "n": 5,
+    "name": "Layers in Neural Networks - Implementation",
+    "unitIds": [
+     "926020096efd418c9430cf281c8315a2",
+     "cec9e894e06b4646a417fd0268e27a56",
+     "ee1e221eb6fe434397047f82d0868ae0",
+     "0964f836efca41e89da8b804927ab2c0"
+    ]
+   },
+   {
+    "n": 6,
+    "name": "Activation Functions Part 1",
+    "unitIds": [
+     "736ec8edcffc44e7a27cef777d85898b",
+     "47a9f74d0c264a7b81ededaf14d3910c",
+     "fdfe15518c9f404c9e0c7f554b38e7b6",
+     "2d9b78c578e14b50ba175f63b60af242"
+    ]
+   },
+   {
+    "n": 7,
+    "name": "Activation Functions Part 2",
+    "unitIds": [
+     "d958e80c2c014bdba5d7ca23447edd54"
+    ]
+   },
+   {
+    "n": 8,
+    "name": "Forward Propagation",
+    "unitIds": [
+     "a518dbe0e49a4770b9d7763996728569"
+    ]
+   },
+   {
+    "n": 9,
+    "name": "Regression Loss Functions",
+    "unitIds": [
+     "452cffd1507c4843a7bc0fe3937501c5"
+    ]
+   },
+   {
+    "n": 10,
+    "name": "Classification Loss Functions",
+    "unitIds": [
+     "beede6fa172a4033926bfc89d09bc361"
+    ]
+   }
+  ]
+ },
+ {
+  "key": "lecture_data_visualization",
+  "portalKey": null,
+  "title": "Data Visualization",
+  "subject": "Artificial Intelligence & Emerging Technologies",
+  "lectures": [
+   {
+    "n": 1,
+    "name": "Intro to Power BI",
+    "unitIds": []
+   },
+   {
+    "n": 2,
+    "name": "Understanding your Data Set",
+    "unitIds": []
+   },
+   {
+    "n": 3,
+    "name": "Adding Cards",
+    "unitIds": []
+   },
+   {
+    "n": 4,
+    "name": "Adding a Line Chart & Area Chart",
+    "unitIds": []
+   },
+   {
+    "n": 5,
+    "name": "Adding a Table",
+    "unitIds": []
+   },
+   {
+    "n": 6,
+    "name": "Adding a Slicer",
+    "unitIds": []
+   },
+   {
+    "n": 7,
+    "name": "Course Introduction To Advanced PowerBI",
+    "unitIds": []
+   },
+   {
+    "n": 8,
+    "name": "Adding a Scatter Chart",
+    "unitIds": []
+   },
+   {
+    "n": 9,
+    "name": "Adding Maps",
+    "unitIds": [
+     "77cbb6b7849d4756b97e948cbca461d0",
+     "08b8927a0f4a47c2a3d8c1bc333eb7c8",
+     "1c2641ee39c34a0598fb4abd026ac827",
+     "aeac6e3f08ab45ee95288fb847518f20",
+     "a158931063ab423bae424aef6d041928",
+     "bd52adf0b1fa4e189bf19b630d1aa732",
+     "53685801e0614feca3c9aaefa152b179",
+     "4090ccfbe1dc4f33894f4686cfc2313a",
+     "adca47c633154fbab7eccdb3b86e6935",
+     "a7667c1183fd4fd9a6b0f91b3aaaa891"
+    ]
+   },
+   {
+    "n": 10,
+    "name": "Q&A Tooling in Power BI",
+    "unitIds": [
+     "cb348c82b5bb442aa481b64b810bad0e",
+     "d1b450a5ee674a27a2ee5470a67dcb24",
+     "b08ddc7300884aa388269c136e8392ad",
+     "77cbb6b7849d4756b97e948cbca461d0",
+     "2b6c48a003d74136835388cb1e5a5185",
+     "b9d50d2c6435464aa72f2f3d4892adca",
+     "b99e24e9f33740208c43d1061ffac901",
+     "a9a5938dc6cb447884ff1d4d844bccfc"
+    ]
+   },
+   {
+    "n": 11,
+    "name": "Adding a Ribbon Chart",
+    "unitIds": []
+   },
+   {
+    "n": 12,
+    "name": "Adding a Filter",
+    "unitIds": []
+   },
+   {
+    "n": 13,
+    "name": "Cross Filtering",
+    "unitIds": []
+   },
+   {
+    "n": 14,
+    "name": "Drill Down",
+    "unitIds": []
+   },
+   {
+    "n": 15,
+    "name": "Formatting Filter Card",
+    "unitIds": []
+   },
+   {
+    "n": 16,
+    "name": "Power BI Service Introduction",
+    "unitIds": [
+     "0ab6be73ffcd4e2b9f5d43c53386fa9c",
+     "8baf3a0b1e174e2b9b2b643a0a128633",
+     "64a5f23b83db458f9907889e8ca1bba7",
+     "e9c9622e07394804955366372ab203ce",
+     "0fa1a761d8f94168a9191dbd91b1fd71",
+     "fe9ba3f9f18840c097d8f921024c3a0d"
+    ]
+   },
+   {
+    "n": 17,
+    "name": "Collaboration using Power BI",
+    "unitIds": []
+   },
+   {
+    "n": 18,
+    "name": "Introduction to Power Query - Extract, Transform, Load",
+    "unitIds": []
+   },
+   {
+    "n": 19,
+    "name": "Data Transformation using Power Query",
+    "unitIds": []
+   },
+   {
+    "n": 20,
+    "name": "Filters in Power Query",
+    "unitIds": []
+   },
+   {
+    "n": 21,
+    "name": "Row Transformations",
+    "unitIds": []
+   },
+   {
+    "n": 22,
+    "name": "Exploring Data",
+    "unitIds": []
+   },
+   {
+    "n": 23,
+    "name": "Inbuilt Column Transformations - 2",
+    "unitIds": []
+   },
+   {
+    "n": 24,
+    "name": "Inbuilt Column Transformations - 4",
+    "unitIds": []
+   },
+   {
+    "n": 25,
+    "name": "Combining Queries",
+    "unitIds": [
+     "2b0ecaa47342473f8c2635dae43aa640",
+     "def5e947be614090a568a06f8b7ba3fc",
+     "bb143d4db6424cbeacfb039822d74712",
+     "29fad71da69a483ca7cf7b92b7141d80",
+     "a3f2d9ccddd149679b3a35b8b36d8592",
+     "29b3cf4e03a040549a7c362fa087c83e",
+     "e2121655fb3349fa8faebaec4c0d58bc",
+     "12622618ac2e44ddaff3d3f5bc04ae9a"
+    ]
+   },
+   {
+    "n": 26,
+    "name": "Introduction to Data Modeling",
+    "unitIds": [
+     "b245b8fc271644c6b2ade6b9630ffdae",
+     "b4766ab5a4e34e9395e8b17b30df34dd",
+     "7ab6c229689d4a9eb133c2a43ccba41e",
+     "e244140bad3e4917a842594b2d80f5e9",
+     "fb638827e51c46078bccca5a50b76059",
+     "13d1f333a92142e2ab0bfa171ca76650",
+     "2ca2222d569b4ad8bd9942282e89f5e7",
+     "37e44b7881624b13a3c8cbdc96f6cc9c"
+    ]
+   },
+   {
+    "n": 27,
+    "name": "Techniques of Data Modeling - 2",
+    "unitIds": []
+   },
+   {
+    "n": 28,
+    "name": "Creating Measures using DAX",
+    "unitIds": []
+   },
+   {
+    "n": 29,
+    "name": "Date and Time Functions",
+    "unitIds": []
+   },
+   {
+    "n": 30,
+    "name": "Text Functions",
+    "unitIds": [
+     "3b0d2bcb34de45d7b7ed10fa0a614849",
+     "29a3f2af367f4b9eb1ca77fe5b4208f3",
+     "537d4f66d7cb44908a852dcf9e36bdc8",
+     "8ce70d48dbbb4843ad0c8c8223d4df8e",
+     "780e508f730945c08aefd1309ab6fee3",
+     "b8b7e3f9e0354fda9e445cb83ac2eea7",
+     "cab3556a50c64defbc708c854f911f4a",
+     "2598b71d810542f7afb1e129380e60a6"
+    ]
+   },
+   {
+    "n": 31,
+    "name": "Filter Functions",
+    "unitIds": [
+     "239d03fda40c424ca820413cdb95d123",
+     "790d46502ca541c8960ce42128af71af",
+     "1c590f84cb21414e9209c1f25dc3ad3a",
+     "b94a62250cb649fbad95595e44847179"
+    ]
+   },
+   {
+    "n": 32,
+    "name": "Time Intelligence Functions",
+    "unitIds": []
+   },
+   {
+    "n": 33,
+    "name": "Introduction to Tableau",
+    "unitIds": []
+   },
+   {
+    "n": 34,
+    "name": "Exploring Tableau UI and Workflow",
+    "unitIds": []
+   },
+   {
+    "n": 35,
+    "name": "Preparing First Visualization",
+    "unitIds": []
+   },
+   {
+    "n": 36,
+    "name": "Adding Labels , Colors And Formatting",
+    "unitIds": []
+   },
+   {
+    "n": 37,
+    "name": "Line & Area Charts",
+    "unitIds": []
+   },
+   {
+    "n": 38,
+    "name": "Filters",
+    "unitIds": []
+   },
+   {
+    "n": 39,
+    "name": "Creating Bins and Parameters",
+    "unitIds": []
+   },
+   {
+    "n": 40,
+    "name": "Data Interpreter",
+    "unitIds": []
+   },
+   {
+    "n": 41,
+    "name": "Blending",
+    "unitIds": []
+   }
+  ]
+ },
+ {
+  "key": "practical_software_engineering",
+  "portalKey": "practical_software_engineering",
+  "title": "Practical Software Engineering",
+  "subject": "Emerging Tech",
+  "lectures": [
+   {
+    "n": 1,
+    "name": "Getting Started with Command Line",
+    "unitIds": []
+   },
+   {
+    "n": 2,
+    "name": "Working with File System",
+    "unitIds": []
+   },
+   {
+    "n": 3,
+    "name": "Working with Files",
+    "unitIds": []
+   },
+   {
+    "n": 4,
+    "name": "Miscellaneous Commands",
+    "unitIds": []
+   },
+   {
+    "n": 5,
+    "name": "Getting Started with Git",
+    "unitIds": []
+   },
+   {
+    "n": 6,
+    "name": "Staging Area and Commits",
+    "unitIds": [
+     "3b0a3568ff594ee6a039d7bdecb16b7f"
+    ]
+   },
+   {
+    "n": 7,
+    "name": "GitHub Pages and Branching",
+    "unitIds": [
+     "adeaf0a0f33c405d8e7a9bd7b78e7714",
+     "29679637547a4708b478ffb59ab20f55",
+     "716021c9f9a24875a8806e284bd09afe"
+    ]
+   },
+   {
+    "n": 8,
+    "name": "Introduction to Software Development Life Cycle",
+    "unitIds": [
+     "942a46dbf2234324ae88eb273fe3db4d"
+    ]
+   },
+   {
+    "n": 9,
+    "name": "Software Development Models",
+    "unitIds": [
+     "502dd00a315d46d69d66d4c7ca7d5c39"
+    ]
+   },
+   {
+    "n": 10,
+    "name": "Building a College Help Desk Agent | Part 1",
+    "unitIds": [
+     "bc1958ed9491411f8267c9c581067bb2",
+     "c6e14fb955d24d6789a94f8466a3c70e",
+     "d7551f39a0e74abb95a47f22e2d71f8f",
+     "5717be57563341e0b021e3f20159e833",
+     "21f4984ca9d04c1abe5dbecd11b1624f"
+    ]
+   },
+   {
+    "n": 11,
+    "name": "Building a College Help Desk Agent | Part 2",
+    "unitIds": [
+     "8198d4ecdfa344ee83322e0f8e4a736f"
+    ]
+   },
+   {
+    "n": 12,
+    "name": "Building a College Help Desk Agent | Part 3",
+    "unitIds": [
+     "124375ba790e48278d6dad47501e3c5e"
+    ]
+   },
+   {
+    "n": 13,
+    "name": "Building a College Help Desk Agent | Part 4",
+    "unitIds": [
+     "e9cf8fd64e624a5cb08a0b07ee4ec60a"
+    ]
+   },
+   {
+    "n": 14,
+    "name": "Integrating Ollama to Run AI Locally",
+    "unitIds": []
+   },
+   {
+    "n": 15,
+    "name": "Testing a Real-World Project",
+    "unitIds": [
+     "88e4642527a440899a63f7e62b7e9025"
+    ]
+   },
+   {
+    "n": 16,
+    "name": "Deploying a Frontend Project",
+    "unitIds": []
+   },
+   {
+    "n": 17,
+    "name": "Deploying a Backend Project",
+    "unitIds": []
+   },
+   {
+    "n": 18,
+    "name": "Setting Up CI/CD Pipeline",
+    "unitIds": [
+     "da0fe0a0fb3a4df5bf9e902a6b10f57a"
+    ]
+   },
+   {
+    "n": 19,
+    "name": "Fullstack App Development using Lovable",
+    "unitIds": [
+     "d07c1644083748a781d1bc9d9e460c72"
+    ]
+   }
+  ]
+ },
+ {
+  "key": "iot",
+  "portalKey": "iot",
+  "title": "Internet of Things",
+  "subject": "Emerging Tech",
+  "lectures": [
+   {
+    "n": 1,
+    "name": "Physical AI and IoT Foundations",
+    "unitIds": [
+     "45a29707b9c343fe987859e47406076d",
+     "baf6118e688c4a04a44b2d335144c1f5",
+     "9eb7576824e2459797782d22223cf25d",
+     "5fda5a78ac334c78b8cfe0be4ab36117"
+    ]
+   },
+   {
+    "n": 2,
+    "name": "Electricity and Circuit Fundamentals",
+    "unitIds": [
+     "eca36cdfaa36483f88674b1aab48bad1",
+     "2f5314d0ceb549fbb18d2888aaaac169",
+     "1dde20ce41394bcb9379fc55b6f479d7",
+     "ee0c560d211f41ce84bd30d3325fc444",
+     "d847f548c38949019a2141a15df6c452"
+    ]
+   },
+   {
+    "n": 3,
+    "name": "Electronic Components",
+    "unitIds": [
+     "e6b0a87b3fa64233895b61364d975d51",
+     "ed46530210374e0f965c587bd01a67d3",
+     "1b5cff821e2e4de7b81edad1fe7c8b53",
+     "7f85e04531fa4b18a9d9bf3b5a0d6e9c",
+     "dc8622b831ec411c8241a22fc2b4a803"
+    ]
+   },
+   {
+    "n": 4,
+    "name": "Microcontrollers  and Simulation Environments",
+    "unitIds": [
+     "88dcb70c200440119966ad002596a837",
+     "603197e952ea46bbb0ebc3259eb28755",
+     "5d40ad5c34464764ab8b777c984b48ec",
+     "df7fbab45f024b4f9474428d625ea599"
+    ]
+   },
+   {
+    "n": 5,
+    "name": "Arduino Programming and Development Environments",
+    "unitIds": []
+   },
+   {
+    "n": 6,
+    "name": "Programming and Testing",
+    "unitIds": []
+   }
+  ]
+ },
+ {
+  "key": "lecture_robotics_operating_system",
+  "portalKey": null,
+  "title": "Robotics Operating System",
+  "subject": "Emerging Tech",
+  "lectures": [
+   {
+    "n": 1,
+    "name": "Linux Terminal Fundamentals",
+    "unitIds": [
+     "a273a5207449427a860c9ae53a6013bd",
+     "34831eb33a1b404893fd3b9262b6a198",
+     "b75f79c2e6b44125a35120deefa156ff",
+     "417398f060b6425ca61eceb636b82120",
+     "dda19e62b0cc471f8f956a8020c16af5"
+    ]
+   },
+   {
+    "n": 2,
+    "name": "ROS2 Development Environment",
+    "unitIds": [
+     "c50728330ce840748b11559f4522d594",
+     "5327bacfbd83487a988c2201b0f33d85",
+     "bd827777d9644e7194b94ce056a715a8",
+     "194de962b95c413c950c3a66b8e33ea0"
+    ]
+   },
+   {
+    "n": 3,
+    "name": "ROS2 Nodes and Computation Graph",
+    "unitIds": [
+     "c87e5e2354a14b708b537af7c64b74d9",
+     "17c1d27dec6a4079bdb4c648b4d7daa2",
+     "358074d8068747d69d42d6c85df6d074",
+     "da1ee0bb19ce48dfa81fc08103abe9a7"
+    ]
+   },
+   {
+    "n": 4,
+    "name": "Topics, Publishers and Subscribers",
+    "unitIds": [
+     "b20146d574d94757a8865ff818825163",
+     "ed02a1409cfc47a593b7405b4ce0f492",
+     "758d700099fe43df82f5ea809f5a179a",
+     "58620840d0c44165b131a0d64fc54d43"
+    ]
+   },
+   {
+    "n": 5,
+    "name": "Services, Actions and Parameters",
+    "unitIds": []
+   },
+   {
+    "n": 6,
+    "name": "Custom Messages and Launch Files",
+    "unitIds": []
    }
   ]
  }

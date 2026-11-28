@@ -71,6 +71,9 @@ export const LECTURE_SEMESTER: Record<string, number> = {
   quantitative_aptitude: 1, numerical_ability: 2, logical_reasoning: 3,
   math_for_cs: 1, probability_statistics: 3,
   lecture_introduction_to_english_language_and_communication: 1, english_foundation: 1, english_advanced: 2, english_applied: 3,
+  // Semester 4 / 6 lecture lists (2026-11-27, from the CDU Semester 4 and KKH Semester 6 prod sequence).
+  advanced_aptitude: 4, language_analytics: 4, linear_algebra_calculus: 4, computer_networks: 4, operating_systems: 4, production_ai: 4, environmental_science: 4,
+  ml: 6, deep_learning: 6, lecture_data_visualization: 6, practical_software_engineering: 6, iot: 6, lecture_robotics_operating_system: 6,
 };
 export const EXAM_SEMESTER: Record<string, number> = {
   lp_quantitative_aptitude: 1, lp_numerical_ability: 2, lp_logical_reasoning: 3, // Aptitude: learning-portal assessments (2026-11-19)

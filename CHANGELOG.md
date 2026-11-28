@@ -23,6 +23,16 @@ Commit messages stay short (title + 2-3 lines); this file is the detailed record
 | Deployed - Readiness tab (subjects, semesters, rules) | `artifacts/api-server/src/lib/connectors/deployedReadiness.ts`; page: `artifacts/instructor-crm/src/pages/deployed-readiness.tsx` |
 | One-off read-only checks | `artifacts/api-server/src/lib/connectors/_tmp_*.ts` |
 
+## 2026-11-28 -- Lecture lists for the Semester 4 and 6 courses (Demos, Taught in Class, Readiness)
+
+Per request ("add the new Sem 4 / Sem 6 subjects to Training - LP, Training - Demos, Taught in Class and all the other tables"). 13 courses, 322 lectures, built with `_tmp_build_sem46_lectures.ts` from the prod sequence (Semester 4: CDU Batch-1; Semester 6: KKH Batch-2), lectures in prod order:
+- Semester 4: Advanced Aptitude (19), Language Analytics (20), Linear Algebra and Calculus (47), Computer Networks (31, CS Core), Operating Systems (34, CS Core), Production AI Engineering (4, GenAI), Environmental Science (14, Interdisciplinary & Applied Sciences).
+- Semester 6: Introduction to ML (71), Introduction to Deep Learning (10), Data Visualization (41) -- all AI & ET; Practical Software Engineering (19), Internet of Things (6), Robotics Operating System (6) -- Emerging Tech.
+- Unit IDs: from the scheduled sessions' resource_id, else the portal unit with the same title. Missing for lectures not held yet with no matching portal unit (ML 44, Data Visualization 34, Environmental Science 14, PSE 8, Advanced Aptitude 3, IoT 2, ROS 2): those count for demos / AI assessments (matched by title) but not in Taught in Class until the list is re-built later. "Your Learning Journey" (orientation) left out.
+- Taught in Class / Training - Demos / Training - Assessments get the new subject columns CS Core, Emerging Tech, Interdisciplinary & Applied Sciences (`TAUGHT_SUBJECT_COLUMNS`).
+- Training - Readiness and Deployed - Readiness can now score Semester 4 and 6 (`LECTURE_SEMESTER`).
+- Files: `artifacts/api-server/src/data/lectureSessions.ts`, `artifacts/api-server/src/data/lecture_sessions_master.csv`, `artifacts/api-server/src/lib/connectors/trainingReadiness.ts` (`LECTURE_SEMESTER`), `artifacts/api-server/src/lib/connectors/taughtTraining.ts`. After pull: typecheck + Publish.
+
 ## 2026-11-27 -- Training tab: Semester 6 courses (Emerging Tech group)
 
 Per request ("also do it for Sem 6"), from KKH Batch-2's Semester 6 (the only Semester 6 batch) and its learning-portal courses (`_tmp_batch_sem_courses.ts KKH 6`, `_tmp_lp_content_for_courses.ts KKH 6`):
