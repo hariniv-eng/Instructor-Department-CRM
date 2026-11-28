@@ -23,6 +23,15 @@ Commit messages stay short (title + 2-3 lines); this file is the detailed record
 | Deployed - Readiness tab (subjects, semesters, rules) | `artifacts/api-server/src/lib/connectors/deployedReadiness.ts`; page: `artifacts/instructor-crm/src/pages/deployed-readiness.tsx` |
 | One-off read-only checks | `artifacts/api-server/src/lib/connectors/_tmp_*.ts` |
 
+## 2026-11-28 -- Deployed - Readiness: tabs per running semester, campus filter
+
+Per request ("show tabs for the semesters running now in the campuses -- Sem 1, 3, 4, 6 -- and for each, who teaches it and their readiness for the next semester; plus a campus filter").
+- Semester now comes from each BATCH's current semester in the prod sequence (niat_schedule_details_as_per_prod_sequence: is_current_semester, else today's dates, else the latest started), not from the NIAT 2026 / 2025 / 2024 shortcut -- e.g. CDU Batch-1 = Sem 4, KKH Batch-2 = Sem 6. An instructor is under the semester(s) of the batches they gave lectures to in the last 60 days; with no lectures, the cohort shortcut (marked "from cohort").
+- Buttons "Semester 1", "Semester 3", "Semester 4", "Semester 6" ... -- one per semester running now (first open by default; count = instructors), then "All semesters". Below them, "Readiness for: Current semester (Sem N) | Next semester (Sem N+1)" switches the scores, filters and cards between the two.
+- New Campus filter (campuses teaching that semester) and Campus column (with the batch names, the semester's end date); CSV gains Campus, Batches, Semester from, Current semester ends.
+- Next semesters with no lecture list in FCC (e.g. Sem 5, Sem 7) show as Not scored.
+- Files: `artifacts/api-server/src/lib/connectors/deployedReadiness.ts` (`fetchBatchSemesters`, `fetchSemesterLectures`), `artifacts/instructor-crm/src/pages/deployed-readiness.tsx`. After pull: typecheck + Publish.
+
 ## 2026-11-28 -- Training - LP: instructors shown under every subject they learn or teach
 
 Per request ("an instructor who has learned several subjects has to be shown in each -- part of Frontend done: shown in Frontend; part of GenAI: in GenAI too"; and "whatever subjects they are teaching, they should also be mapped to that subject"). Before, each instructor appeared only under their mapped subject, so e.g. only 2 people showed under Semester 6 although 19 teach KKH's Semester 6.

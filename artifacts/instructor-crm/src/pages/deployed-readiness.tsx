@@ -21,7 +21,10 @@ type Course = { key: string; title: string; semester: number | null; lectures_to
 type Source = 'teaching' | 'teaching (60 days)' | 'mapped subject' | 'other subject' | 'none';
 type Row = {
   employee_id: string | null; full_name: string; capability_manager: string | null; role: 'Instructor' | 'Mentor' | 'No sessions'; role_days: number;
-  cohort: string; current_sem: number; next_sem: number; subject: string; source: Source; evidence: string | null;
+  // campuses / batches (2026-11-28): where they teach this semester; semester_from: the batches' current semester in the prod sequence, or the
+  // NIAT cohort shortcut when they had no lectures; semester_end: the earliest end date of those batches' current semester.
+  cohort: string; campuses: string[]; batches: string[]; semester_from: 'batch schedule' | 'cohort'; semester_end: string | null;
+  current_sem: number; next_sem: number; subject: string; source: Source; evidence: string | null;
   lectures_30d: number; lectures_60d: number; current: Block | null; next: Block | null; courses: Course[];
 };
 type T = { green: number; yellow: number };
@@ -98,7 +101,8 @@ function Rules({ t, days, fallback }: { t?: { demo: T; ai: T; topn: T }; days: n
       </div>
       <ul className="flex max-w-2xl list-disc flex-col gap-2 pl-5 text-[12px] leading-5 text-foreground">
         <li><b>Same rules as Training - Readiness.</b> Overall = the lowest of the three; a score with no data counts as Red.</li>
-        <li><b>Next semester:</b> scored on the lectures and topin exams of the semester their batch moves to (NIAT 2026: Sem 1 → 2, NIAT 2025: Sem 3 → 4, NIAT 2024: Sem 5 → 6). Switch to <i>Current semester</i> to compare.</li>
+        <li><b>Semester tabs:</b> one per semester running now in some campus, taken from each batch's current semester in the prod sequence (e.g. CDU Batch-1 in Sem 4, KKH Batch-2 in Sem 6). An instructor is under the semester of the batches they taught lectures to in the last {fallback} days; with no lectures, their NIAT cohort decides (2026 = Sem 1, 2025 = Sem 3, 2024 = Sem 5). Use <i>Campus</i> to see one university.</li>
+        <li><b>Next semester:</b> scored on the lectures and topin exams of the semester after the current one (Sem 1 → 2, Sem 3 → 4, Sem 4 → 5, Sem 6 → 7). Switch to <i>Current semester</i> to compare. Not scored = FCC has no lecture list for that next semester yet.</li>
         <li><b>Subjects:</b> what they teach that batch now (lectures in the last {days} days, else {fallback} days, else their mapped subject), <b>plus</b> any other subject they have recorded a demo or AI assessment, or taken a topin exam, for in the next semester.</li>
         <li><b>Aptitude:</b> the exam score comes from the learning portal (exams + classroom quizzes), as on Training - Readiness. No other learning-portal data is used.</li>
         <li className="text-muted-foreground">Every demo counts (in-training, after deployment, mock); demos under 10 minutes and pre-preparedness demos do not. Not scored = FCC has no lecture list for that subject in that semester.</li>
@@ -122,8 +126,14 @@ export function DeployedReadinessView() {
   const days = query.data?.lecture_days ?? 30, fallback = query.data?.lecture_days_fallback ?? 60;
   const [which, setWhich] = useState<Which>('next');
   const sems = useMemo(() => [...new Set(apiRows.map((r) => r.current_sem))].sort((a, b) => a - b), [apiRows]);
-  const [sem, setSem] = useState<string>('all');
+  // Semester tabs (2026-11-28, per request): one per semester running NOW in some campus (from the batches' current semester), each showing
+  // the readiness for the semester after it; the first one is open by default. "All" stays at the end.
+  const [semPick, setSem] = useState<string | null>(null);
+  const sem = semPick ?? (sems.length ? String(sems[0]) : 'all');
   const bySem = useMemo(() => (sem === 'all' ? apiRows : apiRows.filter((r) => String(r.current_sem) === sem)), [apiRows, sem]);
+  // Campus filter (2026-11-28, per request): the campuses teaching this semester; picking one shows its instructors' readiness.
+  const [campuses, setCampuses] = useState<string[]>([]);
+  const campusOf = (r: Row) => (r.campuses.length ? r.campuses : ['(campus not known -- no lectures in 60 days)']);
   const [subjects, setSubjects] = useState<string[]>([]);
   const [sources, setSources] = useState<string[]>([]);
   const [managers, setManagers] = useState<string[]>([]);
@@ -138,19 +148,25 @@ export function DeployedReadinessView() {
     (skip === 'source' || !sources.length || sources.includes(SOURCE_LABEL[r.source])) &&
     (skip === 'cm' || !managers.length || managers.includes(r.capability_manager ?? NONE)) &&
     (skip === 'cat' || !cats.length || cats.includes(catOf(blockOf(r, which)))) &&
-    (skip === 'role' || !roles.length || roles.includes(r.role));
+    (skip === 'role' || !roles.length || roles.includes(r.role)) &&
+    (skip === 'campus' || !campuses.length || campusOf(r).some((c) => campuses.includes(c)));
+  const campusOptions = () => {
+    const counts = new Map<string, number>();
+    for (const r of bySem) if (pass(r, 'campus')) for (const c of campusOf(r)) counts.set(c, (counts.get(c) ?? 0) + 1);
+    return [...counts].sort((a, b) => a[0].localeCompare(b[0])).map(([key, count]) => ({ key, label: key, count }));
+  };
   const optionsFor = (skip: string, value: (r: Row) => string) => {
     const counts = new Map<string, number>();
     for (const r of bySem) if (pass(r, skip)) counts.set(value(r), (counts.get(value(r)) ?? 0) + 1);
     return [...counts].sort((a, b) => a[0].localeCompare(b[0])).map(([key, count]) => ({ key, label: key, count }));
   };
-  const filtered = useMemo(() => bySem.filter((r) => pass(r, '')), [bySem, subjects, sources, managers, cats, roles, which]); // eslint-disable-line react-hooks/exhaustive-deps
+  const filtered = useMemo(() => bySem.filter((r) => pass(r, '')), [bySem, subjects, sources, managers, cats, roles, campuses, which]); // eslint-disable-line react-hooks/exhaustive-deps
   const searched = useMemo(() => {
     const q = search.trim().toLowerCase();
     return q ? filtered.filter((r) => r.full_name.toLowerCase().includes(q) || (r.employee_id ?? '').toLowerCase().includes(q)) : filtered;
   }, [filtered, search]);
   const pager = usePagedRows(searched, 50);
-  const anyFilter = subjects.length + sources.length + managers.length + cats.length + roles.length > 0;
+  const anyFilter = subjects.length + sources.length + managers.length + cats.length + roles.length + campuses.length > 0;
   const kpi = useMemo(() => {
     const c = (k: string) => searched.filter((r) => catOf(blockOf(r, which)) === k).length;
     return { people: new Set(searched.map((r) => r.employee_id ?? r.full_name)).size, rows: searched.length, green: c('Green'), yellow: c('Yellow'), red: c('Red'), notScored: c('Not scored'), other: searched.filter((r) => r.source === 'other subject').length };
@@ -160,9 +176,9 @@ export function DeployedReadinessView() {
   const siblings = (r: Row) => apiRows.filter((x) => (x.employee_id ?? x.full_name) === (r.employee_id ?? r.full_name) && x.cohort === r.cohort);
 
   const downloadTable = () => {
-    const headers = ['Name', 'Employee ID', 'Role by sessions', 'Role window (days)', 'Capability Manager', 'Batch', 'Current semester', 'Next semester', 'Subject', 'Subject from', 'Other-subject evidence', `Lectures in subject (${days}d)`, `Lectures in subject (${fallback}d)`,
+    const headers = ['Name', 'Employee ID', 'Role by sessions', 'Role window (days)', 'Capability Manager', 'Campus', 'Batches', 'Semester from', 'Current semester ends', 'Current semester', 'Next semester', 'Subject', 'Subject from', 'Other-subject evidence', `Lectures in subject (${days}d)`, `Lectures in subject (${fallback}d)`,
       ...(['next', 'current'] as Which[]).flatMap((w) => { const p = w === 'next' ? 'Next sem' : 'Current sem'; return [`${p} lectures`, `${p} lectures with demo + AI`, `${p} % done`, `${p} demo avg`, `${p} lectures with demo`, `${p} demo colour`, `${p} AI avg`, `${p} lectures with AI`, `${p} AI colour`, `${p} Top-N %`, `${p} Top-N exams`, `${p} Top-N colour`, `${p} category`]; })];
-    const rows = searched.map((r) => [r.full_name, r.employee_id ?? '', r.role, r.role_days, r.capability_manager ?? '', r.cohort, r.current_sem, r.next_sem, r.subject, SOURCE_LABEL[r.source], r.evidence ?? '', r.lectures_30d, r.lectures_60d,
+    const rows = searched.map((r) => [r.full_name, r.employee_id ?? '', r.role, r.role_days, r.capability_manager ?? '', r.campuses.join('; '), r.batches.join('; ') || r.cohort, r.semester_from, r.semester_end ?? '', r.current_sem, r.next_sem, r.subject, SOURCE_LABEL[r.source], r.evidence ?? '', r.lectures_30d, r.lectures_60d,
       ...(['next', 'current'] as Which[]).flatMap((w) => { const b = blockOf(r, w); return b ? [b.lectures_total, b.both_lectures, b.lectures_total ? Math.round((b.both_lectures / b.lectures_total) * 100) : 0, b.demo_avg ?? '', b.demo_lectures, LABEL[b.demo_colour], b.ai_avg ?? '', b.ai_lectures, LABEL[b.ai_colour], b.topn_avg ?? '', b.topn_exams, LABEL[b.topn_colour], LABEL[b.overall]] : ['', '', '', '', '', '', '', '', '', '', '', '', 'Not scored']; })]);
     downloadCsv(`deployed-readiness-${sem === 'all' ? 'all' : `sem-${sem}`}.csv`, toCsv(headers, rows));
   };
@@ -185,18 +201,27 @@ export function DeployedReadinessView() {
     {query.isError && <QueryError message="Deployed readiness data is unavailable right now." />}
 
     {query.data && (apiRows.length === 0 ? <EmptyState title="No deployed instructors" description="No NIAT (Deployed) instructors with a NIAT batch right now." /> : <>
-      <div className="mb-4 flex flex-wrap items-center gap-3 border-b border-border pb-3">
-        <div data-testid="deployed-readiness-which" className="inline-flex rounded-lg border border-border bg-card p-1 shadow-sm">
-          {(['next', 'current'] as Which[]).map((w) => <button key={w} type="button" data-testid={`button-deployed-readiness-${w}`} onClick={() => setWhich(w)}
-            className={`rounded-md px-3.5 py-1.5 text-[12px] font-bold transition-colors ${which === w ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>{w === 'next' ? 'Next semester' : 'Current semester'}</button>)}
-        </div>
-        {['all', ...sems.map(String)].map((x) => {
-          const count = x === 'all' ? apiRows.length : apiRows.filter((r) => String(r.current_sem) === x).length;
-          return <button key={x} type="button" data-testid={`button-deployed-readiness-sem-${x}`} onClick={() => setSem(x)}
+      {/* Semester buttons (2026-11-28, per request): "Semester 1", "Semester 3" ... -- the semesters running now; each lists the instructors
+          teaching it. Below, Current / Next semester picks whose readiness is shown (default Next). */}
+      <div data-testid="deployed-readiness-semesters" className="mb-3 flex flex-wrap items-center gap-2 border-b border-border pb-3">
+        <span className="mr-1 font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Teaching now</span>
+        {[...sems.map(String), 'all'].map((x) => {
+          const count = new Set((x === 'all' ? apiRows : apiRows.filter((r) => String(r.current_sem) === x)).map((r) => r.employee_id ?? r.full_name)).size;
+          return <button key={x} type="button" data-testid={`button-deployed-readiness-sem-${x}`} onClick={() => { setSem(x); setCampuses([]); }}
+            title={x === 'all' ? 'Every semester' : `Instructors teaching Semester ${x} now`}
             className={`rounded-full px-4 py-2 text-[12px] font-bold transition-colors ${x === sem ? 'bg-primary text-primary-foreground shadow-sm' : 'bg-secondary text-muted-foreground hover:text-foreground'}`}>
-            {x === 'all' ? 'All batches' : `Sem ${x} → ${Number(x) + 1}`} <span className="ml-1 tabular-nums opacity-75">{formatKpi(count)}</span>
+            {x === 'all' ? 'All semesters' : `Semester ${x}`} <span className="ml-1 tabular-nums opacity-75">{formatKpi(count)}</span>
           </button>;
         })}
+      </div>
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <span className="font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Readiness for</span>
+        <div data-testid="deployed-readiness-which" className="inline-flex rounded-lg border border-border bg-card p-1 shadow-sm">
+          {(['current', 'next'] as Which[]).map((w) => <button key={w} type="button" data-testid={`button-deployed-readiness-${w}`} onClick={() => setWhich(w)}
+            className={`rounded-md px-3.5 py-1.5 text-[12px] font-bold transition-colors ${which === w ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>
+            {w === 'next' ? `Next semester${sem !== 'all' ? ` (Sem ${Number(sem) + 1})` : ''}` : `Current semester${sem !== 'all' ? ` (Sem ${sem})` : ''}`}
+          </button>)}
+        </div>
       </div>
 
       <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-6">
@@ -209,12 +234,13 @@ export function DeployedReadinessView() {
       </div>
 
       <div data-testid="deployed-readiness-filters" className="relative z-30 mb-5 flex flex-wrap items-center gap-4">
+        <MultiSelectFilter label="Campus" options={campusOptions()} selected={campuses} onChange={setCampuses} testId="select-deployed-readiness-campus" widthClass="max-w-[260px]" />
         <MultiSelectFilter label="Subject" options={optionsFor('subject', (r) => r.subject)} selected={subjects} onChange={setSubjects} testId="select-deployed-readiness-subject" />
         <MultiSelectFilter label="Subject from" options={optionsFor('source', (r) => SOURCE_LABEL[r.source])} selected={sources} onChange={setSources} testId="select-deployed-readiness-source" />
         <MultiSelectFilter label="Capability Manager" options={optionsFor('cm', (r) => r.capability_manager ?? NONE)} selected={managers} onChange={setManagers} testId="select-deployed-readiness-cm" />
         <MultiSelectFilter label={which === 'next' ? 'Next-sem category' : 'Current-sem category'} options={optionsFor('cat', (r) => catOf(blockOf(r, which)))} selected={cats} onChange={setCats} testId="select-deployed-readiness-cat" />
         <MultiSelectFilter label="Role by sessions" options={optionsFor('role', (r) => r.role)} selected={roles} onChange={setRoles} testId="select-deployed-readiness-role" />
-        {anyFilter && <button type="button" onClick={() => { setSubjects([]); setSources([]); setManagers([]); setCats([]); setRoles([]); }} className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-[11px] font-bold text-foreground transition-colors hover:bg-secondary"><X size={13} /> Clear filters</button>}
+        {anyFilter && <button type="button" onClick={() => { setSubjects([]); setSources([]); setManagers([]); setCats([]); setRoles([]); setCampuses([]); }} className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-[11px] font-bold text-foreground transition-colors hover:bg-secondary"><X size={13} /> Clear filters</button>}
       </div>
 
       <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
@@ -233,7 +259,7 @@ export function DeployedReadinessView() {
                 <tr className="border-b border-border bg-[#f4f7f9]">
                   <th className={`sticky left-0 z-10 bg-[#f4f7f9] ${th}`}>Name</th>
                   <th className={th}>Employee ID</th>
-                  <th className={th}>Batch</th>
+                  <th className={th}>Campus</th>
                   <th className={th}>Subject</th>
                   <th className={th}>Capability Manager</th>
                   <th className={th}>Lectures done (demo + AI)</th>
@@ -254,7 +280,10 @@ export function DeployedReadinessView() {
                     <tr onClick={() => setOpen(isOpen ? null : id)} className="cursor-pointer border-b border-border/70 last:border-0 hover:bg-[#f8fafb]">
                       <td className={`sticky left-0 z-10 bg-card font-semibold text-foreground ${td}`}><span className="inline-flex items-center gap-1.5">{isOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}{r.full_name}{r.role !== 'Instructor' && <span title={`By sessions, last ${r.role_days} days`} className="rounded-full bg-secondary px-1.5 py-0.5 text-[9px] font-bold uppercase text-muted-foreground">{r.role}</span>}</span></td>
                       <td className={`${td} font-mono-ui text-[11px]`}>{r.employee_id || NONE}</td>
-                      <td className={td}><div>{r.cohort}</div><div className="text-[10px] text-muted-foreground">Sem {r.current_sem} → {r.next_sem}</div></td>
+                      <td className={td} title={r.batches.length ? `Batches: ${r.batches.join(', ')}` : 'No lectures in 60 days -- semester from the NIAT cohort'}>
+                        <div>{r.campuses.length ? r.campuses.join(', ') : r.cohort}</div>
+                        <div className="text-[10px] text-muted-foreground">Sem {r.current_sem} → {r.next_sem}{r.semester_end ? ` · Sem ${r.current_sem} ends ${new Date(`${r.semester_end}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}` : ''}{r.semester_from === 'cohort' ? ' · from cohort' : ''}</div>
+                      </td>
                       <td className={td}>
                         <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${r.source === 'other subject' ? 'bg-[#e6f0fb] text-[#2b59c3]' : 'bg-secondary text-foreground'}`}>{r.subject}</span>
                         <div className="mt-0.5 text-[10px] text-muted-foreground">{sourceLine(r, days, fallback)}</div>
