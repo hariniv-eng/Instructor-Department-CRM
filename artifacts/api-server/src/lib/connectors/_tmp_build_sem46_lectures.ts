@@ -3,14 +3,14 @@
 // data/lectureSessions.ts holds them, from the prod sequence:
 //   lectures  = distinct LECTURE session titles of that course in niat_schedule_details_as_per_prod_sequence (the batch + semester below),
 //               in prod order (lowest session_id_order, then first date);
-//   unit IDs  = the resource_id of those same sessions in the session schedule table (joined on session_id), and, when a lecture has none,
+//   unit IDs  = the resource_id of those same sessions in niat_scheduled_session_wise_resource_details (joined on session_id; the table
+//               Taught in Class reads), and, when a lecture has none,
 //               the learning-portal unit with the same title in the course's portal course (LEARNING_SET units, not "Reading Material").
 // Writes lecture_courses_new.json (courses / lectures / unit IDs only, no people) to be merged into lectureSessions.ts + the master CSV.
 //   pnpm exec tsx src/lib/connectors/_tmp_build_sem46_lectures.ts && gzip -kf lecture_courses_new.json
 import fs from "node:fs";
 import { BigQuery } from "@google-cloud/bigquery";
 import { config } from "./config";
-import { SESSION_SCHEDULE_TABLE } from "./instructorContribution";
 import { UNIT_COMPLETION_TABLE } from "./instructorLearningStatus";
 
 type Spec = { key: string; portalKey: string | null; title: string; subject: string; semester: number; batch: string; prodId: string; lpId: string | null };
@@ -44,7 +44,7 @@ async function main() {
     const [rows] = await bq.query({ query: `
       WITH p AS (SELECT session_id, session_title, session_id_order, session_start_datetime FROM ${T("niat_schedule_details_as_per_prod_sequence")}
                  WHERE ${N("semester_course_id")} = @id AND semester_title = @sem AND LOWER(batch_name) LIKE LOWER(@b) AND session_type = 'LECTURE'),
-           r AS (SELECT ${N("session_id")} AS sid, ${N("resource_id")} AS rid FROM ${T(SESSION_SCHEDULE_TABLE)}
+           r AS (SELECT ${N("session_id")} AS sid, ${N("resource_id")} AS rid FROM ${T("niat_scheduled_session_wise_resource_details")}
                  WHERE resource_id IS NOT NULL AND ${N("session_id")} IN (SELECT ${N("session_id")} FROM p) GROUP BY 1, 2)
       SELECT p.session_title AS t, MIN(p.session_id_order) AS ord, CAST(MIN(p.session_start_datetime) AS STRING) AS first,
              ARRAY_AGG(DISTINCT r.rid IGNORE NULLS) AS rids
