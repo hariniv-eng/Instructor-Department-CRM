@@ -5,6 +5,7 @@ import { PageIntro, EmptyState, QueryError, SkeletonBlock, TablePager, TableSear
 import { downloadCsv, toCsv } from '@/lib/csv';
 import { MultiSelectFilter } from './instructors';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { SemesterButtons, SemesterSubjectSummary, SEMESTER_BUTTONS, avgPct } from './semester-buttons';
 
 // "Demos" view of Training Stats (2026-10-28, per request), next to "Taught in class". For each instructor and course of the lecture list:
 // how many of the course's lectures they have recorded a completed DEMO on (e.g. 8 / 20 for HTML & CSS) and, below it, the average QA
@@ -32,7 +33,8 @@ const KINDS: { kind: Kind; label: string; short: string; noun: string }[] = [
 // A thick line before each course's first column, a thin one before its AI columns.
 const kindBorder = (kind: Kind) => (kind === 'demo_training' ? 'border-l-2' : kind === 'ai_training' ? 'border-l border-l-border' : '');
 type DemoRow = { employee_id: string | null; full_name: string; product: string; subject_area: string | null; capability_manager: string | null; courses: Record<string, Cell> };
-type CourseCol = { course_id: string; title: string; subject: string; demo_instructors: number; ai_instructors: number; total: number };
+// semester (2026-11-28): the course's semester (null = none), for the Semester buttons.
+type CourseCol = { course_id: string; title: string; subject: string; semester: number | null; demo_instructors: number; ai_instructors: number; total: number };
 type DemoResponse = { rows: DemoRow[]; courses: CourseCol[]; subject_columns: string[]; synced_at: string | null };
 
 const QUERY_KEY = ['reports', 'demo-training'];
@@ -94,7 +96,12 @@ export function DemoTrainingView() {
     },
   });
   const all = query.data?.rows ?? [];
-  const allCourses = query.data?.courses ?? [];
+  const everyCourse = query.data?.courses ?? [];
+  // Semester buttons (2026-11-28, per request): All semesters, or one semester -- its subjects, its courses as columns, and the average
+  // completion of each of its subjects (SemesterSubjectSummary).
+  const [semester, setSemester] = useState<number | null>(null);
+  const allCourses = useMemo(() => (semester === null ? everyCourse : everyCourse.filter((c) => c.semester === semester)), [everyCourse, semester]);
+  const semCounts = useMemo(() => Object.fromEntries(SEMESTER_BUTTONS.map((n) => [n, everyCourse.filter((c) => c.semester === n).length])) as Record<number, number>, [everyCourse]);
   const subjectsWithCourses = useMemo(() => (query.data?.subject_columns ?? []).filter((s) => allCourses.some((c) => c.subject === s)), [query.data, allCourses]);
   const [subject, setSubject] = useState<string | null>(null);
   const activeSubject = subject && subjectsWithCourses.includes(subject) ? subject : subjectsWithCourses[0] ?? null;
@@ -123,6 +130,18 @@ export function DemoTrainingView() {
   };
 
   const columns = useMemo(() => allCourses.filter((c) => c.subject === activeSubject), [allCourses, activeSubject]);
+  // Average completion by subject for the semester picked: for each subject, the instructors with a demo or AI assessment on any of its
+  // semester courses, and the average % of the semester's lectures they have covered, for each of the four kinds.
+  const semesterSummary = useMemo(() => semester === null ? [] : subjectsWithCourses.map((s) => {
+    const cs = allCourses.filter((c) => c.subject === s);
+    const total = cs.reduce((a, c) => a + c.total, 0);
+    const people = all.filter((r) => cs.some((c) => r.courses[c.course_id]));
+    const values = KINDS.map(({ kind }) => avgPct(people.map((r) => {
+      const covered = cs.reduce((a, c) => { const x = r.courses[c.course_id]?.[kind]; return a + (x ? (isDemoKind(kind) ? x.covered_long : x.covered) : 0); }, 0);
+      return total ? Math.min(100, (covered / total) * 100) : 0;
+    })));
+    return { subject: SHORT[s] ?? s, courses: cs.length, instructors: people.length, values };
+  }), [semester, subjectsWithCourses, allCourses, all]);
   // Rows of this subject: instructors with a demo in at least one of its courses, with their overall lectures and average over those courses.
   const subjectRows = useMemo(() => all.flatMap((r) => {
     const cells = columns.map((c) => r.courses[c.course_id]).filter((x): x is Cell => !!x);
@@ -190,7 +209,19 @@ export function DemoTrainingView() {
     {query.isLoading && <SkeletonBlock className="h-[520px]" />}
     {query.isError && <QueryError message="Demo data is unavailable right now." />}
 
-    {query.data && (all.length === 0 || !activeSubject ? <EmptyState title="No demo data yet" description="Run the database push, publish, then click Sync Now to build it." /> : <>
+    {query.data && semester !== null && !activeSubject && all.length > 0 && <>
+      <SemesterButtons value={semester} onChange={(n) => { setSemester(n); setSubject(null); }} counts={semCounts} testId="demo-semester-buttons" />
+      <EmptyState title={`No Semester ${semester} demo data`} description={`No lecture-list course of Semester ${semester} has demos or AI assessments yet${semCounts[semester] ? '' : ' (no courses mapped to this semester)'}.`} />
+    </>}
+    {query.data && !(semester !== null && !activeSubject && all.length > 0) && (all.length === 0 || !activeSubject ? <EmptyState title="No demo data yet" description="Run the database push, publish, then click Sync Now to build it." /> : <>
+      <SemesterButtons value={semester} onChange={(n) => { setSemester(n); setSubject(null); setInstructorSubjects([]); setManagers([]); }} counts={semCounts} testId="demo-semester-buttons" />
+      {semester !== null && <SemesterSubjectSummary
+        title={`Semester ${semester} -- average completion by subject`}
+        columns={KINDS.map((k) => k.label)}
+        rows={semesterSummary}
+        note={`Average over the instructors with a demo or AI assessment on any of the subject's Semester ${semester} courses: % of the semester's lectures covered (demos: 10+ minute ones only).`}
+        testId="demo-semester-summary"
+      />}
       <div data-testid="demo-subject-buttons" className="mb-4 flex flex-wrap gap-2 border-b border-border pb-3">
         {subjectsWithCourses.map((s) => {
           const ids = new Set(allCourses.filter((c) => c.subject === s).map((c) => c.course_id));

@@ -4,6 +4,7 @@ import { RefreshCw, X } from 'lucide-react';
 import { PageIntro, EmptyState, QueryError, SkeletonBlock, TablePager, TableSearchInput, DownloadCsvButton, usePagedRows, formatKpi } from '@/components/ui-pieces';
 import { downloadCsv, toCsv } from '@/lib/csv';
 import { MultiSelectFilter } from './instructors';
+import { SemesterButtons, SemesterSubjectSummary, SEMESTER_BUTTONS, avgPct } from './semester-buttons';
 
 // "Taught in class" training, SESSION-ID version (2026-10-19, per request). NIAT instructors only. Every curriculum session of a course
 // has its own session id; for each instructor and course: sessions they completed / the course's sessions at their NIAT institutes.
@@ -13,7 +14,8 @@ import { MultiSelectFilter } from './instructors';
 
 type Cell = { completed: number; curriculum: number; scheduled: number; pct: number; last_taught_date: string | null; institutes: string[] };
 type TaughtRow = { employee_id: string | null; full_name: string; subject_area: string | null; capability_manager: string | null; courses: Record<string, Cell> };
-type CourseCol = { course_id: string; title: string; subject: string; instructors: number; curriculum_max: number };
+// semester (2026-11-28): the course's semester (null = none), for the Semester buttons.
+type CourseCol = { course_id: string; title: string; subject: string; semester: number | null; instructors: number; curriculum_max: number };
 type TaughtResponse = { rows: TaughtRow[]; courses: CourseCol[]; subject_columns: string[]; completed_pct: number; synced_at: string | null };
 
 const QUERY_KEY = ['reports', 'taught-training'];
@@ -36,7 +38,12 @@ export function TaughtTrainingView() {
     },
   });
   const all = query.data?.rows ?? [];
-  const allCourses = query.data?.courses ?? [];
+  const everyCourse = query.data?.courses ?? [];
+  // Semester buttons (2026-11-28, per request): All semesters, or one semester -- its subjects, its courses as columns, and the average
+  // % taught of each of its subjects (SemesterSubjectSummary).
+  const [semester, setSemester] = useState<number | null>(null);
+  const allCourses = useMemo(() => (semester === null ? everyCourse : everyCourse.filter((c) => c.semester === semester)), [everyCourse, semester]);
+  const semCounts = useMemo(() => Object.fromEntries(SEMESTER_BUTTONS.map((n) => [n, everyCourse.filter((c) => c.semester === n).length])) as Record<number, number>, [everyCourse]);
   const subjectsWithCourses = useMemo(() => (query.data?.subject_columns ?? []).filter((s) => allCourses.some((c) => c.subject === s)), [query.data, allCourses]);
   const [subject, setSubject] = useState<string | null>(null);
   const activeSubject = subject && subjectsWithCourses.includes(subject) ? subject : subjectsWithCourses[0] ?? null;
@@ -64,6 +71,17 @@ export function TaughtTrainingView() {
   };
 
   const columns = useMemo(() => allCourses.filter((c) => c.subject === activeSubject), [allCourses, activeSubject]);
+  // Average % taught by subject for the semester picked: instructors who taught any of the subject's semester courses, each at their
+  // overall % over those courses (completed sessions / class sessions, as in the overall column), averaged.
+  const semesterSummary = useMemo(() => semester === null ? [] : subjectsWithCourses.map((s) => {
+    const cs = allCourses.filter((c) => c.subject === s);
+    const pcts = all.flatMap((r) => {
+      const cells = cs.map((c) => r.courses[c.course_id]).filter((x): x is Cell => !!x);
+      if (!cells.length) return [];
+      return [pctOf(cells.reduce((a, x) => a + Math.min(x.completed, x.curriculum), 0), cells.reduce((a, x) => a + x.curriculum, 0))];
+    });
+    return { subject: SHORT[s] ?? s, courses: cs.length, instructors: pcts.length, values: [avgPct(pcts)] };
+  }), [semester, subjectsWithCourses, allCourses, all]);
   // Rows of this subject: instructors who have taught at least one of its courses, with their overall % over those courses.
   const subjectRows = useMemo(() => all.flatMap((r) => {
     const cells = columns.map((c) => r.courses[c.course_id]).filter((x): x is Cell => !!x);
@@ -116,7 +134,19 @@ export function TaughtTrainingView() {
     {query.isLoading && <SkeletonBlock className="h-[520px]" />}
     {query.isError && <QueryError message="Taught-in-class training is unavailable right now." />}
 
-    {query.data && (all.length === 0 || !activeSubject ? <EmptyState title="No taught-in-class data yet" description="Run the database push, publish, then click Sync Now to build it." /> : <>
+    {query.data && semester !== null && !activeSubject && all.length > 0 && <>
+      <SemesterButtons value={semester} onChange={(n) => { setSemester(n); setSubject(null); }} counts={semCounts} testId="taught-semester-buttons" />
+      <EmptyState title={`No Semester ${semester} classes taught`} description={`No course of Semester ${semester} has been taught by a NIAT instructor yet${semCounts[semester] ? '' : ' (no courses mapped to this semester)'}.`} />
+    </>}
+    {query.data && !(semester !== null && !activeSubject && all.length > 0) && (all.length === 0 || !activeSubject ? <EmptyState title="No taught-in-class data yet" description="Run the database push, publish, then click Sync Now to build it." /> : <>
+      <SemesterButtons value={semester} onChange={(n) => { setSemester(n); setSubject(null); setInstructorSubjects([]); setManagers([]); }} counts={semCounts} testId="taught-semester-buttons" />
+      {semester !== null && <SemesterSubjectSummary
+        title={`Semester ${semester} -- average % taught by subject`}
+        columns={['Average % taught']}
+        rows={semesterSummary}
+        note={`Average over the NIAT instructors who taught any of the subject's Semester ${semester} courses: class sessions taught / the courses' class sessions.`}
+        testId="taught-semester-summary"
+      />}
       <div data-testid="taught-subject-buttons" className="mb-4 flex flex-wrap gap-2 border-b border-border pb-3">
         {subjectsWithCourses.map((s) => {
           const ids = new Set(allCourses.filter((c) => c.subject === s).map((c) => c.course_id));

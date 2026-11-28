@@ -9,6 +9,7 @@ import { DemoTrainingView } from './demo-training';
 import { TopinAssessmentView } from './topin-assessments';
 import { TrainingReadinessView } from './training-readiness';
 import { DeployedReadinessView } from './deployed-readiness';
+import { SemesterButtons, SEMESTER_BUTTONS } from './semester-buttons';
 
 // "Training Stats" (2026-09-23, per request): an instructor's OWN
 // training/upskilling progress, distinct from every other tab here, which
@@ -202,7 +203,9 @@ const percentTone = (value: number) => (value >= 80 ? 'bg-[#e5f3ed] text-[#256e6
 // atLeast80 (2026-10-16, per request, replacing the earlier nearComplete): instructors at 80% or more on their track, INCLUDING those at 100%,
 // so "80%+ rate" is always at least the completion rate.
 // atLeast50 (2026-10-16, per request): the same at 50% or more (including 80%+ and 100%).
-type CompletionTally = { total: number; completed: number; atLeast80: number; atLeast50: number; inProgress: number; notStarted: number; noData: number; untracked: number };
+// pctSum / pctN (2026-11-28, per request: "rate of completion of each subject" per semester): sum and count of the instructors' completion %,
+// for the Avg completion column.
+type CompletionTally = { total: number; completed: number; atLeast80: number; atLeast50: number; inProgress: number; notStarted: number; noData: number; untracked: number; pctSum: number; pctN: number };
 const NEAR_COMPLETE_PCT = 80;
 const HALF_COMPLETE_PCT = 50;
 // Semester of each course (2026-10-16, per request). Courses not listed here (Developer Foundation, the DSML courses other than ML) belong to
@@ -258,13 +261,14 @@ function readinessOf(row: TrainingStatsRow, taxonomy: TrainingCourseDef[]): Read
 const readinessText = (it: ReadinessItem) => `Sem ${it.next}: ${it.pct !== null ? `${Math.round(it.pct * 10) / 10}%` : READINESS_LABEL[it.status]}`;
 
 function tallyCompletion(rows: TrainingStatsRow[], taxonomy: TrainingCourseDef[]): CompletionTally {
-  const tally: CompletionTally = { total: 0, completed: 0, atLeast80: 0, atLeast50: 0, inProgress: 0, notStarted: 0, noData: 0, untracked: 0 };
+  const tally: CompletionTally = { total: 0, completed: 0, atLeast80: 0, atLeast50: 0, inProgress: 0, notStarted: 0, noData: 0, untracked: 0, pctSum: 0, pctN: 0 };
   for (const row of rows) {
     const track = row.subject_area ? SUBJECT_TRACK[row.subject_area] : undefined;
     const defs = track ? taxonomy.filter((def) => def.trackGroup === track) : [];
     if (defs.length === 0) { tally.untracked += 1; continue; }
     tally.total += 1;
     const pct = subjectCompletion(row, defs);
+    if (pct !== null) { tally.pctSum += pct; tally.pctN += 1; }
     if (pct === null) tally.noData += 1;
     else if (pct >= 100) { tally.completed += 1; tally.atLeast80 += 1; tally.atLeast50 += 1; }
     else if (pct > 0) { tally.inProgress += 1; if (pct >= NEAR_COMPLETE_PCT) tally.atLeast80 += 1; if (pct >= HALF_COMPLETE_PCT) tally.atLeast50 += 1; }
@@ -272,6 +276,7 @@ function tallyCompletion(rows: TrainingStatsRow[], taxonomy: TrainingCourseDef[]
   }
   return tally;
 }
+const avgCompletion = (tally: CompletionTally) => (tally.pctN > 0 ? Math.round((tally.pctSum / tally.pctN) * 10) / 10 : null);
 const completionRate = (tally: CompletionTally) => (tally.total > 0 ? Math.round((tally.completed / tally.total) * 1000) / 10 : null);
 
 const atLeast80Rate = (tally: CompletionTally) => (tally.total > 0 ? Math.round((tally.atLeast80 / tally.total) * 1000) / 10 : null);
@@ -285,7 +290,9 @@ function CompletionBreakdown({ title, firstColumn, rows, testId, note }: { title
   const total = rows.reduce<CompletionTally>((sum, { tally }) => ({
     total: sum.total + tally.total, completed: sum.completed + tally.completed, atLeast80: sum.atLeast80 + tally.atLeast80, atLeast50: sum.atLeast50 + tally.atLeast50, inProgress: sum.inProgress + tally.inProgress,
     notStarted: sum.notStarted + tally.notStarted, noData: sum.noData + tally.noData, untracked: sum.untracked + tally.untracked,
-  }), { total: 0, completed: 0, atLeast80: 0, atLeast50: 0, inProgress: 0, notStarted: 0, noData: 0, untracked: 0 });
+    pctSum: sum.pctSum + tally.pctSum, pctN: sum.pctN + tally.pctN,
+  }), { total: 0, completed: 0, atLeast80: 0, atLeast50: 0, inProgress: 0, notStarted: 0, noData: 0, untracked: 0, pctSum: 0, pctN: 0 });
+  const totalAvg = avgCompletion(total);
   const totalRate = completionRate(total);
   const totalRate80 = atLeast80Rate(total);
   const totalRate50 = atLeast50Rate(total);
@@ -296,6 +303,7 @@ function CompletionBreakdown({ title, firstColumn, rows, testId, note }: { title
         <tr data-testid={`${testId}-total`} className="border-b border-border bg-secondary/60 text-foreground">
           <td className="whitespace-nowrap px-4 py-2 font-bold">Total</td>
           <td className="px-3 py-2 text-right font-mono-ui font-bold tabular-nums">{formatKpi(total.total)}</td>
+          <td className="px-3 py-2 text-right font-mono-ui font-bold tabular-nums">{totalAvg === null ? '—' : `${totalAvg}%`}</td>
           <td className="px-3 py-2 text-right font-mono-ui font-bold tabular-nums">{formatKpi(total.completed)}</td>
           <td className="px-3 py-2 text-right font-mono-ui font-bold tabular-nums">{formatKpi(total.atLeast80)}</td>
           <td className="px-3 py-2 text-right font-mono-ui font-bold tabular-nums">{formatKpi(total.atLeast50)}</td>
@@ -309,6 +317,7 @@ function CompletionBreakdown({ title, firstColumn, rows, testId, note }: { title
         <tr className="border-b border-border text-left font-mono-ui text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
           <th className="whitespace-nowrap px-4 py-2 font-normal">{firstColumn}</th>
           <th className="whitespace-nowrap px-3 py-2 text-right font-normal" title="Instructors measured on their own subject's course track">Instructors</th>
+          <th className="whitespace-nowrap px-3 py-2 text-right font-normal" title="Average of the instructors' completion % on their subject's courses (with a semester picked: that semester's courses); instructors with no synced data are left out">Avg completion</th>
           <th className="whitespace-nowrap px-3 py-2 text-right font-normal" title="Every course of their subject at 100%">Completed</th>
           <th className="whitespace-nowrap px-3 py-2 text-right font-normal" title="At 80% or more on their subject, including those at 100%">80%+</th>
           <th className="whitespace-nowrap px-3 py-2 text-right font-normal" title="At 50% or more on their subject, including those at 80%+ and 100%">50%+</th>
@@ -325,9 +334,11 @@ function CompletionBreakdown({ title, firstColumn, rows, testId, note }: { title
           const rate = completionRate(tally);
           const rate80 = atLeast80Rate(tally);
           const rate50 = atLeast50Rate(tally);
+          const avg = avgCompletion(tally);
           return <tr key={name} className="border-b border-border last:border-b-0">
             <td className="whitespace-nowrap px-4 py-2 font-semibold text-foreground">{name}</td>
             <td className="px-3 py-2 text-right font-mono-ui tabular-nums text-foreground">{formatKpi(tally.total)}</td>
+            <td className="px-3 py-2 text-right font-mono-ui font-bold tabular-nums text-foreground">{avg === null ? '—' : `${avg}%`}</td>
             <td className="px-3 py-2 text-right font-mono-ui tabular-nums text-foreground">{formatKpi(tally.completed)}</td>
             <td className="px-3 py-2 text-right font-mono-ui tabular-nums text-foreground">{formatKpi(tally.atLeast80)}</td>
             <td className="px-3 py-2 text-right font-mono-ui tabular-nums text-foreground">{formatKpi(tally.atLeast50)}</td>
@@ -417,7 +428,8 @@ function LearningPortalStats() {
   const activeSubTab = SUB_TABS.find((t) => t.key === activeTab) ?? SUB_TABS[0];
   const activeTaxonomy = data ? data.taxonomy.filter((d) => activeSubTab.trackGroups.includes(d.trackGroup)) : [];
   const semesterOptions = SEMESTERS.filter((sem) => activeTaxonomy.some((d) => COURSE_SEMESTER[d.key] === sem));
-  const semSel = semesters.filter((sem) => semesterOptions.includes(sem));
+  // Semester buttons (2026-11-28): one semester or none; a semester with no courses on this tab leaves the tab empty, with a note.
+  const semSel = semesters;
   const semesterActive = semSel.length > 0;
   const semText = semSel.length === 1 ? `Semester ${semSel[0]}` : `Semesters ${semSel.join(', ')}`;
   const semTaxonomy = semesterActive ? activeTaxonomy.filter((d) => semSel.includes(COURSE_SEMESTER[d.key])) : activeTaxonomy;
@@ -518,6 +530,12 @@ function LearningPortalStats() {
 
     {syncMessage && <p data-testid="status-sync-training-status" className={`mb-4 max-w-2xl rounded-lg px-3 py-2 text-[12px] font-semibold ${syncMessage.ok ? 'bg-[#e5f3ed] text-[#256e65]' : 'bg-[#fff0ec] text-[#9b4434]'}`}>{syncMessage.text}</p>}
 
+    {data && <SemesterButtons
+      value={semSel[0] ?? null}
+      onChange={(n) => setSemesters(n === null ? [] : [n])}
+      counts={Object.fromEntries(SEMESTER_BUTTONS.map((n) => [n, data.taxonomy.filter((d) => COURSE_SEMESTER[d.key] === n && isResolved(d)).length]))}
+      testId="training-semester-buttons"
+    />}
     <div className="mb-6 flex flex-wrap gap-2 border-b border-border pb-3">
       {SUB_TABS.map((tab) => <button
         key={tab.key}
@@ -545,22 +563,12 @@ function LearningPortalStats() {
         onChange={setProducts}
         testId="select-training-product"
       />}
-      {semesterOptions.length > 0 && <MultiSelectFilter
-        label="Semester"
-        options={semesterOptions.map((sem) => {
-          const tracks = new Set(activeTaxonomy.filter((d) => COURSE_SEMESTER[d.key] === sem).map((d) => d.trackGroup));
-          return { key: String(sem), label: `Sem ${sem}`, count: activeRows.filter((row) => !!row.subject_area && tracks.has(SUBJECT_TRACK[row.subject_area])).length };
-        })}
-        selected={semSel.map(String)}
-        onChange={(next) => setSemesters(next.map(Number))}
-        testId="select-training-semester"
-        widthClass="w-[150px]"
-      />}
       {(subjectActive || productActive || semesterActive) && <button type="button" data-testid="button-clear-training-filters" onClick={() => { setSubjects([]); setProducts([]); setSemesters([]); }} className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-[11px] font-bold text-foreground transition-colors hover:bg-secondary">
         <X size={13} /> Clear filters
       </button>}
     </div>}
 
+    {data && semesterActive && semTaxonomy.length === 0 && <p data-testid="training-semester-empty" className="mb-6 rounded-lg bg-secondary px-3 py-2 text-[12px] font-semibold text-muted-foreground">No {semText} courses on the {activeSubTab.label} tab yet{semesterOptions.length ? ` -- this tab has courses in ${semesterOptions.map((n) => `Sem ${n}`).join(', ')}` : ''}.</p>}
     {query.isLoading && <SkeletonBlock className="h-[520px]" />}
     {query.isError && <QueryError message="Training Stats is unavailable right now." />}
 

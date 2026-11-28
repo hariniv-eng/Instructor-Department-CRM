@@ -10,7 +10,7 @@ import { isPinnedConfirmedInstructor, TEACHOS_ONLY_UNREVIEWED } from "../data/cl
 import { productOf } from "../lib/product";
 import { taughtSubjectColumn, courseColumnOf, portalColumnOf, TAUGHT_SUBJECT_COLUMNS } from "../lib/connectors/taughtTraining";
 import { ASSESSMENT_COURSES, fetchTopinAssessments, normUid, topinCellsFor } from "../lib/connectors/topinAssessments";
-import { bySubject, fetchLpAptitudeScores, fetchLpSubjectAssessments, topinOverallOf, OVERALL_ASSESSMENT_SUBJECTS, type OverallAssessments, fetchReadinessEvaluations, fetchRecentLpActivity, learningNowOf, readinessOf, READINESS_THRESHOLDS, LEARNING_DAYS } from "../lib/connectors/trainingReadiness";
+import { bySubject, LECTURE_SEMESTER, fetchLpAptitudeScores, fetchLpSubjectAssessments, topinOverallOf, OVERALL_ASSESSMENT_SUBJECTS, type OverallAssessments, fetchReadinessEvaluations, fetchRecentLpActivity, learningNowOf, readinessOf, READINESS_THRESHOLDS, LEARNING_DAYS } from "../lib/connectors/trainingReadiness";
 import { lectureNameIndex } from "../lib/connectors/demoTraining";
 import { buildDeployedReadiness, DEPLOYED_COHORT_SEMESTERS, LECTURE_DAYS, LECTURE_DAYS_FALLBACK } from "../lib/connectors/deployedReadiness";
 import { LECTURE_COURSES } from "../data/lectureSessions";
@@ -1552,6 +1552,21 @@ router.get("/reports/training-stats", requireAuth, requireRole("admin"), async (
 // orientation/intro courses left out), so changing it needs no re-sync. Completed = 80%+. Admin-only. Reads defensively.
 const TAUGHT_COMPLETED_PCT = 80;
 const NON_TECH_TAUGHT_SUBJECTS = new Set(["English", "Aptitude", "Maths"]);
+// Semester of a course column (2026-11-28, per request: "Sem 1 ... Sem 6 buttons on Training - LP, Demos and Taught in Class, with each
+// semester's subjects and their completion"). Lecture-list courses: LECTURE_SEMESTER (connectors/trainingReadiness.ts); learning-portal
+// courses: the same semesters as COURSE_SEMESTER in instructor-crm/src/pages/training-stats.tsx (kept in step by hand). Column keys look
+// like "portal:react_js", "lecture:lecture_ips" or "demo:llm" -- the part after the first ":" is the course key.
+const PORTAL_COURSE_SEMESTER: Record<string, number> = {
+  html_css_2026: 1, static_web: 1, responsive_design: 1, modern_responsive_ui: 1, javascript_sprint: 2, javascript_essentials: 2, dynamic_web_app: 2, react_js: 3,
+  python: 1, sql: 2, mongodb: 2, node_js: 3, dsa: 2, dia: 3, ips: 4, gen_ai: 1, llm: 2, ai_for_finance: 3,
+  quantitative_aptitude: 1, numerical_ability: 2, logical_reasoning: 3, advanced_aptitude: 4, math_for_cs: 1, probability_statistics: 3, linear_algebra_calculus: 4,
+  english_foundation: 1, english_advanced: 2, english_applied: 3, language_analytics: 4,
+  production_ai: 4, computer_networks: 4, operating_systems: 4, environmental_science: 4, ml: 6, deep_learning: 6, practical_software_engineering: 6, iot: 6,
+};
+const semesterOfColumn = (columnKey: string): number | null => {
+  const k = columnKey.includes(":") ? columnKey.slice(columnKey.indexOf(":") + 1) : columnKey;
+  return LECTURE_SEMESTER[k] ?? PORTAL_COURSE_SEMESTER[k] ?? null;
+};
 const isNiatInstructor = (p: typeof instructorsTable.$inferSelect) =>
   productOf(p) === "NIAT (Deployed)" && (!p.enrolledPlans || /niat/i.test(p.enrolledPlans));
 router.get("/reports/taught-training", requireAuth, requireRole("admin"), async (_req, res) => {
@@ -1567,7 +1582,7 @@ router.get("/reports/taught-training", requireAuth, requireRole("admin"), async 
   }
   const pct = (done: number, total: number) => (total > 0 ? Math.min(100, Math.round((done / total) * 1000) / 10) : 0);
   type Cell = { completed: number; curriculum: number; scheduled: number; pct: number; last_taught_date: string | null; institutes: string[]; taught_as: string[] };
-  const courses = new Map<string, { course_id: string; title: string; subject: string; instructors: number; curriculum_max: number; portal: boolean; order: number; taught_as: string[] }>();
+  const courses = new Map<string, { course_id: string; title: string; subject: string; semester: number | null; instructors: number; curriculum_max: number; portal: boolean; order: number; taught_as: string[] }>();
   const cellsByUid = new Map<string, Record<string, Cell>>();
   for (const t of taughtRows) {
     if (!byUid.has(t.instructorUserId) || t.curriculumSessions <= 0) continue;
@@ -1597,7 +1612,7 @@ router.get("/reports/taught-training", requireAuth, requireRole("admin"), async 
     // in DSA, "DSA (C++)" first, then "DSA II").
     const lectureIdx = t.courseId.startsWith("lecture:") ? LECTURE_COURSES.findIndex((c) => c.key === t.courseId.slice("lecture:".length)) : -1;
     const order = portal ? TRAINING_COURSE_TAXONOMY.findIndex((d) => `portal:${d.key}` === key) : 10000 + (lectureIdx >= 0 ? lectureIdx : 999);
-    const c = courses.get(key) ?? { course_id: key, title: (t.courseId.startsWith("lecture:") ? t.courseTitle : portal?.title) ?? named.title, subject, instructors: 0, curriculum_max: 0, portal: !!portal, order, taught_as: [] };
+    const c = courses.get(key) ?? { course_id: key, title: (t.courseId.startsWith("lecture:") ? t.courseTitle : portal?.title) ?? named.title, subject, semester: semesterOfColumn(key), instructors: 0, curriculum_max: 0, portal: !!portal, order, taught_as: [] };
     if (!prev) c.instructors += 1;
     c.curriculum_max = Math.max(c.curriculum_max, curriculum);
     for (const name of t.taughtTopics ?? []) if (!c.taught_as.includes(name)) c.taught_as.push(name);
@@ -1655,7 +1670,7 @@ router.get("/reports/demo-training", requireAuth, requireRole("admin"), async (_
   // TRAINING_ evaluation) and after deployment -- see demoKindOf() in connectors/demoTraining.ts.
   type Kind = "demo_training" | "demo_deployed" | "ai_training" | "ai_deployed";
   type Cell = Record<Kind, Stat | null>;
-  const courses = new Map<string, { course_id: string; title: string; subject: string; demo_instructors: number; ai_instructors: number; total: number; order: number }>();
+  const courses = new Map<string, { course_id: string; title: string; subject: string; semester: number | null; demo_instructors: number; ai_instructors: number; total: number; order: number }>();
   const cellsByUid = new Map<string, Record<string, Cell>>();
   for (const t of demoRows) {
     const person = byUid.get(t.instructorUserId);
@@ -1673,7 +1688,7 @@ router.get("/reports/demo-training", requireAuth, requireRole("admin"), async (_
       avg_long: t.scoredLong > 0 ? Math.round((t.scoreSumLong / t.scoredLong) * 10) / 10 : null, repeats: t.repeats, repeats_long: t.repeatsLong };
     cells[key] = cell;
     cellsByUid.set(t.instructorUserId, cells);
-    const c = courses.get(key) ?? { course_id: key, title: t.courseTitle, subject: t.courseSubject, demo_instructors: 0, ai_instructors: 0, total: t.lecturesTotal,
+    const c = courses.get(key) ?? { course_id: key, title: t.courseTitle, subject: t.courseSubject, semester: semesterOfColumn(t.courseKey), demo_instructors: 0, ai_instructors: 0, total: t.lecturesTotal,
       order: LECTURE_COURSES.findIndex((x) => x.key === t.courseKey) };
     if (kind.startsWith("demo")) c.demo_instructors += 1; else c.ai_instructors += 1;
     courses.set(key, c);

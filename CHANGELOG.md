@@ -23,6 +23,15 @@ Commit messages stay short (title + 2-3 lines); this file is the detailed record
 | Deployed - Readiness tab (subjects, semesters, rules) | `artifacts/api-server/src/lib/connectors/deployedReadiness.ts`; page: `artifacts/instructor-crm/src/pages/deployed-readiness.tsx` |
 | One-off read-only checks | `artifacts/api-server/src/lib/connectors/_tmp_*.ts` |
 
+## 2026-11-28 -- Semester buttons on Training - LP, Training - Demos and Taught in Class
+
+Per request ("show Sem 1 ... Sem 6 separately -- the subjects of that semester and their rate of completion"). A row of buttons on top of each view: **All semesters** (the view as before) and **Sem 1 ... Sem 6**, each with its number of courses (dimmed at 0, e.g. Sem 5 today).
+- Training - LP: the buttons replace the Semester dropdown; the Tech / Maths and Aptitude / English sub-tabs stay below them. A semester narrows the course columns, the instructors (only subjects with courses that semester) and the completion tables to that semester. New column **Avg completion** in "Completion by subject" / "by product": the average of the instructors' completion % (instructors with no synced data left out). A tab with no courses that semester says so.
+- Training - Demos: a semester narrows the subject buttons and course columns to that semester, and adds "Semester N -- average completion by subject": per subject, the instructors with a demo or AI assessment on its semester courses and the average % of the semester's lectures covered -- in-training demos, demos after deployment, in-training AI assessments, AI assessments after deployment (demos: 10+ minute ones).
+- Taught in Class: the same, with "Semester N -- average % taught by subject" (class sessions taught / the courses' class sessions, averaged over the instructors who taught any of them).
+- Course semesters: lecture-list courses from `LECTURE_SEMESTER`, learning-portal courses from `PORTAL_COURSE_SEMESTER` in `routes/reports.ts` (same values as `COURSE_SEMESTER` in training-stats.tsx -- change both together).
+- Files: `artifacts/instructor-crm/src/pages/semester-buttons.tsx` (new), `training-stats.tsx`, `demo-training.tsx`, `taught-training.tsx`; `artifacts/api-server/src/routes/reports.ts` (`semester` on the demo / taught course columns). After pull: typecheck + Publish.
+
 ## 2026-11-28 -- Lecture lists for the Semester 4 and 6 courses (Demos, Taught in Class, Readiness)
 
 Per request ("add the new Sem 4 / Sem 6 subjects to Training - LP, Training - Demos, Taught in Class and all the other tables"). 13 courses, 322 lectures, built with `_tmp_build_sem46_lectures.ts` from the prod sequence (Semester 4: CDU Batch-1; Semester 6: KKH Batch-2), lectures in prod order:
