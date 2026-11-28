@@ -1467,8 +1467,11 @@ router.get("/reports/training-stats", requireAuth, requireRole("admin"), async (
   const statusRows = await db.select().from(instructorTrainingStatusTable);
   // NIAT cohort per instructor (2026-10-17, per request) -- the same Contribution column -- so the Training tab can tell which semester
   // each person teaches now (NIAT 2026 = Sem 1, 2025 = Sem 3, 2024 = Sem 5) and how ready they are for the next one.
-  const cohortRows = await db.select({ id: instructorContributionTable.instructorUserId, niatCohorts: instructorContributionTable.niatCohorts }).from(instructorContributionTable);
+  const cohortRows = await db.select({ id: instructorContributionTable.instructorUserId, niatCohorts: instructorContributionTable.niatCohorts, sessionSubjects: instructorContributionTable.sessionSubjects }).from(instructorContributionTable);
   const cohortsByTeachosId = new Map(cohortRows.map((c) => [c.id, c.niatCohorts]));
+  // Subjects they TEACH (2026-11-28, per request: "whatever subjects they are teaching, they should also be shown under that subject in
+  // Training - LP"): Contribution's session subjects -- completed sessions in the last 30 days per subject (__unmatched left out).
+  const teachingByTeachosId = new Map(cohortRows.map((c) => [c.id, Object.entries(c.sessionSubjects ?? {}).filter(([k, n]) => k !== "__unmatched" && n > 0).map(([k]) => k)]));
   // instructor_user_id (BigQuery's own hex ID) -> courseKey -> that row.
   // Joined here, at read time, against instructorsTable.teachosUserId --
   // the same key reconcileCapabilityManager() already uses to match this
@@ -1529,6 +1532,7 @@ router.get("/reports/training-stats", requireAuth, requireRole("admin"), async (
       courses,
       course_progress: courseProgress,
       niat_cohorts: p.teachosUserId ? (cohortsByTeachosId.get(p.teachosUserId) ?? []) : [],
+      teaching_subjects: p.teachosUserId ? (teachingByTeachosId.get(p.teachosUserId) ?? []) : [],
     };
   });
 

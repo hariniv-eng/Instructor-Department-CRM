@@ -23,6 +23,14 @@ Commit messages stay short (title + 2-3 lines); this file is the detailed record
 | Deployed - Readiness tab (subjects, semesters, rules) | `artifacts/api-server/src/lib/connectors/deployedReadiness.ts`; page: `artifacts/instructor-crm/src/pages/deployed-readiness.tsx` |
 | One-off read-only checks | `artifacts/api-server/src/lib/connectors/_tmp_*.ts` |
 
+## 2026-11-28 -- Training - LP: instructors shown under every subject they learn or teach
+
+Per request ("an instructor who has learned several subjects has to be shown in each -- part of Frontend done: shown in Frontend; part of GenAI: in GenAI too"; and "whatever subjects they are teaching, they should also be mapped to that subject"). Before, each instructor appeared only under their mapped subject, so e.g. only 2 people showed under Semester 6 although 19 teach KKH's Semester 6.
+- An instructor's subjects = mapped subject + every subject whose learning-portal courses they have started (In Progress / Completed) + every subject they taught completed sessions in over the last 30 days (Contribution's session subjects). People with no mapped subject now appear too.
+- Sub-tabs, the Subject filter, the semester buttons and "Completion by subject" use all of them; in "Completion by subject" each person counts under each of their subjects, measured on that subject's courses. "Completion by product" still uses the mapped subject.
+- Subject column: the mapped subject, plus blue chips for the other subjects ("GenAI · learning", "AI & ET · teaching"); also in the CSV ("Also under").
+- Files: `artifacts/api-server/src/routes/reports.ts` (`/reports/training-stats`: `teaching_subjects`), `artifacts/instructor-crm/src/pages/training-stats.tsx` (`subjectSourcesOf`, `tallyCompletion`). After pull: typecheck + Publish.
+
 ## 2026-11-28 -- Semester buttons on Training - LP, Training - Demos and Taught in Class
 
 Per request ("show Sem 1 ... Sem 6 separately -- the subjects of that semester and their rate of completion"). A row of buttons on top of each view: **All semesters** (the view as before) and **Sem 1 ... Sem 6**, each with its number of courses (dimmed at 0, e.g. Sem 5 today).

@@ -73,6 +73,8 @@ export type TrainingStatsRow = {
   course_progress?: Record<string, number>;
   // NIAT cohort(s) this person teaches now (2026-10-17) -- the Contribution column.
   niat_cohorts?: string[];
+  // Subjects they taught completed sessions in, last 30 days (2026-11-28) -- Contribution's session subjects.
+  teaching_subjects?: string[];
 };
 
 type TrainingStatsResponse = {
@@ -131,6 +133,29 @@ export const SUBJECT_TRACK: Record<string, string> = {
   'CS Core': 'CS Core',
   'Emerging Tech': 'Emerging Tech',
 };
+
+// Every subject an instructor belongs to (2026-11-28, per request: "an instructor who has learned / teaches several subjects has to be shown
+// under each of them -- if he has done part of Frontend he is shown in Frontend, part of GenAI in GenAI too"): their mapped subject, every
+// subject whose learning-portal courses they have started (a course In Progress or Completed), and every subject they taught completed
+// sessions in over the last 30 days (Contribution). Each subject's completion is measured on that subject's own courses.
+const TRACK_TO_SUBJECT: Record<string, string> = Object.fromEntries(Object.entries(SUBJECT_TRACK).map(([subject, track]) => [track, subject]));
+export type SubjectSource = 'mapped' | 'learning' | 'teaching';
+export function subjectSourcesOf(row: TrainingStatsRow, taxonomy: TrainingCourseDef[]): Map<string, SubjectSource[]> {
+  const out = new Map<string, SubjectSource[]>();
+  const add = (subject: string | null | undefined, source: SubjectSource) => {
+    if (!subject) return;
+    const list = out.get(subject) ?? [];
+    if (!list.includes(source)) list.push(source);
+    out.set(subject, list);
+  };
+  add(row.subject_area, 'mapped');
+  for (const def of taxonomy) {
+    const status = row.courses[def.key];
+    if (status === 'COMPLETED' || status === 'IN_PROGRESS' || (row.course_progress?.[def.key] ?? 0) > 0) add(TRACK_TO_SUBJECT[def.trackGroup], 'learning');
+  }
+  for (const subject of row.teaching_subjects ?? []) if (SUBJECT_TRACK[subject]) add(subject, 'teaching');
+  return out;
+}
 
 // Groups the flat taxonomy list into [{ trackGroup, defs }] in taxonomy
 // order, for the two-row grouped header below.
@@ -260,10 +285,13 @@ function readinessOf(row: TrainingStatsRow, taxonomy: TrainingCourseDef[]): Read
 }
 const readinessText = (it: ReadinessItem) => `Sem ${it.next}: ${it.pct !== null ? `${Math.round(it.pct * 10) / 10}%` : READINESS_LABEL[it.status]}`;
 
-function tallyCompletion(rows: TrainingStatsRow[], taxonomy: TrainingCourseDef[]): CompletionTally {
+// subject (2026-11-28): measure every row on THIS subject's courses (the subject table, where an instructor counts under each of their
+// subjects); without it, each row on its own mapped subject (the product table).
+function tallyCompletion(rows: TrainingStatsRow[], taxonomy: TrainingCourseDef[], subject?: string): CompletionTally {
   const tally: CompletionTally = { total: 0, completed: 0, atLeast80: 0, atLeast50: 0, inProgress: 0, notStarted: 0, noData: 0, untracked: 0, pctSum: 0, pctN: 0 };
   for (const row of rows) {
-    const track = row.subject_area ? SUBJECT_TRACK[row.subject_area] : undefined;
+    const subj = subject ?? row.subject_area;
+    const track = subj ? SUBJECT_TRACK[subj] : undefined;
     const defs = track ? taxonomy.filter((def) => def.trackGroup === track) : [];
     if (defs.length === 0) { tally.untracked += 1; continue; }
     tally.total += 1;
@@ -434,7 +462,10 @@ function LearningPortalStats() {
   const semText = semSel.length === 1 ? `Semester ${semSel[0]}` : `Semesters ${semSel.join(', ')}`;
   const semTaxonomy = semesterActive ? activeTaxonomy.filter((d) => semSel.includes(COURSE_SEMESTER[d.key])) : activeTaxonomy;
   // With a semester chosen, only instructors whose subject HAS courses in that semester are listed (a DSA instructor has nothing in Sem 1).
-  const hasSemCourses = (row: TrainingStatsRow) => !semesterActive || (!!row.subject_area && semTaxonomy.some((d) => d.trackGroup === SUBJECT_TRACK[row.subject_area!]));
+  // An instructor's subjects (mapped + learning + teaching, 2026-11-28) -- worked out once per row.
+  const sourcesByRow = useMemo(() => new Map((data?.rows ?? []).map((row) => [row, subjectSourcesOf(row, data?.taxonomy ?? [])])), [data]);
+  const subjectsOfRow = (row: TrainingStatsRow) => [...(sourcesByRow.get(row)?.keys() ?? [])];
+  const hasSemCourses = (row: TrainingStatsRow) => !semesterActive || subjectsOfRow(row).some((subj) => (!subjectActive || subjectSel.includes(subj)) && semTaxonomy.some((d) => d.trackGroup === SUBJECT_TRACK[subj]));
   // Each tab shows only ITS OWN subject's instructors (2026-09-24, per
   // request -- see the big comment above SUB_TABS). "TECH" resolves against
   // the server-supplied tech_areas list; the other tabs use their own static
@@ -442,7 +473,10 @@ function LearningPortalStats() {
   // per tab so page 2 of Tech doesn't carry over confusingly into Math and
   // Aptitude's row list.
   const activeSubjectAreas = activeSubTab.subjectAreas === 'TECH' ? (data?.tech_areas ?? []) : activeSubTab.subjectAreas;
-  const activeRows = data ? data.rows.filter((row) => row.subject_area !== null && activeSubjectAreas.includes(row.subject_area)) : [];
+  // A row is on this tab when ANY of its subjects belongs here (2026-11-28) -- a Frontend instructor who has started GenAI courses is on
+  // Tech under both; one who teaches English is also on the English tab.
+  const onTab = (subj: string) => activeSubjectAreas.includes(subj) || activeSubTab.trackGroups.includes(SUBJECT_TRACK[subj]);
+  const activeRows = data ? data.rows.filter((row) => subjectsOfRow(row).some(onTab)) : [];
   // Search box (2026-09-24, per request: "where ever there are tables in
   // the application add search option to search for any person") -- matches
   // name or employee ID, same two fields the Instructors tab's own search
@@ -451,7 +485,7 @@ function LearningPortalStats() {
   // whole roster.
   const [search, setSearch] = useState('');
   // Subject filter: the subjects present on this tab, and the rows of the chosen one.
-  const subjectOptions = useMemo(() => [...new Set(activeRows.map((row) => row.subject_area).filter((area): area is string => !!area))].sort(), [activeRows]);
+  const subjectOptions = useMemo(() => [...new Set(activeRows.flatMap((row) => subjectsOfRow(row).filter(onTab)))].sort(), [activeRows]); // eslint-disable-line react-hooks/exhaustive-deps
   const subjectSel = subjects.filter((name) => subjectOptions.includes(name));
   const subjectActive = subjectSel.length > 0;
   const subjectText = subjectSel.join(', ');
@@ -461,7 +495,7 @@ function LearningPortalStats() {
   const productText = productSel.join(', ');
   const subjectRows = useMemo(() => {
     const byProduct = productActive ? activeRows.filter((row) => productSel.includes(row.product)) : activeRows;
-    return (subjectActive ? byProduct.filter((row) => subjectSel.includes(row.subject_area ?? '')) : byProduct).filter(hasSemCourses);
+    return (subjectActive ? byProduct.filter((row) => subjectsOfRow(row).some((subj) => subjectSel.includes(subj))) : byProduct).filter(hasSemCourses);
   }, [activeRows, subjects, products, subjectOptions, productOptions, semesterActive, semTaxonomy]);
   const selectedTracks = subjectSel.map((name) => SUBJECT_TRACK[name]).filter(Boolean);
   const trackTaxonomy = selectedTracks.length ? semTaxonomy.filter((d) => selectedTracks.includes(d.trackGroup)) : [];
@@ -473,14 +507,14 @@ function LearningPortalStats() {
   const bySize = (a: { name: string; tally: CompletionTally }, b: { name: string; tally: CompletionTally }) => b.tally.total - a.tally.total || a.name.localeCompare(b.name);
   const subjectBreakdown = useMemo(() => {
     const byProduct = productActive ? activeRows.filter((row) => productSel.includes(row.product)) : activeRows;
-    const all = subjectOptions.map((name) => ({ name, tally: tallyCompletion(byProduct.filter((row) => row.subject_area === name), semTaxonomy) }));
+    const all = subjectOptions.map((name) => ({ name, tally: tallyCompletion(byProduct.filter((row) => subjectsOfRow(row).includes(name)), semTaxonomy, name) }));
     return {
       rows: all.filter((entry) => entry.tally.total > 0).sort(bySize),
       untracked: all.filter((entry) => entry.tally.total === 0 && entry.tally.untracked > 0).map((entry) => `${entry.name} (${formatKpi(entry.tally.untracked)})`),
     };
   }, [activeRows, subjectOptions, products, productOptions, semTaxonomy]);
   const productBreakdown = useMemo(() => {
-    const bySubject = subjectActive ? activeRows.filter((row) => subjectSel.includes(row.subject_area ?? '')) : activeRows;
+    const bySubject = subjectActive ? activeRows.filter((row) => subjectsOfRow(row).some((subj) => subjectSel.includes(subj))) : activeRows;
     return productOptions.map((name) => ({ name, tally: tallyCompletion(bySubject.filter((row) => row.product === name), semTaxonomy) })).filter((entry) => entry.tally.total > 0).sort(bySize);
   }, [activeRows, productOptions, subjects, subjectOptions, semTaxonomy]);
   // Readiness table: one row per move (Sem 1 -> 2, 3 -> 4, 5 -> 6) over the rows the filters leave (not search); someone teaching two
@@ -506,9 +540,11 @@ function LearningPortalStats() {
       const label = status === 'COMPLETED' ? 'Completed' : status === 'IN_PROGRESS' ? 'In Progress' : status === 'NOT_STARTED' ? 'Not Started' : 'Mapping pending';
       return (status === 'IN_PROGRESS' || status === 'COMPLETED') && progress !== undefined ? `${label} (${Math.round(progress)}%)` : label;
     };
-    const headers = ['Employee ID', 'Name', 'Department', 'Subject', 'Product', 'Capability Manager', 'Teaching now (semester)', 'Next-semester readiness', ...displayTaxonomy.map((def) => `${def.trackGroup} - ${def.label}`), ...groups.map((group) => `${semesterActive ? semText : 'Subject'} completion % - ${group.trackGroup}`)];
+    const headers = ['Employee ID', 'Name', 'Department', 'Subject', 'Also under (learning / teaching)', 'Product', 'Capability Manager', 'Teaching now (semester)', 'Next-semester readiness', ...displayTaxonomy.map((def) => `${def.trackGroup} - ${def.label}`), ...groups.map((group) => `${semesterActive ? semText : 'Subject'} completion % - ${group.trackGroup}`)];
     const rows = searchedRows.map((row) => [
-      row.employee_id, row.full_name, row.department, row.subject_area, row.product, row.capability_manager,
+      row.employee_id, row.full_name, row.department, row.subject_area,
+      [...(sourcesByRow.get(row) ?? new Map<string, SubjectSource[]>())].filter(([subj]) => subj !== row.subject_area).map(([subj, src]) => `${subj} (${src.join(' + ')})`).join('; '),
+      row.product, row.capability_manager,
       readinessOf(row, data?.taxonomy ?? []).map((it) => `Sem ${it.sem}`).join(', '), readinessOf(row, data?.taxonomy ?? []).map(readinessText).join('; '),
       ...displayTaxonomy.map((def) => statusText(row.courses[def.key] ?? 'NO_DATA', row.course_progress?.[def.key])),
       ...groups.map((group) => { const pct = subjectCompletion(row, group.defs); return pct === null ? '' : Math.round(pct * 10) / 10; }),
@@ -551,7 +587,7 @@ function LearningPortalStats() {
     {data && <div data-testid="training-filters" className="-mt-3 mb-6 flex flex-wrap items-center gap-4">
       {subjectOptions.length > 1 && <MultiSelectFilter
         label="Subject"
-        options={subjectOptions.map((name) => ({ key: name, label: name, count: activeRows.filter((row) => row.subject_area === name).length }))}
+        options={subjectOptions.map((name) => ({ key: name, label: name, count: activeRows.filter((row) => subjectsOfRow(row).includes(name)).length }))}
         selected={subjectSel}
         onChange={setSubjects}
         testId="select-training-subject"
@@ -677,7 +713,11 @@ function LearningPortalStats() {
                 <td className="sticky left-0 z-10 whitespace-nowrap border-r border-border bg-card px-4 py-3 text-[12px] font-semibold text-foreground">{row.full_name}</td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 font-mono-ui text-[11px] text-foreground">{row.employee_id || '—'}</td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-muted-foreground">{row.department || '—'}</td>
-                <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-foreground" data-testid={`cell-subject-${row.employee_id ?? row.full_name}`}>{row.subject_area || '—'}</td>
+                <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-foreground" data-testid={`cell-subject-${row.employee_id ?? row.full_name}`}>
+                  <div>{row.subject_area || '—'}</div>
+                  {(() => { const extra = [...(sourcesByRow.get(row) ?? new Map<string, SubjectSource[]>())].filter(([subj]) => subj !== row.subject_area);
+                    return extra.length > 0 && <div className="mt-1 flex flex-wrap gap-1">{extra.map(([subj, src]) => <span key={subj} title={`Also counted under ${subj}: ${src.join(' + ')}`} className="rounded-full bg-[#e6f0fb] px-2 py-0.5 text-[10px] font-bold text-[#2b59c3]">{subj === 'Artificial Intelligence & Emerging Technologies' ? 'AI & ET' : subj} · {src.join(' + ')}</span>)}</div>; })()}
+                </td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-foreground" data-testid={`cell-product-${row.employee_id ?? row.full_name}`}>{row.product || '—'}</td>
                 <td className="whitespace-nowrap border-r border-border px-4 py-3 text-[12px] text-muted-foreground">{row.capability_manager || '—'}</td>
                 {(() => {
