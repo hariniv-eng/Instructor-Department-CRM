@@ -23,6 +23,11 @@ Commit messages stay short (title + 2-3 lines); this file is the detailed record
 | Deployed - Readiness tab (subjects, semesters, rules) | `artifacts/api-server/src/lib/connectors/deployedReadiness.ts`; page: `artifacts/instructor-crm/src/pages/deployed-readiness.tsx` |
 | One-off read-only checks | `artifacts/api-server/src/lib/connectors/_tmp_*.ts` |
 
+## 2026-11-28 -- Deployed - Readiness: NIAT Chevella's year-long semesters converted
+
+Per request: NIAT Chevella counts a whole YEAR as one semester (= two normal semesters). Chevella semester N now counts as normal semester 2N - 1 in the first half of its dates and 2N in the second half. Checked on its subjects: Chevella "Semester 2" (Aug 2026 - Jul 2027) teaches DAA, Back End Development, AI for Finance, Probability and Statistics, Logical Reasoning and Applied Communicative Skills -- the common Semester 3 courses -- so today its instructors are under Semester 3, readiness for Semester 4 (switching to Semester 4 -> 5 at the middle of the year). Aurora (four terms a year) is not converted yet; its rows say so. The Campus column shows the note in amber; the CSV has a "Semester note" column.
+- Files: `artifacts/api-server/src/lib/connectors/deployedReadiness.ts` (`fetchBatchSemesters`), `artifacts/instructor-crm/src/pages/deployed-readiness.tsx`. After pull: typecheck + Publish.
+
 ## 2026-11-28 -- Deployed - Readiness: tabs per running semester, campus filter
 
 Per request ("show tabs for the semesters running now in the campuses -- Sem 1, 3, 4, 6 -- and for each, who teaches it and their readiness for the next semester; plus a campus filter").

@@ -24,6 +24,8 @@ type Row = {
   // campuses / batches (2026-11-28): where they teach this semester; semester_from: the batches' current semester in the prod sequence, or the
   // NIAT cohort shortcut when they had no lectures; semester_end: the earliest end date of those batches' current semester.
   cohort: string; campuses: string[]; batches: string[]; semester_from: 'batch schedule' | 'cohort'; semester_end: string | null;
+  // semester_note (2026-11-28): how a campus's own semester was converted, e.g. Chevella (year-long semesters), or Aurora (terms, not converted).
+  semester_note: string | null;
   current_sem: number; next_sem: number; subject: string; source: Source; evidence: string | null;
   lectures_30d: number; lectures_60d: number; current: Block | null; next: Block | null; courses: Course[];
 };
@@ -176,9 +178,9 @@ export function DeployedReadinessView() {
   const siblings = (r: Row) => apiRows.filter((x) => (x.employee_id ?? x.full_name) === (r.employee_id ?? r.full_name) && x.cohort === r.cohort);
 
   const downloadTable = () => {
-    const headers = ['Name', 'Employee ID', 'Role by sessions', 'Role window (days)', 'Capability Manager', 'Campus', 'Batches', 'Semester from', 'Current semester ends', 'Current semester', 'Next semester', 'Subject', 'Subject from', 'Other-subject evidence', `Lectures in subject (${days}d)`, `Lectures in subject (${fallback}d)`,
+    const headers = ['Name', 'Employee ID', 'Role by sessions', 'Role window (days)', 'Capability Manager', 'Campus', 'Batches', 'Semester from', 'Current semester ends', 'Semester note', 'Current semester', 'Next semester', 'Subject', 'Subject from', 'Other-subject evidence', `Lectures in subject (${days}d)`, `Lectures in subject (${fallback}d)`,
       ...(['next', 'current'] as Which[]).flatMap((w) => { const p = w === 'next' ? 'Next sem' : 'Current sem'; return [`${p} lectures`, `${p} lectures with demo + AI`, `${p} % done`, `${p} demo avg`, `${p} lectures with demo`, `${p} demo colour`, `${p} AI avg`, `${p} lectures with AI`, `${p} AI colour`, `${p} Top-N %`, `${p} Top-N exams`, `${p} Top-N colour`, `${p} category`]; })];
-    const rows = searched.map((r) => [r.full_name, r.employee_id ?? '', r.role, r.role_days, r.capability_manager ?? '', r.campuses.join('; '), r.batches.join('; ') || r.cohort, r.semester_from, r.semester_end ?? '', r.current_sem, r.next_sem, r.subject, SOURCE_LABEL[r.source], r.evidence ?? '', r.lectures_30d, r.lectures_60d,
+    const rows = searched.map((r) => [r.full_name, r.employee_id ?? '', r.role, r.role_days, r.capability_manager ?? '', r.campuses.join('; '), r.batches.join('; ') || r.cohort, r.semester_from, r.semester_end ?? '', r.semester_note ?? '', r.current_sem, r.next_sem, r.subject, SOURCE_LABEL[r.source], r.evidence ?? '', r.lectures_30d, r.lectures_60d,
       ...(['next', 'current'] as Which[]).flatMap((w) => { const b = blockOf(r, w); return b ? [b.lectures_total, b.both_lectures, b.lectures_total ? Math.round((b.both_lectures / b.lectures_total) * 100) : 0, b.demo_avg ?? '', b.demo_lectures, LABEL[b.demo_colour], b.ai_avg ?? '', b.ai_lectures, LABEL[b.ai_colour], b.topn_avg ?? '', b.topn_exams, LABEL[b.topn_colour], LABEL[b.overall]] : ['', '', '', '', '', '', '', '', '', '', '', '', 'Not scored']; })]);
     downloadCsv(`deployed-readiness-${sem === 'all' ? 'all' : `sem-${sem}`}.csv`, toCsv(headers, rows));
   };
@@ -283,6 +285,7 @@ export function DeployedReadinessView() {
                       <td className={td} title={r.batches.length ? `Batches: ${r.batches.join(', ')}` : 'No lectures in 60 days -- semester from the NIAT cohort'}>
                         <div>{r.campuses.length ? r.campuses.join(', ') : r.cohort}</div>
                         <div className="text-[10px] text-muted-foreground">Sem {r.current_sem} → {r.next_sem}{r.semester_end ? ` · Sem ${r.current_sem} ends ${new Date(`${r.semester_end}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}` : ''}{r.semester_from === 'cohort' ? ' · from cohort' : ''}</div>
+                        {r.semester_note && <div className="text-[10px] font-semibold text-[#8a6212]">{r.semester_note}</div>}
                       </td>
                       <td className={td}>
                         <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${r.source === 'other subject' ? 'bg-[#e6f0fb] text-[#2b59c3]' : 'bg-secondary text-foreground'}`}>{r.subject}</span>

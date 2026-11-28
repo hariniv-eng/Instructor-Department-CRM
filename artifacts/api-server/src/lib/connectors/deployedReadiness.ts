@@ -44,7 +44,7 @@ export type DeployedReadinessRow = {
   employee_id: string | null; full_name: string; capability_manager: string | null; role: "Instructor" | "Mentor" | "No sessions"; role_days: number;
   // cohort: label of the batches (or the NIAT cohort when they had no lectures); campuses / batches they teach in this semester; semester_from:
   // "batch schedule" = the batches' current semester in the prod sequence, "cohort" = the NIAT 2026 / 2025 / 2024 shortcut (no lectures).
-  cohort: string; campuses: string[]; batches: string[]; semester_from: "batch schedule" | "cohort"; semester_end: string | null;
+  cohort: string; campuses: string[]; batches: string[]; semester_from: "batch schedule" | "cohort"; semester_end: string | null; semester_note: string | null;
   current_sem: number; next_sem: number;
   subject: string; source: "teaching" | "teaching (60 days)" | "mapped subject" | "other subject" | "none"; evidence: string | null;
   lectures_30d: number; lectures_60d: number;
@@ -54,7 +54,13 @@ export type DeployedReadinessRow = {
 // Current semester of every batch (2026-11-28, per request: "show tabs for the semesters running now in the universities -- Sem 1, 3, 4, 6 --
 // and for each, the readiness for the NEXT semester; plus a campus filter"). From niat_schedule_details_as_per_prod_sequence: the semester
 // flagged is_current_semester, else the one whose dates include today, else the latest one already started. Key: batch name, lower case.
-type BatchSem = { sem: number; campus: string; end: string | null };
+// NIAT Chevella (2026-11-28, per request): one Chevella semester is a whole YEAR = two normal semesters, so Chevella semester N counts as
+// normal semester 2N - 1 in the first half of its dates and 2N in the second half (end = the middle of the year in the first half).
+// Checked on its subjects: Chevella "Semester 2" (Aug 2026 - Jul 2027) teaches DAA, Back End Development, AI for Finance, Probability and
+// Statistics, Logical Reasoning, Applied Communicative Skills -- the common Semester 3 courses -- so today it is Semester 3, next Semester 4.
+// Aurora (four terms a year) is kept as it is for now -- its term numbers are NOT converted (note says so).
+const CHEVELLA = /chevella/i, AURORA = /aurora/i;
+type BatchSem = { sem: number; campus: string; end: string | null; note: string | null };
 async function fetchBatchSemesters(bq: BigQuery, P: string, DS: string): Promise<Map<string, BatchSem>> {
   const [rows] = await runWithHardTimeout(() => bq.query({ query: `SELECT batch_name AS b, ANY_VALUE(institute_name) AS i, semester_title AS s,
       MAX(SAFE_CAST(CAST(is_current_semester AS STRING) AS INT64)) AS cur, CAST(MIN(semester_start_date) AS STRING) AS st, CAST(MAX(semester_end_date) AS STRING) AS en
@@ -69,13 +75,23 @@ async function fetchBatchSemesters(bq: BigQuery, P: string, DS: string): Promise
     if (!rank) continue;
     const k = plain(r.b).trim().toLowerCase();
     const prev = best.get(k);
-    if (!prev || rank > prev.rank || (rank === prev.rank && st > prev.st)) best.set(k, { rank, st, v: { sem, campus: plain(r.i), end: en || null } });
+    if (!prev || rank > prev.rank || (rank === prev.rank && st > prev.st)) best.set(k, { rank, st, v: { sem, campus: plain(r.i), end: en || null, note: null } });
+  }
+  for (const [k, x] of best) {
+    const v = x.v, label = `${k} ${v.campus}`;
+    if (CHEVELLA.test(label) && x.st && v.end) {
+      const mid = new Date((new Date(`${x.st}T00:00:00Z`).getTime() + new Date(`${v.end}T00:00:00Z`).getTime()) / 2).toISOString().slice(0, 10);
+      const first = today <= mid;
+      x.v = { ...v, sem: first ? 2 * v.sem - 1 : 2 * v.sem, end: first ? mid : v.end, note: `Chevella Semester ${v.sem} (a full year) = Semester ${first ? 2 * v.sem - 1 : 2 * v.sem} (${first ? "first" : "second"} half)` };
+    } else if (AURORA.test(label)) {
+      x.v = { ...v, note: `Aurora term ${v.sem} (four terms a year -- not converted yet)` };
+    }
   }
   return new Map([...best].map(([k, x]) => [k, x.v]));
 }
 
 // Lectures per `${uid}|${current semester of the batch}` and subject (last 30 / 60 days), and the campuses / batches behind each key.
-type Lectures = { by30: Map<string, Map<string, number>>; by60: Map<string, Map<string, number>>; where: Map<string, { campuses: Set<string>; batches: Set<string>; end: string | null; fromCohort: boolean }> };
+type Lectures = { by30: Map<string, Map<string, number>>; by60: Map<string, Map<string, number>>; where: Map<string, { campuses: Set<string>; batches: Set<string>; end: string | null; fromCohort: boolean; notes: Set<string> }> };
 let lecCache: { at: number; data: Lectures } | null = null;
 /** Completed LECTURE sessions in the last 60 days per `${uid}|${semester}` and subject (30-day counts separately). Cached 10 minutes. */
 async function fetchSemesterLectures(force: boolean): Promise<Lectures> {
@@ -109,7 +125,8 @@ async function fetchSemesterLectures(force: boolean): Promise<Lectures> {
     const k = `${plain(r.u)}|${sem}`;
     if (Number(plain(r.n)) > 0) add(by30, k, s, Number(plain(r.n)));
     add(by60, k, s, Number(plain(r.n60)));
-    const w = where.get(k) ?? { campuses: new Set<string>(), batches: new Set<string>(), end: null, fromCohort: false };
+    const w = where.get(k) ?? { campuses: new Set<string>(), batches: new Set<string>(), end: null, fromCohort: false, notes: new Set<string>() };
+    if (bs?.note) w.notes.add(bs.note);
     w.campuses.add(bs?.campus || plain(r.i) || "(unknown campus)"); w.batches.add(batch);
     if (bs?.end && (!w.end || bs.end < w.end)) w.end = bs.end;
     if (!bs) w.fromCohort = true;
@@ -175,6 +192,7 @@ export async function buildDeployedReadiness(people: InstructorRow[], force = fa
           role, role_days: use60 ? LECTURE_DAYS_FALLBACK : LECTURE_DAYS,
           cohort: cohortLabel ?? (batches.length ? batches.join(", ") : `Semester ${cur}`), campuses: cohortLabel ? [] : campuses, batches,
           semester_from: cohortLabel || where?.fromCohort ? "cohort" : "batch schedule", semester_end: where?.end ?? null,
+          semester_note: where?.notes.size ? [...where.notes].join("; ") : null,
           current_sem: cur, next_sem: next,
           subject: s, source, evidence, lectures_30d: t30.get(s) ?? 0, lectures_60d: t60.get(s) ?? 0,
           current: rd.semesters[String(cur)] ?? null, next: rd.semesters[String(next)] ?? null,
